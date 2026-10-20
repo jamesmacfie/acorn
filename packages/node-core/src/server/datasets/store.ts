@@ -3,7 +3,7 @@ import type { DataField } from '@acorn/protocol/dataBindings.ts'
 import type { DataSchema } from '@acorn/protocol/dataSchemas.ts'
 import { canonicalDataEncoding, MISSING, readDataPointer, type DataValue } from '@acorn/protocol/dataValues.ts'
 import { validateDataValue } from '@acorn/protocol/dataSchemas.ts'
-import type { DatasetCreate, DatasetWrite } from '@acorn/protocol/datasets.ts'
+import type { DatasetCreate, DatasetRefresh, DatasetWrite } from '@acorn/protocol/datasets.ts'
 import type { AppDatabase } from '../db'
 import { sourceFieldSchema } from '../dataSources/validation'
 
@@ -62,10 +62,12 @@ export function listDatasets(db: AppDatabase, workspaceId: string, projectId?: s
       .prepare(`SELECT finished_at AS finishedAt, complete, reason, row_count AS rowCount
       FROM dataset_captures WHERE dataset_id = ? ORDER BY finished_at DESC LIMIT 1`)
       .get(row.id) as { finishedAt: number; complete: number; reason: string | null; rowCount: number } | undefined
+    const refresh = datasetRefresh(row)
     return {
       ...row,
       coverage: coverageForDataset(db, row.id),
       ...(capture ? { lastCapture: { ...capture, complete: !!capture.complete } } : {}),
+      ...(refresh ? { refresh } : {}),
     }
   })
 }
@@ -88,9 +90,16 @@ export function assertDatasetScope(dataset: DatasetDefinition, workspaceId: stri
     throw new DatasetError('forbidden')
 }
 
-/** Task writes target one project-owned definition; a workspace-wide read source is not a write grant. */
+/** How agents keep a workspace dataset up to date, which the person set when they created it. */
+export function datasetRefresh(dataset: DatasetDefinition): DatasetRefresh | null {
+  return dataset.feeder === 'agent' && !dataset.projectId ? (JSON.parse(dataset.feederConfig) as DatasetRefresh) : null
+}
+
+/** Task writes target one project: the dataset's own, or the one a workspace dataset's refresh names.
+ *  A workspace-wide read source is not otherwise a write grant. */
 export function assertDatasetWriteScope(dataset: DatasetDefinition, workspaceId: string, projectId: string): void {
-  if (dataset.workspaceId !== workspaceId || dataset.projectId !== projectId) throw new DatasetError('forbidden')
+  const writer = dataset.projectId ?? datasetRefresh(dataset)?.projectId
+  if (dataset.workspaceId !== workspaceId || writer !== projectId) throw new DatasetError('forbidden')
 }
 
 export function currentVersion(db: AppDatabase, dataset: DatasetDefinition): DatasetVersion {
@@ -138,7 +147,7 @@ export function createDataset(db: AppDatabase, input: DatasetCreate): DatasetDef
         input.name,
         input.mode,
         input.feeder,
-        JSON.stringify(input.captureQuery ?? null),
+        JSON.stringify(input.captureQuery ?? input.refresh ?? null),
         JSON.stringify(input.identityFields),
         input.eventTimeField ?? null,
         input.backfillFrom ?? null,
@@ -153,6 +162,7 @@ export function createDataset(db: AppDatabase, input: DatasetCreate): DatasetDef
         'INSERT INTO dataset_versions (dataset_id, version, schema_json, fields_json, created_at) VALUES (?, 1, ?, ?, ?)',
       )
       .run(id, JSON.stringify(input.schema), JSON.stringify(input.fields), now)
+    if (input.rows) writeDatasetRows(db, getDataset(db, id), { datasetId: id, version: 1, rows: input.rows }, now)
   })()
   return getDataset(db, id)
 }
@@ -316,6 +326,13 @@ export function writeDatasetRows(
       .get(dataset.id, dataset.id, dataset.id) as { rows: number; bytes: number }
     if (size.rows > dataset.maxRows || size.bytes > dataset.maxBytes)
       throw new DatasetError('capacity', 'Dataset cap exceeded.')
+    // An agent's write is its capture: the dataset's last one says when it was last refreshed.
+    if (dataset.feeder === 'agent')
+      db.$client
+        .prepare(`INSERT INTO dataset_captures
+        (id, dataset_id, started_at, finished_at, complete, reason, row_count, boundary_json)
+        VALUES (?, ?, ?, ?, 1, NULL, ?, NULL)`)
+        .run(randomUUID(), dataset.id, observationTime, Date.now(), rows.length)
     return rows.length
   })()
 }

@@ -50,7 +50,14 @@ When none of your data sources has what you asked for, the agent can gather the 
 the forecast for this week, or your commits across every repository on disk, and it reads a web page
 or runs `git log`, then draws what it found. The card says where the rows came from and when the
 agent read them, with a link to each page it read. Nothing refreshes those rows, so the panel has no
-refresh button, and **Add to dashboard** places it as a snapshot with the same line.
+refresh button. **Add to dashboard** offers two choices for it:
+
+- **Place as a snapshot** puts it on the tab as it is, with the same line.
+- **Keep it up to date** opens a sheet. Name the dataset, choose how it keeps rows, and optionally
+  choose **Every day at 09:00** or **Every hour** to refresh it on a schedule. **Create** stores the
+  rows as a dataset and puts a panel that reads it on the tab. The panel says when an agent last
+  refreshed it, and **Ask an agent to refresh** asks an agent in the same task for fresh rows. A
+  scheduled refresh that's late shows as a gap under the panel.
 
 The agent never adds a panel to a dashboard itself. A card runs only while it's on screen.
 

@@ -123,7 +123,8 @@ state** upserts an identity and marks missing records removed after a complete c
 event** retains stable event identities and arrival times; **daily snapshots** stores each identity
 at each capture time. A different mode needs a new dataset. The new dataset appears in Pick data as
 a core source. Settings → Datasets shows its feeder, size, 90-day default retention, caps, and
-coverage, and permits deletion.
+coverage, and permits deletion. An agent can keep a dataset from supplied rows
+([keeping it up to date](./dashboards/supplied-rows.md#keeping-it-up-to-date)).
 
 An event archive claims completeness only for source-proved or checkpoint-proved windows. Capture
 failures, schema mismatches, and uncovered windows remain visible as gaps. Dataset panels carry

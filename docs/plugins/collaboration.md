@@ -72,5 +72,7 @@ graph, and `_resetClientCapabilities` exists only for tests.
 A capability key lives with whichever side would otherwise have to import the other. On the Node that's
 almost always the provider. `WORKFLOW_CONTROL` is the exception: agents declares it, workflows
 provides it, and the id still names the provider, because agents draws the control and workflows
-already imports agents. Put the key where it doesn't recreate the import you were avoiding, and say
-which in its file.
+already imports agents. Core declares a key that core consumes and a plugin provides, because core
+can't import a plugin. `AGENT_ASK` and `AGENT_PROMPT_SCHEDULES`, which a kept dashboard panel reads,
+are the two. Put the key where it doesn't recreate the import you were avoiding, and say which in its
+file.

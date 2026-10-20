@@ -3,7 +3,7 @@ import { dataFieldsSchema, dataPointerSchema } from './values/dataBindings'
 import { parseDataSchema } from './values/dataSchemas'
 import { parseDataValue } from './values/dataValues'
 import { dataSourceQuerySchema } from './dataSources'
-import { panelPlanSchema } from '../dashboards/panels'
+import { panelPlanSchema, suppliedOriginSchema } from '../dashboards/panels'
 
 const id = z.string().min(1).max(200)
 const structure = z.unknown().transform((value, ctx) => {
@@ -24,6 +24,23 @@ const data = z.unknown().transform((value, ctx) => {
 })
 const datasetModeSchema = z.enum(['current-mirror', 'event-archive', 'snapshot-history'])
 const datasetFeederSchema = z.enum(['capture', 'workflow', 'agent'])
+const datasetRowSchema = z
+  .object({
+    data,
+    evidence: data.optional(),
+    reason: z.string().min(1).max(2048).optional(),
+  })
+  .strict()
+/** How agents keep a workspace dataset up to date: the project whose tasks may write it, the task to ask
+ *  on request, where its first rows came from, and how often a schedule refreshes it, in seconds. */
+const datasetRefreshSchema = z
+  .object({
+    projectId: id,
+    taskId: id,
+    origin: suppliedOriginSchema.omit({ readAt: true }),
+    every: z.number().int().min(60).max(604_800).optional(),
+  })
+  .strict()
 export const datasetCreateSchema = z
   .object({
     name: z.string().trim().min(1).max(120),
@@ -37,6 +54,9 @@ export const datasetCreateSchema = z
     eventTimeField: dataPointerSchema.optional(),
     backfillFrom: z.number().finite().optional(),
     captureQuery: dataSourceQuerySchema.optional(),
+    refresh: datasetRefreshSchema.optional(),
+    /** An agent dataset's first rows, written with it, so a failed row leaves no dataset behind. */
+    rows: z.array(datasetRowSchema).min(1).max(5000).optional(),
     retentionDays: z.number().int().min(1).max(3650).default(90),
     maxRows: z.number().int().min(1).max(2_000_000).default(500_000),
     maxBytes: z
@@ -59,8 +79,12 @@ export const datasetCreateSchema = z
       ctx.addIssue({ code: 'custom', message: 'Capture query required.' })
     if (value.feeder !== 'capture' && value.captureQuery)
       ctx.addIssue({ code: 'custom', message: 'Only a capture feeder can have a query.' })
-    if (value.feeder !== 'capture' && !value.projectId)
+    if (value.feeder !== 'capture' && !value.projectId && !value.refresh)
       ctx.addIssue({ code: 'custom', message: 'Task-fed datasets need a project.' })
+    if (value.refresh && (value.feeder !== 'agent' || value.projectId))
+      ctx.addIssue({ code: 'custom', message: 'Only a workspace agent dataset names the project that refreshes it.' })
+    if (value.rows && value.feeder !== 'agent')
+      ctx.addIssue({ code: 'custom', message: 'Only an agent dataset starts with rows.' })
     if (value.feeder === 'agent') {
       const properties = value.schema.properties ?? {}
       if (
@@ -82,18 +106,7 @@ export const datasetWriteSchema = z
   .object({
     datasetId: id,
     version: z.number().int().positive(),
-    rows: z
-      .array(
-        z
-          .object({
-            data,
-            evidence: data.optional(),
-            reason: z.string().min(1).max(2048).optional(),
-          })
-          .strict(),
-      )
-      .min(1)
-      .max(5000),
+    rows: z.array(datasetRowSchema).min(1).max(5000),
   })
   .strict()
 export const datasetCorrectionSchema = z.object({ datasetId: id, identity: id, value: data }).strict()
@@ -111,6 +124,7 @@ export const datasetDrilldownSchema = z
 export type DatasetCreate = z.infer<typeof datasetCreateSchema>
 export type DatasetWrite = z.infer<typeof datasetWriteSchema>
 export type DatasetMode = z.infer<typeof datasetModeSchema>
+export type DatasetRefresh = z.infer<typeof datasetRefreshSchema>
 type DatasetFeeder = z.infer<typeof datasetFeederSchema>
 export type DatasetSummary = {
   id: string
@@ -127,4 +141,5 @@ export type DatasetSummary = {
   bytes: number
   coverage: { fromTime: number; toTime: number; kind: string; reason: string | null }[]
   lastCapture?: { finishedAt: number; complete: boolean; reason: string | null; rowCount: number }
+  refresh?: DatasetRefresh
 }

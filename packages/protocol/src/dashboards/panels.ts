@@ -136,18 +136,20 @@ const schemaAt = (schema: DataSchema, pointer: string): DataSchema | undefined =
     (at, key) => (at?.properties && Object.hasOwn(at.properties, key) ? at.properties[key] : undefined),
     schema,
   )
+/** Where an agent read rows: one line it wrote, the `https` pages, and when. */
+export const suppliedOriginSchema = z
+  .object({
+    says: z.string().trim().min(1).max(200),
+    urls: z.array(z.string().max(2048).refine(isPluginOpenableUrl, 'Expected an https URL')).max(8).optional(),
+    readAt: z.number().finite(),
+  })
+  .strict()
 /** Rows an agent gathered itself, carried in the plan in place of a registered source. `schema` and
  *  `fields` take a dataset's shapes, so the rows can be copied into a dataset unchanged. */
 const suppliedRowsSchema = z
   .object({
     kind: z.literal('supplied'),
-    origin: z
-      .object({
-        says: z.string().trim().min(1).max(200),
-        urls: z.array(z.string().max(2048).refine(isPluginOpenableUrl, 'Expected an https URL')).max(8).optional(),
-        readAt: z.number().finite(),
-      })
-      .strict(),
+    origin: suppliedOriginSchema,
     schema: suppliedRowSchema,
     fields: dataFieldsSchema,
     rows: z.array(dataValueSchema).max(SUPPLIED_ROW_LIMITS.rows),

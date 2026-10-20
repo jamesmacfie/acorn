@@ -1,3 +1,4 @@
+import type { JSX } from 'solid-js'
 import { render } from 'solid-js/web'
 import { QueryClient, QueryClientProvider } from '@tanstack/solid-query'
 import { afterEach, describe, expect, it, vi } from 'vitest'
@@ -7,10 +8,17 @@ import type { AgentToolCardProps } from '@acorn/protocol/extensionPoints.ts'
 // The panel runs its plan and the studio is a full-window layer; neither is under test. The stand-in
 // says which plan it was handed, so a test can tell versions apart.
 vi.mock('./PublishedDashboardPanel', () => ({
-  default: (props: { plan: PanelPlan }) => <div class="stand-in">{props.plan.title}</div>,
+  default: (props: { plan: PanelPlan; actions?: (published: () => undefined) => JSX.Element }) => (
+    <div>
+      <div class="stand-in">{props.plan.title}</div>
+      {props.actions?.(() => undefined)}
+    </div>
+  ),
 }))
 vi.mock('./DashboardPanelHost', () => ({ default: () => null }))
 vi.mock('@solidjs/router', () => ({ useNavigate: () => () => {}, useLocation: () => ({ pathname: '/' }) }))
+vi.mock('../tasks/taskLookup', () => ({ taskById: () => ({ id: 'task-1', projectId: 'project' }) }))
+vi.mock('../projects/projectLookup', () => ({ allProjects: () => [{ id: 'project', workspaceId: 'ws' }] }))
 
 const { default: PanelToolCard } = await import('./PanelToolCard')
 
@@ -74,6 +82,32 @@ const show = (calls: AgentToolCardCall[], taskId = 'task-1') => {
 }
 const button = (host: HTMLElement, text: string) =>
   [...host.querySelectorAll('button')].find((entry) => entry.textContent === text)
+const menuRows = () =>
+  [...document.querySelectorAll('.ui-menu > *')].map((entry) =>
+    entry.matches('.ui-menu-separator')
+      ? '-'
+      : (entry.querySelector('.ui-menu-label')?.textContent ?? entry.textContent),
+  )
+const suppliedCall = (): AgentToolCardCall => {
+  const supplied: PanelPlan = {
+    ...plan('Forecast'),
+    sources: [
+      {
+        id: 'pulls',
+        label: 'Forecast',
+        role: 'primary',
+        reference: {
+          kind: 'supplied',
+          origin: { says: 'Open-Meteo', readAt: 1 },
+          schema: { type: 'object', properties: { title: { type: 'string' } } },
+          fields: [{ pointer: '/title', label: 'Title', origin: 'declared' }],
+          rows: [{ title: 'Monday' }],
+        },
+      },
+    ],
+  }
+  return { ...call('Forecast', 4), input: JSON.stringify({ title: 'Forecast', panelId: 'f', plan: supplied }) }
+}
 
 describe('PanelToolCard', () => {
   it('collapses an older version of the same panel to one line that can draw it again', () => {
@@ -96,5 +130,19 @@ describe('PanelToolCard', () => {
     expect(host.querySelector('.stand-in')).toBeNull()
     expect(host.textContent).toContain("Broken didn't pass its checks, so nothing was drawn.")
     expect(host.textContent).toContain('/view/x: A bar chart needs an enum or person axis.')
+  })
+
+  it('offers a live panel only its places, and supplied rows a snapshot or a sheet to keep them up to date', () => {
+    const live = show([call('Pulls', 5)], 'task-3')
+    button(live, 'Add to dashboard')!.click()
+    expect(menuRows()).toEqual(['Home'])
+    dispose?.()
+    document.body.replaceChildren()
+
+    const host = show([suppliedCall()], 'task-4')
+    button(host, 'Add to dashboard')!.click()
+    expect(menuRows()).toEqual(['Place as a snapshot', 'Home', '-', 'Keep it up to date', 'Home…'])
+    ;[...document.querySelectorAll<HTMLButtonElement>('.ui-menu-item')].at(-1)!.click()
+    expect(document.querySelector('[role="dialog"]')?.textContent).toContain('Keep it up to date')
   })
 })

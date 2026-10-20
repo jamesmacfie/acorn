@@ -11,7 +11,15 @@ vi.mock('./dashboardClient', () => ({
   publishedDashboardPanelKey: () => ['published-dashboard-panel'],
 }))
 
+const readJson = vi.fn((_url: string, _options?: unknown): Promise<unknown> => Promise.reject(new Error('offline')))
+vi.mock('../../infra/node/apiClient', async (original) => ({
+  ...(await original<typeof import('../../infra/node/apiClient')>()),
+  readJson: (url: string, options?: unknown) => readJson(url, options),
+}))
+
 const { default: PublishedDashboardPanel } = await import('./PublishedDashboardPanel')
+const { provideClientCapability } = await import('../../infra/node/clientCapabilities')
+const { AGENT_ASK } = await import('./refreshCapabilities')
 
 let dispose: (() => void) | undefined
 afterEach(() => dispose?.())
@@ -144,5 +152,93 @@ it("selects the target's item when the record's target opens the same pane", asy
     expect(paneItem({ ...row, recordItems: [] }, { verb: 'openPane', pane: 'agents' })).toBe('turn-1')
   } finally {
     link.dispose()
+  }
+})
+
+// A dataset an agent keeps up to date says when it last refreshed, and asks the task that kept it.
+it('draws a kept panel with when an agent refreshed it, and asks an agent in its task for fresh rows', async () => {
+  const plan: PanelPlan = {
+    version: 2,
+    title: 'Forecast',
+    time: { zone: 'UTC', mode: 'fixed', weekStart: 'monday' },
+    sources: [
+      {
+        id: 'forecast',
+        label: 'Forecast',
+        role: 'primary',
+        reference: {
+          kind: 'inline',
+          bindings: {},
+          content: {
+            name: 'Forecast',
+            parameters: { type: 'object', properties: {}, additionalProperties: false },
+            sourceParameters: {},
+            query: {
+              source: { pluginId: 'core', sourceId: 'dataset:d1' },
+              scope: { workspaceId: 'ws-1', parameters: {} },
+              sort: [],
+            },
+          },
+        },
+      },
+    ],
+    columns: [{ id: 'day', label: 'Day', type: 'text', bind: { forecast: { field: '/day' } } }],
+    stages: [],
+    view: { kind: 'table' },
+  }
+  run.mockResolvedValueOnce({
+    plan,
+    rows: [],
+    groups: [],
+    description: [],
+    diagnostics: {
+      problems: [],
+      sources: [
+        {
+          id: 'forecast',
+          label: 'Forecast',
+          dataset: { mode: 'current-mirror', feeder: 'agent', refreshedAt: Date.parse('2026-10-20T06:02:00Z') },
+        },
+      ],
+      stages: [],
+      evaluationTime: 2,
+      plugins: [],
+      accounts: [],
+      complete: true,
+    },
+  })
+  const ask = vi.fn(async () => {})
+  const provided = provideClientCapability(AGENT_ASK, { ask })
+  readJson.mockImplementation(async (url) => {
+    if (!url.startsWith('/v1/core/datasets')) throw new Error('offline')
+    return {
+      datasets: [{ id: 'd1', name: 'Forecast', refresh: { taskId: 'task-9', origin: { says: 'Open-Meteo' } } }],
+    }
+  })
+  try {
+    const host = document.body.appendChild(document.createElement('div'))
+    dispose = render(
+      () => (
+        <QueryClientProvider client={new QueryClient()}>
+          <PublishedDashboardPanel
+            definition={{ id: 'panel-3', title: 'Forecast', shaping: {}, view: plan.view }}
+            workspaceId="ws-1"
+            plan={plan}
+          />
+        </QueryClientProvider>
+      ),
+      host,
+    )
+    await vi.waitFor(() => expect(host.textContent).toContain('Refreshed by an agent, '))
+    ;[...host.querySelectorAll('button')].find((entry) => entry.textContent === 'Ask an agent to refresh')!.click()
+    await vi.waitFor(() => expect(ask).toHaveBeenCalled())
+    expect(readJson).toHaveBeenCalledWith('/v1/core/datasets?workspaceId=ws-1', { nodeId: expect.anything() })
+    expect(ask).toHaveBeenCalledWith({
+      taskId: 'task-9',
+      title: 'Refresh Forecast',
+      prompt: expect.stringContaining('sourceId "dataset:d1"'),
+    })
+  } finally {
+    provided.dispose()
   }
 })

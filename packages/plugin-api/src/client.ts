@@ -268,6 +268,10 @@ export { hasHostCapability } from '@acorn/client-core/infra/node'
 // The other capability: a typed function another plugin published. Register through
 // `ctx.capabilities`; these two are for reading one from a component, which has no ctx in hand.
 export { clientCapability, clientCapabilityId } from '@acorn/client-core/infra/node'
+// What a kept dashboard panel asks of the plugins that run agents. Core declares the keys, because core
+// consumes them and can't import a plugin.
+export { AGENT_ASK, AGENT_PROMPT_SCHEDULES } from '@acorn/client-core/features/dashboards/refreshCapabilities.ts'
+export type { AgentPromptSchedules } from '@acorn/client-core/features/dashboards/refreshCapabilities.ts'
 export { parseJson } from '@acorn/client-core/infra/persistence'
 export type { PersistedStateSlice } from '@acorn/client-core/infra/persistence'
 export { PersistedSliceKeys, PrefKeys, storageKeyFor } from '@acorn/client-core/infra/persistence'

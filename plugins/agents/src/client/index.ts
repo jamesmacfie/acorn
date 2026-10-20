@@ -4,7 +4,7 @@
 // the managed-agent runtime is for, and core's task view falls back to a pane list that assumes they
 // exist.
 import { lazy } from 'solid-js'
-import type { ClientPlugin } from '@acorn/plugin-api/client'
+import { AGENT_ASK, type ClientPlugin } from '@acorn/plugin-api/client'
 import {
   AGENT_SESSION_KEY,
   AGENT_TOOL_CARD_POINT,
@@ -22,6 +22,7 @@ import {
   activateManagedAgentNoticeTargets,
   activateManagedAgentPaneIntents,
   agentAttentionItemId,
+  openManagedSession,
 } from './sessions/managedSelection'
 import { activateManagedAgentNotifications, managedAgentStore } from './sessions/managedStore'
 import { clearableAgents, markAgentsRead } from './sessions/markAgentsRead'
@@ -100,6 +101,29 @@ export const agentsClientPlugin: ClientPlugin = {
         })
         managedAgentStore.upsertSession(session)
         return session.id
+      },
+    })
+    // A kept dashboard panel's Ask an agent to refresh: a new session in the task that kept it, on the
+    // first installed harness, sent the prompt as its first turn.
+    ctx.capabilities.provide(AGENT_ASK, {
+      ask: async ({ taskId, title, prompt }) => {
+        const provider = (await managedAgentApi.providers()).find((candidate) => candidate.installed)
+        if (!provider) throw new Error('No agent harness is installed on this Node.')
+        const session = await managedAgentApi.createSession({
+          taskId,
+          providerId: provider.id,
+          profileId: provider.profileId,
+          kind: 'interactive',
+          title,
+          config: {},
+        })
+        managedAgentStore.upsertSession(session)
+        await managedAgentApi.enqueue(session.id, {
+          input: [{ type: 'text', text: prompt }],
+          source: 'interactive',
+          effectivePolicy: {},
+        })
+        openManagedSession(taskId, session.id)
       },
     })
     ctx.capabilities.provide(AGENTS_INLINE_DIFF, {

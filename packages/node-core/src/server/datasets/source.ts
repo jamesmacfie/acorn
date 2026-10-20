@@ -16,6 +16,7 @@ import {
   coverageForDataset,
   datasetCoveragePartial,
   currentVersion,
+  datasetRefresh,
   getDataset,
   listDatasets,
   type DatasetDefinition,
@@ -105,8 +106,35 @@ export function datasetPredicateSql(predicate: DataPredicate | undefined, fields
   return { text: `${value} ${operator} ?`, params: [path, operand] }
 }
 
+type CoverageWindow = NonNullable<DataSourceDescription['coverageWindows']>[number]
+
+/** A scheduled agent refresh that hasn't written for its cadence and a grace of a quarter of it, at
+ *  most an hour, is a gap from when it was due, as a failed capture is. */
+export function overdueRefresh(
+  dataset: DatasetDefinition,
+  refreshedAt: number | undefined,
+  now: number,
+): CoverageWindow | undefined {
+  // shortcut: `every` is the cadence chosen when the dataset was made, so a schedule edited later in
+  // Workflows doesn't move it. Read the schedule itself if that drift starts to mislead.
+  const every = datasetRefresh(dataset)?.every
+  if (!every || refreshedAt === undefined) return undefined
+  const due = refreshedAt + every * 1000
+  if (now < due + Math.min(every * 250, 3_600_000)) return undefined
+  return { fromTime: due, toTime: now, kind: 'gap', reason: 'The scheduled agent refresh is overdue.' }
+}
+
 export function datasetSourceDescription(db: AppDatabase, dataset: DatasetDefinition): DataSourceDescription {
   const version = currentVersion(db, dataset)
+  const refreshedAt =
+    dataset.feeder === 'agent'
+      ? ((
+          db.$client
+            .prepare('SELECT MAX(finished_at) AS at FROM dataset_captures WHERE dataset_id = ?')
+            .get(dataset.id) as { at: number | null }
+        ).at ?? undefined)
+      : undefined
+  const overdue = overdueRefresh(dataset, refreshedAt, Date.now())
   const metadata = dataset.mode === 'snapshot-history' ? '_observationTime' : '_arrivedAt'
   return {
     revision: String(version.version),
@@ -143,11 +171,14 @@ export function datasetSourceDescription(db: AppDatabase, dataset: DatasetDefini
     parameterFields: [],
     operations: { query: true, options: false, details: false, incremental: false, groups: ['all', 'any'] },
     consistency: `${dataset.mode}; ${dataset.feeder} feeder; ${dataset.retentionDays} day retention. Coverage is tracked separately from captures.`,
-    dataset: { mode: dataset.mode, feeder: dataset.feeder },
-    coverageWindows: coverageForDataset(db, dataset.id).map((item) => ({
-      ...item,
-      kind: item.kind === 'complete' ? ('complete' as const) : ('gap' as const),
-    })),
+    dataset: { mode: dataset.mode, feeder: dataset.feeder, ...(refreshedAt !== undefined ? { refreshedAt } : {}) },
+    coverageWindows: [
+      ...(overdue ? [overdue] : []),
+      ...coverageForDataset(db, dataset.id).map((item) => ({
+        ...item,
+        kind: item.kind === 'complete' ? ('complete' as const) : ('gap' as const),
+      })),
+    ].slice(0, 100),
   }
 }
 

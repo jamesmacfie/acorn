@@ -55,7 +55,9 @@ a plan's `connectionId` takes.
 
 `dataset_write` is a write-risk core tool for agent-fed datasets. Its rows need evidence and a
 reason. The Node derives workspace and project from the authenticated task and rejects other
-datasets, stale schema versions, and malformed rows. A person can correct an agent row from a
+datasets, stale schema versions, and malformed rows. A task may write a dataset in its own project,
+or a workspace dataset whose `refresh` names that project, as a kept dashboard panel's does. Each
+write records a capture. Its time is the "Refreshed by an agent" line on the panel. A person can correct an agent row from a
 published panel; that correction is stored separately and survives later feeder writes.
 
 ## Panels

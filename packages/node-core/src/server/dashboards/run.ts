@@ -317,6 +317,7 @@ export async function runDashboard(
         account: resolved.query.scope.connectionId ?? null,
         coverageWindows: description.coverageWindows,
         writable: description.writable,
+        ...(description.dataset ? { dataset: description.dataset } : {}),
       })
     } catch (error) {
       problems.push(

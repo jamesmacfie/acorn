@@ -128,6 +128,8 @@ export const dataSourceDescriptionSchema = z
       .object({
         mode: z.enum(['current-mirror', 'event-archive', 'snapshot-history']),
         feeder: z.enum(['capture', 'workflow', 'agent']),
+        /** When an agent last wrote rows, for an agent-fed dataset. */
+        refreshedAt: z.number().finite().optional(),
       })
       .strict()
       .optional(),

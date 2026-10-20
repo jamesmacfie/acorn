@@ -42,11 +42,52 @@ Open-Meteo forecast for Wellington, read Oct 20, 2026, 5:31 PM", with each URL a
 because nothing can refresh a snapshot. That holds in a conversation card, in an app's `Panel`, and
 on a dashboard.
 
-**Add to dashboard** places the snapshot as it is, keeping the line. The studio shows the line in
-place of the source picker, so a person can still change the columns, stages, and view.
+**Add to dashboard** offers two choices. **Place as a snapshot** places the panel as it is, keeping
+the line. **Keep it up to date** opens a sheet that makes the rows a dataset an agent refreshes
+([keeping it up to date](#keeping-it-up-to-date)). The studio shows the line in place of the source
+picker, so a person can still change the columns, stages, and view.
 
 A client from before supplied rows can't parse such a plan, so its card says the plan didn't pass its
 checks and shows the call. The transcript keeps the call either way.
+
+## Keeping it up to date
+
+The sheet (`KeepUpdatedSheet`) names the dataset after the panel and suggests how it stores rows
+(`suggestMode` and `suggestIdentity` in `keepUpdated.ts`):
+
+| Suggestion | When |
+| --- | --- |
+| **Latest state** | A time field holds a value after the agent read the rows, such as a forecast. |
+| **Every event** | A time field holds only past values, such as releases. That field is the event time. |
+| **Daily snapshots** | No time field, and a number, such as commits per repository. |
+
+The identity it suggests is the fewest fields that tell every row apart, trying words and dates before
+numbers. The person can change both, and **Create** stays off until the identity fits every row.
+
+**Create** makes a workspace dataset with feeder `agent`, so a Home tab can draw it. Its `refresh`
+names the task's project, the only project whose tasks may write it with `dataset_write`, and the
+task to ask. The snapshot's rows go in with the dataset, in one transaction, each with the origin as
+its evidence. Then the sheet places the plan with its source switched to an inline query on
+`core:dataset:<id>` (`keptPlan`). Its stages and view don't change. A failure deletes what the sheet
+made. A daily-snapshots panel shows every day's rows until someone edits it to group by **Observed**.
+
+A kept panel says "Refreshed by an agent" and the time of the dataset's last write in place of the
+origin line (`KeptOrigin`). **Ask an agent to refresh** starts a new agent session in the task that
+kept it, with a prompt naming the dataset and the origin (`refreshPrompt`). The agent describes
+`core:dataset:<id>`, gathers fresh rows, and writes them with `dataset_write`, so each row has
+evidence and a person's corrections survive.
+
+The sheet's **Refresh** choice adds a schedule: every day at 09:00 or every hour. After the person
+confirms, it publishes a workflow with one agent step that sends the same prompt, and approves a
+schedule for it ([user schedules](../schedules/user-schedules.md#workflow)). Workflows lists both,
+and pausing or deleting works as for any schedule. A scheduled dataset stores its cadence as
+`refresh.every`. When no write arrives within that cadence and a quarter of it, at most an hour more,
+the dataset's coverage shows a gap from when the refresh was due, as a failed capture does. The gap
+reads the cadence chosen in the sheet, so a schedule edited later in Workflows doesn't move it.
+
+Core draws the panel and plugins run agents, so core declares two client capabilities and the plugins
+provide them: `AGENT_ASK` from agents and `AGENT_PROMPT_SCHEDULES` from workflows. With either plugin
+off, its button or choice doesn't show.
 
 ## Teaching the agent
 

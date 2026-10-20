@@ -25,6 +25,7 @@ import { readPanelShowCall } from './panelShowCall'
 import { homeTabScope, type DashboardTab, type PlacementScope } from './persist'
 import { panelRegionRegistry, regionsToAddTo, type PanelRegion } from './region'
 import PublishedDashboardPanel from './PublishedDashboardPanel'
+import KeepUpdatedSheet from './KeepUpdatedSheet'
 import './dashboards.css'
 
 // The transcript card for an agent's `panel_show` call (docs/dashboards.md § Panels from a
@@ -104,29 +105,41 @@ function PanelCard(props: { taskId: string; result: PanelShowResult; plan: Panel
   /** Where the panel went, named under the card, and how to open it there. */
   const [added, setAdded] = createSignal<{ name: string; open?: () => void }>()
   const [studio, setStudio] = createSignal<{ dashboardId: string; scope: PlacementScope; region?: PanelRegion }>()
-  const add = async (destination: { name: string; scope: PlacementScope; region?: PanelRegion; open?: () => void }) => {
+  type Destination = { name: string; scope: PlacementScope; region?: PanelRegion; open?: () => void }
+  const place = async (destination: Destination, plan: PanelPlan) => {
     const { scope, region } = destination
-    try {
-      const saved = await addNewPanel({
-        nodeId,
-        scope: { workspaceId: workspaceId() },
-        plan: props.plan,
-        placement: scope,
-        ...(region ? { region } : {}),
-        queryClient,
-        recovery: dashboardRecoveryStore(typeof localStorage === 'undefined' ? undefined : localStorage),
-      })
-      setAdded(destination)
-      toast('Panel added.', {
-        action: {
-          label: 'Edit…',
-          onPress: () => setStudio({ dashboardId: saved.id, scope, ...(region ? { region } : {}) }),
-        },
-      })
-    } catch (error) {
-      toast(publishFailureMessage(error, "Couldn't add the panel. Try again."), { tone: 'danger' })
-    }
+    const saved = await addNewPanel({
+      nodeId,
+      scope: { workspaceId: workspaceId() },
+      plan,
+      placement: scope,
+      ...(region ? { region } : {}),
+      queryClient,
+      recovery: dashboardRecoveryStore(typeof localStorage === 'undefined' ? undefined : localStorage),
+    })
+    setAdded(destination)
+    toast('Panel added.', {
+      action: {
+        label: 'Edit…',
+        onPress: () => setStudio({ dashboardId: saved.id, scope, ...(region ? { region } : {}) }),
+      },
+    })
   }
+  const add = (destination: Destination) =>
+    place(destination, props.plan).catch((error: unknown) =>
+      toast(publishFailureMessage(error, "Couldn't add the panel. Try again."), { tone: 'danger' }),
+    )
+  /** Rows the agent supplied, which Add to dashboard can place as they are or keep up to date. */
+  const supplied = () => {
+    const reference = props.plan.sources[0]?.reference
+    return reference?.kind === 'supplied' ? reference : undefined
+  }
+  const [keeping, setKeeping] = createSignal<Destination>()
+  const homeTab = (tab: DashboardTab): Destination => ({
+    name: tab.name,
+    scope: homeTabScope(tab.id, workspaceId()),
+    open: () => openTab(tab),
+  })
   const editInStudio = async () => {
     try {
       const draft = await dashboardClient(nodeId, { workspaceId: workspaceId() }).create(props.plan)
@@ -179,18 +192,12 @@ function PanelCard(props: { taskId: string; result: PanelShowResult; plan: Panel
                   >
                     {(menu) => (
                       <>
+                        <Show when={supplied()}>
+                          <Menu.Label>Place as a snapshot</Menu.Label>
+                        </Show>
                         <For each={homeTabsToAddTo(workspaceId())}>
                           {(tab) => (
-                            <Menu.Item
-                              context={menu}
-                              onSelect={() =>
-                                void add({
-                                  name: tab.name,
-                                  scope: homeTabScope(tab.id, workspaceId()),
-                                  open: () => openTab(tab),
-                                })
-                              }
-                            >
+                            <Menu.Item context={menu} onSelect={() => void add(homeTab(tab))}>
                               {tab.name}
                             </Menu.Item>
                           )}
@@ -204,6 +211,17 @@ function PanelCard(props: { taskId: string; result: PanelShowResult; plan: Panel
                             void add({ name: region.label, scope: region.scope, region: region.region })
                           }
                         />
+                        <Show when={supplied() && projectId()}>
+                          <Menu.Separator />
+                          <Menu.Label>Keep it up to date</Menu.Label>
+                          <For each={homeTabsToAddTo(workspaceId())}>
+                            {(tab) => (
+                              <Menu.Item context={menu} onSelect={() => setKeeping(homeTab(tab))}>
+                                {`${tab.name}…`}
+                              </Menu.Item>
+                            )}
+                          </For>
+                        </Show>
                       </>
                     )}
                   </Menu>
@@ -234,6 +252,21 @@ function PanelCard(props: { taskId: string; result: PanelShowResult; plan: Panel
             </Button>
           </Show>
         </Stack>
+      </Show>
+      <Show when={keeping()}>
+        {(destination) => (
+          <KeepUpdatedSheet
+            nodeId={nodeId}
+            workspaceId={workspaceId()}
+            projectId={projectId()!}
+            taskId={props.taskId}
+            plan={props.plan}
+            rows={supplied()!}
+            destination={destination().name}
+            onKeep={(plan) => place(destination(), plan)}
+            onClose={() => setKeeping(undefined)}
+          />
+        )}
       </Show>
       <DashboardPanelHost
         session={studio() && { dashboardId: studio()!.dashboardId }}

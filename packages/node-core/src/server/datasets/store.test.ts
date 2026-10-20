@@ -2,8 +2,11 @@ import { afterEach, expect, it } from 'vitest'
 import { makeTestDb, type TestDb } from '../../testkit/db'
 import { schema } from '../db'
 import type { DatasetCreate } from '@acorn/protocol/datasets.ts'
+import { datasetCreateSchema } from '@acorn/protocol/datasets.ts'
+import { datasetSourceDescription, overdueRefresh } from './source'
 import {
   addDatasetVersion,
+  assertDatasetWriteScope,
   correctDatasetRow,
   createDataset,
   datasetCoveragePartial,
@@ -198,4 +201,70 @@ it('rejects stale writes, bounds storage, retains versions, and removes workspac
   expect(pruneDatasetRows(world!.db, 100 + 91 * 86_400_000)).toBe(1)
   deleteWorkspaceDatasets(world!.db, 'ws')
   expect(() => getDataset(world!.db, dataset.id)).toThrow('not-found')
+})
+
+const kept = (rows: unknown[]) =>
+  datasetCreateSchema.parse({
+    name: 'Forecast',
+    workspaceId: 'ws',
+    mode: 'current-mirror',
+    feeder: 'agent',
+    schema: {
+      type: 'object',
+      properties: {
+        day: { type: 'string' },
+        high: { type: 'number' },
+        evidence: { type: 'object' },
+        reason: { type: 'string' },
+        correction: { type: ['string', 'null'] },
+      },
+      additionalProperties: false,
+    },
+    fields: [{ pointer: '/day', label: 'Day', origin: 'declared' }],
+    identityFields: ['/day'],
+    refresh: { projectId: 'project', taskId: 'task', origin: { says: 'Open-Meteo' }, every: 86_400 },
+    rows: rows.map((data) => ({ data, evidence: { says: 'Open-Meteo' }, reason: 'Kept from the panel' })),
+  })
+
+it('keeps a workspace agent dataset that one project refreshes, starting from its first rows', async () => {
+  await setup('current-mirror', 'agent')
+  const dataset = createDataset(
+    world!.db,
+    kept([
+      { day: '2026-10-20', high: 17 },
+      { day: '2026-10-21', high: 15 },
+    ]),
+  )
+  expect(dataset.projectId).toBeNull()
+  expect(stored().map((row) => JSON.parse(row.dataJson).evidence)).toEqual([
+    { says: 'Open-Meteo' },
+    { says: 'Open-Meteo' },
+  ])
+  // The first rows are its first refresh, and only the named project may write the next.
+  const description = datasetSourceDescription(world!.db, dataset)
+  expect(description.dataset?.refreshedAt).toBeTypeOf('number')
+  expect(() => assertDatasetWriteScope(dataset, 'ws', 'project')).not.toThrow()
+  expect(() => assertDatasetWriteScope(dataset, 'ws', 'other')).toThrow()
+})
+
+it('leaves no dataset behind when a first row breaks its schema', async () => {
+  await setup('current-mirror', 'agent')
+  expect(() => createDataset(world!.db, kept([{ day: '2026-10-20', high: 'warm' }]))).toThrow()
+  expect(world!.db.$client.prepare('SELECT COUNT(*) AS n FROM datasets').get()).toEqual({ n: 1 })
+})
+
+it('refuses first rows and a refresh outside a workspace agent dataset', () => {
+  const input = { ...kept([{ day: '2026-10-20', high: 17 }]) }
+  expect(datasetCreateSchema.safeParse({ ...input, projectId: 'project' }).success).toBe(false)
+  expect(datasetCreateSchema.safeParse({ ...input, feeder: 'workflow' }).success).toBe(false)
+  const { refresh: _refresh, ...unkept } = input
+  expect(datasetCreateSchema.safeParse(unkept).success).toBe(false)
+})
+
+it('shows a scheduled refresh as a gap once it is a quarter of its cadence late', async () => {
+  await setup('current-mirror', 'agent')
+  const dataset = createDataset(world!.db, kept([{ day: '2026-10-20', high: 17 }]))
+  const day = 86_400_000
+  expect(overdueRefresh(dataset, 0, day + 3_599_999)).toBeUndefined()
+  expect(overdueRefresh(dataset, 0, day + 3_600_000)).toMatchObject({ kind: 'gap', fromTime: day })
 })

@@ -20,6 +20,7 @@ import { dataSourceCatalogOptions } from '../dataSources/queries'
 import { failureContext } from './planInputs'
 import SourceFailureAlert from './SourceFailureAlert'
 import SuppliedOrigin from './SuppliedOrigin'
+import KeptOrigin from './KeptOrigin'
 import { runChromeAction } from '../../host/chrome/actions'
 import {
   availableContentPresentations,
@@ -145,6 +146,16 @@ export default function PublishedDashboardPanel(props: {
   })
   const stale = createMemo(() => !!fresh() && sourceFailed(fresh()!) && !!lastAnswered())
   const run = createMemo(() => (stale() ? lastAnswered() : fresh()))
+  /** A dataset an agent keeps up to date, which says when it last refreshed in place of a live source's
+   *  silence. */
+  const kept = createMemo(() => {
+    const dataset = run()?.diagnostics.sources[0]?.dataset
+    const reference = run()?.plan.sources[0]?.reference
+    const source = reference?.kind === 'inline' ? reference.content.query.source : undefined
+    return dataset?.feeder === 'agent' && source?.pluginId === 'core' && source.sourceId.startsWith('dataset:')
+      ? { datasetId: source.sourceId.slice('dataset:'.length), refreshedAt: dataset.refreshedAt }
+      : undefined
+  })
   const catalog = createQuery(() => ({
     ...dataSourceCatalogOptions(nodeId, { ...scope(), parameters: {} }),
     enabled: !!fresh()?.diagnostics.problems.some((problem) => problem.failure),
@@ -637,6 +648,16 @@ export default function PublishedDashboardPanel(props: {
       </div>
       <div class="dash-panel-body">
         <Show when={supplied()}>{(reference) => <SuppliedOrigin origin={reference().origin} />}</Show>
+        <Show when={kept()}>
+          {(dataset) => (
+            <KeptOrigin
+              nodeId={nodeId}
+              workspaceId={scope().workspaceId}
+              datasetId={dataset().datasetId}
+              {...(dataset().refreshedAt !== undefined ? { refreshedAt: dataset().refreshedAt } : {})}
+            />
+          )}
+        </Show>
         <Show
           when={!loaded.error || loaded.data}
           fallback={
