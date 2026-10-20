@@ -33,7 +33,7 @@ second of two renewals that spend the same one.
 A renewal the provider refuses, with `provider_needs_auth`, marks the connection `needs-auth`, and
 nothing renews it again until the person signs in. Any other failure fails only the one request and
 keeps the connection. A backup blanks the refresh token with the credential. [MCP
-sign-in](../future/mcp-sign-in.md) follows the same rules for its tokens.
+sign-in](../mcp/sign-in.md) follows the same rules for its tokens.
 
 ## Errors
 

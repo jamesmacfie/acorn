@@ -44,9 +44,8 @@ Docker**, still opens.
   so dragging and hiding never overwrite each other.
 - Core's sources, Home among them, always show.
 - Hiding the source on screen goes back to Home. Showing one adds its icon and moves nothing.
-- Every hidden, available source gets a palette row, **Open \<label\>**
-  (`packages/client-core/src/host/palette/sourceOpeners.ts`). A plugin that registers
-  `source.<id>.open` keeps its own row.
+- Every available source has a palette row, **Open \<label\>**, and a hidden one adds the hint
+  **hidden from the left rail** ([rail source openers](../command-palette-and-shortcuts/commands.md#rail-source-openers)).
 - The switch is drawn in two places: **Settings > Plugins > Rail and surfaces** lists every plugin
   source, and the plugin strip above a plugin's settings page draws one for each source the page names
   in `railSourceVisibility`. A plugin page's own code never touches the preference.
