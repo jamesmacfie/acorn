@@ -1187,6 +1187,22 @@ export class AgentStore {
     return this.readSnapshot(sessionId, 0, undefined, false)
   }
 
+  /** The session with only its newest `count` events, for a reader that keeps no more. */
+  async recentSnapshot(sessionId: string, count: number): Promise<AgentSessionSnapshot> {
+    const before = await this.db.transaction(
+      (tx) =>
+        tx
+          .select({ seq: schema.agentEvents.seq })
+          .from(schema.agentEvents)
+          .where(eq(schema.agentEvents.sessionId, sessionId))
+          .orderBy(desc(schema.agentEvents.seq))
+          .limit(1)
+          .offset(count)
+          .get()?.seq ?? 0,
+    )
+    return this.readSnapshot(sessionId, before, undefined, false)
+  }
+
   private async readSnapshot(
     sessionId: string,
     afterSeq: number,

@@ -52,12 +52,38 @@ export function projectCommandEvents(
   })
 }
 
-/** One session's commands, or only commands whose events were written at or after `since`. A scope with
- *  neither reads every event, which is gigabytes on a long-used Node. */
-export type CommandScope = { sessionId?: string; since?: number }
+/** One session's commands, one turn's, or only commands whose events were written at or after `since`.
+ *  A scope with none of these reads every event, which is gigabytes on a long-used Node. */
+export type CommandScope = { sessionId?: string; turnId?: string; since?: number }
+
+// Both reads below repeat the expressions of `agent_events_session_tool_idx` exactly, `->>` and all.
+// SQLite uses an index on an expression only when the query spells it the same way, and a
+// `json_extract` here reads every event of the session instead.
+export function unfinishedCommandsQuery({ sessionId, turnId, since }: CommandScope) {
+  return sql`
+    WITH commands AS (
+      SELECT session_id, min(seq) AS opener,
+        coalesce(max(CASE WHEN event_json ->> '$.tool.status' IS NOT NULL THEN seq END), max(seq)) AS seq
+      FROM agent_events
+      WHERE event_json ->> '$.type' = 'tool'
+        ${sessionId ? sql`AND session_id = ${sessionId}` : sql``}
+        ${turnId ? sql`AND turn_id = ${turnId}` : sql``}
+        ${since !== undefined ? sql`AND created_at >= ${since}` : sql``}
+      GROUP BY session_id, turn_id, event_json ->> '$.tool.id'
+      HAVING max(event_json ->> '$.tool.kind' = 'execute')
+    )
+    SELECT e.id, e.session_id AS sessionId, e.turn_id AS turnId, e.seq, e.event_json AS eventJson,
+      o.event_json AS openerJson, e.created_at AS createdAt
+    FROM agent_events e JOIN commands c ON e.session_id = c.session_id AND e.seq = c.seq
+      JOIN agent_events o ON o.session_id = c.session_id AND o.seq = c.opener
+    WHERE e.event_json ->> '$.tool.status' IN ('pending', 'running')
+      OR e.event_json ->> '$.tool.status' IS NULL
+    ORDER BY e.session_id, e.seq
+  `
+}
 
 /** Latest unfinished command states only; output stays in its original ledger rows. */
-export function unfinishedCommands(tx: Transaction, { sessionId, since }: CommandScope = {}): AgentEventRecord[] {
+export function unfinishedCommands(tx: Transaction, scope: CommandScope = {}): AgentEventRecord[] {
   return tx
     .all<{
       id: string
@@ -67,25 +93,7 @@ export function unfinishedCommands(tx: Transaction, { sessionId, since }: Comman
       eventJson: string
       openerJson: string
       createdAt: number
-    }>(sql`
-    WITH commands AS (
-      SELECT session_id, min(seq) AS opener,
-        coalesce(max(CASE WHEN json_extract(event_json, '$.tool.status') IS NOT NULL THEN seq END), max(seq)) AS seq
-      FROM agent_events
-      WHERE json_extract(event_json, '$.type') = 'tool'
-        ${sessionId ? sql`AND session_id = ${sessionId}` : sql``}
-        ${since !== undefined ? sql`AND created_at >= ${since}` : sql``}
-      GROUP BY session_id, turn_id, json_extract(event_json, '$.tool.id')
-      HAVING max(json_extract(event_json, '$.tool.kind') = 'execute')
-    )
-    SELECT e.id, e.session_id AS sessionId, e.turn_id AS turnId, e.seq, e.event_json AS eventJson,
-      o.event_json AS openerJson, e.created_at AS createdAt
-    FROM agent_events e JOIN commands c ON e.session_id = c.session_id AND e.seq = c.seq
-      JOIN agent_events o ON o.session_id = c.session_id AND o.seq = c.opener
-    WHERE json_extract(e.event_json, '$.tool.status') IN ('pending', 'running')
-      OR json_extract(e.event_json, '$.tool.status') IS NULL
-    ORDER BY e.session_id, e.seq
-  `)
+    }>(unfinishedCommandsQuery(scope))
     .map(({ eventJson, openerJson, ...row }) => ({
       ...row,
       schemaVersion: 1,
@@ -96,14 +104,18 @@ export function unfinishedCommands(tx: Transaction, { sessionId, since }: Comman
     }))
 }
 
+export function commandTurnQuery(sessionId: string, tool: AgentToolCall) {
+  return sql`
+    SELECT DISTINCT turn_id AS turnId FROM agent_events
+    WHERE session_id = ${sessionId} AND event_json ->> '$.type' = 'tool'
+      AND event_json ->> '$.tool.id' = ${tool.id}
+      AND event_json ->> '$.tool.subagentId' IS ${tool.subagentId ?? null}
+    LIMIT 2
+  `
+}
+
 /** A late update with no turn can join a card only when its stream has one unambiguous owner. */
 export function commandTurn(tx: Transaction, sessionId: string, tool: AgentToolCall): string | null {
-  const owners = tx.all<{ turnId: string | null }>(sql`
-    SELECT DISTINCT turn_id AS turnId FROM agent_events
-    WHERE session_id = ${sessionId} AND json_extract(event_json, '$.type') = 'tool'
-      AND json_extract(event_json, '$.tool.id') = ${tool.id}
-      AND json_extract(event_json, '$.tool.subagentId') IS ${tool.subagentId ?? null}
-    LIMIT 2
-  `)
+  const owners = tx.all<{ turnId: string | null }>(commandTurnQuery(sessionId, tool))
   return owners.length === 1 ? owners[0].turnId : null
 }

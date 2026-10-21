@@ -127,6 +127,13 @@
       "when": 1792531823562,
       "tag": "0021_agent_events_tool_index",
       "breakpoints": true
+    },
+    {
+      "idx": 22,
+      "version": "6",
+      "when": 1792607128947,
+      "tag": "0022_agent_events_usage_index",
+      "breakpoints": true
     }
   ]
 }

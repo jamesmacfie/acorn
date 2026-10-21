@@ -12,6 +12,9 @@ The core migration chain also owns `datasets`, immutable `dataset_versions`, `da
 `dataset_corrections`, `dataset_captures`, and `dataset_coverage`. A dataset has one storage mode,
 feeder, scope, and retention policy. Corrections are separate from feeder rows so a later capture
 or agent write cannot erase them; they count toward the byte cap and remain until dataset deletion.
+A dataset's row and byte counts live on its `datasets` row, kept by triggers on the rows and
+corrections tables, so a write checks its caps without summing them. A run's pages of a dataset come
+from one read, held by the selection pager, not from a read for each page.
 The daily dataset compactor applies per-dataset row and coverage retention;
 current stat measure history remains in its existing tables and compactor.
 

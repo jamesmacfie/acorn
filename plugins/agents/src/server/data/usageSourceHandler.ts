@@ -1,4 +1,4 @@
-import { and, asc, desc, eq, inArray, lt, sql, type SQL } from 'drizzle-orm'
+import { and, desc, eq, inArray, lt, sql, type SQL } from 'drizzle-orm'
 import {
   createDataSourceHandler,
   DATA_READ_LIMIT,
@@ -40,27 +40,38 @@ const usageEvent = (row: UsageRow): UsageEventInput[] => {
   }
 }
 
+// The WHERE of each partial index in `schema.ts`, repeated exactly so SQLite reads through it.
+const usageRow = sql<string>`${schema.agentEvents.eventJson} ->> '$.type' = 'usage'`
+const countsFromHere = sql<string>`(${schema.agentEvents.eventJson} ->> '$.usage.inputTokens' IS NOT NULL OR ${schema.agentEvents.eventJson} ->> '$.usage.cost' IS NOT NULL)`
+
+export const usageEvents = (db: PluginDatabase, where: SQL | undefined) =>
+  db
+    .select({
+      id: schema.agentEvents.id,
+      sessionId: schema.agentEvents.sessionId,
+      turnId: schema.agentEvents.turnId,
+      seq: schema.agentEvents.seq,
+      at: schema.agentEvents.createdAt,
+      eventJson: schema.agentEvents.eventJson,
+      taskId: schema.agentSessions.taskId,
+      provider: schema.agentSessions.providerId,
+      policy: schema.agentTurns.effectivePolicyJson,
+    })
+    .from(schema.agentEvents)
+    .innerJoin(schema.agentSessions, eq(schema.agentEvents.sessionId, schema.agentSessions.id))
+    .leftJoin(schema.agentTurns, eq(schema.agentEvents.turnId, schema.agentTurns.id))
+    .where(and(usageRow, where))
+
+/** The session's latest usage report before `seq` that counts toward a delta. */
+export const usageBaseline = (db: PluginDatabase, sessionId: string, seq: number) =>
+  usageEvents(db, and(eq(schema.agentEvents.sessionId, sessionId), lt(schema.agentEvents.seq, seq), countsFromHere))
+    .orderBy(desc(schema.agentEvents.seq))
+    .limit(1)
+
 export function createUsageSourceHandler(
   db: PluginDatabase,
   core: Pick<CoreServices, 'tasks' | 'projects' | 'prefs'>,
 ): PluginFetchHandler {
-  const usageEvents = (where: SQL | undefined) =>
-    db
-      .select({
-        id: schema.agentEvents.id,
-        sessionId: schema.agentEvents.sessionId,
-        turnId: schema.agentEvents.turnId,
-        seq: schema.agentEvents.seq,
-        at: schema.agentEvents.createdAt,
-        eventJson: schema.agentEvents.eventJson,
-        taskId: schema.agentSessions.taskId,
-        provider: schema.agentSessions.providerId,
-        policy: schema.agentTurns.effectivePolicyJson,
-      })
-      .from(schema.agentEvents)
-      .innerJoin(schema.agentSessions, eq(schema.agentEvents.sessionId, schema.agentSessions.id))
-      .leftJoin(schema.agentTurns, eq(schema.agentEvents.turnId, schema.agentTurns.id))
-      .where(and(eq(sql<string>`json_extract(${schema.agentEvents.eventJson}, '$.type')`, 'usage'), where))
   return createDataSourceHandler({
     description: usageSourceDescription,
     failure: 'agent_usage_source_failed',
@@ -69,25 +80,21 @@ export function createUsageSourceHandler(
       const { time, equals } = sqlDataFilters(input.query.predicate, fields)
       const read = withinDataBudget(
         await usageEvents(
+          db,
           and(...time, ...equals, tasks ? inArray(schema.agentSessions.taskId, [...tasks.keys()]) : undefined),
         )
           .orderBy(desc(schema.agentEvents.createdAt), desc(schema.agentEvents.sessionId), desc(schema.agentEvents.seq))
           .limit(DATA_READ_LIMIT),
       )
-      // Each session's reports before the first one kept, which that one's deltas count from.
+      // Each session's report just before the first one kept, which that one's deltas count from.
       const firstSeq = new Map<string, number>()
       for (const row of read.rows)
         firstSeq.set(row.sessionId, Math.min(row.seq, firstSeq.get(row.sessionId) ?? row.seq))
-      const earlier: UsageRow[] = []
-      for (const [sessionId, seq] of firstSeq)
-        earlier.push(
-          ...(await usageEvents(
-            and(eq(schema.agentEvents.sessionId, sessionId), lt(schema.agentEvents.seq, seq)),
-          ).orderBy(asc(schema.agentEvents.seq))),
-        )
+      const baselines: UsageRow[] = []
+      for (const [sessionId, seq] of firstSeq) baselines.push(...(await usageBaseline(db, sessionId, seq)))
       const kept = new Set(read.rows.map((row) => row.id))
       const preferences = await readAgentPricingPreferences(core.prefs, context.userId)
-      const records = usageRecords([...earlier, ...[...read.rows].reverse()].flatMap(usageEvent), preferences)
+      const records = usageRecords([...baselines, ...[...read.rows].reverse()].flatMap(usageEvent), preferences)
         .filter((record) => kept.has(record.recordId))
         .reverse()
       return pageDataRecords(input, { records, truncated: read.truncated }, { timePointer: '/at', readOrder: true })

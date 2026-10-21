@@ -23,8 +23,9 @@ The event asks listeners to read again. It carries no records and has no deliver
 listener still reads on its own schedule and treats the event as a reason to read sooner. These
 sources call it: `github:pull-requests`, `gitlab:merge-requests`, `bitbucket:pull-requests`,
 `workflows:runs`, `agents:sessions`, and `core:tasks`. The three code hosts call it beside
-`pulls-changed` and `pr-synced`. An [event feed](./event-feeds.md) calls it for you whenever
-`append` stores an event.
+`pulls-changed` and `pr-synced`. GitHub skips the call when a refresh wrote the mirror and found every
+row as it was, because each call wakes the record triggers that read the source. An
+[event feed](./event-feeds.md) calls it for you whenever `append` stores an event.
 
 Linear's issues and Rollbar's errors don't call it. Acorn only reads them, so the plugin never sees
 the moment they change, and their triggers check on the cadence the person picks.

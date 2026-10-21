@@ -62,13 +62,15 @@ const childWhere = (t: { userId: SQLiteColumn; repoId: SQLiteColumn; number: SQL
 // Runs in one db.batch; callers can fan these out in parallel across PRs.
 //
 // Reports whether the checks rows differ from what was mirrored before, so the caller can announce
-// `checks-changed` only when a check actually flipped rather than on every sync.
+// `checks-changed` only when a check actually flipped rather than on every sync. `changed` also counts
+// the pull row, whose `updatedAt` moves with any comment, review, label, or commit. The fetch time
+// doesn't count.
 export const mirrorPr = async (
   db: Db,
   key: PrKey,
   pr: PullComposite,
   now: number,
-): Promise<{ checksChanged: boolean }> => {
+): Promise<{ checksChanged: boolean; changed: boolean }> => {
   const pullRow = {
     ...key,
     nodeId: pr.id,
@@ -167,6 +169,10 @@ export const mirrorPr = async (
       .sort()
       .join('\n')
   const checksChanged = signature(before) !== signature(checkRows)
+  const [previous] = await db.select().from(pullRequestsTable).where(childWhere(pullRequestsTable, key))
+  const { fetchedAt: _fetchedAt, ...content } = pullRow
+  const pullChanged =
+    !previous || Object.entries(content).some(([column, value]) => previous[column as keyof typeof previous] !== value)
 
   const resource = prResource(key.repoId, key.number)
   await db.batch([
@@ -215,7 +221,7 @@ export const mirrorPr = async (
         set: { fetchedAt: now, revision: pr.revision ?? null },
       }),
   ])
-  return { checksChanged }
+  return { checksChanged, changed: checksChanged || pullChanged }
 }
 
 const toThread = (row: typeof reviewThreadsTable.$inferSelect) =>

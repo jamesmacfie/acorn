@@ -84,7 +84,8 @@ Each reader stays correct:
 - **Export, waits, workflows, and delegation.** They read rows as stored. The markdown export folds
   tool rows to one line per call.
 - **One call by ID.** `GET /sessions/:id/tools/:toolId` reads a call's rows through
-  `agent_events_session_tool_idx`, an index on the session and the tool ID over tool rows, and folds
+  `agent_events_session_tool_idx`, an index on the session and the tool ID over tool rows
+  ([why reads must repeat its expressions](./operations.md#indexes-on-the-event-ledger)), and folds
   all of them in sequence order, so a call whose opener and latest state are pages apart reads whole
   (`toolCallRead.ts`).
 

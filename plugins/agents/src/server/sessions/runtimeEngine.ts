@@ -1355,15 +1355,17 @@ export class ManagedAgentEngine {
     if (event.type === 'session_metadata' || this.frames.rowChanged(session)) {
       this.frames.emit({ channel: 'agent:session', session })
     }
-    if (
-      settle &&
-      (event.type === 'turn_completed' ||
-        event.type === 'error' ||
+    if (settle) {
+      // A turn's end changes only that turn's commands. A session state or a child's end can change any.
+      if (event.type === 'turn_completed' || event.type === 'error') {
+        await this.settleCommands({ sessionId, turnId: turnId ?? undefined })
+      } else if (
         (event.type === 'session_state' &&
           ['ready', 'stopped', 'failed', 'archived', 'reconnecting'].includes(event.state)) ||
-        (event.type === 'subagent' && ['idle', 'completed', 'failed'].includes(event.subagent.status ?? '')))
-    ) {
-      await this.settleCommands({ sessionId })
+        (event.type === 'subagent' && ['idle', 'completed', 'failed'].includes(event.subagent.status ?? ''))
+      ) {
+        await this.settleCommands({ sessionId })
+      }
     }
     return record
   }

@@ -12,7 +12,7 @@ import { foldUsageEvents } from '../../shared/usageFold'
 import type { ManagedAgentRuntime } from '../sessions/runtime'
 import type { AgentDelegationService } from '../delegation/service'
 import type { ManagedAgentsBridge } from './managed'
-import { sessionReferenceContext } from '../sessions/sessionReference'
+import { REFERENCE_EVENT_READ, sessionReferenceContext } from '../sessions/sessionReference'
 
 // The runtime throws plain Errors and has no idea it is behind HTTP, so the mapping goes by message
 // shape. An unmatched error rethrows and becomes a 500, which is the honest answer for a bug.
@@ -152,7 +152,7 @@ export function managedAgentsBridge(
         return { ...snapshot, events: foldTools ? foldToolEvents(events) : events }
       }),
     referenceContext: (sessionId) =>
-      guarded(async () => sessionReferenceContext(await runtime.store.exportSnapshot(sessionId))),
+      guarded(async () => sessionReferenceContext(await runtime.store.recentSnapshot(sessionId, REFERENCE_EVENT_READ))),
     setGoal: (sessionId, objective) => guarded(() => runtime.setGoal(sessionId, objective)),
     resumeGoal: (sessionId) => guarded(() => runtime.resumeGoal(sessionId)),
     events: (sessionId, afterSeq, limit, foldTools) =>

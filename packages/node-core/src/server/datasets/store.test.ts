@@ -3,7 +3,8 @@ import { makeTestDb, type TestDb } from '../../testkit/db'
 import { schema } from '../db'
 import type { DatasetCreate } from '@acorn/protocol/datasets.ts'
 import { datasetCreateSchema } from '@acorn/protocol/datasets.ts'
-import { datasetSourceDescription, overdueRefresh } from './source'
+import { registeredDataSource } from '../dataSources/registry'
+import { datasetSourceDescription, ensureDatasetSource, overdueRefresh } from './source'
 import {
   addDatasetVersion,
   assertDatasetWriteScope,
@@ -267,4 +268,83 @@ it('shows a scheduled refresh as a gap once it is a quarter of its cadence late'
   const day = 86_400_000
   expect(overdueRefresh(dataset, 0, day + 3_599_999)).toBeUndefined()
   expect(overdueRefresh(dataset, 0, day + 3_600_000)).toMatchObject({ kind: 'gap', fromTime: day })
+})
+
+const recomputed = (id: string) =>
+  world!.db.$client
+    .prepare(
+      `SELECT
+      (SELECT COUNT(*) FROM dataset_rows WHERE dataset_id = ?) AS rowCount,
+      (SELECT COALESCE(SUM(length(data_json) + COALESCE(length(evidence_json), 0)), 0) FROM dataset_rows WHERE dataset_id = ?)
+        + (SELECT COALESCE(SUM(length(value_json)), 0) FROM dataset_corrections WHERE dataset_id = ?) AS byteCount`,
+    )
+    .get(id, id, id)
+const counted = (id: string) =>
+  world!.db.$client.prepare('SELECT row_count AS rowCount, byte_count AS byteCount FROM datasets WHERE id = ?').get(id)
+
+it('keeps the row and byte counts through writes, corrections, pruning, and removal', async () => {
+  const dataset = await setup('snapshot-history', 'agent')
+  const day = 86_400_000
+  const agentRow = (id: string, state: string) => ({
+    data: { id, at: 1, state },
+    evidence: { says: id },
+    reason: 'Because',
+  })
+  const put = (rows: ReturnType<typeof agentRow>[], observed: number) =>
+    writeDatasetRows(
+      world!.db,
+      getDataset(world!.db, dataset.id),
+      { datasetId: dataset.id, version: 1, rows },
+      observed,
+    )
+  const now = Date.now()
+  put([agentRow('a', 'open'), agentRow('b', 'open')], now - 100 * day)
+  put([agentRow('a', 'open')], now)
+  // The same observation again replaces its row, which changes its bytes and not its count.
+  put([agentRow('a', 'closed with a longer state')], now)
+  const row = rowIdentity(dataset, { id: 'a' })
+  correctDatasetRow(world!.db, getDataset(world!.db, dataset.id), row, 'first note')
+  correctDatasetRow(world!.db, getDataset(world!.db, dataset.id), row, 'a second, longer note')
+  expect(counted(dataset.id)).toEqual(recomputed(dataset.id))
+  expect(counted(dataset.id)).toMatchObject({ rowCount: 3 })
+  // Retention takes the two old observations.
+  expect(pruneDatasetRows(world!.db)).toBe(2)
+  expect(counted(dataset.id)).toEqual(recomputed(dataset.id))
+  expect(counted(dataset.id)).toMatchObject({ rowCount: 1 })
+})
+
+it('serves a run its pages from one read, and the same rows an unpaged read would', async () => {
+  const dataset = await setup('current-mirror')
+  for (let index = 0; index < 7; index++) write(dataset.id, 1, { id: `row-${index}`, at: 7 - index, state: 'open' })
+  const scope = { workspaceId: 'ws', projectId: 'project', parameters: {} }
+  ensureDatasetSource(world!.db, dataset.id, scope)
+  const source = registeredDataSource({ pluginId: 'core', sourceId: `dataset:${dataset.id}` })!
+  const read = (pageSize: number, cursor?: string) =>
+    source.coreHandler!(
+      {
+        operation: 'query',
+        mode: 'execution',
+        evaluationTime: 1,
+        pageSize,
+        ...(cursor ? { cursor } : {}),
+        query: {
+          source: { pluginId: 'core', sourceId: `dataset:${dataset.id}` },
+          scope,
+          sort: [{ pointer: '/at', direction: 'asc' }],
+        },
+      } as never,
+      { DB: world!.db } as never,
+      new AbortController().signal,
+    ) as Promise<{ records: { recordId: string }[]; completeness: { kind: string; cursor?: string } }>
+  const ids: string[] = []
+  let page = await read(3)
+  for (;;) {
+    ids.push(...page.records.map((record) => record.recordId))
+    if (page.completeness.kind !== 'more') break
+    page = await read(3, page.completeness.cursor)
+  }
+  const whole = await read(100)
+  expect(ids).toHaveLength(7)
+  expect(ids).toEqual(whole.records.map((record) => record.recordId))
+  expect(page.completeness).toEqual({ kind: 'complete' })
 })

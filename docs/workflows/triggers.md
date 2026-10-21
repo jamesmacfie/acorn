@@ -96,10 +96,11 @@ source it reads, and lists the trigger among that query's consumers. Changing th
 approved trigger needs **Start fresh**, because the ledger keeps projections, not records.
 
 **The check** reads the pinned query at the current time through every page, then decides each
-record. In one transaction it updates `workflow_trigger_records`, keyed by trigger, epoch, and record,
-reserves an occurrence of kind `record` for each admitted record up to the caps, and writes the
-checkpoint only when no admitted record was left over. A record over a cap stays undecided, so the
-next check sees it again. After the commit, each occurrence creates a root task titled
+record. In transactions of 500 records, with a turn for the Node's timers and sockets between them, it
+updates `workflow_trigger_records`, keyed by trigger, epoch, and record, and reserves an occurrence of
+kind `record` for each admitted record up to the caps. A last transaction marks records that stopped
+matching and writes the checkpoint, only when no admitted record was left over. A record over a cap
+stays undecided, so the next check sees it again. After the commits, each occurrence creates a root task titled
 "Workflow · record title" with origin `workflows:trigger`, then starts its run. The check returns
 "started N workflow runs", or nothing, which the run ring shows. A record whose run is still going
 starts nothing. A check that finds nothing creates nothing.

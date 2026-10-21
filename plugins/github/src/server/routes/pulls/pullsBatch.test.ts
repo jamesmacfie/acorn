@@ -71,7 +71,9 @@ describe('pulls batch route', () => {
     expect(item!.files?.files[0]).toMatchObject({ position: 0, patchState: 'available', patch: null })
     expect(fake.requests.filter((r) => r.kind === 'graphql-page')).toHaveLength(1)
     expect(fake.requests.filter((r) => r.kind === 'files')).toHaveLength(3)
-    expect(emit).toHaveBeenCalledWith('pr-synced', expect.objectContaining({ pullNumber: 7, headSha: null }))
+    expect(emit).toHaveBeenCalledWith('pr-synced', expect.objectContaining({ pullNumber: 7, headSha: null }), {
+      unchanged: true,
+    })
   })
 
   it('serves a fresh pull from the mirror without calling GitHub, with full patches when asked', async () => {

@@ -51,9 +51,7 @@ export function getDataset(db: AppDatabase, id: string): DatasetDefinition {
 export function listDatasets(db: AppDatabase, workspaceId: string, projectId?: string) {
   const rows = db.$client
     .prepare(`SELECT ${definitionColumns},
-    (SELECT COUNT(*) FROM dataset_rows r WHERE r.dataset_id = d.id) AS rowCount,
-    (SELECT COALESCE(SUM(length(data_json) + COALESCE(length(evidence_json), 0)), 0) FROM dataset_rows r WHERE r.dataset_id = d.id)
-      + (SELECT COALESCE(SUM(length(value_json)), 0) FROM dataset_corrections c WHERE c.dataset_id = d.id) AS bytes
+    row_count AS rowCount, byte_count AS bytes
     FROM datasets d WHERE workspace_id = ? AND (project_id IS NULL OR project_id = ?) ORDER BY created_at DESC`)
     .all(workspaceId, projectId ?? null) as (DatasetDefinition & { rowCount: number; bytes: number })[]
   return rows.map((row) => {
@@ -318,11 +316,8 @@ export function writeDatasetRows(
       )
     }
     const size = db.$client
-      .prepare(`SELECT
-      (SELECT COUNT(*) FROM dataset_rows WHERE dataset_id = ?) AS rows,
-      (SELECT COALESCE(SUM(length(data_json) + COALESCE(length(evidence_json), 0)), 0) FROM dataset_rows WHERE dataset_id = ?)
-        + (SELECT COALESCE(SUM(length(value_json)), 0) FROM dataset_corrections WHERE dataset_id = ?) AS bytes`)
-      .get(dataset.id, dataset.id, dataset.id) as { rows: number; bytes: number }
+      .prepare('SELECT row_count AS rows, byte_count AS bytes FROM datasets WHERE id = ?')
+      .get(dataset.id) as { rows: number; bytes: number }
     if (size.rows > dataset.maxRows || size.bytes > dataset.maxBytes)
       throw new DatasetError('capacity', 'Dataset cap exceeded.')
     // An agent's write is its capture: the dataset's last one says when it was last refreshed.
@@ -375,11 +370,9 @@ export function correctDatasetRow(
       .prepare(`INSERT INTO dataset_corrections (dataset_id, identity, value_json, corrected_at) VALUES (?, ?, ?, ?)
       ON CONFLICT(dataset_id, identity) DO UPDATE SET value_json = excluded.value_json, corrected_at = excluded.corrected_at`)
       .run(dataset.id, identity, JSON.stringify(value), Date.now())
-    const bytes = db.$client
-      .prepare(`SELECT
-      (SELECT COALESCE(SUM(length(data_json) + COALESCE(length(evidence_json), 0)), 0) FROM dataset_rows WHERE dataset_id = ?)
-        + (SELECT COALESCE(SUM(length(value_json)), 0) FROM dataset_corrections WHERE dataset_id = ?) AS bytes`)
-      .get(dataset.id, dataset.id) as { bytes: number }
+    const bytes = db.$client.prepare('SELECT byte_count AS bytes FROM datasets WHERE id = ?').get(dataset.id) as {
+      bytes: number
+    }
     if (bytes.bytes > dataset.maxBytes) throw new DatasetError('capacity', 'Dataset cap exceeded.')
   })()
 }

@@ -235,7 +235,7 @@ describe('detail mirror', () => {
     const emit = vi.fn()
     await refreshPullFiles('token', plugin.db, store, refreshKey, emit)
     expect((await filesSync())?.revision).toBe('base-sha:pushed-head')
-    expect(emit).toHaveBeenCalledWith('pr-synced', expect.objectContaining({ pullNumber: 7 }))
+    expect(emit).toHaveBeenCalledWith('pr-synced', expect.objectContaining({ pullNumber: 7 }), { unchanged: true })
   })
 
   it('keeps the previous detail and its sync time when a continuation fails', async () => {

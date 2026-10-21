@@ -187,20 +187,50 @@ describe('shared pull refresh operations', () => {
       ],
     })
     const prKey = { userId: USER, repoId: REPO_ID, number: 5 }
-    expect(await mirrorPr(plugin.db, prKey, withCheck('SUCCESS'), 1)).toEqual({ checksChanged: true })
-    expect(await mirrorPr(plugin.db, prKey, withCheck('SUCCESS'), 2)).toEqual({ checksChanged: false })
-    expect(await mirrorPr(plugin.db, prKey, withCheck('FAILURE'), 3)).toEqual({ checksChanged: true })
+    expect(await mirrorPr(plugin.db, prKey, withCheck('SUCCESS'), 1)).toEqual({ checksChanged: true, changed: true })
+    expect(await mirrorPr(plugin.db, prKey, withCheck('SUCCESS'), 2)).toEqual({ checksChanged: false, changed: false })
+    expect(await mirrorPr(plugin.db, prKey, withCheck('FAILURE'), 3)).toEqual({ checksChanged: true, changed: true })
+    const retitled = { ...withCheck('FAILURE'), title: 'Another title' }
+    expect(await mirrorPr(plugin.db, prKey, retitled, 4)).toEqual({ checksChanged: false, changed: true })
 
     const emit = vi.fn()
-    announcePrSynced(emit, { ...key, number: 5 }, 'abc123', false)
+    announcePrSynced(emit, { ...key, number: 5 }, 'abc123', false, false)
     expect(emit.mock.calls.map(([verb]) => verb)).toEqual(['pr-synced'])
-    announcePrSynced(emit, { ...key, number: 5 }, 'abc123', true)
+    expect(emit.mock.calls[0][2]).toEqual({ unchanged: true })
+    announcePrSynced(emit, { ...key, number: 5 }, 'abc123', true, true)
     expect(emit.mock.calls.map(([verb]) => verb)).toEqual(['pr-synced', 'pr-synced', 'checks-changed'])
     expect(emit.mock.calls[2][1]).toEqual({ repoOwner: 'acme', repoName: 'web', pullNumber: 5, headSha: 'abc123' })
   })
 
   // The guarantee in place of a shared transaction: adoption runs only after the mirror batch
   // commits, so a refresh that never reaches the batch cannot adopt a PR into a task.
+  it('says the open list changed only when a pull is new, gone, or different', async () => {
+    const listed = (title: string) =>
+      vi.fn(async () =>
+        json([
+          {
+            number: 5,
+            node_id: 'PR_5',
+            state: 'open',
+            draft: false,
+            title,
+            head: { ref: 'feature' },
+            base: { ref: 'main' },
+            user: { login: USER },
+            updated_at: '2026-07-11T00:00:00Z',
+          },
+        ]),
+      )
+    const refresh = async (title: string) => {
+      const emit = vi.fn()
+      await refreshOpenPulls('token', plugin.db, { tasks }, key, listed(title), emit)
+      return emit.mock.calls[0][2]
+    }
+    expect(await refresh('First')).toEqual({ unchanged: false })
+    expect(await refresh('First')).toEqual({ unchanged: true })
+    expect(await refresh('Second')).toEqual({ unchanged: false })
+  })
+
   it('does not adopt a PR into a task when the open-PR fetch fails', async () => {
     await core.db.insert(schema.tasks).values({
       id: 'task-1',

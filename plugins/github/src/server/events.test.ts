@@ -13,3 +13,12 @@ it('says the pull-requests source changed beside the two pull request verbs only
   expect(send).toHaveBeenCalledWith({ channel: 'plugin:github:pulls-changed', repoOwner: 'acme', repoName: 'app' })
   expect(changed.mock.calls).toEqual([['pull-requests'], ['pull-requests']])
 })
+
+it('says nothing changed in the source when the refresh found every row as it was', () => {
+  const send = vi.fn()
+  const changed = vi.fn()
+  const emit = githubEmitter(send, changed)
+  emit('pr-synced', { pullNumber: 7 }, { unchanged: true })
+  expect(send).toHaveBeenCalledWith({ channel: 'plugin:github:pr-synced', pullNumber: 7 })
+  expect(changed).not.toHaveBeenCalled()
+})

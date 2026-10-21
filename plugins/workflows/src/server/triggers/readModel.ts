@@ -1,4 +1,4 @@
-import { eq } from 'drizzle-orm'
+import { desc, eq, sql } from 'drizzle-orm'
 import type { PluginDatabase } from '@acorn/plugin-api/node'
 import type { ScheduleRow } from '@acorn/protocol/schedules.ts'
 import * as schema from '../../node/schema'
@@ -29,13 +29,14 @@ export async function workflowTriggerView(
   const scheduled = row.schedulerKey
     ? (await scheduler?.list())?.find((entry) => entry.key === row.schedulerKey)
     : undefined
+  // Each occurrence carries the workflow's whole graph, so read only the last. The row ID settles a tie.
   const occurrence = db
     .select()
     .from(schema.workflowTriggerOccurrences)
     .where(eq(schema.workflowTriggerOccurrences.triggerId, row.id))
-    .orderBy(schema.workflowTriggerOccurrences.updatedAt)
-    .all()
-    .at(-1)
+    .orderBy(desc(schema.workflowTriggerOccurrences.updatedAt), desc(sql`rowid`))
+    .limit(1)
+    .get()
   const internal = row.state as WorkflowTriggerState
   const unavailable = !!row.schedulerKey && (!scheduled?.registered || UNAVAILABLE.has(row.errorReason))
   const displayState: WorkflowTriggerView['state'] = unavailable

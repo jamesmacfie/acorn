@@ -1,0 +1,2 @@
+CREATE INDEX `agent_events_usage_time_idx` ON `agent_events` (`created_at`,`session_id`,`seq`) WHERE event_json ->> '$.type' = 'usage';--> statement-breakpoint
+CREATE INDEX `agent_events_usage_baseline_idx` ON `agent_events` (`session_id`,`seq`) WHERE event_json ->> '$.type' = 'usage' AND (event_json ->> '$.usage.inputTokens' IS NOT NULL OR event_json ->> '$.usage.cost' IS NOT NULL);

@@ -1,6 +1,7 @@
 import type { DataPredicate } from '@acorn/protocol/dataBindings.ts'
 import type {
   DataSourceDescription,
+  DataSourcePage,
   DataSourceQuery,
   DataSourceRequest,
   DataSourceScope,
@@ -9,6 +10,7 @@ import { DATA_LIMITS, parseDataPointer } from '@acorn/protocol/dataValues.ts'
 import type { Env } from '../bindings'
 import type { AppDatabase } from '../db'
 import { registerCoreDataSource, registeredDataSource } from '../dataSources/registry'
+import { createDataSelectionPager } from '../dataSources/selection'
 import { sourceFieldSchema } from '@acorn/protocol/dataSchemas.ts'
 import {
   DatasetError,
@@ -182,26 +184,22 @@ export function datasetSourceDescription(db: AppDatabase, dataset: DatasetDefini
   }
 }
 
-function sourcePage(
+/** Every row the query selects, up to the host's budget. A run's pages are cut from one read through the pager. */
+function readDataset(
   db: AppDatabase,
   dataset: DatasetDefinition,
   query: DataSourceQuery,
-  cursor: string | undefined,
-  pageSize: number,
   readTime: number,
-) {
+): DataSourcePage {
   const fields = new Set(datasetSourceDescription(db, dataset).fields.map((field) => field.pointer))
   const where = datasetPredicateSql(query.predicate, fields)
-  const offset = cursor === undefined ? 0 : Number(cursor)
-  if (!Number.isSafeInteger(offset) || offset < 0 || offset > DATA_LIMITS.selectionRecords)
-    throw new DatasetError('invalid', 'Invalid cursor.')
   const sort = query.sort
     .map((entry) => {
       if (!fields.has(entry.pointer)) throw new DatasetError('invalid', 'Unknown sort field.')
       return `json_extract(exposed.data_json, '${jsonPath(entry.pointer).replaceAll("'", "''")}') ${entry.direction.toUpperCase()}`
     })
     .join(', ')
-  const limit = Math.min(pageSize, query.take ?? DATA_LIMITS.selectionRecords)
+  const limit = query.take ?? DATA_LIMITS.selectionRecords
   const metadata = dataset.mode === 'snapshot-history' ? '_observationTime' : '_arrivedAt'
   const rows = db.$client
     .prepare(`WITH exposed AS (
@@ -211,15 +209,15 @@ function sourcePage(
       FROM dataset_rows r LEFT JOIN dataset_corrections c ON c.dataset_id = r.dataset_id AND c.identity = r.identity)
       SELECT identity, data_json AS dataJson, evidence_json AS evidenceJson, reason, value_json AS correctionJson
       FROM exposed WHERE dataset_id = ? AND removed_at IS NULL AND ${where.text}
-      ORDER BY ${sort ? `${sort}, ` : ''}id ASC LIMIT ? OFFSET ?`)
-    .all(dataset.id, ...where.params, limit + 1, offset) as {
+      ORDER BY ${sort ? `${sort}, ` : ''}id ASC LIMIT ?`)
+    .all(dataset.id, ...where.params, limit + 1) as {
     identity: string
     dataJson: string
     evidenceJson: string | null
     reason: string | null
     correctionJson: string | null
   }[]
-  const more = !query.take && rows.length > limit
+  const cut = !query.take && rows.length > limit
   const records = rows.slice(0, limit).map((row) => ({
     recordId: row.identity,
     data: {
@@ -239,22 +237,26 @@ function sourcePage(
     completeness:
       query.take && records.length === query.take
         ? { kind: 'bounded' as const }
-        : more
-          ? { kind: 'more' as const, cursor: String(offset + limit) }
+        : cut
+          ? { kind: 'incomplete' as const, cause: 'host-budget' as const }
           : gaps
             ? { kind: 'incomplete' as const, cause: 'coverage-gap' as const }
             : { kind: 'complete' as const },
   }
 }
 
+const pageDataset = createDataSelectionPager()
+
 function datasetSourceHandler(id: string) {
-  return (request: DataSourceRequest, env: Env) => {
+  return async (request: DataSourceRequest, env: Env) => {
     const dataset = getDataset(env.DB, id)
     const scope = request.operation === 'query' ? request.query.scope : request.scope
     assertDatasetScope(dataset, scope.workspaceId ?? '', scope.projectId)
     if (request.operation === 'describe') return datasetSourceDescription(env.DB, dataset)
     if (request.operation !== 'query') throw new DatasetError('invalid', 'Unsupported dataset operation.')
-    return sourcePage(env.DB, dataset, request.query, request.cursor, request.pageSize, request.evaluationTime)
+    return pageDataset(`dataset:${id}`, request, async () =>
+      readDataset(env.DB, dataset, request.query, request.evaluationTime),
+    )
   }
 }
 

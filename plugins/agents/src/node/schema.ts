@@ -138,6 +138,17 @@ export const agentEvents = sqliteTable(
     index('agent_events_session_tool_idx')
       .on(t.sessionId, sql`event_json ->> '$.tool.id'`)
       .where(sql`event_json ->> '$.type' = 'tool'`),
+    // The usage source's two reads, which repeat these expressions exactly. The first is a window of
+    // usage rows newest first. The second is a session's latest row before the window that carries a
+    // token count or a cost, which is all a delta needs to count from.
+    index('agent_events_usage_time_idx')
+      .on(t.createdAt, t.sessionId, t.seq)
+      .where(sql`event_json ->> '$.type' = 'usage'`),
+    index('agent_events_usage_baseline_idx')
+      .on(t.sessionId, t.seq)
+      .where(
+        sql`event_json ->> '$.type' = 'usage' AND (event_json ->> '$.usage.inputTokens' IS NOT NULL OR event_json ->> '$.usage.cost' IS NOT NULL)`,
+      ),
   ],
 )
 

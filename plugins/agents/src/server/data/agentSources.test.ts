@@ -2,6 +2,7 @@
 // rows (docs/data-sources.md).
 import { randomUUID } from 'node:crypto'
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
+import { desc, gt, sql, type SQL } from 'drizzle-orm'
 import { makeTestNodeContext, schema as core, type TestNodeContext } from '@acorn/plugin-api/testkit'
 import type { PluginFetchHandler } from '@acorn/plugin-api/node'
 import type { DataPredicate } from '@acorn/protocol/dataBindings.ts'
@@ -12,7 +13,7 @@ import { createApprovalSourceHandler } from './approvalSourceHandler'
 import { createSessionTotalsSourceHandler } from './sessionTotalsSourceHandler'
 import { createToolCallSourceHandler } from './toolCallSourceHandler'
 import { createTurnSourceHandler } from './turnSourceHandler'
-import { createUsageSourceHandler } from './usageSourceHandler'
+import { createUsageSourceHandler, usageBaseline, usageEvents } from './usageSourceHandler'
 import { usageRecords } from './usageRecords'
 
 const OCTOBER = Date.UTC(2026, 9, 1)
@@ -243,6 +244,70 @@ describe('agents data sources', () => {
       expect(unbounded.records).toHaveLength(5_000)
       expect(unbounded.records[0]?.recordId).toBe(events.at(-1)?.id)
       expect(unbounded.coveredRange?.start).toBe(events[1_000]?.createdAt)
+    })
+  })
+
+  describe('Agent usage reads', () => {
+    it('counts a cost from before the window when a context-only report sits just before it', async () => {
+      const projectId = await project(await workspace('Home'), 'api')
+      const taskId = await task(projectId, 'ACP session')
+      const sessionId = session(taskId, { provider: 'claude' })
+      // The running cost rises on every third report. The rest only say how full the context is.
+      const events = Array.from({ length: 90 }, (_, index) => ({
+        id: randomUUID(),
+        sessionId,
+        turnId: null,
+        seq: index + 1,
+        schemaVersion: 1,
+        eventJson: JSON.stringify({
+          type: 'usage',
+          usage:
+            index % 3 === 0
+              ? { contextUsed: index, cost: { amount: (index / 3 + 1) * 0.5, currency: 'USD' } }
+              : { contextUsed: index },
+        }),
+        createdAt: OCTOBER + (index - 41) * 60_000,
+      }))
+      db.transaction((tx) => {
+        for (const event of events) tx.insert(schema.agentEvents).values(event).run()
+      })
+      const everything = usageRecords(
+        events.map((event) => ({
+          id: event.id,
+          sessionId,
+          turnId: null,
+          taskId,
+          provider: 'claude',
+          model: null,
+          at: event.createdAt,
+          usage: JSON.parse(event.eventJson).usage,
+        })),
+        emptyAgentPricingPreferences(),
+      )
+      const october = new Map(everything.slice(41).map((record) => [record.recordId, record.data]))
+
+      const { records } = await readAll(
+        createUsageSourceHandler(db, ctx.core),
+        'usage-records',
+        {},
+        after('/at', OCTOBER - 1),
+      )
+      expect(records).toHaveLength(49)
+      for (const record of records) expect(record.data).toEqual(october.get(record.recordId))
+      expect(records.map((record) => record.data.costUsd).filter((cost) => cost)).toEqual(Array(16).fill(0.5))
+    })
+
+    it('reads a window and a baseline through the usage indexes', () => {
+      const plan = (query: { getSQL(): SQL }) =>
+        db
+          .all<{ detail: string }>(sql`EXPLAIN QUERY PLAN ${query.getSQL()}`)
+          .map((row) => row.detail)
+          .join('\n')
+      const window = usageEvents(db, gt(schema.agentEvents.createdAt, OCTOBER))
+        .orderBy(desc(schema.agentEvents.createdAt), desc(schema.agentEvents.sessionId), desc(schema.agentEvents.seq))
+        .limit(5_000)
+      expect(plan(window)).toContain('agent_events_usage_time_idx')
+      expect(plan(usageBaseline(db, 's', 10))).toContain('agent_events_usage_baseline_idx')
     })
   })
 

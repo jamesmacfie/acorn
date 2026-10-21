@@ -155,6 +155,25 @@ shutdown joins a sample already in progress.
 **Stop idle agents now** is `POST /v1/p/agents/stop-idle`, which runs `stopIdleSessionsNow` with the
 same rules and no time limit. Both routes are device-only, because they reach every task's agents.
 
+### Indexes on the event ledger
+
+`agents.sqlite` held about 830,000 events on one machine, and the Node reads it with a synchronous
+`DatabaseSync`, so a statement that scans the table stops every request until it ends. Three partial
+indexes on `agent_events` keep the reads that run often off a scan. SQLite uses an index on an
+expression only when the query writes the expression the same way, so each read repeats the index's
+`->>` expression exactly. A `json_extract` of the same path doesn't match, and the read scans the
+session or the table. Each has a plan test that fails when a read stops using its index.
+
+| Index | Rows it holds | Read |
+| --- | --- | --- |
+| `agent_events_session_tool_idx` | Tool rows, by session and tool ID | One call by ID, the command settle, and `commandTurn` (`commandLifecycle.ts`) |
+| `agent_events_usage_time_idx` | Usage rows, by time, session, and sequence | A window of the usage source, newest first |
+| `agent_events_usage_baseline_idx` | Usage rows with a token count or a cost, by session and sequence | The report a window's deltas count from |
+
+A turn's end settles only that turn's commands, through `agent_events_turn_seq_idx`. A session state
+or a subagent's end settles the whole session. A `#session` reference reads the newest 201 events,
+not the session.
+
 ## Shutdown
 
 Shutdown closes queue admission, aborts starts, and clears reconnect, quiet, idle, and process sample

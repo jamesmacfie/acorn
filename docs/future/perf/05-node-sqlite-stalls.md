@@ -1,5 +1,65 @@
 # Phase 5: stop SQLite reads stalling the Node
 
+## Completion note
+
+Landed October 22, 2026, on branch `phase-5-node-sqlite-stalls`. The code, tests, and docs are done.
+The week of Sentry the acceptance asks for isn't taken, and neither are phase 1's per-statement
+timings on the owner's `agents.sqlite`, so the speedups are argued from query plans, not measured.
+
+What landed:
+
+- The command settle and `commandTurn` write `->>`, so they read through `agent_events_session_tool_idx`.
+  A turn's end settles that turn through `agent_events_turn_seq_idx`. Plan tests cover both reads.
+- A `#session` reference reads the newest 201 events through `AgentStore.recentSnapshot`, not the whole
+  session.
+- Migration `0022_agent_events_usage_index.sql` adds `agent_events_usage_time_idx` and
+  `agent_events_usage_baseline_idx`. The usage source reads its window through the first, and each
+  session's baseline through the second with one `LIMIT 1`.
+- A record trigger check loads its ledger rows in one query, dedupes with a `Set`, and writes in
+  transactions of 500 with `await setImmediate()` between them. A last transaction marks records that
+  stopped matching and writes the checkpoint. GitHub raises `changed('pull-requests')` only when a
+  refresh changed a row.
+- A dataset read selects its rows once per run, through `createDataSelectionPager`. Migration
+  `0014_dataset_size_counters.sql` adds `row_count` and `byte_count` to `datasets`, kept by triggers.
+- The trigger view reads only the latest occurrence.
+- The operations page names the indexes and why a read must repeat their expressions.
+
+Decisions and deviations:
+
+1. The `#session` reference keeps the old output exactly. It reads the newest 201 events of every
+   type, as the renderer slices the last 200 of all types, not `LIMIT 200` over the shown types. That
+   would have put earlier messages into a tool-heavy session's reference.
+2. The usage baseline is the latest earlier report that carries a token count or a cost, not the plain
+   latest one. ACP reports often carry only context, and the old code carried the last cost forward, so a
+   plain `LIMIT 1` would have counted a session's whole earlier cost on the window's first record. It
+   stays exact for a session that reports tokens or a cost, as Codex and ACP do. A harness that reported
+   tokens in one row and a cost in another would count from the later one only.
+3. The turn-end settle covers commands with that turn's ID. A command with no turn ID waits for the next
+   session state or subagent settle, and for the boot settle.
+4. Record trigger writes are no longer one transaction. A crash between chunks leaves a partial ledger,
+   which the next check reads as already seen, and the checkpoint moves only in the last transaction.
+5. GitHub's `emit` takes `{ unchanged: true }` as a third argument. `mirrorPr` says `changed` when the
+   pull row, ignoring its fetch time, or its checks differ. GitHub's `updatedAt` moves with comments,
+   reviews, labels, and commits. A file refresh never raises the source.
+6. A dataset read past 5,000 rows now ends `incomplete` with `host-budget`. It used to fail its cursor
+   at the next page.
+7. Dataset counters use triggers, so every writer, tests and the retention pass included, is covered.
+8. The optional read worker is skipped. Without phase 1's numbers on the owner's file, nothing shows that
+   a read still passes 250 ms.
+
+Not done:
+
+- The `sql.select` window counts and the event loop p99 over a working week.
+- Both new `agents` indexes build over the owner's 830,000 events when the Node first boots. Migration
+  0021 did the same. Watch that boot's `migrate` mark.
+
+For later phases:
+
+- The Node service bundle is 1,933,484 B.
+- Two failures were on the base before this phase and still fail: `routeRegistry.test.ts` lacks phase 3's
+  `GET /v1/core/task-scripts` in its golden list, and four loaded `http` plugin tests in `apps/node` fail
+  with "Unclassified host context method ... core.proc.lowerPriority" from phase 4.
+
 Date: October 21, 2026. Status: proposed. Can run beside phases 7 and 8.
 
 The Node reads its stores through `node:sqlite`'s synchronous `DatabaseSync`. A long statement stops

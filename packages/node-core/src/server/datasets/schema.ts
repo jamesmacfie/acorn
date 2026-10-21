@@ -19,6 +19,9 @@ export const datasets = sqliteTable(
     retentionDays: integer('retention_days').notNull(),
     maxRows: integer('max_rows').notNull(),
     maxBytes: integer('max_bytes').notNull(),
+    // Kept by triggers on the rows and corrections tables, so a write checks its caps without summing them.
+    rowCount: integer('row_count').notNull().default(0),
+    byteCount: integer('byte_count').notNull().default(0),
     createdAt: integer('created_at').notNull(),
     updatedAt: integer('updated_at').notNull(),
   },

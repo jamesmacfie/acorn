@@ -3,6 +3,7 @@
 // nothing creates nothing. Loaded on a trigger's first check, approval, or preview, to keep it off the
 // Node's boot graph.
 import { randomUUID } from 'node:crypto'
+import { setImmediate as yieldToNode } from 'node:timers/promises'
 import { and, count, desc, eq, gt, inArray, notInArray } from 'drizzle-orm'
 import type { PluginDatabase } from '@acorn/plugin-api/node'
 import { ScheduleSkipped } from '@acorn/plugin-api/node'
@@ -39,6 +40,8 @@ export const DEFAULT_RUNS_PER_CHECK = 10
 export const DEFAULT_RUNS_PER_DAY = 50
 const PREVIEW_RECORDS = 20
 const MATCH_HISTORY = 50
+// Records written per transaction. A check of 5,000 held the Node's loop for the whole of them.
+const WRITE_CHUNK = 500
 
 /** Reads a record trigger's source in its project's scope, as the workflow's owner. */
 export type TriggerRecordReader = {
@@ -279,10 +282,11 @@ async function readRecords(
 }
 
 /**
- * One check. It reads every page, decides each record, and in one transaction updates the ledger and
- * reserves an occurrence for each admitted record up to the caps. A record over a cap stays undecided,
- * so the next check sees it again, and the checkpoint moves only when nothing was left over. After the
- * commit, each occurrence makes its task and starts its run. A baseline check, Track from now, writes
+ * One check. It reads every page, decides each record, and in transactions of 500 records updates the
+ * ledger and reserves an occurrence for each admitted record up to the caps. A last transaction marks
+ * the records that stopped matching and records the check. A record over a cap stays undecided, so the
+ * next check sees it again, and the checkpoint moves only when nothing was left over. After the
+ * commits, each occurrence makes its task and starts its run. A baseline check, Track from now, writes
  * the ledger and starts nothing.
  */
 export async function checkRecords(
@@ -310,81 +314,105 @@ export async function checkRecords(
   let leftOver = false
   let dailyCapped = false
 
-  db.transaction((tx) => {
-    let today = tx
-      .select({ n: count() })
-      .from(occurrences)
+  let today = db
+    .select({ n: count() })
+    .from(occurrences)
+    .where(
+      and(
+        eq(occurrences.triggerId, row.id),
+        eq(occurrences.generation, row.generation),
+        eq(occurrences.kind, 'record'),
+        gt(occurrences.createdAt, at - DAY_MS),
+        notInArray(occurrences.state, ['blocked', 'skipped']),
+      ),
+    )
+    .get()!.n
+  let started = 0
+  const found = result.records.map((record) => ({ record: envelopeOf(record), recordKey: recordIdentity(record) }))
+  const kept = new Map(
+    db
+      .select()
+      .from(ledger)
       .where(
         and(
-          eq(occurrences.triggerId, row.id),
-          eq(occurrences.generation, row.generation),
-          eq(occurrences.kind, 'record'),
-          gt(occurrences.createdAt, at - DAY_MS),
-          notInArray(occurrences.state, ['blocked', 'skipped']),
+          eq(ledger.triggerId, row.id),
+          eq(ledger.epoch, row.epoch),
+          inArray(
+            ledger.recordKey,
+            found.flatMap(({ recordKey }) => (recordKey ? [recordKey] : [])),
+          ),
         ),
       )
-      .get()!.n
-    let started = 0
-    const seen: string[] = []
-    for (const found of result.records) {
-      const record = envelopeOf(found)
-      const recordKey = recordIdentity(record)
-      if (!recordKey || seen.includes(recordKey) || ownRun(tx, row.id, record)) continue
-      seen.push(recordKey)
-      const key = and(eq(ledger.triggerId, row.id), eq(ledger.epoch, row.epoch), eq(ledger.recordKey, recordKey))
-      const kept = tx.select().from(ledger).where(key).get()
-      // Overlap is per record: one whose run is still going starts nothing, whichever epoch started it.
-      const active = tx
-        .select({ id: occurrences.id })
-        .from(occurrences)
-        .where(
-          and(
-            eq(occurrences.triggerId, row.id),
-            eq(occurrences.recordKey, recordKey),
-            inArray(occurrences.state, [...ACTIVE_OCCURRENCE]),
-          ),
-        )
-        .get()
-      const decision: RecordChangeDecision = recordChangeDecision({
-        policy,
-        snapshot: record as unknown as DataValue,
-        previous: previousOf(kept),
-        active: !!active,
-        baseline: options.baseline,
-      })
-      let occurrenceId = kept?.lastOccurrenceId ?? null
-      if (decision === 'admitted') {
-        if (started >= perCheck || today >= perDay) {
-          leftOver = true
-          dailyCapped ||= today >= perDay
-          continue
-        }
-        const filled = recordInputs(graph, literals, when.bindings, record)
-        const occurrence = deps.occurrences.reserveIn(tx, row, {
-          kind: 'record',
-          requestKey: `record:${checkId}:${recordKey}`,
-          recordKey,
-          record: { title: titleOf(record), reason: when.change.on },
-          ...('inputs' in filled
-            ? { inputs: filled.inputs }
-            : { inputs: literals, blocked: `${titleOf(record)}: ${filled.problem}` }),
+      .all()
+      .map((entry) => [entry.recordKey, entry]),
+  )
+  const seen = new Set<string>()
+  for (let from = 0; from < found.length; from += WRITE_CHUNK) {
+    // Each chunk's writes hold the Node's loop until they commit. Awaiting a finished query doesn't
+    // let timers and sockets run, so give them a turn here.
+    if (from) await yieldToNode()
+    db.transaction((tx) => {
+      for (const { record, recordKey } of found.slice(from, from + WRITE_CHUNK)) {
+        if (!recordKey || seen.has(recordKey) || ownRun(tx, row.id, record)) continue
+        seen.add(recordKey)
+        const previous = kept.get(recordKey)
+        // Overlap is per record: one whose run is still going starts nothing, whichever epoch started it.
+        const active = tx
+          .select({ id: occurrences.id })
+          .from(occurrences)
+          .where(
+            and(
+              eq(occurrences.triggerId, row.id),
+              eq(occurrences.recordKey, recordKey),
+              inArray(occurrences.state, [...ACTIVE_OCCURRENCE]),
+            ),
+          )
+          .get()
+        const decision: RecordChangeDecision = recordChangeDecision({
+          policy,
+          snapshot: record as unknown as DataValue,
+          previous: previousOf(previous),
+          active: !!active,
+          baseline: options.baseline,
         })
-        occurrenceId = occurrence.id
-        if (occurrence.state === 'claimed') {
-          reserved.push(occurrence)
-          started++
-          today++
+        let occurrenceId = previous?.lastOccurrenceId ?? null
+        if (decision === 'admitted') {
+          if (started >= perCheck || today >= perDay) {
+            leftOver = true
+            dailyCapped ||= today >= perDay
+            continue
+          }
+          const filled = recordInputs(graph, literals, when.bindings, record)
+          const occurrence = deps.occurrences.reserveIn(tx, row, {
+            kind: 'record',
+            requestKey: `record:${checkId}:${recordKey}`,
+            recordKey,
+            record: { title: titleOf(record), reason: when.change.on },
+            ...('inputs' in filled
+              ? { inputs: filled.inputs }
+              : { inputs: literals, blocked: `${titleOf(record)}: ${filled.problem}` }),
+          })
+          occurrenceId = occurrence.id
+          if (occurrence.state === 'claimed') {
+            reserved.push(occurrence)
+            started++
+            today++
+          }
         }
+        // An active record keeps its projection, so a change made while its run works is seen after.
+        const projection =
+          decision === 'admitted' || decision === 'baseline' || !previous
+            ? recordProjection(record, fields)
+            : previous.projection
+        const values = { projection, matching: true, lastSeenAt: at, lastOccurrenceId: occurrenceId }
+        tx.insert(ledger)
+          .values({ triggerId: row.id, epoch: row.epoch, recordKey, firstSeenAt: at, ...values })
+          .onConflictDoUpdate({ target: [ledger.triggerId, ledger.epoch, ledger.recordKey], set: values })
+          .run()
       }
-      // An active record keeps its projection, so a change made while its run works is seen after.
-      const projection =
-        decision === 'admitted' || decision === 'baseline' || !kept ? recordProjection(record, fields) : kept.projection
-      const values = { projection, matching: true, lastSeenAt: at, lastOccurrenceId: occurrenceId }
-      tx.insert(ledger)
-        .values({ triggerId: row.id, epoch: row.epoch, recordKey, firstSeenAt: at, ...values })
-        .onConflictDoUpdate({ target: [ledger.triggerId, ledger.epoch, ledger.recordKey], set: values })
-        .run()
-    }
+    })
+  }
+  db.transaction((tx) => {
     if (whole)
       tx.update(ledger)
         .set({ matching: false })
@@ -393,7 +421,7 @@ export async function checkRecords(
             eq(ledger.triggerId, row.id),
             eq(ledger.epoch, row.epoch),
             eq(ledger.matching, true),
-            notInArray(ledger.recordKey, seen),
+            notInArray(ledger.recordKey, [...seen]),
           ),
         )
         .run()
@@ -409,16 +437,16 @@ export async function checkRecords(
       .run()
   })
 
-  let started = 0
+  let resumedRuns = 0
   for (const occurrence of reserved) {
     // A failure that needs the owner has already moved the trigger to review. Any other leaves the
     // occurrence claimed, and the next check's reconcile resumes it.
     const resumed = await deps.occurrences.resume(occurrence).catch(() => undefined)
-    if (resumed?.state === 'run-started') started++
+    if (resumed?.state === 'run-started') resumedRuns++
   }
   // After this check's runs start, because review blocks an occurrence that hasn't.
   if (dailyCapped) deps.moveToReview(row.id, `Started ${perDay} runs today. Review the trigger before it starts more.`)
-  if (started) return `started ${started} workflow ${started === 1 ? 'run' : 'runs'}`
+  if (resumedRuns) return `started ${resumedRuns} workflow ${resumedRuns === 1 ? 'run' : 'runs'}`
 }
 
 /** Track from now, run in place by approval: the ledger learns today's matches and nothing starts.

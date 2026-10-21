@@ -62,6 +62,15 @@ describe('a record trigger', () => {
     expect(t.occurrences()).toHaveLength(2)
   })
 
+  it('shows the latest of its runs, the last one saved when they share a time', async () => {
+    const trigger = await approve()
+    returns(task('t-1', 'One'), task('t-2', 'Two'), task('t-3', 'Three'))
+    await check(trigger.id)
+    t.database.db.update(schema.workflowTriggerOccurrences).set({ updatedAt: 1 }).run()
+    const latest = t.occurrences().at(-1)!
+    expect((await t.service.view(trigger.id)).latest).toMatchObject({ taskId: latest.taskId, runId: latest.runId })
+  })
+
   it('starts again when a record stops matching and starts again', async () => {
     const trigger = await approve({ change: { on: 'enters' } })
     returns(task('t-1', 'Failing'))
@@ -122,6 +131,18 @@ describe('a record trigger', () => {
     expect(t.occurrences()).toHaveLength(1)
     expect(t.occurrence()).toMatchObject({ state: 'run-started' })
     expect(runs().map((run) => run.id)).toEqual([t.occurrence().runId])
+  })
+
+  it('lets the Node answer a timer between the chunks of a 5,000-record check', async () => {
+    returns(...Array.from({ length: 5_000 }, (_, index) => task(`t-${index}`, `Triage ${index}`)))
+    let ticks = 0
+    const timer = setInterval(() => ticks++, 0)
+    const trigger = await approve({}, 'track-now')
+    clearInterval(timer)
+    expect(trigger.state).toBe('active')
+    expect(t.database.db.select().from(schema.workflowTriggerRecords).all()).toHaveLength(5_000)
+    // Ten chunks of 500 leave nine turns for the timer. Without them it ticks about once.
+    expect(ticks).toBeGreaterThanOrEqual(5)
   })
 
   it('tracks from now in place: the trigger is active at once and starts nothing for current matches', async () => {

@@ -4,6 +4,8 @@ import type { AgentContextSnapshot } from '@acorn/protocol/agentContext.ts'
 import type { AgentSessionSnapshot } from '../../contract/wire.ts'
 
 const MAX_EVENTS = 200
+/** How many of the newest events to read: one more than it keeps, so it can tell it left some out. */
+export const REFERENCE_EVENT_READ = MAX_EVENTS + 1
 const MAX_CHARACTERS = 100_000
 
 /** Render only conversation events, plans, and file changes. Tool output is not part of this copy. */

@@ -72,12 +72,11 @@ export async function refreshOpenPulls(
   const etag = res.headers.get('etag')
   const body = (await res.json()) as GitHubPull[]
   const retainedNumbers = new Set(body.map((pull) => pull.number))
-  const removedPulls = (
-    await db
-      .select({ userId: pullRequests.userId, repoId: pullRequests.repoId, number: pullRequests.number })
-      .from(pullRequests)
-      .where(and(eq(pullRequests.userId, userId), eq(pullRequests.repoId, repoId), eq(pullRequests.state, 'open')))
-  ).filter((pull) => !retainedNumbers.has(pull.number))
+  const openBefore = await db
+    .select()
+    .from(pullRequests)
+    .where(and(eq(pullRequests.userId, userId), eq(pullRequests.repoId, repoId), eq(pullRequests.state, 'open')))
+  const removedPulls = openBefore.filter((pull) => !retainedNumbers.has(pull.number))
   const rows = body.map((pull) => ({
     userId,
     repoId,
@@ -93,6 +92,20 @@ export async function refreshOpenPulls(
     autoMergeEnabled: false,
     fetchedAt: now,
   }))
+
+  // Only what the upsert below writes, so a re-listed pull that is the same counts as unchanged.
+  const mirrored = new Map(openBefore.map((pull) => [pull.number, pull]))
+  const changed =
+    removedPulls.length > 0 ||
+    rows.some((row) => {
+      const before = mirrored.get(row.number)
+      return (
+        !before ||
+        (Object.keys(row) as (keyof typeof row)[]).some(
+          (column) => column !== 'fetchedAt' && before[column] !== row[column],
+        )
+      )
+    })
 
   const branchToPull = new Map<string, number>()
   for (const pull of body) if (pull.head?.ref) branchToPull.set(pull.head.ref, pull.number)
@@ -128,7 +141,7 @@ export async function refreshOpenPulls(
   ])
   // After the mirror commits, never inside it: two SQLite files cannot share a transaction.
   await core.tasks.adoptChangeRequests('github', `${owner}/${repo}`, branchToPull)
-  emit('pulls-changed', { repoOwner: owner, repoName: repo })
+  emit('pulls-changed', { repoOwner: owner, repoName: repo }, { unchanged: !changed })
   return { ok: true }
 }
 
@@ -145,13 +158,13 @@ export async function refreshPullDetail(
   const { fetchPullComposite } = await import('../mirror/prFetch')
   const pull = await fetchPullComposite(token, key.owner, key.repo, key.number)
   if (!pull.ok) return pull
-  const { checksChanged } = await mirrorPr(
+  const { checksChanged, changed } = await mirrorPr(
     db,
     { userId: key.userId, repoId: key.repoId, number: key.number },
     pull.value,
     Date.now(),
   )
-  announcePrSynced(emit, key, pull.value.headRefOid, checksChanged)
+  announcePrSynced(emit, key, pull.value.headRefOid, checksChanged, changed)
   return { ok: true, headSha: pull.value.headRefOid, checksSha: pull.value.checksOid ?? null }
 }
 
@@ -167,19 +180,21 @@ export async function refreshPullFiles(
   const files = await fetchFiles(token, key.owner, key.repo, key.number)
   if (!files.ok) return files
   await mirrorFiles(blobs, db, { userId: key.userId, repoId: key.repoId, number: key.number }, files.value)
-  announcePrSynced(emit, key, null, false)
+  announcePrSynced(emit, key, null, false, false)
   return { ok: true }
 }
 
 /** One PR's composite landed. `checks-changed` rides alongside only when a check flipped: it is the
- *  verb a consumer keys a green-to-red alert on, so it must not fire on every sync. */
+ *  verb a consumer keys a green-to-red alert on, so it must not fire on every sync. `changed` says
+ *  whether the pull request source's record moved. */
 export function announcePrSynced(
   emit: GithubEmit,
   key: PullRefreshKey & { number: number },
   headSha: string | null,
   checksChanged: boolean,
+  changed: boolean,
 ): void {
   const payload = { repoOwner: key.owner, repoName: key.repo, pullNumber: key.number, headSha }
-  emit('pr-synced', payload)
+  emit('pr-synced', payload, { unchanged: !changed })
   if (checksChanged) emit('checks-changed', payload)
 }
