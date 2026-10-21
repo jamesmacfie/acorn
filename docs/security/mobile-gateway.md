@@ -74,12 +74,19 @@ The gateway answers these paths:
 | `GET /session` | Names the Node, as `{ nodeId, label }`, to a phone with a live session, and answers `401 signed_out` to one without |
 | `/node/*` | Forwards the rest of the path and the query to the Node through `broker.fetch`, and answers with the Node's status, headers, and body |
 | `GET /events` | The event socket |
-| Any other `GET` | A file from the built web app in `apps/mobile/dist`, or its `index.html` for a path without an extension, with `Content-Security-Policy: script-src 'self'` |
+| Any other `GET` | A file from the built web app in `apps/mobile/dist`, or its `index.html` for a path without an extension, with `Content-Security-Policy: script-src 'self'; object-src 'none'; base-uri 'none'; frame-ancestors 'none'; form-action 'self'` |
 
 A forwarded request keeps its headers except the ones that describe the phone's connection to the
 gateway: the cookie, `Authorization`, `Host`, `Origin`, `Referer`, the `Sec-` and `X-Forwarded-`
 families, and the hop-by-hop headers. The broker sets the Node's own `Authorization`. The answer drops
 `Set-Cookie` and the hop-by-hop headers.
+
+The gateway sandboxes every forwarded answer, so a Node answer never renders as a page with the
+phone's session. It replaces any `Content-Security-Policy` and `X-Content-Type-Options` the Node sent
+with `Content-Security-Policy: sandbox; default-src 'none'` and `X-Content-Type-Options: nosniff`. A
+loaded plugin's HTML opened at a `/node` address runs no script, makes no requests, and has an opaque
+origin, so it can't use the cookie. The app reads these answers with `fetch`, which the policy doesn't
+touch, and an image still draws. The gateway's own error answers carry the same two headers.
 
 The request's `x-request-id`, or a fresh one, becomes the broker's request ID, prefixed with the
 session so phones can't collide. When the phone closes a request before the answer, the gateway calls

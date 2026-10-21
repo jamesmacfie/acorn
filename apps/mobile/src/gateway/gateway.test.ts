@@ -217,6 +217,27 @@ describe('forwarding to the Node', () => {
     expect(request.headers).toEqual({ accept: 'application/json', 'x-request-id': 'read-1' })
   })
 
+  it('sandboxes a Node answer over any policy the Node set', async () => {
+    const session = await cookie()
+    broker.fetch.mockResolvedValue({
+      status: 200,
+      headers: { 'Content-Type': 'text/html', 'Content-Security-Policy': "script-src 'unsafe-inline'" },
+      body: new TextEncoder().encode('<script>fetch("/node/v1/core/terminals")</script>'),
+    })
+    const reply = await send('/node/v1/p/hostile/page', { headers: { cookie: session } })
+    expect(reply.headers['content-type']).toBe('text/html')
+    expect(reply.headers['content-security-policy']).toBe("sandbox; default-src 'none'")
+    expect(reply.headers['x-content-type-options']).toBe('nosniff')
+  })
+
+  it('keeps a JSON answer’s type and sandboxes it too', async () => {
+    const session = await cookie()
+    const reply = await send('/node/v1/core/tasks', { headers: { cookie: session } })
+    expect(reply.headers['content-type']).toBe('application/json')
+    expect(reply.headers['content-security-policy']).toBe("sandbox; default-src 'none'")
+    expect(reply.headers['x-content-type-options']).toBe('nosniff')
+  })
+
   it('forwards a write with its body', async () => {
     const session = await cookie()
     await send('/node/v1/core/tasks', {
@@ -317,13 +338,22 @@ describe('the event socket', () => {
 })
 
 describe('the web app', () => {
-  it('serves the page with a same-origin script policy, for the app’s own routes too', async () => {
+  it('serves the page with its policy, for the app’s own routes too', async () => {
     for (const path of ['/', '/w/workspace-1', '/w/workspace-1/tasks', '/t/task-1']) {
       const reply = await send(path)
       expect(reply.status).toBe(200)
       expect(reply.body).toContain('<title>Acorn</title>')
-      expect(reply.headers['content-security-policy']).toBe("script-src 'self'")
+      expect(reply.headers['content-security-policy']).toBe(
+        "script-src 'self'; object-src 'none'; base-uri 'none'; frame-ancestors 'none'; form-action 'self'",
+      )
     }
+  })
+
+  it('sandboxes its error answers', async () => {
+    const reply = await send('/missing.js')
+    expect(reply.status).toBe(404)
+    expect(reply.headers['content-security-policy']).toBe("sandbox; default-src 'none'")
+    expect(reply.headers['x-content-type-options']).toBe('nosniff')
   })
 
   it('serves nothing outside the app', async () => {

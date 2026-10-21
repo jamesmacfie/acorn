@@ -55,7 +55,25 @@ const NOT_FORWARDED = new Set([
   'transfer-encoding',
   'upgrade',
 ])
-const NOT_RETURNED = new Set(['connection', 'content-length', 'keep-alive', 'set-cookie', 'transfer-encoding'])
+// The Node's own policy and sniffing headers are dropped too, because SANDBOXED replaces them.
+const NOT_RETURNED = new Set([
+  'connection',
+  'content-length',
+  'content-security-policy',
+  'keep-alive',
+  'set-cookie',
+  'transfer-encoding',
+  'x-content-type-options',
+])
+// Set on every answer that isn't one of the app's files. A Node answer opened as a page, such as a
+// loaded plugin's HTML, runs no script, makes no requests, and has an opaque origin, so it can't use
+// the session cookie. The app reads these answers with fetch, which the policy doesn't touch, and an
+// image still draws.
+const SANDBOXED = { 'content-security-policy': "sandbox; default-src 'none'", 'x-content-type-options': 'nosniff' }
+// The desktop's renderer_csp also sets default-src, style-src, font-src, img-src, connect-src,
+// worker-src, and frame-src. They're left out here because the app sets styles at run time, and
+// default-src would fall back onto those, so each needs its own check on a real phone.
+const APP_POLICY = "script-src 'self'; object-src 'none'; base-uri 'none'; frame-ancestors 'none'; form-action 'self'"
 
 const CONTENT_TYPES: Record<string, string> = {
   '.css': 'text/css; charset=utf-8',
@@ -93,7 +111,7 @@ type Phone = { viewerId: string; session: string; answeredPing: boolean }
 
 const answer = (res: ServerResponse, status: number, code: string, message: string): void => {
   res
-    .writeHead(status, { 'content-type': 'application/json', 'cache-control': 'no-store' })
+    .writeHead(status, { 'content-type': 'application/json', 'cache-control': 'no-store', ...SANDBOXED })
     .end(JSON.stringify({ error: { code, message } }))
 }
 
@@ -205,7 +223,7 @@ export function startGateway(options: {
     })
     try {
       const response = await broker.fetch(nodeId, request.data)
-      res.writeHead(response.status, returnedHeaders(response.headers)).end(response.body)
+      res.writeHead(response.status, { ...returnedHeaders(response.headers), ...SANDBOXED }).end(response.body)
     } catch (error) {
       if (res.destroyed) return
       const { name, message } = describeError(error)
@@ -231,7 +249,7 @@ export function startGateway(options: {
     res
       .writeHead(200, {
         'content-type': CONTENT_TYPES[extname(file)] ?? 'application/octet-stream',
-        'content-security-policy': "script-src 'self'",
+        'content-security-policy': APP_POLICY,
         'x-content-type-options': 'nosniff',
         'cache-control': 'no-cache',
       })

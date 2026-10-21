@@ -1,5 +1,38 @@
 # Phase 2: sandbox what the gateway forwards
 
+## Completion note
+
+Done on October 22, 2026.
+
+What landed:
+
+- `forward` in `apps/mobile/src/gateway/gateway.ts` sets `SANDBOXED` on every Node answer:
+  `content-security-policy: sandbox; default-src 'none'` and `x-content-type-options: nosniff`.
+  `answer` sets the same two on every gateway error.
+- `NOT_RETURNED` also drops the Node's `content-security-policy` and `x-content-type-options`. The
+  Node's header names keep their case, so spreading `SANDBOXED` over them would send a plugin's
+  `Content-Security-Policy` beside ours rather than replace it.
+- The app page's policy is `APP_POLICY`, with the four directives this doc lists. A comment names the
+  directives of the desktop's `renderer_csp` it leaves out and why.
+- The mobile gateway reference describes the sandbox under **Forward requests** and gives the full app
+  policy in the paths table. No public site page cites the changed files.
+- Tests in `gateway.test.ts`: a plugin HTML answer with its own mixed-case policy, a JSON answer, the
+  app page's policy, and a 404 error answer.
+
+Decisions and deviations:
+
+- The two success answers the gateway builds itself, `GET /session` and the sign-in `204`, don't carry
+  the sandbox. The doc asked only for `answer`'s errors. Both are JSON or empty.
+- `content-security-policy-report-only` from the Node still passes through. It can't loosen anything.
+
+For later phases:
+
+- The `pnpm dev:mobile` walk in Acceptance didn't run here, because it needs a real phone. Phase 6
+  should open `/node/v1/core/tasks` in the phone's browser and check the policy in its tools.
+- The phone app downloads attachments with `fetch` and builds a `blob:` link, so the sandbox doesn't
+  touch downloads. A future feature that links straight to a `/node` address would open a sandboxed
+  page.
+
 Date: October 22, 2026. Status: proposed. Severity: medium.
 
 The phone gateway serves the phone app and the Node's API from one address, and the session cookie
