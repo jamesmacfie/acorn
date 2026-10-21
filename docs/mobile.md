@@ -101,6 +101,23 @@ Watch for these traps:
   gateway's own port too.
 - `kill -USR1 PID` prints another sign-in code. The gateway prints its PID with the first one.
 
+## Narrow mode
+
+`index.html` sets `data-form-factor="narrow"` on `<html>`, so the attribute holds before the first
+paint. Client-core does the rest, and no plugin changes
+([the narrow sheet](./ui-design/tokens.md#the-narrow-sheet)):
+
+- Controls and rows take touch sizes, and text inputs draw at 16px so iOS Safari doesn't zoom into them.
+- Controls that appear on hover are always shown.
+- `startClientRuntime` installs `installLongPressMenu`, which sends the `contextmenu` event a
+  right-click sends after a finger rests for half a second. iOS sends none of its own, and Android's
+  is dropped when ours arrived first, so a menu opens once.
+- A pane that lists only `desktop` in its `formFactor`, such as Preview, isn't offered
+  ([form factor](./panes/contributions.md#form-factor)).
+- The rail data a plugin's tree reads carries `formFactor: 'narrow'`.
+
+The phone's own bars are sized in `mobile.css`.
+
 ## Limits
 
 - Loaded plugins don't run, because the browser has no plugin custody.

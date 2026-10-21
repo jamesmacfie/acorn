@@ -16,6 +16,8 @@ import type { Region } from '../../layouts'
 import { suppliedLayout, suppliedRegionPlaceholder } from '../../layouts/table'
 import type { Task } from '../../../infra/queries'
 import { hasHostCapability, type HostCapabilityRequirement } from '../../../infra/node/hostCapabilities'
+import { formFactor } from '../../../infra/platform'
+import type { FormFactor } from '@acorn/protocol/chrome.ts'
 import { markPaneDrawn, paneDrawn, paneModel, paneModelScope } from './paneModels'
 import { recordSample, startSpan, type SpanHandle } from '../../../infra/telemetry/emitter'
 import { featureMounted } from '../../../infra/telemetry/featureOpening'
@@ -38,6 +40,8 @@ type PaneCommon = {
   showInSwitcher?: boolean
   defaultChord?: string
   requires?: HostCapabilityRequirement
+  /** The form factors the pane draws at. Absent means all of them, because a pane draws with the kit. */
+  formFactor?: readonly FormFactor[]
   when?: (task: Task) => boolean
   /** A linkable item currently selected in this pane, when the pane can report one. */
   selectedItem?: (task: Task) => string | undefined
@@ -319,6 +323,7 @@ export const paneContributions = (): readonly PaneContribution[] =>
 export const paneContribution = (id: PaneId): PaneContribution | undefined => paneRegistry.get(id)
 export const paneAvailable = (pane: PaneContribution, task?: Task): boolean =>
   hasHostCapability(pane.requires) &&
+  (!pane.formFactor || pane.formFactor.includes(formFactor())) &&
   (!task || task.status !== 'archived' || pane.readsArchived === true) &&
   (!task || !pane.when || pane.when(task))
 

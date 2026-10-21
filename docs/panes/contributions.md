@@ -64,6 +64,16 @@ built before the route existed, and the pane then shows on every task. The route
 task, so it should refuse a task-scoped caller. Answer "is this set up", not "is it running": an
 answer that turns false while a dev server restarts closes a pane you're looking at.
 
+### Form factor
+
+A pane works at every form factor unless it says otherwise, because a pane draws with the kit. A
+compiled pane that needs a desktop sets `formFactor: ['desktop']` on its contribution, as Preview
+does because it's a native web view. A phone leaves it out of the pane bar, the way `paneAvailable`
+leaves out a pane whose `requires` or `when` says no. A loaded plugin sets `formFactor` on a `frames`
+entry. The manifest takes `desktop` and `mobile`, defaults to `['desktop']`, and reads `mobile` as
+`narrow`, the name the rest of the app uses. The host skips a surface that doesn't list its form
+factor. A terminal draws what the desktop does.
+
 ## Regions a loaded plugin declares
 
 A loaded plugin declares `layout` and `regions` on a `frames` entry. `layout` is required on a

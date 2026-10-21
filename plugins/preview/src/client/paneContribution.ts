@@ -18,6 +18,8 @@ export const previewPaneContribution: PaneLayoutContribution = {
   // a desktop shell may ship without preview views — so a host that has not installed the group
   // never lists the pane at all, rather than listing it and then saying it cannot draw it.
   requires: { seam: 'preview' },
+  // A native web view has no narrow form, so a phone's pane bar leaves the pane out.
+  formFactor: ['desktop'],
   // A task with no preview URL configured has nothing to draw here (./configuredStore.ts).
   when: (task) => previewConfigured(task.id),
   // `single`, so the pane inherits the host's frame, focus group and padding rules.

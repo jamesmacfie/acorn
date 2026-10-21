@@ -1,7 +1,85 @@
 # Phase 3: turn on a narrow mode from the root element
 
-Date: October 17, 2026. Status: proposed. Check it in the [phase 2](./02-shell.md) shell. Can run
-beside [phase 4](./04-narrow-layouts.md).
+Date: October 17, 2026. Status: shipped October 21, 2026. Check it in the [phase 2](./02-shell.md)
+shell. Can run beside [phase 4](./04-narrow-layouts.md).
+
+## Completion note
+
+Completed October 21, 2026. [Mobile web app](../../mobile.md#narrow-mode) and
+[the narrow sheet](../../ui-design/tokens.md#the-narrow-sheet) own the shipped behavior, and
+[form factor](../../panes/contributions.md#form-factor) owns the pane field. This page keeps what the
+later phases need.
+
+### What landed
+
+- `formFactor()` in `infra/platform`, answering `'desktop'`, `'narrow'`, or `'tui'`. `TabRail` sends
+  it as the rail data's `formFactor`. `FormFactor` is a type in `@acorn/protocol/chrome.ts`.
+- `PaneCommon.formFactor`. `paneAvailable` leaves out a pane that doesn't list the host's form
+  factor, and Preview declares `['desktop']`. `register.ts` checks the host's form factor, and reads
+  the manifest's `mobile` as `narrow`.
+- `infra/styles/narrow.css`, loaded after the style packs, with a test that pins the order and that
+  it sets style tokens only. `apps/mobile/index.html` sets the attribute on `<html>`.
+- A new style token, `--fs-input`, which `.ui-input` and its filter and mono forms read. The narrow
+  block sets it to 16px.
+- `@media (hover: none)` rules for the hover-only controls, beside each hover rule.
+- `installLongPressMenu` in `kit/lib/controls/longPressMenu.ts`, started by `startClientRuntime`
+  when the form factor is narrow.
+- `settings.css` and `dashboards.css` use container queries.
+- Tests for `formFactor()`, the pane filter, the manifest alias, the token order, and the long press.
+
+The acceptance checks passed in Chromium at 390 by 844 against a throwaway standalone Node. Preview is
+absent from the pane bar. In Agent, Git, Notes, Context, and Editor, every button, input, and tab
+measures 44px or more, apart from the exceptions listed below. A touch context (`hasTouch`, which
+reports `hover: none`) shows the row actions and draws inputs at 16px. A long press made with
+Chrome DevTools Protocol touch events opened the row's menu exactly once. Client-core, protocol,
+plugin-api, mobile, Preview, and the architecture suites pass. The phone's startup budget went from
+482,910 B to 484,239 B of scripts, and from 121,692 B to 122,302 B of styles.
+
+The screenshots are in
+`/Users/jamesmacfie/Source/acorn/apps/node/.acorn/worktrees/jamesmacfie-acorn-phase-3-narrow-mode/references/mobile-phase-3/`,
+a folder git ignores. They aren't committed.
+
+### Decisions and deviations
+
+- **All three control heights are 44px.** This page proposed 44, 36, and 32px, but a 36px button
+  fails its own acceptance check of 44px for every control. The small rungs now match. Rows are 48px,
+  and `--row-h-sm` and `--tab-h` are 44px.
+- **`--fs-input` is a new token.** The stylesheet ratchet forbids a literal font size, so the 16px
+  needed a token. It defaults to `--fs-sm`, which is what inputs drew at before.
+- **The long press is one listener, not six components.** `installLongPressMenu` sends the
+  `contextmenu` event on the element under the finger, so every menu already wired to it opens,
+  including `PaneSwitcher`, `DashboardTabs`, and the link preview. `PickerRow` has no handler of its
+  own and draws a `Row`. Android's own `contextmenu` is dropped when ours came first, and ours is
+  dropped when Android's came first. Letting go after a long press doesn't press the row.
+- **`formFactor()` reads the attribute on every call.** It doesn't cache. The attribute never
+  changes, the read is one property lookup, and a test sets it directly. A missing `document` means
+  the terminal.
+- **The manifest keeps `desktop` and `mobile`.** The alias is one comparison in `register.ts`, not a
+  schema transform, so the JSON schema is unchanged. A terminal checks `desktop`, as it did.
+- **More hover-only controls than listed.** The copy button and the buttons in a dashboard panel's
+  header also hid until hover, so they show on touch too.
+- **No plugin API export.** A name nothing imports fails the unused-export check, and no plugin
+  needs the form factor yet. Export `formFactor` from `@acorn/plugin-api/client` when one does, with
+  `formFactor` added to `infra/platform/public.ts` and the surface snapshot.
+- **Container queries on the full-window layers.** `.settings-view` and `.dash-studio` are fixed to
+  the window, so their containers measure what the media queries did, and the 900 and 1,100px
+  thresholds stay. The desktop draws as before.
+
+### What later phases need
+
+- **Phase 4.** Controls are 44px, so the split `list-detail` panes at 390px have less room still.
+  Three things measure under 44px by design: the native check boxes (12px), a row's twist (3 by 6px),
+  and the two buttons of a segmented control (42px inside a 44px box). Each sits inside a row or a
+  control that is itself 44px. A row's twist and a check box need a bigger target if phase 4 finds
+  they can't be hit.
+- **Phase 5.** Menus open by long press anywhere a right-click opens one. A new menu needs only an
+  `onContextMenu` handler. A control that reveals on hover needs a `@media (hover: none)` rule.
+- **Phase 6.** Check on a real iOS Safari that the long press opens a menu once, that releasing the
+  finger doesn't press the row, and that the text callout doesn't show over the menu.
+  `-webkit-touch-callout` and `user-select` on rows are unset. CodeMirror's editable area isn't an
+  `input`, so it may still make iOS zoom. The desktop renderer budget check fails on the
+  denylisted workflows chunks and the roster size before and after this change. This change adds 23 B
+  to the roster, 1,299 B to the startup scripts, and 499 B to the styles.
 
 ## Goal
 

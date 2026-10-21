@@ -123,6 +123,20 @@ project's task-tab color or a review note's state, so a pack may zero `--marker-
 `--bw-marker` rather than either role, because it's the control that opens the content and no pack may
 hide it.
 
+## The narrow sheet
+
+`narrow.css` is the one stylesheet that isn't a pack. Its single `:root[data-form-factor='narrow']`
+block raises the control and row heights to 44px for a finger, trims the pane padding, and sets
+`--fs-input` to 16px, because iOS Safari zooms the page into an input set smaller than that. Every
+input draws its text from `--fs-input`, which is `--fs-sm` until a form factor changes it. It loads
+after the packs, so its sizes win in all of them, and `tokenAxes.test.ts` pins that order. It sets
+style tokens only. A shell turns it on by putting `data-form-factor="narrow"` on `<html>`, and
+`formFactor()` in `infra/platform` reads the same attribute. Nothing measures the window.
+
+Controls that appear on hover show on a touch screen by a `@media (hover: none)` rule beside each
+hover rule in `primitives.css` and `dashboards.css`. That rule doesn't depend on the attribute, so a
+touch-screen laptop gets it too.
+
 ## Style packs
 
 Each pack, `style-cozy.css`, `style-cute.css`, and `style-modern.css`, is mostly a token block: a

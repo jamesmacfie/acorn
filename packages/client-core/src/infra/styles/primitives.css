@@ -80,7 +80,7 @@
   flex: 1;
   min-width: 0;
   font: inherit;
-  font-size: var(--fs-sm);
+  font-size: var(--fs-input);
   color: var(--text);
   background: var(--input-bg);
   border: var(--control-border);
@@ -884,6 +884,7 @@ button.ui-chip:hover { background: var(--bg-hover); border-color: var(--accent);
 .ui-chip[data-reveal] .ui-chip-remove { opacity: 0; }
 .ui-chip[data-reveal]:hover .ui-chip-remove,
 .ui-chip[data-reveal]:focus-within .ui-chip-remove { opacity: 1; }
+@media (hover: none) { .ui-chip[data-reveal] .ui-chip-remove { opacity: 1; } }
 
 /* ── DescriptionList ────────────────────────────────────────────────────────────────────────
    Two layouts covered all nine hand-rolled label/value grids. `facts` minmax is lifted from the
@@ -1049,7 +1050,7 @@ button.ui-chip:hover { background: var(--bg-hover); border-color: var(--accent);
   border-radius: var(--radius-0);
   outline: none;
 }
-.ui-input[data-kind='filter'] { font-size: var(--fs-sm); min-height: var(--control-h-sm); }
+.ui-input[data-kind='filter'] { font-size: var(--fs-input); min-height: var(--control-h-sm); }
 /* A bare input in a bar is the bar's title, such as a note's name: no underline of its own under the
    bar's divider, and a detail title's size, so the header is one line. */
 .ui-toolbar .ui-input[data-kind='bare'] {
@@ -1060,7 +1061,7 @@ button.ui-chip:hover { background: var(--bg-hover); border-color: var(--accent);
   font-weight: var(--heading-weight);
   background: transparent;
 }
-.ui-input[data-mono] { font-family: var(--font-mono); font-size: var(--fs-sm); resize: vertical; }
+.ui-input[data-mono] { font-family: var(--font-mono); font-size: var(--fs-input); resize: vertical; }
 
 /* ── Card ───────────────────────────────────────────────────────────────────────────────────
    Eleven bespoke card rules. See docs/ui-design/kit-internals.md § How the kit is built for why the
@@ -1273,6 +1274,8 @@ button.ui-chip:hover { background: var(--bg-hover); border-color: var(--accent);
 .copy-btn:hover {
   color: var(--text);
 }
+/* Nothing hovers on a touch screen, so the button stays. */
+@media (hover: none) { .copy-btn { opacity: 1; } }
 /* On a markdown code fence, sit top-right, same corner as CodeBlock's own button below. The wrapper is
    already `position: relative`, and it's the CopyButton's only direct-child use. */
 .ui-code-wrap > .copy-btn { position: absolute; top: var(--space-2); right: var(--space-2); }
@@ -1413,6 +1416,8 @@ button.ui-chip:hover { background: var(--bg-hover); border-color: var(--accent);
    bespoke rule had this; hover-only would have made its start/stop buttons vanish on the row you
    just clicked. */
 .ui-row[data-reveal][data-selected] .ui-row-trailing { opacity: 1; }
+/* A touch screen has no hover to reveal them, so the row's actions are always there. */
+@media (hover: none) { .ui-row[data-reveal] .ui-row-trailing { opacity: 1; } }
 
 /* RowActions: the same reveal, but scoped to the overflow button instead of the whole trailing
    slot, so a badge beside it stays visible. Opt-in per button rather than per row, so it needs no
@@ -1427,6 +1432,7 @@ button.ui-chip:hover { background: var(--bg-hover); border-color: var(--accent);
 .ui-table tr:hover .ui-row-actions,
 .ui-table tr:focus-within .ui-row-actions,
 .ui-row-actions:has([aria-expanded='true']) { opacity: 1; }
+@media (hover: none) { .ui-row-actions { opacity: 1; } }
 
 /* ── SplitHandle ────────────────────────────────────────────────────────────────────────────
    Lifted from `.pane-divider`: a wide hit area around a hairline. The negative margin keeps the
@@ -1959,6 +1965,7 @@ button.ui-chip:hover { background: var(--bg-hover); border-color: var(--accent);
 .ui-doctab:hover > .ui-btn,
 .ui-doctab:focus-within > .ui-btn,
 .ui-doctab[data-active] > .ui-btn { opacity: 1; }
+@media (hover: none) { .ui-doctab > .ui-btn { opacity: 1; } }
 
 /* ── Button/Row/Tabs extensions ─────────────────────────────────────────────────────────────
    `xs` is the slim rung: a chip-height affordance that rides inside a list row or a topbar strip

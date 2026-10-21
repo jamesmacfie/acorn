@@ -20,6 +20,8 @@
   display: flex;
   flex-direction: column;
   background: var(--bg);
+  /* What the narrow rules further down measure. */
+  container-type: inline-size;
 }
 .dash-studio:focus { outline: none; }
 .dash-studio-title { min-width: 0; }
@@ -116,7 +118,7 @@
   border-left: var(--chrome-divider);
 }
 
-@media (max-width: 1100px) {
+@container (max-width: 1100px) {
   .dash-studio-detail { grid-template-columns: minmax(0, 1fr); overflow-y: auto; }
   .dash-studio-preview, .dash-studio-inspector, .dash-studio-dock { overflow: visible; }
   .dash-studio-inspector, .dash-studio-dock { border-left: 0; border-top: var(--chrome-divider); }
@@ -345,6 +347,10 @@
 .dash-slot:focus-within .dash-resize {
   opacity: 1;
 }
+/* A touch screen has no hover to reveal the handles. */
+@media (hover: none) {
+  .dash-slot .dash-resize { opacity: 1; }
+}
 .dash-resize::after {
   content: '';
   position: absolute;
@@ -457,6 +463,9 @@
 .dash-slot:focus-within .dash-panel-head button,
 .dash-slot .dash-panel-head button[aria-expanded='true'] {
   opacity: 1;
+}
+@media (hover: none) {
+  .dash-slot .dash-panel-head button { opacity: 1; }
 }
 
 /* A pack that asks for stillness gets it: everything above still draws and positions still update

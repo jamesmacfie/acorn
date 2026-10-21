@@ -371,6 +371,26 @@ describe('paneAvailable', () => {
     }
     expect(paneAvailable(entry)).toBe(true)
   })
+
+  describe('by form factor', () => {
+    const availableOn = (factor: 'desktop' | 'narrow') => {
+      document.documentElement.dataset.formFactor = factor
+      return paneAvailable(paneRegistry.get('notes')!)
+    }
+    afterEach(() => {
+      delete document.documentElement.dataset.formFactor
+    })
+
+    it('offers a pane that names no form factor on every one', () => {
+      register(pane())
+      expect([availableOn('desktop'), availableOn('narrow')]).toEqual([true, true])
+    })
+
+    it('leaves out a pane that does not list the host’s form factor', () => {
+      register(pane({ formFactor: ['desktop'] }))
+      expect([availableOn('desktop'), availableOn('narrow')]).toEqual([true, false])
+    })
+  })
 })
 
 // The two pane spans (docs/telemetry/renderer.md § Renderer seams). Here rather than beside the emitter because

@@ -25,6 +25,7 @@ import type {
 } from '@acorn/protocol/api.ts'
 import type { WsClientFrame, WsSendOptions } from '@acorn/protocol/ws.ts'
 import type { DeviceConfig } from '@acorn/protocol/deviceConfig.ts'
+import type { FormFactor } from '@acorn/protocol/chrome.ts'
 
 // The platform seam: the renderer's one door to whatever is hosting it. See
 // docs/architecture/node-api.md § The platform seam for the seam's shape, its nullable
@@ -573,6 +574,14 @@ export const onHostVisibilityChange = (cb: () => void): (() => void) => {
   if (typeof document === 'undefined') return () => {}
   document.addEventListener('visibilitychange', cb)
   return () => document.removeEventListener('visibilitychange', cb)
+}
+
+// The form factor this client draws for. The phone's shell sets `data-form-factor="narrow"` on the root
+// element before its first paint and the desktop sets nothing, so the page answers without measuring a
+// window. A terminal has no `document`.
+export const formFactor = (): FormFactor => {
+  if (typeof document === 'undefined') return 'tui'
+  return document.documentElement.dataset.formFactor === 'narrow' ? 'narrow' : 'desktop'
 }
 
 // Whether this host can change fleet membership rather than only read it (`fleetBridge`). Settings →
