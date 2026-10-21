@@ -1,6 +1,7 @@
 # Build a mobile web app
 
-Date: October 17, 2026. Status: proposed. Implementation not started.
+Date: October 17, 2026. Status: in progress. Phases 1 to 5 shipped October 21, 2026. Phase 6's code and
+docs shipped the same day, and its real-device acceptance is outstanding.
 
 This programme plans a mobile web app that reaches a Node and draws the same plugin UI the desktop
 draws, at phone width. It starts small: the things you want from your phone while agents work. Read
@@ -56,14 +57,23 @@ Four things stop a phone browser from reaching a Node:
 | [3](./03-narrow-mode.md) | One root attribute turns on touch sizes, shows hover-only controls, and tells plugins the form factor. |
 | [4](./04-narrow-layouts.md) | The host layouts and the kit's `ListDetail` draw their narrow projections. |
 | [5](./05-needs-you.md) | The first release's features: **Needs you**, the agent conversation, and **New task**. |
-| [6](./06-on-a-phone.md) | A real phone over Tailscale, installed to the home screen, with real-device acceptance. |
+| [6](./06-on-a-phone.md) | A real phone over Tailscale, installed to the home screen, with real-device acceptance. Built, with the acceptance not yet run. |
+| [7](./07-workspaces-and-compact-controls.md) | The phone opens on workspaces, each with a dashboard and its tasks, and the agent pane fits a phone. Built. |
 
 [Later](./later.md) lists the work after the first release: push, Node-side browser sessions, loaded
 plugins, more than one Node, and the browser extension.
 
 Phases 1 and 2 give you something to look at in desktop Chrome at phone width. Do them first, because
 phases 3 and 4 are UI work that needs a real screen to check. Phases 3 and 4 can run in parallel.
-Phase 5 needs both. Phase 6 needs everything.
+Phase 5 needs both. Phase 6 needs everything before it, and so does phase 7.
+
+## What is left before this folder goes
+
+Every phase's behavior is in a reference page: [the mobile web app](../../mobile.md), [the gateway](../../security/mobile-gateway.md),
+and [`acorn mobile`](../../cli/mobile.md). This folder stays until the owner runs
+[the real-device acceptance](../../testing/mobile-on-a-phone.md) on an iPhone and an Android phone, because
+phase 6's own acceptance is the one thing no agent could run. When it passes, delete every shipped phase here. Keep
+[later](./later.md) and any phase still to build.
 
 ## What holds across every phase
 

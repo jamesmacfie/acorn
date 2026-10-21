@@ -46,6 +46,11 @@ const cliTarget = resolve(PKG, 'dist/cli')
 rmSync(cliTarget, { recursive: true, force: true })
 cpSync(cliSource, cliTarget, { recursive: true })
 writeFileSync(resolve(cliTarget, 'package.json'), '{"type":"module"}\n')
+// `acorn mobile` serves the phone's web app from beside cli.js (apps/cli/src/main.ts).
+cpSync(need(resolve(ROOT, 'apps/mobile/dist'), 'run `pnpm --filter @acorn/mobile build` first.'), resolve(cliTarget, 'mobile'), {
+  recursive: true,
+  filter: (path) => !path.endsWith('.map'),
+})
 
 // Migration chains, beside the helper for the same reason. Unset `process.resourcesPath` under a real
 // Node means node-core walks up from the service module looking for a `migrations` directory, so this

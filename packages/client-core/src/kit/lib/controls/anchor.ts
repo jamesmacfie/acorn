@@ -1,8 +1,12 @@
 import { createEffect, createSignal, onCleanup, onMount } from 'solid-js'
+import { isNarrow } from '../layout/narrowView'
 
 // Element-anchored floating surfaces: portal-aware dismissal plus position-to-rect. See
 // docs/ui-design/interaction.md § Menus and right-click for why this exists, what it leaves to the
 // focus trap and the call site, and why the portal matters.
+//
+// On a phone every surface is a sheet along the bottom edge instead, over a backdrop. The geometry is
+// `.ui-popover`'s narrow rule, so a caller's `placement` and `minWidth` don't apply there.
 
 export type Placement = 'bottom-start' | 'bottom-end' | 'top-start' | 'right-start'
 
@@ -95,6 +99,20 @@ export function anchoredPosition(
     top: fit(top, surface.height, viewport.height),
     left: fit(left, surface.width, viewport.width),
   }
+}
+
+const SHEET_BACKDROP = 'ui-sheet-backdrop'
+
+/** The backdrop under a sheet. It takes the tap that closes the sheet, so the tap never lands on
+ *  whatever is under it. It goes just before the surface, so the surface paints over it, and a sheet
+ *  opened from inside another covers that one too. */
+function sheetBackdrop(surface: HTMLElement | undefined, close: () => void): HTMLElement {
+  const backdrop = document.createElement('div')
+  backdrop.className = SHEET_BACKDROP
+  backdrop.addEventListener('click', close)
+  if (surface) surface.before(backdrop)
+  else document.body.append(backdrop)
+  return backdrop
 }
 
 const rectOf = (target: AnchorTarget): Rect =>
@@ -212,7 +230,9 @@ export function createAnchoredPopover(opts: {
     if (!open()) return
     reposition()
     openSurfaces.push(entry)
+    const backdrop = isNarrow() ? sheetBackdrop(surface, close) : undefined
     onCleanup(() => {
+      backdrop?.remove()
       const at = openSurfaces.indexOf(entry)
       if (at >= 0) openSurfaces.splice(at, 1)
     })
@@ -221,6 +241,8 @@ export function createAnchoredPopover(opts: {
   const onDocPointer = (event: PointerEvent) => {
     if (!open()) return
     const target = event.target as Node
+    // A backdrop closes its own sheet on the click that follows, and no other surface's.
+    if (target instanceof HTMLElement && target.classList.contains(SHEET_BACKDROP)) return
     // A point anchor has no element, so nothing but the surface itself counts as "inside". That is
     // the right answer for a context menu: the row it was opened over is not part of the menu.
     if (elementOf(opts.anchor())?.contains(target) || surface?.contains(target)) return
@@ -261,6 +283,7 @@ export function createAnchoredPopover(opts: {
       surface = element
     },
     surfaceStyle: () => {
+      if (isNarrow()) return { position: 'fixed' }
       const p = pos()
       return {
         position: 'fixed',

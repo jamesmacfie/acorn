@@ -70,6 +70,9 @@ Deleting a workspace removes its datasets. Row and byte caps plus retention boun
   takes the row and action from that run, never from the browser, so the browser can't name a record
   or an action the source didn't offer, and an older app revision acts on nothing. The Node checks
   the confirmed risk against the action's own.
+- **A phone's browser** reaches one Node through the mobile gateway, a process on the Node's
+  computer that holds the device token and the pin and gives the phone a session cookie. The phone
+  has owner power minus a short route denylist ([mobile gateway](./security/mobile-gateway.md)).
 - **The terminal client** collapses the shell and helper into one process. UI code and the broker share
   a realm, so what the desktop holds as a process boundary this holds as a module boundary. The device
   token lives in the broker's module, the plugin cache and acknowledgements in one custody module, and
@@ -88,7 +91,8 @@ The shell's Rust dependency patch and remaining upstream advisories are in
 [Rust dependency security](./shell/packaging.md#rust-dependency-security). The dated review of October 1, 2026
 is [review-2026-10-01.md](./security/review-2026-10-01.md), and its follow-up on October 11, 2026 is
 [review-2026-10-11.md](./security/review-2026-10-11.md). The review of agent-built apps on October 19, 2026 is
-[review-2026-10-19.md](./security/review-2026-10-19.md).
+[review-2026-10-19.md](./security/review-2026-10-19.md). The review of the work since October 11, with the
+fixes for it, is [review-2026-10-21.md](./security/review-2026-10-21.md).
 
 ## What task scope does and doesn't protect against
 

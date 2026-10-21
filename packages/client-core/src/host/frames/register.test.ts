@@ -377,6 +377,25 @@ describe('syncFrameContributions', () => {
     expect(ids().panes).toEqual(['board-pane'])
   })
 
+  it('reads the manifest’s `mobile` as the narrow form factor', () => {
+    seedTrusted(
+      row('board', {
+        frames: [
+          surface({ target: 'pane', id: 'phone-only', formFactor: ['mobile'] }),
+          surface({ target: 'pane', id: 'board-pane' }),
+        ],
+      }),
+    )
+    // No jsdom in this project: a bare `document` answering for the root element is the phone's.
+    Reflect.set(globalThis, 'document', { documentElement: { dataset: { formFactor: 'narrow' } } })
+    try {
+      syncFrameContributions()
+    } finally {
+      Reflect.deleteProperty(globalThis, 'document')
+    }
+    expect(ids().panes).toEqual(['phone-only'])
+  })
+
   it('gates every surface it can on the plugin running on the node being looked at', () => {
     seedTrusted(row('board', ALL_TARGETS))
     _seedPluginDistribution(

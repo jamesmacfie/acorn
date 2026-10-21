@@ -1,5 +1,8 @@
+import { Show } from 'solid-js'
+import { formFactor } from '../../infra/platform'
 import { createSplitDrag } from '../../kit/lib/layout/split'
 import { layoutState } from './state'
+import { RegionSheet } from './RegionSheet'
 // Imported for `use:regionFocus` below: Solid compiles a directive to a bare reference, so the
 // import has to be here even though nothing calls it.
 // eslint-disable-next-line no-unused-vars -- used by the `use:regionFocus` directive.
@@ -32,14 +35,16 @@ import type { LayoutProps } from './regions'
 // One component and two names, because the axis is in the name and never in a prop
 // (docs/panes/layout.md § Layout model, on adding a ninth).
 //
-// Narrow: the frame region collapses to a sheet the document can summon. Terminal: both regions draw,
-// with the split moved by a key.
+// Narrow: the document fills the pane, and the frame region opens as a sheet from a bar above it
+// (./RegionSheet.tsx). Terminal: both regions draw, with the split moved by a key.
 
 const DEFAULT_DOCUMENT_SIZE = 200
 const MIN_DOCUMENT_SIZE = 80
 const MAX_DOCUMENT_FRACTION = 0.7
 
 const documentSplit = (axis: 'x' | 'y') => (props: LayoutProps) => {
+  // Fixed for a boot, so the branch never remounts a region.
+  const narrow = formFactor() === 'narrow'
   const [size, setSize] = layoutState(props.stateKey, 'document-size', DEFAULT_DOCUMENT_SIZE)
   let root: HTMLDivElement | undefined
   let dragStart: number | null = null
@@ -64,18 +69,25 @@ const documentSplit = (axis: 'x' | 'y') => (props: LayoutProps) => {
   })
 
   return (
-    <div ref={root} class="pane layout-document-split" data-axis={axis}>
+    <div ref={root} class="pane layout-document-split" data-axis={axis} data-narrow={narrow ? '' : undefined}>
+      <Show when={narrow}>
+        <RegionSheet stateKey={props.stateKey} regionId="frame" label={props.label}>
+          {props.regions.frame?.()}
+        </RegionSheet>
+      </Show>
       <div
         class="layout-region-document"
-        style={axis === 'x' ? { width: `${size()}px` } : { height: `${size()}px` }}
+        style={narrow ? undefined : axis === 'x' ? { width: `${size()}px` } : { height: `${size()}px` }}
         use:regionFocus={{ paneId: props.stateKey, regionId: 'document' }}
       >
         {props.regions.document?.()}
       </div>
-      <div {...drag.handleProps} class="ui-split-handle" data-axis={axis} />
-      <div class="layout-region-frame" use:regionFocus={{ paneId: props.stateKey, regionId: 'frame' }}>
-        {props.regions.frame?.()}
-      </div>
+      <Show when={!narrow}>
+        <div {...drag.handleProps} class="ui-split-handle" data-axis={axis} />
+        <div class="layout-region-frame" use:regionFocus={{ paneId: props.stateKey, regionId: 'frame' }}>
+          {props.regions.frame?.()}
+        </div>
+      </Show>
     </div>
   )
 }

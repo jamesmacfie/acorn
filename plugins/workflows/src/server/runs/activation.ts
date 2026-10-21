@@ -121,6 +121,7 @@ export const createWorkflowExecution = (
           runId: opts.workflowRunId,
           stepId: opts.workflowStepId,
           posture: opts.posture ?? 'gated',
+          allowUnguardedAgents: opts.allowUnguardedAgents,
           goal: opts.goal,
           admitAutomatic: opts.admitAutomatic,
           onGoal: opts.onGoal,

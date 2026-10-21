@@ -6,7 +6,7 @@ export { onboardingWizardVisible, ownOnboardingVisibility } from './onboardingVi
 export { noProjectsScreenVisible } from './noProjectsGate.ts'
 export { createProjectAddNavigation } from './projectAddNavigation.ts'
 export { addProjectFromFolder, canAddProjectFromFolder, pickNodeFolder } from './addProject.ts'
-export { createFleetWorkspaces, selectFleetWorkspace } from './fleetWorkspaces.ts'
+export { createFleetWorkspaces, pickerWorkspaces, selectFleetWorkspace } from './fleetWorkspaces.ts'
 export { currentWorkspaceId, noteWorkspaceVisit } from './lastWorkspace.ts'
 export { hydrateWorkspaceHistory } from './lastWorkspace.ts'
 export { createProject, createWorkspace, patchProject } from './workspaceMutations.ts'

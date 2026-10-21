@@ -2,6 +2,7 @@ import type { ApiError as ApiErrorBody } from '@acorn/protocol/api.ts'
 import type { NodeFetchBody, NodeFetchResponse } from '@acorn/protocol/broker.ts'
 import { apiRouteNamespace, formatTraceparent } from '@acorn/protocol/telemetry.ts'
 import { nodeTransport } from '../platform'
+import { bodyForFetch } from './fetchBody'
 import { currentTrace, measure, recordSample, startSpan } from '../telemetry/emitter'
 import { activeNodeId } from './activeNode'
 import { nodeState, nodeStatus } from './fleet'
@@ -230,17 +231,6 @@ const headersToObject = (headers: Headers): Record<string, string> => {
     out[key] = value
   })
   return out
-}
-
-const bodyForFetch = (body: NodeFetchBody | undefined): BodyInit | undefined => {
-  if (!body) return undefined
-  if (body.kind === 'bytes') return body.bytes.byteLength === 0 ? undefined : (body.bytes as unknown as BodyInit)
-  const form = new FormData()
-  for (const part of body.parts) {
-    if ('value' in part) form.append(part.name, part.value)
-    else form.append(part.name, new Blob([part.bytes as unknown as BlobPart], { type: part.type }), part.filename)
-  }
-  return form
 }
 
 const JSON_HEADERS = { 'content-type': 'application/json' }

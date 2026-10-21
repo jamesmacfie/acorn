@@ -117,7 +117,8 @@ The local probe can also pair by approval
 ([pairing by approval](./api-reference/transport.md#pairing-by-approval)). `node.ask` asks the Node
 over the kept probe and keeps the secret in the host, so the extension never holds it. The sidebar
 shows the phrase and calls `node.collect` once a second until the owner allows it in the desktop, with
-**Use a pairing code instead** one click away for a Node no desktop is watching. A typed address can't
+**Use a pairing code instead** one click away for a Node no desktop is watching. When another ask
+overlapped, `node.ask` fails with `pairing_busy` and the sidebar offers **Try again** above the code. A typed address can't
 ask, because the Node answers an ask only from its own computer. The sidebar names the Node in
 `node.collect` and `node.pair` itself, "This computer" or the address's host, and Settings renames it
 with `node.rename`.

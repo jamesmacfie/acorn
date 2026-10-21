@@ -482,6 +482,7 @@ describe('architecture boundaries', () => {
       'apps/tui/src/node/supervise.ts', // `acorn` supervising the node it started, when it started one
       'apps/cli/src/supervision/lifecycle.ts', // explicit background Node lifecycle commands
       'apps/cli/src/supervision/service.ts', // launchctl, systemctl, loginctl, and schtasks for `acorn node service`
+      'apps/cli/src/mobile.ts', // `acorn mobile` runs the phone gateway, a long-lived server, as its child
       // Long-lived engines. Each owns its children's lifetime, and the broker has no model for that.
       'plugins/terminal/src/server/terminal.ts', // PTYs
       'plugins/agents/src/server/drivers/jsonRpcProcess.ts', // child stream types for JSON-RPC
@@ -577,11 +578,20 @@ describe('architecture boundaries', () => {
       // handshake, not log lines; everything else in the file goes through the logger
       // (docs/shell/process.md § The shell process).
       'apps/desktop/src/helper/helperMain.ts',
+      // Prints the sign-in banner and the session list a person at this terminal is here to read.
+      // Its request lines go through the logger in gateway.ts.
+      'apps/mobile/src/gateway/main.ts',
     ]
-    // The helper and the custody stack are here rather than with the renderer's rule: they are Node
-    // processes, they already depend on node-core, and their lines belong on stderr
+    // The helper, the mobile gateway, and the custody stack are here rather than with the renderer's
+    // rule: they are Node processes, they already depend on node-core, and their lines belong on stderr
     // (docs/shell/node-child.md § What the helper reports).
-    const SCANNED = ['packages/node-core/src', 'apps/node/src', 'packages/custody/src', 'apps/desktop/src/helper']
+    const SCANNED = [
+      'packages/node-core/src',
+      'apps/node/src',
+      'packages/custody/src',
+      'apps/desktop/src/helper',
+      'apps/mobile/src/gateway',
+    ]
     const files = SCANNED.flatMap((dir) => walk(join(ROOT, dir))).filter((file) => !isTestCode(file))
     expect(files.length).toBeGreaterThan(150) // anti-vacuity: the walker found the node
     expect(
@@ -848,12 +858,14 @@ describe('architecture boundaries', () => {
       // page, the model picker popover, `features/editor/documentCustody`, `ContributionBoundary`, and
       // `LinkPreviewHost` (docs/frontend/startup-budget.md). The token and style pack stylesheets, which
       // the browser extension loads without the app's own stylesheet.
-      '@acorn/client-core': 208, // Includes the agent panel card the agents plugin draws, the capability keys agents and workflows provide for a kept dashboard panel, the card frame and plan panel an app card draws with, the run panel and panel view host the extension sidebar draws a panel's run with, the desktop's panel view host, the registry of dashboard cells a plugin draws, with its Add to dashboard, the no-projects surface, workspace rail, device preference reader, SelectionActions, the Markdown fence model and view, the four stylesheets the extension sidebar loads, TreeHost for the site's component pages, the anchored popover and focus restore the sidebar's Go to task draws on, Artwork for the plugin API's components barrel, the Inter font file the site preloads, the Performance settings page, and the trigger dialog's suggested triggers.
+      '@acorn/client-core': 211, // Includes the agent panel card the agents plugin draws, the capability keys agents and workflows provide for a kept dashboard panel, the card frame and plan panel an app card draws with, the run panel and panel view host the extension sidebar draws a panel's run with, the desktop's panel view host, the registry of dashboard cells a plugin draws, with its Add to dashboard, the no-projects surface, workspace rail, device preference reader, SelectionActions, the Markdown fence model and view, the four stylesheets the extension sidebar loads, TreeHost for the site's component pages, the anchored popover and focus restore the sidebar's Go to task draws on, Artwork for the plugin API's components barrel, the Inter font file the site preloads, the Performance settings page, the trigger dialog's suggested triggers, the request body the mobile shell's transport sends before the seam exists, the draft form the phone loads when **New task** is pressed, and the workspace tile the phone's list of workspaces draws.
       // Includes `mcp/fileGuard`, the read block's file guard, a build entry like `mcp/loopHook`
       // (docs/managed-agents/read-block.md). The manifest parser and the core facet list, which the
       // public site's plugin reference reads to check its examples and list the grants. `mcp/toolOutputDir`,
       // so the Claude harness can let an agent read the folder where a cut tool result's full text goes.
-      '@acorn/node-core': 68,
+      // `server/auth/pairingCodes.ts`, so the mobile gateway's sign-in code keeps the Node's code rules
+      // without loading the auth barrel's database modules.
+      '@acorn/node-core': 69,
       '@acorn/custody': 10,
       '@acorn/dashboards-core': 18, // Shared SQL/in-memory summary and time-bucket semantics, the plan's labels, its outline, the plan-writing guide the studio and panel_guide share, and the heatmap's cells HeatmapView draws.
       // The document model, and the store a code host's Node half keeps documents in.
@@ -1324,6 +1336,22 @@ describe('architecture boundaries', () => {
     expect(importers.filter((file) => !MAY_HOLD_A_TOKEN.test(file))).toEqual([])
     // Anti-vacuity: the seam must still be the thing that installs the broker.
     expect(importers).toContain('apps/tui/src/platform.ts')
+  })
+
+  it('the mobile app keeps custody in its gateway', () => {
+    // The phone's browser never holds a device token or a certificate; the gateway process does
+    // (docs/security/mobile-gateway.md). The web app shares this package, so the promise is a folder
+    // boundary: custody is reachable from the gateway and from nothing the browser loads.
+    const importers = [
+      ...new Set(
+        EDGES.filter((e) => e.fromPkg.name === '@acorn/mobile' && !isTestCode(e.fromFile))
+          .filter((e) => e.target.pkg?.name === '@acorn/custody')
+          .map((e) => rel(e.fromFile)),
+      ),
+    ].sort()
+    expect(importers.filter((file) => !file.startsWith('apps/mobile/src/gateway/'))).toEqual([])
+    // Anti-vacuity: the gateway must still be the thing that opens the broker.
+    expect(importers).toContain('apps/mobile/src/gateway/main.ts')
   })
 
   it('the terminal focus store knows the keyboard and not the screen', () => {

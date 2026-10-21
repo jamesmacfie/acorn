@@ -1,12 +1,21 @@
+import { readFileSync } from 'node:fs'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
+import { memoryIdentityStore } from '@acorn/node-core/server/activeIdentity.ts'
+import { mintInternalToken } from '@acorn/node-core/server/auth'
+import type { Env } from '@acorn/node-core/server/bindings.ts'
+import { createCoreServices } from '@acorn/node-core/server/core/index.ts'
 import { createApp } from '@acorn/node-core/server/index.ts'
+import { CapabilityRegistry } from '@acorn/node-core/server/pluginHost/capabilities.ts'
+import { initPlugins } from '@acorn/node-core/server/pluginHost/host.ts'
+import type { NodePlugin } from '@acorn/node-core/server/pluginHost'
+import { loadedPluginBinding, parsePluginManifest } from '@acorn/node-core/server/plugins'
 import {
   requireDevice,
   requireProviderAccess,
   requireTaskScope,
 } from '@acorn/node-core/server/middleware/requireUser.ts'
 import { PLUGIN_NAMESPACE } from '@acorn/node-core/server/routes/registry.ts'
-import { mountCovers, registeredHandler } from '@acorn/node-core/testkit'
+import { makeTestDb, mountCovers, registeredHandler, testCoreSeams, testEnv } from '@acorn/node-core/testkit'
 import { initCompiledPlugins } from '../helpers/compiledPlugins'
 
 // The compiled plugins' version of packages/node-core/src/server/mountCoverage.test.ts. A task's agent
@@ -21,7 +30,9 @@ import { initCompiledPlugins } from '../helpers/compiledPlugins'
 // - a plugin ownership mount named in OWNERSHIP_GATES
 //
 // It reads only routers registered with `ctx.routes.register`. A fetch handler, which every loaded
-// plugin uses, and a `lazyRouter` mount are opaque here: each checks its caller inside the handler.
+// plugin uses, and a `lazyRouter` mount are opaque here: each checks its caller inside the handler,
+// except on a path the host calls itself, which the host closes to internal callers. The last case
+// below drives a task token at one of those.
 
 // Plugin middleware that resolves the task behind an id in the path and refuses a caller that may not
 // act on it. Named by mount path, because each plugin builds its own.
@@ -158,5 +169,82 @@ describe('compiled plugin mount coverage', () => {
     const { routes } = table()
     const mounted = new Set(routes.filter((r) => r.method === 'ALL' && !CORE_GATES.has(r.handler)).map((r) => r.path))
     expect(Object.keys(OWNERSHIP_GATES).filter((path) => !mounted.has(path))).toEqual([])
+  })
+})
+
+// acme-alerts' raise route appends feed events, and every trigger on the feed hears them, so only the
+// device-only CLI route may call it. Served here by a stand-in that counts calls, because the host
+// decides from the manifest before any plugin code runs.
+describe('loaded plugin command route', () => {
+  it('answers 404 to a task token and still serves the owner', async () => {
+    const manifestPath = new URL('../../../../examples/plugins/acme-alerts/acorn-plugin.json', import.meta.url)
+    const parsed = parsePluginManifest(JSON.parse(readFileSync(manifestPath, 'utf8')))
+    if (!parsed.ok) throw new Error(parsed.reason)
+    const raised: string[] = []
+    const plugin: NodePlugin = {
+      name: 'acme-alerts',
+      init: (ctx) =>
+        ctx.routes.fetch(async (request) => {
+          raised.push(new URL(request.url).pathname)
+          return Response.json({ stored: 1 })
+        }),
+    }
+    const core = makeTestDb()
+    const env = testEnv({
+      DB: core.db,
+      INTERNAL_TOKEN: 'mount-coverage-secret',
+      ACTIVE_IDENTITY: memoryIdentityStore('owner'),
+      DEVICES: {
+        authenticate: async (candidate: string) => (candidate === 'device-token' ? { deviceId: 'device-1' } : null),
+      } as Env['DEVICES'],
+    })
+    const storage = {
+      open: () => {
+        throw new Error('this case never opens a plugin database')
+      },
+    }
+    const host = await initPlugins([plugin], {
+      capabilities: new CapabilityRegistry(),
+      core: createCoreServices({
+        db: core.db,
+        secrets: core.secrets,
+        activeIdentity: memoryIdentityStore('owner'),
+        ...testCoreSeams(),
+      }),
+      dataDir: '',
+      env,
+      loaded: new Map([
+        [
+          'acme-alerts',
+          loadedPluginBinding({
+            manifest: parsed.manifest,
+            plugin,
+            dir: '',
+            shadowsBuiltin: false,
+            migrationsFolder: null,
+            storage,
+          }),
+        ],
+      ]),
+    })
+    const raise = (headers: Record<string, string>) =>
+      createApp().fetch(
+        new Request('http://127.0.0.1/v1/p/acme-alerts/cli/raise', {
+          method: 'POST',
+          headers: { ...headers, 'content-type': 'application/json' },
+          body: JSON.stringify({ nodeId: 'node-1', host: 'web-1', load: 6.2 }),
+        }),
+        env,
+      )
+    try {
+      const task = mintInternalToken('mount-coverage-secret', { scope: 'task', taskId: 'task-1' })
+      expect((await raise({ 'x-acorn-internal': task })).status).toBe(404)
+      expect(raised).toEqual([])
+      expect((await raise({ authorization: 'Bearer device-token' })).status).toBe(200)
+      expect(raised).toEqual(['/cli/raise'])
+    } finally {
+      await host.dispose()
+      core.cleanup()
+    }
   })
 })

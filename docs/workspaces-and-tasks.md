@@ -49,6 +49,8 @@ A task is the single-project unit of work, and each one is a rail row. A task ho
 - One required `projectId`.
 - An optional branch and an optional worktree path.
 - An origin. It's a source ID the owning plugin declared, or `local` for a task core made itself.
+  A task an agent created has the origin `agent` and the ID of the task that made it in
+  `created_by_task_id`. The Node sets both.
   A task with a primary change request opens on its code host's pane on first activation. Otherwise
   the source that tracks it names the pane (`defaultPane`), and a task neither claims opens on the
   first pane it offers.

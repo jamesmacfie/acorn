@@ -80,7 +80,7 @@
   flex: 1;
   min-width: 0;
   font: inherit;
-  font-size: var(--fs-sm);
+  font-size: var(--fs-input);
   color: var(--text);
   background: var(--input-bg);
   border: var(--control-border);
@@ -625,6 +625,25 @@ textarea.ui-input[data-grow] { flex: 1; min-height: 0; resize: none; }
   border-radius: var(--radius-popover);
   box-shadow: var(--elev-popover);
 }
+/* Narrow: a sheet along the bottom edge, full width, stopping above the keyboard (--keyboard-inset,
+   which the phone's shell keeps). surfaceStyle() leaves the geometry to this rule on a phone, and
+   createAnchoredPopover draws the backdrop. A Picker's list has its own class but the same hook. */
+:root[data-form-factor='narrow'] :is(.ui-popover, .repo-picker-popover-fixed) {
+  inset: auto 0 var(--keyboard-inset, 0px);
+  width: auto;
+  max-width: none;
+  max-height: calc(100dvh - var(--keyboard-inset, 0px) - env(safe-area-inset-top) - var(--space-8));
+  overflow-y: auto;
+  padding-bottom: max(var(--space-1), env(safe-area-inset-bottom));
+  border-width: var(--bw) 0 0;
+  border-radius: var(--radius-popover) var(--radius-popover) 0 0;
+}
+.ui-sheet-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: var(--z-picker);
+  background: var(--scrim);
+}
 /* A menu wants its items against the edge, where the hover band reaches the full width. A dialog
    holds prose and numbers, and 2px of surface left them touching the border. Anything that wants
    the tight surface back sets `padding: 0` on its own content, the way the notification inbox does. */
@@ -884,6 +903,7 @@ button.ui-chip:hover { background: var(--bg-hover); border-color: var(--accent);
 .ui-chip[data-reveal] .ui-chip-remove { opacity: 0; }
 .ui-chip[data-reveal]:hover .ui-chip-remove,
 .ui-chip[data-reveal]:focus-within .ui-chip-remove { opacity: 1; }
+@media (hover: none) { .ui-chip[data-reveal] .ui-chip-remove { opacity: 1; } }
 
 /* ── DescriptionList ────────────────────────────────────────────────────────────────────────
    Two layouts covered all nine hand-rolled label/value grids. `facts` minmax is lifted from the
@@ -1049,7 +1069,7 @@ button.ui-chip:hover { background: var(--bg-hover); border-color: var(--accent);
   border-radius: var(--radius-0);
   outline: none;
 }
-.ui-input[data-kind='filter'] { font-size: var(--fs-sm); min-height: var(--control-h-sm); }
+.ui-input[data-kind='filter'] { font-size: var(--fs-input); min-height: var(--control-h-sm); }
 /* A bare input in a bar is the bar's title, such as a note's name: no underline of its own under the
    bar's divider, and a detail title's size, so the header is one line. */
 .ui-toolbar .ui-input[data-kind='bare'] {
@@ -1060,7 +1080,7 @@ button.ui-chip:hover { background: var(--bg-hover); border-color: var(--accent);
   font-weight: var(--heading-weight);
   background: transparent;
 }
-.ui-input[data-mono] { font-family: var(--font-mono); font-size: var(--fs-sm); resize: vertical; }
+.ui-input[data-mono] { font-family: var(--font-mono); font-size: var(--fs-input); resize: vertical; }
 
 /* ── Card ───────────────────────────────────────────────────────────────────────────────────
    Eleven bespoke card rules. See docs/ui-design/kit-internals.md § How the kit is built for why the
@@ -1273,6 +1293,8 @@ button.ui-chip:hover { background: var(--bg-hover); border-color: var(--accent);
 .copy-btn:hover {
   color: var(--text);
 }
+/* Nothing hovers on a touch screen, so the button stays. */
+@media (hover: none) { .copy-btn { opacity: 1; } }
 /* On a markdown code fence, sit top-right, same corner as CodeBlock's own button below. The wrapper is
    already `position: relative`, and it's the CopyButton's only direct-child use. */
 .ui-code-wrap > .copy-btn { position: absolute; top: var(--space-2); right: var(--space-2); }
@@ -1413,6 +1435,8 @@ button.ui-chip:hover { background: var(--bg-hover); border-color: var(--accent);
    bespoke rule had this; hover-only would have made its start/stop buttons vanish on the row you
    just clicked. */
 .ui-row[data-reveal][data-selected] .ui-row-trailing { opacity: 1; }
+/* A touch screen has no hover to reveal them, so the row's actions are always there. */
+@media (hover: none) { .ui-row[data-reveal] .ui-row-trailing { opacity: 1; } }
 
 /* RowActions: the same reveal, but scoped to the overflow button instead of the whole trailing
    slot, so a badge beside it stays visible. Opt-in per button rather than per row, so it needs no
@@ -1427,6 +1451,7 @@ button.ui-chip:hover { background: var(--bg-hover); border-color: var(--accent);
 .ui-table tr:hover .ui-row-actions,
 .ui-table tr:focus-within .ui-row-actions,
 .ui-row-actions:has([aria-expanded='true']) { opacity: 1; }
+@media (hover: none) { .ui-row-actions { opacity: 1; } }
 
 /* ── SplitHandle ────────────────────────────────────────────────────────────────────────────
    Lifted from `.pane-divider`: a wide hit area around a hairline. The negative margin keeps the
@@ -1564,6 +1589,24 @@ button.ui-chip:hover { background: var(--bg-hover); border-color: var(--accent);
    the same rule `single` and `header-body-footer` apply to their bodies. */
 .ui-listdetail-list[data-scroll] { padding-inline: var(--pane-pad); }
 .ui-listdetail-detail { min-width: 0; min-height: 0; display: flex; flex-direction: column; overflow: hidden; }
+/* Narrow: the component sets `data-view` and one column shows at a time, in a column of its own. It
+   replaces the grid rather than adjusting its tracks, which are widths a phone has no room for. The
+   switch is the control that crosses between the halves, which the host's `list-detail` layout draws
+   too (shell.css). */
+.ui-listdetail[data-view] { display: flex; flex-direction: column; }
+.ui-listdetail[data-view] > :is(.ui-listdetail-list, .ui-listdetail-detail) { flex: 1; }
+.ui-listdetail[data-view='list'] > .ui-listdetail-detail,
+.ui-listdetail[data-view='detail'] > .ui-listdetail-list { display: none; }
+.ui-listdetail-switch {
+  flex: none;
+  display: flex;
+  align-items: center;
+  min-height: var(--control-h);
+  padding-inline: var(--pane-pad);
+  background: var(--bg-subtle);
+}
+.ui-listdetail-switch[data-to='list'] { border-bottom: var(--chrome-divider); }
+.ui-listdetail-switch[data-to='detail'] { justify-content: flex-end; border-top: var(--chrome-divider); }
 /* `scroll` means this column is a page rather than a frame around one, so it takes the pane's inline
    padding for the same reason the list column does: its children are content, and content that starts
    at the border has nothing to sit off.
@@ -1959,6 +2002,7 @@ button.ui-chip:hover { background: var(--bg-hover); border-color: var(--accent);
 .ui-doctab:hover > .ui-btn,
 .ui-doctab:focus-within > .ui-btn,
 .ui-doctab[data-active] > .ui-btn { opacity: 1; }
+@media (hover: none) { .ui-doctab > .ui-btn { opacity: 1; } }
 
 /* ── Button/Row/Tabs extensions ─────────────────────────────────────────────────────────────
    `xs` is the slim rung: a chip-height affordance that rides inside a list row or a topbar strip
@@ -1967,6 +2011,23 @@ button.ui-chip:hover { background: var(--bg-hover); border-color: var(--accent);
 .ui-btn[data-size='xs'] { min-height: var(--control-h-xs); padding: 0 var(--space-3); font-size: var(--fs-xs); }
 /* Not when armed: the armed prompt is words, and this rule comes after the one that widens it. */
 .ui-btn[data-size='xs'][data-icon-only]:not([data-armed]) { width: var(--control-h-xs); }
+/* Narrow: a small or extra small control draws smaller than a fingertip, so an invisible box centred
+   on it keeps a 44px tap area, Apple's guideline. `:where` keeps the `relative` at zero specificity,
+   so a control some other rule positions keeps that position and still anchors the box. */
+:where(:root[data-form-factor='narrow'] :is(.ui-btn, .ui-select):is([data-size='sm'], [data-size='xs'])) {
+  position: relative;
+}
+:root[data-form-factor='narrow'] :is(.ui-btn, .ui-select):is([data-size='sm'], [data-size='xs'])::after {
+  content: '';
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: max(100%, 44px);
+  height: max(100%, 44px);
+  transform: translate(-50%, -50%);
+}
+/* Wide enough that two extra small neighbours' tap areas, 8px past each edge, don't overlap. */
+:root[data-form-factor='narrow'] :is(.ui-toolbar, .ui-toolbar-group:not([data-joined])) { column-gap: var(--space-8); }
 /* An <a class="ui-btn"> has to shed the UA's link decoration and pick up the button's box. */
 a.ui-btn { text-decoration: none; }
 a.ui-btn:hover { text-decoration: none; }

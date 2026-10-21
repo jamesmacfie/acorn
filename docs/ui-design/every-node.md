@@ -95,7 +95,7 @@ paint containment would clip a card's focus ring.
 | `ModalActions` | none | The buttons on one line, right-aligned inside the box |
 | `Menu` | trap | A vertical list in a box. A choice item prints `(•)` or `( )` for a radio and `[x]` or `[ ]` for a checkbox before its label, and `Menu.Separator` is a rule |
 | `Popover` | none | Reduced: the panel opens as a block under its anchor, not floating. Open, the anchor and its panel take a line of their own, because a row shares its width between its children and a panel laid out in a trigger's few cells reads as nothing |
-| `ListDetail` | none | Reduced: two columns above 80 cells, the list 20, 32, or 48 cells wide for `listWidth` `narrow`, `default`, or `wide`, with a rule down its full height. The `split` form's first child is the list. Below 80 cells both forms stack the list over the detail, because this node has no keys of its own to switch with and a column of 38 cells is a column nobody can read. `collapseKey` is ignored: a rail of marks reads only because the names it drops come back on hover, and this host has neither hover nor `tip`, so narrowing by region is the answer here |
+| `ListDetail` | none | Reduced: two columns above 80 cells, the list 20, 32, or 48 cells wide for `listWidth` `narrow`, `default`, or `wide`, with a rule down its full height. The `split` form's first child is the list. Below 80 cells both forms stack the list over the detail, because this node has no keys of its own to switch with and a column of 38 cells is a column nobody can read. `collapseKey` is ignored: a rail of marks reads only because the names it drops come back on hover, and this host has neither hover nor `tip`, so narrowing by region is the answer here. `selection` is ignored, because below 80 cells both columns stack |
 | `ListColumn` | none | Reduced: the left column, or the whole width when the split has collapsed. It scrolls its own rows, as the desktop column does. `label` is the column's accessible name and isn't drawn |
 | `DetailColumn` | none | The right column, or the whole width. `measure` is ignored, since the column is already no wider than a readable line |
 | `Sections` | collection | Reduced: a strip of tabs over one panel: the header first, then each section, then `main` below 120 cells, where a diff in half the width is a diff wrapped at 45 columns. `h` and `l` walk the strip. A section's `meta` is not drawn: a strip has room for a label and a count |
@@ -182,5 +182,5 @@ shared provider error codes. It adds no kit node.
 | Node | Focus | At 80×24 |
 | --- | --- | --- |
 | `Rectangle` | stop | Absent, with two exceptions the node handles itself: `kind="pty"` and `kind="editor"` are native, and `webview` and `frame` draw their `<Fallback>` child or nothing |
-| `Only` | none | Children exist on the named hosts and nowhere else. No fallback wanted |
+| `Only` | none | Children exist on the named hosts or form factors and nowhere else. No fallback wanted |
 | `Fallback` | none | What to draw where the matrix says this host cannot draw the node it is inside |

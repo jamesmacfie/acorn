@@ -7,6 +7,7 @@ import { setImmediate as yieldToNode } from 'node:timers/promises'
 import { and, count, desc, eq, gt, inArray, notInArray } from 'drizzle-orm'
 import type { PluginDatabase } from '@acorn/plugin-api/node'
 import { ScheduleSkipped } from '@acorn/plugin-api/node'
+import type { DataPredicate } from '@acorn/protocol/dataBindings.ts'
 import type { QueryReference, ResolvedQuery } from '@acorn/protocol/dataQueries.ts'
 import { readDataBinding } from '@acorn/protocol/dataQueryResolution.ts'
 import type { DataRecord, DataSourceQuery, DataSourceResult } from '@acorn/protocol/dataSources.ts'
@@ -26,8 +27,10 @@ import type {
   WorkflowRecordsWhen,
   WorkflowTriggerCheck,
   WorkflowTriggerMatch,
+  WorkflowTriggerPreparation,
   WorkflowTriggerPreview,
 } from '../../shared/workflowTriggers'
+import { BUILTIN_AGENT_STEP_KINDS } from '../../shared/stepFields'
 import { workflowContentFingerprint } from '../definitions/fingerprint'
 import type { WorkflowTransaction } from '../dispatch/dispatcher'
 import { asAuthorityError, WorkflowAuthorityError } from '../runs/authority'
@@ -144,6 +147,38 @@ export async function reviewRecords(
     if (binding.address.from !== 'item') throw new Error(`The input ${name} can only be bound to a record field.`)
   }
   return source
+}
+
+/** Whether a trigger on core's Tasks source could match a task an agent made: the query doesn't hold
+ *  `createdByTask` to missing. Core's Tasks source combines conditions with "all" only. */
+export async function matchesAgentTasks(
+  reader: TriggerRecordReader,
+  projectId: string,
+  when: WorkflowRecordsWhen,
+): Promise<boolean> {
+  const { query } = await reader.resolve(projectId, when.query, Date.now())
+  if (query.source.pluginId !== 'core' || query.source.sourceId !== 'tasks') return false
+  const excludes = (predicate?: DataPredicate): boolean =>
+    predicate?.kind === 'all'
+      ? predicate.predicates.some(excludes)
+      : predicate?.kind === 'comparison' &&
+        predicate.operator === 'missing' &&
+        predicate.left.address.from === 'item' &&
+        predicate.left.address.pointer === '/createdByTask'
+  return !excludes(query.predicate)
+}
+
+/** What the approval sheet says about agent steps, which read text the people who write records chose. Set
+ *  when the workflow has one. shortcut: built-in kinds only, so a contributed agent kind gets no
+ *  warning here, but the agents plugin still refuses it at run time. */
+export function recordAgents(
+  source: TriggerSourceDescription,
+  graph: ResolvedWorkflowGraph,
+): { recordAgents?: WorkflowTriggerPreparation['recordAgents'] } {
+  const runsAgent = graph.nodes.some((node) =>
+    node.definition.steps.some((step) => BUILTIN_AGENT_STEP_KINDS.has(step.kind ?? 'agent')),
+  )
+  return runsAgent ? { recordAgents: source.recordsFrom ? { from: source.recordsFrom } : {} } : {}
 }
 
 /** Approval's part for a record trigger: the review checks, then the query pinned at the saved

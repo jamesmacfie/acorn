@@ -41,8 +41,11 @@ import { readPairingBody } from './pairingBody'
 // bound.
 const PAIR_ATTEMPT_WINDOW_MS = 60_000
 const PAIR_ATTEMPTS_PER_WINDOW = 20
+// Asks count apart from codes, so a loop of asks can't block someone typing a code from another
+// computer.
+const PAIR_ASKS_PER_WINDOW = 6
 
-function attemptCeiling(now: () => number = () => Date.now()): () => boolean {
+function attemptCeiling(perWindow: number, now: () => number = () => Date.now()): () => boolean {
   let windowStartedAt = 0
   let attempts = 0
   return () => {
@@ -52,7 +55,7 @@ function attemptCeiling(now: () => number = () => Date.now()): () => boolean {
       attempts = 0
     }
     attempts += 1
-    return attempts <= PAIR_ATTEMPTS_PER_WINDOW
+    return attempts <= perWindow
   }
 }
 
@@ -72,7 +75,8 @@ async function paired(c: Context<AppEnv>, deviceName: string): Promise<Response>
 }
 
 export function pairingRoutes(): { open: Hono<AppEnv>; core: Hono<AppEnv> } {
-  const withinCeiling = attemptCeiling()
+  const withinCeiling = attemptCeiling(PAIR_ATTEMPTS_PER_WINDOW)
+  const withinAskCeiling = attemptCeiling(PAIR_ASKS_PER_WINDOW)
   // Per instance, like the ceiling: a request belongs to the Node that was asked.
   const requests = pairingRequests()
 
@@ -110,12 +114,12 @@ export function pairingRoutes(): { open: Hono<AppEnv>; core: Hono<AppEnv> } {
     })
     // Pairing by approval (docs/api-reference/transport.md § Pairing by approval). Only from this
     // computer: a dialog anyone on the network could raise is a dialog the owner learns to click
-    // through. Another machine pairs with a code. Under the same ceiling as codes, so a loop of asks
-    // can't keep the owner's dialog changing faster than they can read it.
+    // through. Another machine pairs with a code. The ceiling bounds the noise a loop of asks makes in
+    // the owner's dialog. It doesn't stop a swap: an ask that overlaps another cancels both.
     .post('/pair/requests', async (c) => {
       if (!isLoopbackPeer(c.env.incoming?.socket.remoteAddress))
         return respondError(c, 403, 'pairing_local_only', ['Pair from another computer with a pairing code.'])
-      if (!withinCeiling())
+      if (!withinAskCeiling())
         return respondError(c, 429, 'rate_limited', ['Too many pairing attempts. Try again shortly.'])
       const body = await readPairingBody(c.req.raw)
       if (body.oversized) return respondError(c, 413, 'payload_too_large', ['Pairing request exceeds 4 KiB.'])
@@ -123,6 +127,7 @@ export function pairingRoutes(): { open: Hono<AppEnv>; core: Hono<AppEnv> } {
       if (!parsed.success) return respondError(c, 400, 'bad_request', ['A pairing request needs a device name.'])
       const ask = requests.ask(parsed.data.deviceName)
       broadcastPairingRequested()
+      if (!ask) return respondError(c, 409, 'pairing_busy', ['Another client asked at the same moment. Try again.'])
       return c.json(ask satisfies PairingAsk)
     })
     // The asker polls this until the owner answers. No ceiling: the secret is 256 random bits, and

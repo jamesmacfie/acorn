@@ -216,6 +216,31 @@ describe('host wrappers', () => {
     expect(host.querySelector('#gone')).toBe(null)
   })
 
+  it('Only draws for the form factor the root names, and needs both lists to match', () => {
+    const narrow = () => (
+      <Only formFactors={['narrow']}>
+        <span id="phone">phone</span>
+      </Only>
+    )
+    mount(narrow)
+    expect(host.querySelector('#phone')).toBe(null)
+    dispose()
+    document.documentElement.dataset.formFactor = 'narrow'
+    try {
+      mount(narrow)
+      expect(host.querySelector('#phone')).not.toBe(null)
+      dispose()
+      mount(() => (
+        <Only hosts={['tui']} formFactors={['narrow']}>
+          <span id="both">both</span>
+        </Only>
+      ))
+      expect(host.querySelector('#both')).toBe(null)
+    } finally {
+      delete document.documentElement.dataset.formFactor
+    }
+  })
+
   it('Fallback stays out of the way of a node this host draws fully', () => {
     // Every node is `full` on the DOM, so nothing substitutes for one here. The wrapper exists so a
     // plugin written today still says the right thing on a host that cannot draw the node.

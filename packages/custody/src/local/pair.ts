@@ -1,7 +1,7 @@
 import { hostname } from 'node:os'
 import { createInterface } from 'node:readline/promises'
 import { setTimeout as sleep } from 'node:timers/promises'
-import { askToPair, collectPairing, probeNode, pairWithNode } from '../broker/nodePairing'
+import { askToPair, collectPairing, PairingBusyError, probeNode, pairWithNode } from '../broker/nodePairing'
 import type { FleetNode, FleetStore } from '../broker/fleetStore'
 import { fingerprintPhrase } from '@acorn/protocol/fingerprintWords.ts'
 import type { PairResult } from '@acorn/protocol/node.ts'
@@ -11,16 +11,16 @@ const COLLECT_EVERY_MS = 1_000
 export async function pairInteractively(
   endpoint: string,
   fleet: FleetStore,
-  node: { label: string; local: boolean },
+  node: { label: string; local: boolean; deviceName?: string },
 ): Promise<FleetNode> {
   if (!process.stdin.isTTY || !process.stdout.isTTY)
-    throw new Error('This node is not paired. Run acorn --node URL in a terminal to pair it.')
+    throw new Error('This Node is not paired. Run the same command in an interactive terminal to pair it.')
   const probe = await probeNode(endpoint)
   if (!probe.compatible)
     throw new Error(
       `${probe.endpoint} speaks acorn protocol ${probe.protocolVersion}; upgrade whichever side is older.`,
     )
-  const deviceName = `acorn on ${hostname()}`
+  const deviceName = node.deviceName ?? `acorn on ${hostname()}`
   const words = fingerprintPhrase(probe.fingerprint) ?? probe.fingerprint
   process.stderr.write(
     `\n  ${probe.endpoint}\n  Identity      ${words}\n\n  Compare these words with the node's boot output.\n`,
@@ -28,7 +28,13 @@ export async function pairInteractively(
   // The Node on this computer can ask a paired client to allow this one, so nobody has to copy a
   // code across (docs/api-reference/transport.md § Pairing by approval). The code prompt stays open
   // beside the wait, for a Node no paired client is watching.
-  const ask = node.local ? await askToPair(probe, deviceName).catch(() => null) : null
+  const ask = node.local
+    ? await askToPair(probe, deviceName).catch((error: unknown) => {
+        if (error instanceof PairingBusyError)
+          process.stderr.write(`\n  ${error.message} Run acorn again, or type a pairing code.\n`)
+        return null
+      })
+    : null
   if (ask)
     process.stderr.write(
       `\n  Allow this in Acorn on this computer. It shows: ${ask.phrase}\n  Or type a pairing code.\n`,

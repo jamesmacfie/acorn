@@ -20,6 +20,7 @@ describe('no phantom tokens', () => {
     // (docs/ui-design/tokens.md § Runtime-set custom properties).
     const runtimeSet = new Set([
       '--term-drawer-h', // TerminalPanel.tsx sets it on documentElement
+      '--keyboard-inset', // the phone shell's trackKeyboardInset sets it on documentElement
       '--left-rails-w', // App.tsx publishes the combined left rail width on documentElement
       '--left', // reserved override hook for the left pane width
       '--l',

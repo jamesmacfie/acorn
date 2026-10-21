@@ -76,7 +76,7 @@ const coreTaskStarterPlans: PanelPlan[] = [
 ]
 
 export const coreTaskSourceDescription: DataSourceDescription = {
-  revision: '2',
+  revision: '3',
   schema: {
     type: 'object',
     additionalProperties: false,
@@ -87,6 +87,7 @@ export const coreTaskSourceDescription: DataSourceDescription = {
       workspaceId: { type: 'string' },
       workspace: { type: 'string' },
       origin: { type: 'string' },
+      createdByTask: { type: 'string' },
       branch: { type: ['string', 'null'] },
       status: { type: 'string' },
       worktreeChanged: { type: ['boolean', 'null'] },
@@ -124,6 +125,13 @@ export const coreTaskSourceDescription: DataSourceDescription = {
     { pointer: '/project', label: 'Project', origin: 'declared', query: { operators: ['eq', 'ne'], sortable: false } },
     { pointer: '/workspace', label: 'Scope', origin: 'declared', query: { operators: ['eq', 'ne'], sortable: false } },
     { pointer: '/origin', label: 'Origin', origin: 'declared', query: { operators: ['eq', 'ne'], sortable: false } },
+    {
+      pointer: '/createdByTask',
+      label: 'Created by task',
+      description: 'The task whose agent made this one. Absent on a task a person made.',
+      origin: 'declared',
+      query: { operators: ['missing', 'present'], sortable: false },
+    },
     {
       pointer: '/branch',
       label: 'Branch',
@@ -217,6 +225,7 @@ async function coreTasks(request: DataSourceRequest, env: Env) {
         workspaceId: workspace.id,
         workspace: workspace.name,
         origin: task.origin,
+        ...(task.createdByTaskId ? { createdByTask: task.createdByTaskId } : {}),
         branch: task.branch,
         status: task.status,
         worktreeChanged: counts.get(task.id)?.changed ?? null,

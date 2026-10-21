@@ -15,7 +15,7 @@ request carries `v: 1` and a request `id`, and the host answers with the same `i
 | `node.probe` | `endpoint` | The probe result: endpoint, fingerprint, protocol, baseline, `compatible` |
 | `node.local` | none | The Node on this computer as a probe result with its `nodeId`, or `null` when none is running |
 | `node.pair` | `code`, `label` | The paired Node's record |
-| `node.ask` | none | `{ phrase }`: the words the owner's dialog shows. Only after `node.local` |
+| `node.ask` | none | `{ phrase }`: the words the owner's dialog shows. Only after `node.local`. Fails with `pairing_busy` when another ask overlapped, and asking again starts clean |
 | `node.collect` | `label` | The paired Node's record once the owner allows the ask, or `null` while they haven't. A denial or an expiry fails with `pairing_failed` |
 | `node.select` | `nodeId` or `null` | `{ nodes, activeNodeId, status }` |
 | `node.forget` | `nodeId` | `{ nodes, activeNodeId, status }` |

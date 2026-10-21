@@ -105,3 +105,54 @@ describe('ListDetail', () => {
     dispose()
   })
 })
+
+// A phone shows one column at a time (docs/ui-design/two-column-panes.md § Narrow). The columns stay
+// mounted and `data-view` says which one the sheet shows.
+describe('ListDetail on a phone', () => {
+  const view = () => host.querySelector<HTMLElement>('.ui-listdetail')?.dataset.view
+  const press = (name: string) =>
+    [...host.querySelectorAll('button')].find((button) => button.textContent === name)!.click()
+
+  beforeEach(() => {
+    document.documentElement.dataset.formFactor = 'narrow'
+  })
+  afterEach(() => {
+    delete document.documentElement.dataset.formFactor
+  })
+
+  it('shows the list, drops the divider, and goes forward and back on request', () => {
+    render(() => <ListDetail list={<span>the list</span>}>the detail</ListDetail>, host)
+
+    expect(view()).toBe('list')
+    expect(host.querySelector('.ui-split-handle')).toBe(null)
+    press('Show detail')
+    expect(view()).toBe('detail')
+    press('Back')
+    expect(view()).toBe('list')
+  })
+
+  it('shows the detail when the selection changes to a key', () => {
+    const [selection, setSelection] = createSignal<string | null>(null)
+    render(
+      () => (
+        <ListDetail selection={selection()} list={<span>the list</span>}>
+          the detail
+        </ListDetail>
+      ),
+      host,
+    )
+
+    expect(host.querySelector('.ui-listdetail-switch')).toBe(null)
+    setSelection('one')
+    expect(view()).toBe('detail')
+    press('Back')
+    setSelection(null)
+    expect(view()).toBe('list')
+  })
+
+  it('leaves a split of one column alone', () => {
+    render(() => <ListDetail>the detail</ListDetail>, host)
+
+    expect(view()).toBeUndefined()
+  })
+})

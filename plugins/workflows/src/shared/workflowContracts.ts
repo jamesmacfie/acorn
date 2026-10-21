@@ -155,9 +155,10 @@ export type WorkflowAuthorityReason =
   | 'missing'
   | 'untrusted'
   | 'input-required'
+  | 'unguarded-agent'
 
 /** What a failed run's error means, stored beside its text as `workflow_runs.error_cause`. */
-export type WorkflowRunErrorCause = 'checkpoint-expired'
+export type WorkflowRunErrorCause = 'checkpoint-expired' | 'unguarded-agent'
 
 export type WorkflowRunRow = typeof schema.workflowRuns.$inferSelect
 export type WorkflowStepRow = typeof schema.workflowSteps.$inferSelect

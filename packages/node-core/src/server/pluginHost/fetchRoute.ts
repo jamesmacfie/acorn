@@ -1,7 +1,7 @@
 import type { Context, Next } from 'hono'
 import type { AppEnv } from '../middleware/auth'
 import { respondError } from '../respond'
-import { resolvePluginFetch } from '../routes/registry'
+import { isHostDispatchedPath, resolvePluginFetch } from '../routes/registry'
 import { pluginRequestContext } from './requestContext'
 import type { PluginFetchHandler } from './types'
 
@@ -12,7 +12,13 @@ export async function servePluginFetch(
   c: Context<AppEnv>,
   args: { pluginId: string; mount: string; fetch: PluginFetchHandler },
 ): Promise<Response> {
-  if (!c.get('principal')) return respondError(c, 401, 'unauthenticated')
+  const principal = c.get('principal')
+  if (!principal) return respondError(c, 401, 'unauthenticated')
+  // A path the host dispatches itself answers only the host and devices: an agent's task token, the
+  // service, and a workflow step all reach it through `dispatchPluginRoute` when they're meant to. 404
+  // rather than 403, so the answer doesn't say which paths a plugin declares.
+  if (principal.kind === 'internal' && isHostDispatchedPath(args.pluginId, c.req.path))
+    return respondError(c, 404, 'not_found')
   const raw = c.req.raw
   const url = new URL(raw.url)
   url.pathname = url.pathname.slice(args.mount.length) || '/'

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import type { AgentConfigOption } from '../../contract/wire.ts'
+import type { AgentConfigOption } from '../contract/wire.ts'
 import { unguardedCommandsWarning } from './unguardedCommands'
 
 const option = (category: AgentConfigOption['category'], currentValue: string | null): AgentConfigOption => ({

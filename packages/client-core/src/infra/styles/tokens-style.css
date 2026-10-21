@@ -134,6 +134,9 @@
 
   --fs-2xs: 10px;  --fs-xs: 11px;  --fs-sm: 12px;  --fs: 13px;
   --fs-md: 14px;   --fs-lg: 15px;  --fs-xl: 18px;
+  /* What the text of an input is set in. A phone raises it, because iOS Safari zooms the page into an
+     input set smaller than 16px (narrow.css). */
+  --fs-input: var(--fs-sm);
   --lh: 1.5;  --lh-tight: 1.25;  --lh-diff: 1.45;
   --fw-normal: 400;  --fw-medium: 500;  --fw-semibold: 600;  --fw-bold: 700;
 

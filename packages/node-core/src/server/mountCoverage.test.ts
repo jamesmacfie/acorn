@@ -26,10 +26,11 @@ const OPEN_TO_A_TASK_TOKEN: Record<string, string> = {
   'GET /v1/core/task-statuses': 'routes/worktree.ts filters the roster by mayActOnTask',
   'GET /v1/core/task-scripts': 'routes/projects/taskScripts.ts filters the ids by mayActOnTask',
 
-  // A task row is inert. It records intent — a title, a project, a branch name — and nothing on it
-  // runs until a person opens it, at which point the worktree and setup paths apply their own gates.
-  // Same reasoning as `POST /v1/core/projects/:id/detect` in the frame scope table.
-  'POST /v1/core/tasks': 'creates an inert row; every executable path off it is separately gated',
+  // A task row records intent — a title, a project, a branch name — and nothing on it runs until a
+  // person opens it, except through a record trigger on the Tasks source. So the route holds a task
+  // token to its own task's project and stamps the origin itself (routes/projects/tasks.ts).
+  'POST /v1/core/tasks':
+    'a task token creates only in its own project, with origin stamped agent by the Node, because a trigger can act on a new task',
 
   // The static tool catalog: names, descriptions and risk tiers, no task data and no owner data. An
   // agent already sees the tools it may call at /tasks/:id/tools, which this cannot widen.

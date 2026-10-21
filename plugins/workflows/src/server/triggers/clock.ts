@@ -28,6 +28,8 @@ export type TriggerSourceDescription = {
   fields: DataField[]
   incremental: boolean
   incrementalReason?: string
+  /** Where the records come from, such as "issues in acme/billing-api". Absent when the source can't say. */
+  recordsFrom?: string
 }
 
 export type TriggerSourceDescriber = (

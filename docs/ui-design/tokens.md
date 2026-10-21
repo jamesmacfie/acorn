@@ -87,6 +87,8 @@ decision.
 - `--dash-cell` and `--dash-pitch` are a dashboard grid's measured cell size and pitch, from
   `PanelGrid`'s `ResizeObserver`.
 - `--term-drawer-h` is the terminal drawer's height, and `--left` is a reserved override hook.
+- `--keyboard-inset` is how much of the page the on-screen keyboard covers, published by the phone's shell
+  for the shell's height and for dialog sheets.
 - `--left-rails-w` is the combined left rail width, published by the desktop shell for body portals.
 - `--l` and `--r` are Shiki's per-token syntax colors. An `ansi` `CodeBlock` sets them on each colored
   run of terminal output, with `--lb` and `--rb` for a background.
@@ -122,6 +124,25 @@ project's task-tab color or a review note's state, so a pack may zero `--marker-
 `--stripe-w`. A disclosure triangle, `Fold`'s marker or a tree row's twist, sizes from the scale rung
 `--bw-marker` rather than either role, because it's the control that opens the content and no pack may
 hide it.
+
+## The narrow sheet
+
+`narrow.css` is the one stylesheet that isn't a pack. Its single `:root[data-form-factor='narrow']`
+block draws controls at 40, 32, and 28px for `--control-h`, `--control-h-sm`, and `--control-h-xs`,
+raises the row heights to 44px or more for a finger, trims the pane padding, and sets
+`--fs-input` to 16px, because iOS Safari zooms the page into an input set smaller than that. Every
+input draws its text from `--fs-input`, which is `--fs-sm` until a form factor changes it. It loads
+after the packs, so its sizes win in all of them, and `tokenAxes.test.ts` pins that order. It sets
+style tokens only. A shell turns it on by putting `data-form-factor="narrow"` on `<html>`, and
+`formFactor()` in `infra/platform` reads the same attribute. Nothing measures the window.
+
+A small or extra small button or select draws under the 44-point tap guideline on iOS, so on a phone
+an invisible `::after` box centered on it keeps a 44px tap area (`primitives.css`). A toolbar on a
+phone spaces its controls 16px apart, so two neighbors' tap areas don't overlap.
+
+Controls that appear on hover show on a touch screen by a `@media (hover: none)` rule beside each
+hover rule in `primitives.css` and `dashboards.css`. That rule doesn't depend on the attribute, so a
+touch-screen laptop gets it too.
 
 ## Style packs
 

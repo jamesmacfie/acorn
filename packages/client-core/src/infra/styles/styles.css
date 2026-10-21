@@ -20,6 +20,7 @@
 @import './style-modern.css';
 @import './style-cozy.css';
 @import './style-cute.css';
+@import './narrow.css'; /* after the packs, so a phone's sizes beat theirs */
 
 @import './diff.css';
 @import './topbar.css';

@@ -22,6 +22,7 @@ import type {
   PluginScheduleDescriptor,
   PluginTaskCheckDescriptor,
 } from '../plugins/manifest'
+import type { PluginCliCommandDescriptor } from '@acorn/protocol/plugin/cliCommands.ts'
 import { scopeCapabilities, scopeCore } from '../plugins/permissions'
 import { registerAgentTool } from '../agentTools/registry'
 import { registerDataSource, registerDataSourceDiscovery } from '../dataSources/registry'
@@ -46,7 +47,7 @@ import { contributeExtension, extensionsFor, openExtensionPoint } from './extens
 import { hookHandlersFor, registerHookHandler, registerHookPoint, runHook } from './hooks'
 import { DISCLOSED_NODE_POINTS, qualifiedExtensionPointId } from '@acorn/protocol/extensionPoints.ts'
 import { asContextSection, registerContextSection } from '../agentTools/contextSections'
-import { registerRoute } from '../routes/registry'
+import { registerRoute, reserveHostDispatchedPath } from '../routes/registry'
 import { connectionProviderRegistry } from '../integrations/connectionProviders/registry'
 import { integrationProviderRegistry } from '../integrations/registry'
 import { modelProviderRegistry } from '../modelProviders/registry'
@@ -123,6 +124,9 @@ export type LoadedPluginBinding = {
   skills?: readonly PackageSkill[]
   agentTools?: readonly PluginAgentToolDescriptor[]
   contextSections?: readonly PluginContextSectionDescriptor[]
+  // Read only for their routes, which the host reserves (./manifestWork.ts § reserveManifestRoutes). The
+  // CLI route itself reads the running manifest from the plugin state.
+  cliCommands?: readonly PluginCliCommandDescriptor[]
   // Buttons the browser extension draws, replayed into the handoff registry (./browserHandoffs.ts).
   browserHandoffs?: readonly BrowserHandoffDescriptor[]
   // The route listing its tasks' app addresses for the browser extension, kept beside the handoffs.
@@ -223,6 +227,10 @@ export function buildPluginContext(options: PluginContextOptions): HostPluginCon
   const permissions = options.loaded?.permissions
   const recordUndo = options.onUndo
   const pending = options.pending
+  // For the registrations below that name a route the host will call, so the HTTP door refuses an
+  // internal caller there (`reserveHostDispatchedPath`). Called after the registration, so one the
+  // registry refuses reserves nothing.
+  const reserveDispatched = (path: string) => recordUndo(reserveHostDispatchedPath(plugin, path).dispose)
   // A loaded plugin files into a disclosed node point only if its manifest named it, which is what put
   // the grant in front of the owner (@acorn/protocol/extensionPoints.ts § DISCLOSED_NODE_POINTS).
   const assertDisclosedPoint = <T>(point: ExtensionPointId<T>): ExtensionPointId<T> => {
@@ -309,8 +317,14 @@ export function buildPluginContext(options: PluginContextOptions): HostPluginCon
         await authorizeQueryScope(options.env, scope, invocation)
         queryStore(options.env.DB).setConsumer(scope, queryId, { ...consumer, pluginId: plugin }, remove)
       },
-      register: (source) => recordUndo(registerDataSource(plugin, source, { loaded: !!permissions }).dispose),
-      discover: (discovery) => recordUndo(registerDataSourceDiscovery(plugin, discovery).dispose),
+      register: (source) => {
+        recordUndo(registerDataSource(plugin, source, { loaded: !!permissions }).dispose)
+        reserveDispatched(source.handler)
+      },
+      discover: (discovery) => {
+        recordUndo(registerDataSourceDiscovery(plugin, discovery).dispose)
+        reserveDispatched(discovery.handler)
+      },
       // Bound to the caller, so a plugin can only say its own sources changed.
       changed: (sourceId, hint) => dataSourceChanged(plugin, sourceId, hint),
       registerFeed: (feed) => recordUndo(registerDataFeed(plugin, feed).dispose),
@@ -359,7 +373,10 @@ export function buildPluginContext(options: PluginContextOptions): HostPluginCon
     // accepted at that moment. Filing one under a stranger's name borrows that plugin's reputation for
     // your own route.
     nodeActions: {
-      register: (action) => recordUndo(registerNodeAction({ ...action, pluginId: plugin }).dispose),
+      register: (action) => {
+        recordUndo(registerNodeAction({ ...action, pluginId: plugin }).dispose)
+        reserveDispatched(action.path)
+      },
     },
     // Owner-bound like the three above, and the provenance the dialog draws: every concern this check
     // answers with renders beside the plugin's name.
@@ -373,7 +390,10 @@ export function buildPluginContext(options: PluginContextOptions): HostPluginCon
     // Owner-bound like the rest: a plugin lists its own runs and cannot register a pointer at someone
     // else's route (../runs/registry.ts). The route is re-confined on every read.
     runs: {
-      register: (source) => recordUndo(registerRunSource({ ...source, pluginId: plugin }).dispose),
+      register: (source) => {
+        recordUndo(registerRunSource({ ...source, pluginId: plugin }).dispose)
+        reserveDispatched(source.runs)
+      },
     },
     // Owner-bound like the four above, and here the binding is the id itself: a harness id is persisted
     // into session rows and workflow steps, so minting it from `plugin` keeps one package's sessions out

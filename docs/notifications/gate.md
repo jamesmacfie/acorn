@@ -60,6 +60,15 @@ clears on a Node switch, like every other Node-scoped signal
 **Mark all read** applies to the whole number the bell shows. It marks every notice read and
 acknowledges every nudge on show. It can't empty a bell that holds a real block.
 
+## Keeping the inbox current
+
+The inbox fetches its rows once and nothing else asks again, so `observeAttention` also tells it when
+to. `onAttentionStateChange` runs whenever a snapshot is new or its state differs from the last one the
+host saw. A session that only bumped its `updatedAt` doesn't count, so a streaming turn doesn't refetch
+on every event. `createAttentionInbox` listens and refetches every source. A request raised on the
+desktop reaches a phone's **Needs you** list within the second or so the Node's frame takes, and an
+answered one leaves it the same way.
+
 ## Invariants
 
 `packages/client-core/src/features/notifications/invariants.test.ts` checks these as properties over

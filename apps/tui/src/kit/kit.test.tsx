@@ -1236,11 +1236,19 @@ const CASES: Case[] = [
         <Only hosts={['dom']}>
           <Text>elsewhere</Text>
         </Only>
+        <Only formFactors={['tui']}>
+          <Text>terminal</Text>
+        </Only>
+        <Only hosts={['tui']} formFactors={['narrow']}>
+          <Text>phone</Text>
+        </Only>
       </Stack>
     ),
     check: (frame) => {
       has(frame, 'here')
+      has(frame, 'terminal')
       lacks(frame, 'elsewhere')
+      lacks(frame, 'phone')
     },
   },
   {

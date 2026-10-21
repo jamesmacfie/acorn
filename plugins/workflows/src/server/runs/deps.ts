@@ -29,6 +29,7 @@ export type RunStepOptions = HeadlessOpts & {
   workflowRunId?: string
   workflowStepId?: string
   posture?: 'gated' | 'autonomous'
+  allowUnguardedAgents?: boolean
   sessionTitle?: string
   requireManagedSession?: boolean
   managedSessionId?: string

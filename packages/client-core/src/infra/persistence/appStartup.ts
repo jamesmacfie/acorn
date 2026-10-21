@@ -40,6 +40,14 @@ function applyStyle(prefs: Readonly<Record<string, string>>): void {
   document.documentElement.dataset.style = resolveStyle(prefs[PrefKeys.style])
 }
 
+/** Paint the theme and style the prefs name, following the OS's light and dark until the returned
+ *  function runs. Exported for a host that draws the person's appearance without restoring the
+ *  shell's persisted state, such as the mobile shell. */
+export function applyAppearance(prefs: Readonly<Record<string, string>>): () => void {
+  applyStyle(prefs)
+  return applyTheme(prefs)
+}
+
 export type AppStartupOptions = {
   queryClient: QueryClient
   prefs: Accessor<Readonly<Record<string, string>> | undefined>
@@ -66,8 +74,7 @@ export function createAppStartupRestore(options: AppStartupOptions): {
     const prefs = options.prefs()
     if (!prefs) return
     disposeTheme()
-    disposeTheme = applyTheme(prefs)
-    applyStyle(prefs)
+    disposeTheme = applyAppearance(prefs)
   })
   onCleanup(() => disposeTheme())
 

@@ -40,6 +40,10 @@ and the limits. `packages/node-core/src/server/pluginHost/host.ts` registers the
 }
 ```
 
+The `handler` and `read` paths answer only the host and the owner's devices: an agent that posts to
+one over HTTP gets `404`
+([plugin secrets and routes](../security/plugin-secrets-and-routes.md#routes-and-task-tokens)).
+
 Tool IDs are lowercase snake case and become `<pluginId>_<id>` in the registry. A context section
 whose ID equals its plugin ID keeps the ID `<pluginId>`, and others become `<pluginId>:<id>`. Tool and
 inclusion preferences are stored by these IDs, so renaming one drops the preference.

@@ -367,6 +367,22 @@
 .layout-region-detail:has(> .ui-listdetail, > .remote-tree > .ui-listdetail) > *,
 .layout-region-detail:has(> .diff-toolbar) > * { max-width: none; margin-inline: 0; }
 
+/* Narrow `document-over-frame`, `frame-beside-document` and `stack-split` (host/layouts/RegionSheet.tsx):
+   the first region fills the pane under a bar holding **Show panel**, and the second opens in a drawer. */
+.layout-document-split[data-narrow] { flex-direction: column; }
+.layout-document-split[data-narrow] > .layout-region-document { flex: 1; }
+.layout-sheet-bar {
+  flex: none;
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  min-height: var(--control-h);
+  padding-inline: var(--pane-pad);
+  background: var(--bg-subtle);
+  border-bottom: var(--chrome-divider);
+}
+.layout-sheet-body { flex: 1; min-width: 0; min-height: 0; display: flex; flex-direction: column; overflow: hidden; }
+
 /* `list-detail`. The list column's width is a style token until someone drags the handle, which
    writes a pixel value onto the container. The divider is the handle's while expanded, so the
    column carries no border of its own. The surviving edge takes it over when collapsed. */
@@ -406,6 +422,10 @@
    (tokens-style.css § --tabrail-w). The dragged pixel value stops being applied while it is, which
    is why the component drops the inline custom property rather than this rule fighting it. */
 .layout-region-list[data-collapsed] { width: var(--tabrail-w); }
+/* Narrow: the layout sets `data-view` and mounts one region, so the root stacks that region under the
+   switch bar the layout draws, and the list takes the width a column would have had. */
+.layout-list-detail[data-view] { flex-direction: column; }
+.layout-list-detail[data-view] > .layout-region-list { flex: 1; width: auto; }
 .layout-collapsed-header {
   flex: none;
   height: var(--pane-head-h);

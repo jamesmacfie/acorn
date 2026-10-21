@@ -12,12 +12,26 @@ import { AgentDriverRegistry } from '../drivers/registry'
 import { claudeCodeProfile } from '../profiles/claudeCode'
 import { ManagedAgentRuntime } from './runtime'
 import { createSessionExecute } from './sessionExecute'
+import { UnguardedAgentError } from '../../contract/sessionExecute'
+import { defaultAgentSessionDefaults, rememberAgentDefaults } from '../../shared/sessionDefaults'
+import { writeAgentSessionDefaults } from '../sessionDefaultsStore'
 
 // A workflow step's turn (docs/workflows/execution.md § Execution model). The step names the provider options
 // it wants and they have to be applied to the session, because the Claude driver takes a switch only
 // through `setConfig` and never off the turn.
 
-const advertised = (): AgentConfigOption[] => [
+const advertised = (startMode?: string): AgentConfigOption[] => [
+  ...(startMode
+    ? [
+        {
+          id: 'mode',
+          label: 'Mode',
+          category: 'mode' as const,
+          currentValue: startMode,
+          values: ['default', 'bypassPermissions'].map((value) => ({ value, label: value })),
+        },
+      ]
+    : []),
   {
     id: 'model',
     label: 'Model',
@@ -48,6 +62,8 @@ class ConfigDriver implements AgentDriver {
     readonly profileId = 'claude-code',
   ) {}
   readonly configSets: Array<[string, string]> = []
+  // The mode the harness starts in, as its own settings choose it. Advertised only when set.
+  startMode: string | undefined
   readonly turns: AgentDriverTurnOptions[] = []
   readonly envs: Record<string, string>[] = []
   // What each turn answers, in order. Past the end of the script every turn answers 'Done.'.
@@ -85,7 +101,7 @@ class ConfigDriver implements AgentDriver {
     this.envs.push(options.env)
     const providerSessionRef = options.session.providerSessionRef ?? `cfg-${randomUUID()}`
     let active = false
-    let current = advertised()
+    let current = advertised(this.startMode)
     await options.onEvent({ type: 'session_metadata', providerSessionRef, configOptions: current })
     await options.onEvent({ type: 'session_state', state: 'ready' })
     const driver = this
@@ -179,7 +195,7 @@ describe('agents.sessionExecute config options', () => {
         return {}
       },
       secrets: ctx.env.SECRETS,
-      currentUserId: () => null,
+      currentUserId: () => 'owner',
       registry,
     })
   })
@@ -320,6 +336,64 @@ describe('agents.sessionExecute config options', () => {
     expect(only?.type === 'text' && only.text).toContain(
       '<acorn-context source="workflow.upstream" label="Output of get-diff">',
     )
+  })
+
+  describe('a step that would run commands without asking', () => {
+    const step = (extra: Partial<Parameters<ReturnType<typeof createSessionExecute>>[0]> = {}) =>
+      createSessionExecute(runtime)({
+        taskId,
+        profileId: 'claude-code',
+        title: 'Workflow',
+        prompt: 'Triage.',
+        runId: 'run-1',
+        stepId: 'step-1',
+        ...extra,
+      })
+
+    it('refuses an autonomous turn in bypassPermissions before it queues a turn', async () => {
+      driver.startMode = 'bypassPermissions'
+      await expect(step({ posture: 'autonomous' })).rejects.toMatchObject({
+        name: 'UnguardedAgentError',
+        mode: 'bypassPermissions',
+      })
+      expect(driver.turns).toHaveLength(0)
+    })
+
+    it('refuses the mode a step asks for in its config options', async () => {
+      driver.startMode = 'default'
+      await expect(
+        step({ posture: 'autonomous', configOptions: { mode: 'bypassPermissions' } }),
+      ).rejects.toBeInstanceOf(UnguardedAgentError)
+      expect(driver.turns).toHaveLength(0)
+    })
+
+    it('lets a supervised turn run in that mode', async () => {
+      driver.startMode = 'bypassPermissions'
+      expect((await step({ posture: 'gated' }))?.status).toBe('ok')
+      expect(driver.turns).toHaveLength(1)
+    })
+
+    it('lets an autonomous turn run in that mode when the caller allows it', async () => {
+      driver.startMode = 'bypassPermissions'
+      expect((await step({ posture: 'autonomous', allowUnguardedAgents: true }))?.status).toBe('ok')
+      expect(driver.turns).toHaveLength(1)
+    })
+
+    it('lets an autonomous turn run in a guarded mode', async () => {
+      driver.startMode = 'default'
+      expect((await step({ posture: 'autonomous' }))?.status).toBe('ok')
+    })
+
+    it('starts a workflow session from the harness, not from the mode the owner last chose in a chat', async () => {
+      await writeAgentSessionDefaults(
+        ctx.core.prefs,
+        'owner',
+        rememberAgentDefaults(defaultAgentSessionDefaults(), 'claude', { mode: 'bypassPermissions' }),
+      )
+      driver.startMode = 'default'
+      expect((await step({ posture: 'autonomous' }))?.status).toBe('ok')
+      expect(driver.configSets).toEqual([])
+    })
   })
 
   describe('a turn that ends without what the step needs', () => {

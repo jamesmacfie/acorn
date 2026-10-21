@@ -1,4 +1,5 @@
 import type { NodePlugin, PluginDatabase } from '@acorn/plugin-api/node'
+import { readDataPointer } from '@acorn/protocol/dataValues.ts'
 import { destinationQuery } from '../validation/destination'
 import { parseWorkflowTriggerTarget, WorkflowTriggerService, type WorkflowTriggerScheduler } from './service'
 import type { WorkflowTriggersBridge } from '../routes/triggers'
@@ -47,12 +48,20 @@ export const workflowTriggerService = (
       (candidate) =>
         candidate.pluginId === resolved.query.source.pluginId && candidate.sourceId === resolved.query.source.sourceId,
     )
+    const label = source?.plural ?? source?.name ?? resolved.query.source.sourceId
+    const reach = description.reach
+    const chosen = reach ? readDataPointer(resolved.query.scope.parameters, reach.parameter) : undefined
     return {
-      label: source?.plural ?? source?.name ?? resolved.query.source.sourceId,
+      label,
       schema: description.schema,
       fields: description.fields,
       incremental: description.operations.incremental,
       ...(description.incremental?.semantics ? { incrementalReason: description.incremental.semantics } : {}),
+      ...(reach
+        ? {
+            recordsFrom: `${label.toLowerCase()} in ${Array.isArray(chosen) && chosen.length ? chosen.join(', ') : reach.default}`,
+          }
+        : {}),
     }
   }
   return new WorkflowTriggerService(store, starts, core, reconciled, {

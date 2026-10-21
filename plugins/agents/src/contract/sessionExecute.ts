@@ -67,6 +67,9 @@ export type AgentSessionExecuteRequest = {
   stepId?: string
   /** Resolved from the workflow run by the workflows plugin, never from an HTTP or tool body. */
   posture?: 'gated' | 'autonomous'
+  /** Lets an autonomous turn run with the harness's checks off. Without it the step is refused with
+   *  UnguardedAgentError. Resolved by the workflows plugin like `posture`. */
+  allowUnguardedAgents?: boolean
   /** A completion condition, already rendered. The step continues in the same session until a
    *  check finds it satisfied, or the step reaches a blocker or a limit. Needs a profile with a
    *  one-shot mode, because the check runs through it. */
@@ -81,6 +84,15 @@ export type AgentSessionExecuteRequest = {
   onGoal?: (summary: AgentExecuteGoalSummary) => void
   onEvent?: (event: StreamEvent) => void
   signal?: AbortSignal
+}
+
+/** An autonomous step was refused because its session runs commands with no sandbox and no approval,
+ *  such as Claude Code's `bypassPermissions`. `mode` is the setting's value (docs/workflows/triggers.md). */
+export class UnguardedAgentError extends Error {
+  constructor(readonly mode: string) {
+    super(`The agent runs commands without a sandbox or approval (${mode}).`)
+    this.name = 'UnguardedAgentError'
+  }
 }
 
 /** The step's outcome, plus its completion condition's final state when it had one. */

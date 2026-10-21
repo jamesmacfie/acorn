@@ -8,7 +8,7 @@ import {
 } from '@acorn/protocol/agentContext.ts'
 import { AGENT_COMPOSER_ACTIONS_POINT } from '@acorn/protocol/extensionPoints.ts'
 import { managedAgentApi } from '../sessions/managedClient'
-import { activeNodeId, agentContextContributions, formatChord } from '@acorn/plugin-api/client'
+import { activeNodeId, agentContextContributions, formatChord, formFactor } from '@acorn/plugin-api/client'
 import {
   Alert,
   Button,
@@ -16,6 +16,7 @@ import {
   ChipRow,
   CodeBlock,
   Field,
+  Fold,
   Icon,
   IconButton,
   Inline,
@@ -38,7 +39,12 @@ import { consumeComposerFocus } from '../sessions/managedSelection'
 import { composerDraftState, hydrateComposerDraft } from './composerState'
 import { sameAgentConfigOptions } from '../settings/agentConfigOptions'
 import { agentComposerDisabledMessage } from './agentComposerState'
-import { composerExpanded, toggleComposerExpanded } from './composerPrefs'
+import {
+  composerControlsOpen,
+  composerExpanded,
+  setComposerControlsOpen,
+  toggleComposerExpanded,
+} from './composerPrefs'
 import { canStopAgent } from '../sessions/agentActivity'
 import { fileMentionSuggestions, formatFileMention } from './fileMentions'
 import {
@@ -72,7 +78,7 @@ import {
 } from './attachmentOperations'
 import { captureReferences, refreshAutomaticContext } from './contextOperations'
 import { submitTurn } from './submitOperation'
-import { unguardedCommandsWarning } from './unguardedCommands'
+import { unguardedCommandsWarning } from '../../shared/unguardedCommands'
 import {
   AUTOMATIC_TASK_CONTEXT_SOURCE,
   TASK_CONTEXT_CONTRIBUTION_ID,
@@ -364,8 +370,16 @@ export default function AgentComposer(props: {
     setDraft((current) => `${current}${current && !current.endsWith(' ') ? ' ' : ''}${value} `)
   }
 
-  const attach = () => pickDraftAttachments(capture())
-  const addFiles = (files: File[]) => addDraftFiles(capture(), files)
+  // On a phone, adding something unfolds the controls, so the chip that names it can be seen and
+  // removed. Only what the person adds: a draft's own attachments and the automatic context arrive
+  // on their own and leave it folded.
+  const unfoldWhenAttached = async (add: Promise<void>) => {
+    const before = attachments().length
+    await add
+    if (attachments().length > before) setComposerControlsOpen(true)
+  }
+  const attach = () => unfoldWhenAttached(pickDraftAttachments(capture()))
+  const addFiles = (files: File[]) => unfoldWhenAttached(addDraftFiles(capture(), files))
   const removeAttachment = (attachment: AgentAttachment) => removeDraftAttachment(capture(), attachment)
   const replaceAttachment = (expected: AgentAttachment, payload: unknown) =>
     replaceDraftAttachment(capture(), expected, payload)
@@ -437,6 +451,7 @@ export default function AgentComposer(props: {
     return typeof at === 'number' ? at : draft().length
   }
   const addReference = (contribution: AgentContextContribution, option?: AgentContextOption) => {
+    setComposerControlsOpen(true)
     const token = tokenFor(contribution, option)
     if (option) recordReference(token, option)
     const inserted = insertContextToken(draft(), caret(), token)
@@ -527,68 +542,38 @@ export default function AgentComposer(props: {
             : { text: segment.text },
         )
 
-  return (
-    <Stack gap="row">
-      <Only hosts={['tui']}>
-        <TerminalComposerShortcut toggle={toggleExpanded} />
-      </Only>
-      <Only hosts={['dom']}>
-        <Show when={configOptions().length || props.viewControls}>
-          <Inline wrap>
-            <For each={configOptions()}>
-              {(option) => (
-                <Field label={option.label} layout="row">
-                  <Select
-                    label={option.label}
-                    size="sm"
-                    width="auto"
-                    value={option.currentValue ?? ''}
-                    disabled={props.disabled || props.submitDisabled}
-                    onChange={(value) => void updateOption(option, value)}
-                    options={option.values.map((value) => ({
-                      value: value.value,
-                      label: value.label,
-                      title: value.description,
-                    }))}
-                  />
-                </Field>
-              )}
-            </For>
-            <Show when={props.viewControls}>
-              <Toolbar.Spacer />
-              {props.viewControls}
-            </Show>
-          </Inline>
+  // Drawn in their usual places on a desktop and in a terminal, and inside the fold on a phone.
+  const configSelects = () => (
+    <Show when={configOptions().length || props.viewControls}>
+      <Inline wrap>
+        <For each={configOptions()}>
+          {(option) => (
+            <Field label={option.label} layout="row">
+              <Select
+                label={option.label}
+                size="sm"
+                width="auto"
+                value={option.currentValue ?? ''}
+                disabled={props.disabled || props.submitDisabled}
+                onChange={(value) => void updateOption(option, value)}
+                options={option.values.map((value) => ({
+                  value: value.value,
+                  label: value.label,
+                  title: value.description,
+                }))}
+              />
+            </Field>
+          )}
+        </For>
+        <Show when={props.viewControls}>
+          <Toolbar.Spacer />
+          {props.viewControls}
         </Show>
-      </Only>
-      <Only hosts={['tui']}>
-        <Show when={terminalOptions().length}>
-          <Inline wrap>
-            <For each={terminalOptions()}>
-              {(option) => (
-                <Inline>
-                  <Text emphasis="muted">{option.label}</Text>
-                  <Select
-                    label={option.label}
-                    kind="bare"
-                    size="sm"
-                    width="auto"
-                    value={option.currentValue ?? ''}
-                    disabled={props.disabled || props.submitDisabled}
-                    onChange={(value) => void updateOption(option, value)}
-                    options={option.values.map((value) => ({
-                      value: value.value,
-                      label: value.label,
-                      title: value.description,
-                    }))}
-                  />
-                </Inline>
-              )}
-            </For>
-          </Inline>
-        </Show>
-      </Only>
-
+      </Inline>
+    </Show>
+  )
+  const attachedToTurn = () => (
+    <>
       <Show when={attachments().length || contexts().length}>
         <ChipRow ariaLabel="Attached to this turn">
           <For each={attachments()}>
@@ -633,6 +618,143 @@ export default function AgentComposer(props: {
           </Text>
         )}
       </Show>
+    </>
+  )
+  const draftActions = () => (
+    <>
+      <Show when={props.onGoal && props.session.kind === 'interactive'}>
+        <Button size="sm" title="Set session goal" disabled={props.disabled} onPress={props.onGoal}>
+          Goal
+        </Button>
+      </Show>
+      <Button
+        size="sm"
+        title="Attach files"
+        disabled={uploading() || props.disabled}
+        busy={uploading()}
+        onPress={() => void attach()}
+      >
+        Attach
+      </Button>
+      <ContextReferencePicker
+        catalog={catalog}
+        references={contextReferences}
+        disabled={props.disabled}
+        onAdd={addReference}
+        onRemove={removeReferences}
+        onDone={() => field?.focus?.()}
+      />
+      <Picker<InsertChoice>
+        label="Insert"
+        ariaLabel="Insert provider command or skill"
+        size="sm"
+        placeholder="Filter commands and skills…"
+        emptyText="No commands or skills advertised."
+        results={(query) =>
+          insertChoices().filter((choice) =>
+            `${choice.label} ${choice.description ?? ''}`.toLowerCase().includes(query.trim().toLowerCase()),
+          )
+        }
+        rowLabel={(choice) => choice.label}
+        rowDescription={(choice) => choice.description}
+        isActive={() => false}
+        onSelect={(choice) => insert(choice.value)}
+        disabled={props.disabled}
+        placement="top-start"
+      />
+      <Show when={contexts().length}>
+        {/* A Popover, not a <details> with an absolutely-positioned <pre>, which the composer's own
+            overflow clips. Popover portals it and adds Escape + outside-click. */}
+        <Popover
+          placement="top-start"
+          ariaLabel="Sent context preview"
+          role="dialog"
+          trigger={({ toggle, open }) => (
+            <Button variant="bare" size="sm" expanded={open()} onPress={toggle}>
+              Preview sent context · ~{contextBudget().estimatedTokens.toLocaleString()} tokens ·{' '}
+              {(contextBudget().bytes / 1024).toFixed(1)} KiB
+            </Button>
+          )}
+        >
+          <Stack gap="row">
+            <SectionHeader level="group">Sent context</SectionHeader>
+            <CodeBlock wrap maxHeight="block">
+              {contexts()
+                .map((context) => `## ${context.label}\n${context.content}`)
+                .join('\n\n')}
+            </CodeBlock>
+          </Stack>
+        </Popover>
+      </Show>
+      {/* Room for another plugin beside this pane's own controls. A `stack` point: several plugins
+          with something to offer a draft is a real answer, and four is the owner's ceiling because
+          it is the owner's bar. */}
+      <Slot
+        point={AGENT_COMPOSER_ACTIONS_POINT}
+        taskId={props.session.taskId}
+        props={() => ({ taskId: props.session.taskId, sessionId: props.session.id })}
+      />
+    </>
+  )
+  // Such as "Opus · high · 2 attached": each select's current value, then what is attached.
+  const foldSummary = () => {
+    const values = configOptions().flatMap((option) => {
+      const current = option.values.find((value) => value.value === option.currentValue)
+      return current ? [current.label] : []
+    })
+    const attached = attachments().length + contexts().length
+    const parts = attached ? [...values, `${attached} attached`] : values
+    return parts.length ? parts.join(' · ') : 'Options'
+  }
+
+  return (
+    <Stack gap="row">
+      <Only hosts={['tui']}>
+        <TerminalComposerShortcut toggle={toggleExpanded} />
+      </Only>
+      <Only formFactors={['desktop']}>{configSelects()}</Only>
+      <Only hosts={['tui']}>
+        <Show when={terminalOptions().length}>
+          <Inline wrap>
+            <For each={terminalOptions()}>
+              {(option) => (
+                <Inline>
+                  <Text emphasis="muted">{option.label}</Text>
+                  <Select
+                    label={option.label}
+                    kind="bare"
+                    size="sm"
+                    width="auto"
+                    value={option.currentValue ?? ''}
+                    disabled={props.disabled || props.submitDisabled}
+                    onChange={(value) => void updateOption(option, value)}
+                    options={option.values.map((value) => ({
+                      value: value.value,
+                      label: value.label,
+                      title: value.description,
+                    }))}
+                  />
+                </Inline>
+              )}
+            </For>
+          </Inline>
+        </Show>
+      </Only>
+
+      <Only formFactors={['desktop', 'tui']}>{attachedToTurn()}</Only>
+      {/* A phone folds everything but the message box and Send away, under one line that says what
+          is set and attached, so nothing hidden is out of mind. */}
+      <Only formFactors={['narrow']}>
+        <Fold label={foldSummary()} level="sub" open={composerControlsOpen()} onOpenChange={setComposerControlsOpen}>
+          <Stack gap="row">
+            {configSelects()}
+            {attachedToTurn()}
+            <Toolbar variant="actions" size="sm">
+              {draftActions()}
+            </Toolbar>
+          </Stack>
+        </Fold>
+      </Only>
 
       <Only hosts={['tui']}>
         <Show when={unguardedWarning()}>
@@ -662,7 +784,8 @@ export default function AgentComposer(props: {
         }}
         onBlur={() => shared().flushText()}
         onFiles={addFiles}
-        onSubmit={() => void send()}
+        // A phone's return key adds a line, and Send is the one way to send.
+        onSubmit={formFactor() === 'narrow' ? undefined : () => void send()}
         onCancel={canStopAgent(props.session) ? () => void stop() : undefined}
         onToggleExpand={toggleExpanded}
         overlay={
@@ -691,82 +814,14 @@ export default function AgentComposer(props: {
       />
 
       <Toolbar variant="actions" size="sm">
-        <Show when={props.onGoal && props.session.kind === 'interactive'}>
-          <Button size="sm" title="Set session goal" disabled={props.disabled} onPress={props.onGoal}>
-            Goal
-          </Button>
-        </Show>
-        <Button
-          size="sm"
-          title="Attach files"
-          disabled={uploading() || props.disabled}
-          busy={uploading()}
-          onPress={() => void attach()}
-        >
-          Attach
-        </Button>
-        <ContextReferencePicker
-          catalog={catalog}
-          references={contextReferences}
-          disabled={props.disabled}
-          onAdd={addReference}
-          onRemove={removeReferences}
-          onDone={() => field?.focus?.()}
-        />
-        <Picker<InsertChoice>
-          label="Insert"
-          ariaLabel="Insert provider command or skill"
-          size="sm"
-          placeholder="Filter commands and skills…"
-          emptyText="No commands or skills advertised."
-          results={(query) =>
-            insertChoices().filter((choice) =>
-              `${choice.label} ${choice.description ?? ''}`.toLowerCase().includes(query.trim().toLowerCase()),
-            )
-          }
-          rowLabel={(choice) => choice.label}
-          rowDescription={(choice) => choice.description}
-          isActive={() => false}
-          onSelect={(choice) => insert(choice.value)}
-          disabled={props.disabled}
-          placement="top-start"
-        />
-        <Show when={contexts().length}>
-          {/* A Popover, not a <details> with an absolutely-positioned <pre>, which the composer's own
-              overflow clips. Popover portals it and adds Escape + outside-click. */}
-          <Popover
-            placement="top-start"
-            ariaLabel="Sent context preview"
-            role="dialog"
-            trigger={({ toggle, open }) => (
-              <Button variant="bare" size="sm" expanded={open()} onPress={toggle}>
-                Preview sent context · ~{contextBudget().estimatedTokens.toLocaleString()} tokens ·{' '}
-                {(contextBudget().bytes / 1024).toFixed(1)} KiB
-              </Button>
-            )}
-          >
-            <Stack gap="row">
-              <SectionHeader level="group">Sent context</SectionHeader>
-              <CodeBlock wrap maxHeight="block">
-                {contexts()
-                  .map((context) => `## ${context.label}\n${context.content}`)
-                  .join('\n\n')}
-              </CodeBlock>
-            </Stack>
-          </Popover>
-        </Show>
-        {/* Room for another plugin beside this pane's own controls. A `stack` point: several plugins
-            with something to offer a draft is a real answer, and four is the owner's ceiling because
-            it is the owner's bar. */}
-        <Slot
-          point={AGENT_COMPOSER_ACTIONS_POINT}
-          taskId={props.session.taskId}
-          props={() => ({ taskId: props.session.taskId, sessionId: props.session.id })}
-        />
+        <Only formFactors={['desktop', 'tui']}>{draftActions()}</Only>
         <Toolbar.Spacer />
-        <Text emphasis="muted">
-          <Kbd size="xs">{formatChord('shift+enter')}</Kbd> for newline
-        </Text>
+        {/* Return adds a line on a phone, so there is no other key to name. */}
+        <Only formFactors={['desktop', 'tui']}>
+          <Text emphasis="muted">
+            <Kbd size="xs">{formatChord('shift+enter')}</Kbd> for newline
+          </Text>
+        </Only>
         {/* Its own button, never Enter: people type their next request while they wait, and Enter
             steering would turn that habit into redirecting the agent mid-task. */}
         <Show when={props.steerable}>

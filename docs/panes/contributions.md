@@ -32,6 +32,12 @@ A pane that collapses without doing that gets full-width rows clipped mid-word. 
 remote tree can't read a host signal from its worker, so it leaves the flag off and keeps a column
 that resizes but doesn't collapse. See [two-column panes](../ui-design/two-column-panes.md#two-column-panes).
 
+### Selection
+
+`selection`, on a `list-detail` pane, returns the key of what the list has selected, or null. A phone
+shows one region at a time and uses it to show the detail when someone picks a row
+([narrow `list-detail`](./layout.md#narrow-list-detail)). A desktop layout ignores it.
+
 ### Archived tasks
 
 `readsArchived` says a task pane can draw an archived task. The archive page previews one in the
@@ -63,6 +69,16 @@ the last answer, so one dropped request doesn't make the button flicker. A `404`
 built before the route existed, and the pane then shows on every task. The route lists every active
 task, so it should refuse a task-scoped caller. Answer "is this set up", not "is it running": an
 answer that turns false while a dev server restarts closes a pane you're looking at.
+
+### Form factor
+
+A pane works at every form factor unless it says otherwise, because a pane draws with the kit. A
+compiled pane that needs a desktop sets `formFactor: ['desktop']` on its contribution, as Preview
+does because it's a native web view. A phone leaves it out of the pane bar, the way `paneAvailable`
+leaves out a pane whose `requires` or `when` says no. A loaded plugin sets `formFactor` on a `frames`
+entry. The manifest takes `desktop` and `mobile`, defaults to `['desktop']`, and reads `mobile` as
+`narrow`, the name the rest of the app uses. The host skips a surface that doesn't list its form
+factor. A terminal draws what the desktop does.
 
 ## Regions a loaded plugin declares
 

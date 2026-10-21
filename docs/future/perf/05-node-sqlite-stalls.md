@@ -20,7 +20,7 @@ What landed:
   stopped matching and writes the checkpoint. GitHub raises `changed('pull-requests')` only when a
   refresh changed a row.
 - A dataset read selects its rows once per run, through `createDataSelectionPager`. Migration
-  `0014_dataset_size_counters.sql` adds `row_count` and `byte_count` to `datasets`, kept by triggers.
+  `0015_dataset_size_counters.sql` adds `row_count` and `byte_count` to `datasets`, kept by triggers.
 - The trigger view reads only the latest occurrence.
 - The operations page names the indexes and why a read must repeat their expressions.
 

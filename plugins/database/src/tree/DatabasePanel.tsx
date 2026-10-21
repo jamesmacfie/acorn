@@ -476,7 +476,7 @@ export default function DatabasePanel(props: { bridge: AcornBridge; taskId: stri
         <IconButton size="sm" icon="refresh-cw" label="Reconnect" onPress={() => void connect()} />
       </Toolbar>
 
-      <ListDetail split listLabel="Tables">
+      <ListDetail split listLabel="Tables" selection={selected() ? `${selected()!.schema}.${selected()!.name}` : null}>
         <ListColumn label="Tables">
           <SectionHeader count={connected() ? tables().length : undefined}>Tables</SectionHeader>
           {/* Last-known tables remain visible while the connection check runs. */}

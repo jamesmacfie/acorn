@@ -12,6 +12,8 @@
   z-index: var(--z-modal);
   display: flex;
   background: var(--bg);
+  /* What the narrow rules below measure. */
+  container-type: inline-size;
 }
 
 .settings-rail {
@@ -131,7 +133,7 @@
 .settings-plugin-content { contain: layout; isolation: isolate; }
 
 /* Narrow: the rail is a screen of its own, and a page opens over it with a link back. */
-@media (max-width: 900px) {
+@container (max-width: 900px) {
   .settings-rail { width: 100%; border-right: 0; }
   .settings-view[data-page-open] .settings-rail { display: none; }
   .settings-view:not([data-page-open]) .settings-main { display: none; }

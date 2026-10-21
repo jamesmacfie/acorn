@@ -77,6 +77,19 @@ export function validateCommand(args: ParsedArgs): void {
       throw new CliError('usage', 'JSON Lines is for agent events and plugin command results.', 2)
     return
   }
+  // The phone gateway serves this computer's Node, or the one --node names. `mobile sessions` and
+  // `mobile revoke` act on the gateway's own files.
+  if (subject === 'mobile') {
+    const counts: Record<string, number> = { serve: 1, sessions: 2, revoke: 3 }
+    const count = counts[verb ?? 'serve']
+    if (count === undefined) throw new CliError('usage', 'mobile takes no command, sessions, or revoke ID.', 2)
+    if (args.positionals.length !== count)
+      throw new CliError('usage', verb === 'revoke' ? 'mobile revoke needs a session ID.' : 'Too many arguments.', 2)
+    const allowed = new Set(['help', ...(verb ? [] : ['node', 'port', 'origin', 'app-dir'])])
+    for (const option of Object.keys(args.options))
+      if (!allowed.has(option)) throw new CliError('usage', `--${option} is not supported by mobile ${verb ?? ''}.`, 2)
+    return
+  }
   if (overflow) throw new CliError('usage', 'Too many arguments.', 2)
   if (subject === 'workflow' && verb === 'run') {
     const action = id

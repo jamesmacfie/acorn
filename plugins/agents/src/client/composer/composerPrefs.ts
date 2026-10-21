@@ -2,6 +2,12 @@ import { createSignal } from 'solid-js'
 import { onScopeEvicted, parseJson, type PersistedStateSlice } from '@acorn/plugin-api/client'
 
 type SessionExpansion = Record<string, boolean>
+
+// Whether a phone's composer shows its selects, chips, and extra buttons. One value for every
+// session, since it is about the screen rather than the session. It lasts as long as the page: the
+// phone shell restores no persisted state slices, so a slice would never be read back.
+const [composerControlsOpen, setComposerControlsOpen] = createSignal(false)
+export { composerControlsOpen, setComposerControlsOpen }
 const [expansionByTask, setExpansionByTask] = createSignal<Record<string, SessionExpansion>>({})
 
 export const composerExpanded = (taskId: string, sessionId: string): boolean =>

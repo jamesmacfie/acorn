@@ -1,3 +1,6 @@
+import { readFileSync } from 'node:fs'
+import { join } from 'node:path'
+import { fileURLToPath } from 'node:url'
 import { describe, expect, it } from 'vitest'
 import { THEME_PALETTE_TOKENS } from '@acorn/protocol/themeTokens.ts'
 import {
@@ -161,6 +164,33 @@ describe('style packs stay in their lane', () => {
       const id = pack.name.replace(/^style-|\.css$/g, '')
       expect(pack.text, `${pack.name}`).toContain(`:root[data-style='${id}']`)
     }
+  })
+})
+
+describe('the narrow sheet', () => {
+  const narrow = readStyleSheets().find((file) => file.name === 'narrow.css')!
+  const manifest = readFileSync(join(fileURLToPath(new URL('.', import.meta.url)), 'styles.css'), 'utf8')
+  const importAt = (name: string) => manifest.indexOf(`@import './${name}'`)
+
+  it('loads after every style pack, so a phone’s sizes win in all of them', () => {
+    const packs = readStylePacks()
+    expect(packs.length).toBeGreaterThan(0)
+    for (const pack of packs) expect(importAt('narrow.css'), pack.name).toBeGreaterThan(importAt(pack.name))
+  })
+
+  it('sets style tokens only, under one root selector', () => {
+    const blocks = declaredByBlock(narrow.text)
+    expect([...blocks.keys()]).toEqual([`:root[data-form-factor='narrow']`])
+    expect([...declaredIn(narrow.text)].filter((t) => !style.has(t))).toEqual([])
+  })
+
+  it('draws controls at 40, 32, and 28px, below the 44px tap area the small ones keep', () => {
+    const height = (token: string) => narrow.text.match(new RegExp(`${token}:\\s*([^;]+);`))?.[1]
+    expect([height('--control-h'), height('--control-h-sm'), height('--control-h-xs')]).toEqual([
+      '40px',
+      '32px',
+      '28px',
+    ])
   })
 })
 

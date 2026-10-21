@@ -21,6 +21,7 @@ import {
   forgetAttentionSource,
   initWorkflowNotices,
   observeAttention,
+  onAttentionStateChange,
   replaceAttentionSource,
   registerNoticeSink,
   resetDelivery,
@@ -82,6 +83,22 @@ afterEach(() => {
 })
 
 const settle = () => vi.advanceTimersByTime(HOLD_MS)
+
+describe('the cue the attention inbox listens for', () => {
+  it('fires for a session that is new or has changed state, and not for one that only moved', () => {
+    const changed = vi.fn()
+    const stop = onAttentionStateChange(changed)
+    observeAttention([snap('working')], context)
+    expect(changed).toHaveBeenCalledTimes(1)
+    observeAttention([snap('working', { title: 'renamed' })], context)
+    expect(changed).toHaveBeenCalledTimes(1)
+    observeAttention([snap('blocked')], context)
+    expect(changed).toHaveBeenCalledTimes(2)
+    stop()
+    observeAttention([snap('working')], context)
+    expect(changed).toHaveBeenCalledTimes(2)
+  })
+})
 
 describe('the hold', () => {
   it('forgets disappeared rows and pending edges for one source only', () => {

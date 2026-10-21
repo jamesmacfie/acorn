@@ -88,7 +88,15 @@ A pane that needs to span the shell grid uses `grid-column: 2 / -1`, never its o
 `grid-template-columns` for `.panes`, which would only resemble the shell's widths and fight every
 style pack's override.
 
-`ListDetail` sets no narrow-width behavior. Stacking would need a container query, and
-`container-type` makes the element a containing block for `position: fixed` descendants, which
-mispositions any `Modal` inside. Narrowing is the layout's job: the `list-detail` layout carries the
-narrow projection.
+`ListDetail` never reads the window's width. A container query would make the element a containing
+block for `position: fixed` descendants, which mispositions any `Modal` inside. The phone's form
+factor does the narrowing instead (`formFactor()` in `infra/platform`).
+
+### Narrow
+
+On a phone the node shows one column at a time and sets `data-view` to say which. The divider and its
+collapse control go. **Show detail** sits under the list and **Back** above the detail, the same pair
+the `list-detail` layout draws ([narrow `list-detail`](../panes/layout.md#narrow-list-detail)). The
+`selection` prop is the key of the selected row, or null for nothing. A key that changes to a new value
+shows the detail. Leave it out for a split with no row to pick, such as a form beside its preview. A
+node with only a detail column is not a split and isn't touched.

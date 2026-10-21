@@ -46,6 +46,16 @@ type OccurrenceDeps = {
   settled(occurrence: Occurrence, run: Run): Promise<void>
 }
 
+/** Whether a run's agent steps may run commands without asking. A record trigger's runs read text other
+ *  people wrote, so they may only when the owner's approval said so. Any other run starts from the owner's
+ *  own schedule or hand. Reads the approval the occurrence froze, not the trigger's draft. */
+export function allowsUnguardedAgents(db: PluginDatabase, rootRunId: string): boolean {
+  const table = schema.workflowTriggerOccurrences
+  const occurrence = db.select().from(table).where(eq(table.runId, rootRunId)).get()
+  if (occurrence?.kind !== 'record') return true
+  return (JSON.parse(occurrence.payloadJson) as WorkflowTriggerPayload).limits.allowUnguardedAgents === true
+}
+
 const isActive = (state: string): boolean => ACTIVE_OCCURRENCE.includes(state as (typeof ACTIVE_OCCURRENCE)[number])
 
 export class TriggerOccurrences {

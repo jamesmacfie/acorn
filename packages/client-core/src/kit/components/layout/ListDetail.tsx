@@ -1,6 +1,7 @@
 import { children, createMemo, createSignal, Show, type JSX } from 'solid-js'
 import { Dynamic } from 'solid-js/web'
 import { sidebarCollapse } from '../../lib/layout/collapseState'
+import { createNarrowView, isNarrow, type NarrowView } from '../../lib/layout/narrowView'
 import { keyedScrollStore, retainScroll } from '../../lib/layout/retainScroll'
 import { createSplitDrag, type SplitDrag } from '../../lib/layout/split'
 import { listWidthState } from '../../lib/layout/listWidthState'
@@ -54,6 +55,26 @@ export function CollapseEdge(props: {
   )
 }
 
+/* ViewSwitch: the control a narrow `list-detail` draws to cross between its two halves, **Back** above
+   the detail and **Show detail** under the list. The kit's split and the host's layout
+   (host/layouts/ListDetail.tsx) draw the same one, so they read alike. */
+export function ViewSwitch(props: { to: NarrowView; onSwitch: () => void }) {
+  const toList = () => props.to === 'list'
+  return (
+    <div class="ui-listdetail-switch" data-to={props.to}>
+      <Button variant="bare" onPress={() => props.onSwitch()}>
+        <Show when={toList()}>
+          <Icon name="chevron-left" />
+        </Show>
+        {toList() ? 'Back' : 'Show detail'}
+        <Show when={!toList()}>
+          <Icon name="chevron-right" />
+        </Show>
+      </Button>
+    </div>
+  )
+}
+
 /* ListDetail: list beside detail. See docs/ui-design/two-column-panes.md § Two-column panes for what it replaces,
    the layout rules, and when not to use it. */
 const MIN_LIST_DETAIL_WIDTH = 120
@@ -92,6 +113,10 @@ export function ListDetail(props: {
   collapseTo?: 'rail' | 'edge'
   /** Hide list contents in a collapsed rail while keeping them mounted. */
   collapseContent?: 'rows' | 'empty'
+  /** What the list has selected, as a key, or null for nothing. On a phone the split shows one column
+   *  at a time, and a key that changes to a new value shows the detail. Leave it out and the list
+   *  stays up until someone presses **Show detail**. */
+  selection?: string | null
   children: JSX.Element
 }) {
   // `list` is a prop, so every read of it re-runs the JSX the caller wrote there. This read it three
@@ -137,23 +162,40 @@ export function ListDetail(props: {
       dragStart = null
     },
   })
+  // A phone shows one column at a time. The form factor is fixed for a boot, so this never remounts a
+  // column; the columns stay mounted and the sheet hides the one that is not showing.
+  const [view, setView] = createNarrowView(() => props.selection)
+  const stacked = () => isNarrow() && (list() !== undefined || props.split === true)
   // A split with no collapse is the bare handle it always was, and the edge above appears only where
   // there is a second thing to hold. Most of this node's callers are two halves of a document rather
   // than a sidebar, and the grid's middle track is a contract they already keep.
   const edge = () => (
-    <Show when={props.collapseKey !== undefined} fallback={<SplitHandle axis="x" drag={drag} />}>
-      <CollapseEdge
-        collapsed={collapsed()}
-        onToggle={() => collapse()?.[1](!collapsed())}
-        drag={drag}
-        listLabel={props.listLabel}
-      />
+    <Show when={!stacked()}>
+      <Show when={props.collapseKey !== undefined} fallback={<SplitHandle axis="x" drag={drag} />}>
+        <CollapseEdge
+          collapsed={collapsed()}
+          onToggle={() => collapse()?.[1](!collapsed())}
+          drag={drag}
+          listLabel={props.listLabel}
+        />
+      </Show>
+    </Show>
+  )
+  const showDetailSwitch = () => (
+    <Show when={stacked() && view() === 'list' && props.selection !== null}>
+      <ViewSwitch to="detail" onSwitch={() => setView('detail')} />
+    </Show>
+  )
+  const backSwitch = () => (
+    <Show when={stacked() && view() === 'detail'}>
+      <ViewSwitch to="list" onSwitch={() => setView('list')} />
     </Show>
   )
   return (
     <div
       ref={root}
       class="ui-listdetail"
+      data-view={stacked() ? view() : undefined}
       data-list={
         list() !== undefined || props.split ? (collapsed() ? 'collapsed' : (props.listWidth ?? 'default')) : undefined
       }
@@ -165,7 +207,9 @@ export function ListDetail(props: {
         fallback={
           <Show when={props.split} fallback={columns()}>
             {columns.toArray()[0]}
+            {showDetailSwitch()}
             {edge()}
+            {backSwitch()}
             {columns.toArray().slice(1)}
           </Show>
         }
@@ -180,7 +224,9 @@ export function ListDetail(props: {
           >
             {list()}
           </aside>
+          {showDetailSwitch()}
           {edge()}
+          {backSwitch()}
           <Dynamic
             component={props.detailAs === 'main' ? 'main' : 'div'}
             class="ui-listdetail-detail"

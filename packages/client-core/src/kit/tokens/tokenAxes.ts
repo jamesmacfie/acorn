@@ -164,6 +164,7 @@ export const STYLE_TOKENS = [
   '--fs-md',
   '--fs-lg',
   '--fs-xl',
+  '--fs-input',
   '--lh',
   '--lh-tight',
   '--lh-diff',

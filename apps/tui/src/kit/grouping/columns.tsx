@@ -31,6 +31,8 @@ export function ListDetail(props: {
   collapseKey?: string
   /** The terminal keeps the full list readable, so it ignores this DOM collapse choice. */
   collapseContent?: 'rows' | 'empty'
+  /** The phone's one-column-at-a-time rule. This host stacks by width instead, so it ignores it. */
+  selection?: string | null
   children: JSX.Element
 }) {
   const paneId = paneIdForFocus()
