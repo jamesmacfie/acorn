@@ -472,20 +472,6 @@ Each plugin landing page above has topic pages in a folder of the same name:
   [keeping the machine awake](./future/node-tray/07-keep-awake.md), and [acceptance on real
   machines](./future/node-tray/08-acceptance.md).
 
-## Agent panels and apps in the browser extension proposal
-
-- [Draw agent panels and apps in the browser extension](./future/ext-ui/README.md), with phases for
-  [naming the cards](./future/ext-ui/01-card-lines.md), [portable panel
-  views](./future/ext-ui/02-portable-panel-views.md), [panel cards](./future/ext-ui/03-panel-cards.md),
-  [app cards](./future/ext-ui/04-app-cards.md), and [row actions](./future/ext-ui/05-row-actions.md).
-
-## Panels over data an agent found proposal
-
-- [Let an agent chart data it gathered itself](./future/supplied-data/README.md), with phases for
-  [supplied rows](./future/supplied-data/01-supplied-rows.md), [keeping a panel up to
-  date](./future/supplied-data/02-keep-it-updated.md), and [a code search
-  source](./future/supplied-data/03-code-search-source.md).
-
 ## Responsiveness under load proposal
 
 - [Keep the window responsive under load](./future/perf/README.md), with phases for [measuring under
