@@ -1340,7 +1340,7 @@ describe('architecture boundaries', () => {
 
   it('the mobile app keeps custody in its gateway', () => {
     // The phone's browser never holds a device token or a certificate; the gateway process does
-    // (docs/future/mobile/01-gateway.md). The web app shares this package, so the promise is a folder
+    // (docs/security/mobile-gateway.md). The web app shares this package, so the promise is a folder
     // boundary: custody is reachable from the gateway and from nothing the browser loads.
     const importers = [
       ...new Set(
