@@ -6,7 +6,7 @@ sources:
   - docs/security/secret-publication.md
   - docs/security/plugin-secrets-and-routes.md
   - docs/security.md
-checked: 'cd6645657'
+checked: '9aaaaf7d3'
 ---
 
 This page covers where acorn stores credentials such as your GitHub token and API keys, why agents
@@ -109,7 +109,8 @@ copy with each match replaced by `[redacted secret]`. The stored session doesn't
 ## In the terminal
 
 The terminal client stores its device token in a folder only your user can open, with files only your
-user can read. Credentials themselves stay on the Node, as they do for the desktop app.
+user can read. An agent runs as your user, so it can read that token too, unless **Keep agents out of
+Acorn's data folder** is on. Credentials themselves stay on the Node, as they do for the desktop app.
 
 ## Limits
 

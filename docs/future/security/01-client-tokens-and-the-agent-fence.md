@@ -1,6 +1,55 @@
 # Phase 1: keep agents away from client device tokens
 
-Date: October 22, 2026. Status: proposed. Severity: high.
+## Completion note
+
+Done on October 22, 2026.
+
+What landed:
+
+- `appDataDir`, `configDir`, and `desktopDataRootDir` moved into
+  `packages/node-core/src/server/transport/listenerConfig.ts`. Custody re-exports `configDir` and
+  `desktopDataRootDir`, so no caller changed. A new `clientCustodyDirs(dataDir)` there lists the
+  folders to block, and `@acorn/plugin-api/node` exports it for the agents runtime.
+- `dataRootReadBlock` takes `clientDirs`. The file guard protects every one of them, including a
+  folder that doesn't exist yet, so tokens a client writes after the start are covered. The sandbox's
+  `denyRead` gets each existing folder whole (`clientReadDenied`). Their entries join `hidden`, which
+  feeds the `Read` and `Edit` deny rules, the same way the data root's do.
+- The CLI's environment check has a comment saying it isn't a boundary. The read block doc, the CLI
+  task doc, and the credentials doc say the same, and credentials names keychain sealing as the
+  follow-up. Four public site pages changed to match, and every page citing a touched file is marked.
+- Tests: a client folder case in `readBlock.test.ts`, and `packages/custody/src/local/paths.test.ts`
+  for `ACORN_TUI_CONFIG_DIR`.
+
+Decisions and deviations:
+
+- The desktop folder in the list is wrong for a development build. Its `data.key` lives in the
+  custody root beside the Node's root, `<data root>-shell` (`development_custody_root` in the desktop
+  crate), not in `com.acorn.desktop`. `clientCustodyDirs` lists both.
+- A client folder that holds the worktree or the data root isn't denied whole, because that would
+  stack a second deny above paths the sandbox opens again, which I couldn't check on Linux. The
+  sandbox denies its entries beside them instead, and the file guard still covers the whole folder.
+  That's always the case for the installed desktop's folder, so its `data.key` and `fleet.json` are
+  blocked, but one created there after a session starts is caught only by the file guard.
+- Each folder is listed as the Node's environment spells it and as the platform default, because a
+  client started from another shell may have had a different `XDG_CONFIG_HOME` or `APPDATA`.
+- **Check this node** reports only the switch and the harnesses, not folder coverage, so the
+  diagnostics test didn't change.
+- The file guard's refusal still says "Acorn's data folder" for a client folder. That matches the
+  switch's name, so I left it.
+
+For later phases:
+
+- The `pnpm dev:agent` walk in Acceptance didn't run here. This session runs inside a sandbox, so a
+  nested Claude Code sandbox can't start. Phase 6 should walk it: `cat` of `device-token-local`, the
+  `env -u` CLI run, and `acorn task scripts status`, with the switch on and off.
+- A client folder that doesn't exist when a session starts is left out of the sandbox, as this doc
+  asked, and only the file guard covers it until the next start or resume. That matters only when
+  the owner pairs a first client of that kind during a running session. Phase 6 could check whether
+  Claude Code's sandbox accepts a missing path on Linux; if it does, denying every folder whole
+  closes this.
+- The Node service bundle measured 1,937,799 bytes against the 1,939,000 ceiling after this change.
+
+Date: October 22, 2026. Status: done. Severity: high.
 
 Every client except the desktop keeps the owner's device token as a plain file. An agent runs as the
 same OS user, so one `cat` turns its task token into the owner's device token, which passes every

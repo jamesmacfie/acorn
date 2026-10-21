@@ -1,10 +1,12 @@
-import { lstatSync, readFileSync, readdirSync } from 'node:fs'
+import { existsSync, lstatSync, readFileSync, readdirSync } from 'node:fs'
 import { join, resolve, sep } from 'node:path'
 import type { AgentDriverReadBlock } from './types'
 
 // What a session confined to its own work may still reach (docs/managed-agents/read-block.md). The
 // data root holds every session's token file, the task database, and the TLS key, and it also holds
 // the session's own worktree, token file, and skill folders, so the block is the data root minus those.
+// The client folders, where the CLI and other clients keep the owner's device tokens as plain files,
+// are blocked the same way.
 
 const within = (path: string, root: string): boolean => path === root || path.startsWith(root + sep)
 
@@ -86,6 +88,8 @@ function hiddenBeside(dir: string, kept: readonly string[]): string[] {
 
 export function dataRootReadBlock(input: {
   dataDir: string
+  /** Folders outside the data root to block the same way (`clientCustodyDirs`). */
+  clientDirs: readonly string[]
   worktree: string
   env: Record<string, string>
   /** The skill folders and plugin folders this start hands the harness. */
@@ -111,12 +115,25 @@ export function dataRootReadBlock(input: {
   } catch {
     // No listener address yet. The task CLI then can't reach the Node from the sandbox.
   }
+  // The file guard checks every client folder, so one a client makes after the start is covered too.
+  const clientDirs = [...new Set(input.clientDirs.map((dir) => resolve(dir)))]
+  const kept = [...workspace, dataDir]
+  // The sandbox denies an existing client folder whole, or, when it holds the worktree or the data root,
+  // the entries beside them, so it never stacks a second deny above the paths it opens again. The
+  // installed desktop's own folder is the second kind.
+  const clientReadDenied = clientDirs
+    .filter((dir) => existsSync(dir))
+    .flatMap((dir) => (kept.some((path) => within(path, dir)) ? hiddenBeside(dir, kept) : [dir]))
   return {
     dataDir,
+    clientDirs,
+    clientReadDenied,
     worktree,
     readable: [...new Set([...workspace, ...credentials])],
     ...gitWrites(worktree),
-    hidden: hiddenBeside(dataDir, workspace),
+    hidden: [
+      ...new Set([...hiddenBeside(dataDir, workspace), ...clientDirs.flatMap((dir) => hiddenBeside(dir, kept))]),
+    ],
     loopback,
     fileGuard: input.fileGuard,
   }

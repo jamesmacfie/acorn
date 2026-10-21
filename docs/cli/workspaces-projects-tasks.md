@@ -102,3 +102,9 @@ can use the CLI after its launch token expires. An older task shell can find the
 root, task ID, and session ID. A different task or Node
 is rejected. That connection permits only the task's script reads and never falls back to device
 credentials, and every other command is refused.
+
+That refusal stops a person running the wrong command in a task terminal. It isn't a boundary: an
+agent controls its own environment, and a CLI started without these variables uses the device token
+in the client config folder. What keeps an agent from that token is **Keep agents out of Acorn's data
+folder** ([the read block](../managed-agents/read-block.md)), which also blocks the client config
+folder.

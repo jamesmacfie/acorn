@@ -192,6 +192,8 @@ export {
   serverName,
 } from '@acorn/node-core/server/mcpRegister.ts'
 export { encodeFileGuardPolicy, FILE_GUARD_MATCHER, type FileGuardPolicy } from '@acorn/node-core/mcp/fileGuard.ts'
+// The folders the read block keeps an agent out of besides the data root.
+export { clientCustodyDirs } from '@acorn/node-core/server/transport/listenerConfig.ts'
 export { toolOutputDir } from '@acorn/node-core/mcp/toolOutputDir.ts'
 export type { Argv, Launcher, McpCommands } from '@acorn/node-core/server/mcpRegister.ts'
 
