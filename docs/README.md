@@ -492,6 +492,16 @@ Each plugin landing page above has topic pages in a folder of the same name:
   [main-thread work](./future/perf/08-main-thread-work.md), [faster
   opens](./future/perf/09-faster-opens.md), and [acceptance](./future/perf/10-acceptance.md).
 
+## October 22 security findings proposal
+
+- [Close the October 22 security findings](./future/security/README.md), with phases for [client device
+  tokens and the agent fence](./future/security/01-client-tokens-and-the-agent-fence.md), [gateway answer
+  headers](./future/security/02-gateway-answer-headers.md), [phone session
+  expiry](./future/security/03-phone-session-expiry.md), [plugin writes from a
+  phone](./future/security/04-plugin-writes-from-a-phone.md), [agent-written
+  memory](./future/security/05-agent-written-memory.md), and [recording the
+  review](./future/security/06-record-the-review.md).
+
 ## OpenCode harness proposal
 
 - [OpenCode as a contributed harness](./future/opencode.md), postponed.
