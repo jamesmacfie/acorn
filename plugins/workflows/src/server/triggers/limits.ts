@@ -42,7 +42,12 @@ export function effectiveTriggerLimits(
       throw new Error(`A trigger's ${field} must be finite and no wider than the workflow budget.`)
     }
   }
-  return { maxDescendants, maxConcurrency, budget: { ...root.budget, ...requestedBudget, maxWallTimeMs } }
+  return {
+    maxDescendants,
+    maxConcurrency,
+    budget: { ...root.budget, ...requestedBudget, maxWallTimeMs },
+    allowUnguardedAgents: requested?.allowUnguardedAgents === true,
+  }
 }
 
 /** Writes the limits onto the root, so the approval digest covers them. */

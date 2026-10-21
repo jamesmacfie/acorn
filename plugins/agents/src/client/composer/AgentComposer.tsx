@@ -72,7 +72,7 @@ import {
 } from './attachmentOperations'
 import { captureReferences, refreshAutomaticContext } from './contextOperations'
 import { submitTurn } from './submitOperation'
-import { unguardedCommandsWarning } from './unguardedCommands'
+import { unguardedCommandsWarning } from '../../shared/unguardedCommands'
 import {
   AUTOMATIC_TASK_CONTEXT_SOURCE,
   TASK_CONTEXT_CONTRIBUTION_ID,

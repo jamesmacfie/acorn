@@ -6,6 +6,7 @@ import * as schema from '../../node/schema'
 import { WorkflowRunner, type RunnerDeps, type WorkflowExtensions } from './runner'
 import { inlinePrompt } from './deps'
 import type { WorkflowDef } from '../../shared/workflowContracts'
+import { UnguardedAgentError } from '@acorn/plugin-agents/contract/sessionExecute.ts'
 
 // What the agents plugin publishes as its default profile, which these tests stand in for.
 const DEFAULT_PROFILE_ID = 'claude-code'
@@ -193,6 +194,98 @@ describe('workflow attendance ownership', () => {
       profile()
       testDb.cleanup()
     }
+  })
+})
+
+describe('an agent step that would run without asking', () => {
+  const unguarded = async (kind: 'record' | 'due', allow: boolean) => {
+    const testDb = makeTestPluginDb('workflows')
+    const profile = agentProfileRegistry.register({
+      id: DEFAULT_PROFILE_ID,
+      label: 'Claude',
+      kind: 'agent',
+      command: 'claude',
+      backendPreference: 'tmux',
+      transport: 'pty',
+    })
+    const runStep = vi.fn<RunnerDeps['runStep']>().mockRejectedValue(new UnguardedAgentError('bypassPermissions'))
+    try {
+      const runner = new WorkflowRunner(
+        testDb.db,
+        {
+          runStep,
+          writeHandoff: async () => {},
+          assembleContext: async () => '',
+          defaultProfileId: () => DEFAULT_PROFILE_ID,
+          notify: () => {},
+        },
+        noExtensions,
+      )
+      const runId = 'run-from-trigger'
+      testDb.db
+        .insert(schema.workflowTriggerOccurrences)
+        .values({
+          id: 'occurrence',
+          triggerId: 'trigger',
+          recordKey: kind === 'record' ? 'record-1' : null,
+          generation: 1,
+          kind,
+          dueAt: kind === 'record' ? null : 1,
+          requestKey: 'request',
+          payloadFingerprint: 'fingerprint',
+          payloadJson: JSON.stringify({ limits: allow ? { allowUnguardedAgents: true } : {} }),
+          taskId: 'task-1',
+          runId,
+          state: 'run-started',
+          createdAt: 1,
+          updatedAt: 1,
+        })
+        .run()
+      await runner.start(
+        'task-1',
+        v2({
+          baseline: 'acorn-1',
+          name: 'Triage',
+          posture: 'autonomous',
+          tools: { maxRisk: 'read' },
+          steps: [{ name: 'look', prompt: 'go' }],
+        }),
+        {
+          startedBy: 'trigger',
+          triggerId: 'trigger',
+          intendedRunId: runId,
+          invocation: {
+            callerKey: 'caller',
+            payloadFingerprint: 'fingerprint',
+            rootRunId: runId,
+            parentRunId: null,
+            parentStepId: null,
+            depth: 0,
+          },
+        },
+      )
+      await vi.waitFor(async () => expect((await runner.run(runId))?.status).toBe('failed'))
+      return { run: (await runner.run(runId))!, allowed: runStep.mock.calls[0]![2].allowUnguardedAgents }
+    } finally {
+      profile()
+      testDb.cleanup()
+    }
+  }
+
+  it('fails a record trigger run with a cause the trigger can act on, naming the step and the mode', async () => {
+    const { run, allowed } = await unguarded('record', false)
+    expect(allowed).toBe(false)
+    expect(run).toMatchObject({ errorCause: 'unguarded-agent' })
+    expect(run.error).toContain("Step 'look'")
+    expect(run.error).toContain('bypassPermissions')
+  })
+
+  it('lets a record trigger run its agent steps once the approval allowed it', async () => {
+    expect((await unguarded('record', true)).allowed).toBe(true)
+  })
+
+  it('leaves a clock trigger run alone', async () => {
+    expect((await unguarded('due', false)).allowed).toBe(true)
   })
 })
 

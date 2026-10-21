@@ -26,8 +26,10 @@ import type {
   WorkflowRecordsWhen,
   WorkflowTriggerCheck,
   WorkflowTriggerMatch,
+  WorkflowTriggerPreparation,
   WorkflowTriggerPreview,
 } from '../../shared/workflowTriggers'
+import { BUILTIN_AGENT_STEP_KINDS } from '../../shared/stepFields'
 import { workflowContentFingerprint } from '../definitions/fingerprint'
 import type { WorkflowTransaction } from '../dispatch/dispatcher'
 import { asAuthorityError, WorkflowAuthorityError } from '../runs/authority'
@@ -161,6 +163,19 @@ export async function matchesAgentTasks(
         predicate.left.address.from === 'item' &&
         predicate.left.address.pointer === '/createdByTask'
   return !excludes(query.predicate)
+}
+
+/** What the approval sheet says about agent steps, which read text the people who write records chose. Set
+ *  when the workflow has one. shortcut: built-in kinds only, so a contributed agent kind gets no
+ *  warning here, but the agents plugin still refuses it at run time. */
+export function recordAgents(
+  source: TriggerSourceDescription,
+  graph: ResolvedWorkflowGraph,
+): { recordAgents?: WorkflowTriggerPreparation['recordAgents'] } {
+  const runsAgent = graph.nodes.some((node) =>
+    node.definition.steps.some((step) => BUILTIN_AGENT_STEP_KINDS.has(step.kind ?? 'agent')),
+  )
+  return runsAgent ? { recordAgents: source.recordsFrom ? { from: source.recordsFrom } : {} } : {}
 }
 
 /** Approval's part for a record trigger: the review checks, then the query pinned at the saved

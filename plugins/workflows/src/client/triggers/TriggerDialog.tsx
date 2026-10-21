@@ -292,6 +292,9 @@ function TriggerDialog(props: { request: TriggerRequest }) {
     const value = Number(raw)
     setRequestedLimits((current) => ({ ...current, [key]: value }))
   }
+  const setAllowUnguardedAgents = (allow: boolean): void => {
+    setRequestedLimits((current) => ({ ...current, allowUnguardedAgents: allow }))
+  }
   // Shown in minutes, the unit the Definition inspector uses; stored in milliseconds.
   const wallMinutes = (limits: WorkflowTriggerLimits): number =>
     (requestedLimits()?.budget?.maxWallTimeMs ?? limits.budget.maxWallTimeMs) / 60_000
@@ -669,6 +672,25 @@ function TriggerDialog(props: { request: TriggerRequest }) {
                         is missing to leave those out.
                       </Text>
                     </Alert>
+                  </Show>
+                  <Show when={reviewed().recordAgents}>
+                    {(agents) => (
+                      <Alert tone="warn" title="Agent steps read text other people write">
+                        <Stack gap="row">
+                          <Show when={agents().from}>
+                            <Text wrap>
+                              {`Records come from ${agents().from}. Anyone who can create a record there can write text your agent steps read.`}
+                            </Text>
+                          </Show>
+                          <Checkbox
+                            label="Let agent steps run commands without asking"
+                            checked={effectiveLimits()?.allowUnguardedAgents === true}
+                            onChange={setAllowUnguardedAgents}
+                            hint="This trigger's agent steps run commands without asking. Anyone who can create a matching record can write text those agents read."
+                          />
+                        </Stack>
+                      </Alert>
+                    )}
                   </Show>
                   <Show when={reviewed().changes.length}>
                     <Alert tone="warn" title="Published dependencies changed">

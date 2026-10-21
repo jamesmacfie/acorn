@@ -164,6 +164,23 @@ describe('workflow trigger setup', () => {
     expect(approveTrigger).toHaveBeenCalledWith('trigger', 'process-current', false)
   })
 
+  it('names who writes the records, and keeps agent steps guarded until the owner ticks the box', async () => {
+    prepareTrigger.mockResolvedValueOnce({ ...preparation, recordAgents: { from: 'issues in acme/billing-api' } })
+    await press('Set it up yourself')
+    await press('Review activation')
+    expect(document.body.textContent).toContain(
+      'Records come from issues in acme/billing-api. Anyone who can create a record there can write text your agent steps read.',
+    )
+    await press('Save draft')
+    expect(saveTrigger.mock.calls.at(-1)?.[0]).not.toMatchObject({ limits: { allowUnguardedAgents: true } })
+
+    const box = document.querySelector<HTMLInputElement>('input[type="checkbox"]')!
+    box.click()
+    await settle()
+    await press('Save draft')
+    expect(saveTrigger.mock.calls.at(-1)?.[0]).toMatchObject({ limits: { allowUnguardedAgents: true } })
+  })
+
   it('reports an offline activation failure without retrying or queueing it', async () => {
     approveTrigger.mockRejectedValueOnce(new Error('Node offline'))
     await press('Set it up yourself')

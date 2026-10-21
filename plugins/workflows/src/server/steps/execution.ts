@@ -3,6 +3,7 @@ import { slugifyBranch } from '@acorn/protocol/branch.ts'
 import type { HeadlessResult, PluginDatabase } from '@acorn/plugin-api/node'
 import {
   MAX_AGENT_GOAL_CHARS,
+  UnguardedAgentError,
   type AgentExecuteGoalSummary,
   type AgentSessionExecuteResult,
 } from '@acorn/plugin-agents/contract/sessionExecute.ts'
@@ -35,6 +36,8 @@ import {
 } from '../validation/treeSafety'
 import { retryRecord, unreachableSteps } from '../runs/graph'
 import { Semaphore } from '../runs/semaphore'
+import { WorkflowAuthorityError } from '../runs/authority'
+import { allowsUnguardedAgents } from '../triggers/occurrences'
 import type { RunnerDeps, RunStepOptions, StepRunRequest } from '../runs/deps'
 import type { WorkflowRunState } from '../runs/state'
 
@@ -281,7 +284,13 @@ export class WorkflowStepExecution {
           ? { status: 'safety-rail', error: error.message }
           : controller.signal.aborted
             ? { status: 'cancelled', error: 'Step cancelled.' }
-            : { status: 'failed', error: error instanceof Error ? error.message : 'Step handler failed.' }
+            : {
+                status: 'failed',
+                error: error instanceof Error ? error.message : 'Step handler failed.',
+                ...(error instanceof WorkflowAuthorityError && error.reason === 'unguarded-agent'
+                  ? { cause: 'unguarded-agent' as const }
+                  : {}),
+              }
     } finally {
       if (budgetTimer) clearTimeout(budgetTimer)
       this.unregisterActive(run.id, step.id)
@@ -511,6 +520,7 @@ export class WorkflowStepExecution {
             workflowRunId: ctx.run.id,
             workflowStepId: ctx.step.id,
             posture: workflowPosture(ctx.run.posture),
+            allowUnguardedAgents: allowsUnguardedAgents(this.services.db, ctx.run.rootRunId ?? ctx.run.id),
             managedSessionId: ctx.step.agentSessionId ?? undefined,
             ...(sessionTitle ? { sessionTitle } : {}),
             requireManagedSession: ctx.run.startedBy === 'agent-map',
@@ -544,6 +554,12 @@ export class WorkflowStepExecution {
               admissionId,
               {},
               error instanceof Error ? error.message : 'Provider turn failed.',
+            )
+          // The run records the step's name beside this text. Only the owner can fix it.
+          if (error instanceof UnguardedAgentError)
+            throw new WorkflowAuthorityError(
+              'unguarded-agent',
+              `The agent would run in ${error.mode}, with no sandbox or approval. Allow that on the trigger, or change the step's mode.`,
             )
           throw error
         }

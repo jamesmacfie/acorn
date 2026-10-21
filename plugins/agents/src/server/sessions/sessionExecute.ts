@@ -9,7 +9,9 @@ import {
   type AgentSessionExecute,
   type AgentSessionExecuteRequest,
   type AgentSessionExecuteResult,
+  UnguardedAgentError,
 } from '../../contract/sessionExecute'
+import { unguardedSetting } from '../../shared/unguardedCommands'
 import type { ManagedAgentRuntime } from './runtime'
 import { assistantResult, parseStructuredResult, promptWithResultContract } from './resultContract'
 import { contextBlock } from '../drivers/contextBlock'
@@ -286,6 +288,12 @@ export function createSessionExecute(
     }
     const session = await sessionFor(runtime, request, providerId)
     await applyRequestedConfig(runtime, session.id, request.configOptions)
+    if (request.posture === 'autonomous' && !request.allowUnguardedAgents) {
+      // Read after the requested options are applied, and before the first turn is queued.
+      const { config } = await runtime.store.requireSession(session.id)
+      const unguarded = Array.isArray(config.configOptions) ? unguardedSetting(config.configOptions) : undefined
+      if (unguarded) throw new UnguardedAgentError(unguarded.value)
+    }
     const registry = await followUps?.()
     const beforeSeq = (await runtime.store.requireSession(session.id)).lastEventSeq
     const forwarding = new ExecutionEvents(session.id, beforeSeq, request.onEvent)
