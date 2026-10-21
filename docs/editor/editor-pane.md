@@ -26,7 +26,8 @@ same tick. A missing path is always awaited, because "this task has no checkout 
 Each open file's `EditorState`, with its text, undo history, and grammar, lives on the pane's model
 ([pane models](../panes/models.md)), which the host keeps for recent tasks. Closing the pane, or
 leaving the task, and coming back keeps undo history and costs one disk read: a new mount marks every
-kept file stale, because no mount heard the worktree's events in between. A state built by an earlier mount is reconfigured before it goes on screen, because its
+kept file stale, because no mount heard the worktree's events in between. The pane draws the kept text
+first and reads the disk behind it, replacing the buffer in place if the file changed. A state built by an earlier mount is reconfigured before it goes on screen, because its
 update listener and save chord close over that mount. Closing the pane still flushes a pending
 autosave, and that write finishes its own bookkeeping after the mount is gone.
 
@@ -118,7 +119,8 @@ Listings belong to the Node and task that asked. Matching reads share one reques
 can't replace a listing. Collapsing keeps loaded listings. Worktree events, reconnects, and window
 focus refresh loaded directories, parents first. The worktree event carries no path, so every loaded
 directory refreshes, including collapsed ones, and unopened directories stay unloaded. A failed
-refresh keeps the last listing and shows **Retry**.
+refresh keeps the last listing and shows **Retry**. A tree that mounts again reads every remembered open
+folder that shows in one round trip, and leaves those under a collapsed parent alone.
 
 The tree's ellipsis, right-click, and focused-row menu show file actions, other plugins' included,
 without opening a preview or saving a draft. F2 renames the focused row. On the terminal, Shift+F10 opens its menu and Ctrl+N
@@ -153,7 +155,7 @@ task. Trash prunes those references. These records contain paths and positions, 
 
 Window focus, worktree invalidation, reconnect, and **Reload status** revalidate the active text
 file. Bursts share one active-file refresh at a time. Inactive cached files become stale and
-revalidate before the pane shows them. An unchanged read leaves the buffer, undo history, selection,
+revalidate as the pane shows them. An unchanged read leaves the buffer, undo history, selection,
 and save timer alone. Changed disk text replaces a clean buffer and clamps its cursor and scroll. A
 dirty draft stays visible and pauses automatic saves when the disk revision diverges. A failed read
 retains the useful text. A missing file shows **Deleted on disk**; connection failures show a

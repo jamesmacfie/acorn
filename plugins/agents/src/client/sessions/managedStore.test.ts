@@ -469,7 +469,7 @@ describe('reading a session the store holds', () => {
   })
 })
 
-// The store keeps what is drawn and the three drawn last, not every transcript it has read.
+// The store keeps what is drawn and the five drawn last, not every transcript it has read.
 describe('which snapshots the store keeps', () => {
   const answer = (id: string): AgentSessionSnapshot => ({
     session: { ...session, id, lastEventSeq: 1 },
@@ -489,30 +489,30 @@ describe('which snapshots the store keeps', () => {
   }
   const kept = () => Object.keys(managedAgentStore.snapshots()).sort()
 
-  it('keeps the three drawn last and drops the rest, rows and all left in the roster', async () => {
-    await visit('a', 'b', 'c', 'd', 'e')
-    expect(kept()).toEqual(['c', 'd', 'e'])
+  it('keeps the five drawn last and drops the rest, rows and all left in the roster', async () => {
+    await visit('a', 'b', 'c', 'd', 'e', 'f', 'g')
+    expect(kept()).toEqual(['c', 'd', 'e', 'f', 'g'])
     expect(
       managedAgentStore
         .sessions()
         .map((item) => item.id)
         .sort(),
-    ).toEqual(['a', 'b', 'c', 'd', 'e'])
+    ).toEqual(['a', 'b', 'c', 'd', 'e', 'f', 'g'])
   })
 
   it('reports the events it keeps, which stop growing at the bound', async () => {
     const gauge = vi.spyOn(agentTelemetry, 'gauge')
-    await visit('a', 'b', 'c', 'd', 'e')
-    expect(gauge).toHaveBeenLastCalledWith('agents.snapshots.events', 3)
+    await visit('a', 'b', 'c', 'd', 'e', 'f', 'g')
+    expect(gauge).toHaveBeenLastCalledWith('agents.snapshots.events', 5)
     gauge.mockRestore()
   })
 
   it('never drops a session something is drawing, and counts letting go as the latest drawing', async () => {
     const releaseA = await open('a')
-    await visit('b', 'c', 'd', 'e')
-    expect(kept()).toEqual(['a', 'c', 'd', 'e'])
+    await visit('b', 'c', 'd', 'e', 'f', 'g')
+    expect(kept()).toEqual(['a', 'c', 'd', 'e', 'f', 'g'])
     releaseA()
-    expect(kept()).toEqual(['a', 'd', 'e'])
+    expect(kept()).toEqual(['a', 'd', 'e', 'f', 'g'])
   })
 
   it('holds a session for as long as any of its readers does', async () => {
@@ -521,14 +521,14 @@ describe('which snapshots the store keeps', () => {
     const second = managedAgentStore.hold('a')
     first()
     first()
-    await visit('b', 'c', 'd', 'e')
+    await visit('b', 'c', 'd', 'e', 'f', 'g')
     expect(kept()).toContain('a')
     second()
-    expect(kept()).toEqual(['a', 'd', 'e'])
+    expect(kept()).toEqual(['a', 'd', 'e', 'f', 'g'])
   })
 
   it('reads a dropped session from the start, and leaves its frames alone until then', async () => {
-    await visit('a', 'b', 'c', 'd')
+    await visit('a', 'b', 'c', 'd', 'e', 'f')
     expect(kept()).not.toContain('a')
     push({ channel: 'agent:event', event: { ...prose(2), id: 'a-e2', sessionId: 'a' } })
     expect(kept()).not.toContain('a')
@@ -542,27 +542,27 @@ describe('which snapshots the store keeps', () => {
   it('keeps a session’s projection with its events, and starts a new one once they are dropped', async () => {
     await visit('a')
     const project = managedAgentStore.projection('a')
-    await visit('b', 'c')
+    await visit('b', 'c', 'd', 'e')
     expect(managedAgentStore.projection('a')).toBe(project)
-    await visit('d')
+    await visit('f')
     expect(kept()).not.toContain('a')
     expect(managedAgentStore.projection('a')).not.toBe(project)
   })
 
   it('leaves a session alone while it is being read', async () => {
-    await visit('a', 'b', 'c')
+    await visit('a', 'b', 'c', 'd', 'e')
     let open_ = (): void => undefined
     gates.a = new Promise((resolve) => {
       open_ = resolve
     })
     const reading = managedAgentStore.loadSnapshot('a')
-    await visit('d', 'e')
+    await visit('f', 'g')
     // Past the bound, and the oldest, but its read resumes from the events it holds.
     expect(kept()).toContain('a')
     open_()
     await reading
     expect(snapshotCursors.at(-3)).toBe(1)
-    expect(kept()).toEqual(['a', 'd', 'e'])
+    expect(kept()).toEqual(['a', 'd', 'e', 'f', 'g'])
   })
 
   it('does not read back a session it is not keeping when that session reports an error', async () => {

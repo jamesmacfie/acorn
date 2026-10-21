@@ -34,6 +34,7 @@ import { createFileActionModel } from './fileActionModel'
 import {
   collapseEditorTreeDirectories,
   editorTreeDirectoryOpen,
+  editorTreeOpenDirectories,
   editorTreeCollectionId,
   registerEditorTreeFolders,
   setEditorTreeDirectoryOpen,
@@ -471,16 +472,13 @@ export default function FileTree(props: {
     ),
   )
 
-  // Expansion outlives this component, while its lazy listings do not. Rebuild every retained open
-  // branch as its parent listing arrives, so returning to the pane cannot show an open twist beside
-  // an empty folder. This also restores nested branches in order without fetching collapsed ones.
+  // Expansion outlives this component, while its lazy listings do not. Read every retained open folder
+  // that shows (all its parents are open too) at once, so returning to the pane costs one round trip
+  // however deep the open branch goes. A collapsed parent's descendants stay unfetched.
   createEffect(() => {
-    for (const [dir, entries] of listings()) {
-      for (const entry of entries) {
-        if (!entry.dir) continue
-        const path = dir ? `${dir}/${entry.name}` : entry.name
-        if (isOpen(path) && !listings().has(path) && !errors().has(path)) void load(path)
-      }
+    for (const path of editorTreeOpenDirectories(props.taskId, nodeId)) {
+      const shown = path.split('/').every((_, depth, parts) => isOpen(parts.slice(0, depth + 1).join('/')))
+      if (shown && !listings().has(path) && !errors().has(path)) void load(path)
     }
   })
 

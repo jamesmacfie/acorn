@@ -34,6 +34,7 @@ vi.mock('./AttachmentSlot', () => ({
   ),
 }))
 import AgentComposer from './AgentComposer'
+import { managedAgentStore } from '../sessions/managedStore'
 const disposals: (() => void)[] = []
 const row = (id: string): AgentSession =>
   ({
@@ -322,4 +323,36 @@ it('steers a draft by queuing it and handing the queued turn to the running one'
   // Queued before the steer, so a refused steer leaves it where Enter would have put it.
   await vi.waitFor(() => expect(draft.error()).toBe('The turn has ended.'))
   expect(draft.text()).toBe('')
+})
+
+it('sends with the task context it already captured, and puts the queued turn in the store from the answer', async () => {
+  setActiveNode('A')
+  const capture = vi
+    .fn()
+    .mockResolvedValue([
+      { type: 'context', contextId: 'task', label: 'Task', content: 'task', source: 'context.task', capturedAt: 1 },
+    ])
+  contextFixture.contributions = [
+    {
+      id: 'acorn-task-context',
+      source: 'context.task',
+      keyword: 'task',
+      itemless: true,
+      label: 'Task context',
+      options: async () => [],
+      capture,
+    },
+  ]
+  const session = { ...row('send'), kind: 'interactive' as const }
+  const turn = { id: 'turn-1', sessionId: 'send' }
+  api.enqueue.mockResolvedValue(turn)
+  const upsertTurn = vi.spyOn(managedAgentStore, 'upsertTurn')
+  const host = mount(() => session)
+  await vi.waitFor(() => expect(composerDraftState('send', 'A').contexts()).toHaveLength(1))
+  composerDraftState('send', 'A').setText('Go')
+  button(host, 'Send').click()
+  await vi.waitFor(() => expect(api.enqueue).toHaveBeenCalledOnce())
+  expect(capture).toHaveBeenCalledOnce()
+  expect(api.enqueue.mock.calls[0][1].input).toContainEqual(expect.objectContaining({ contextId: 'automatic:task' }))
+  expect(upsertTurn).toHaveBeenCalledWith(turn)
 })

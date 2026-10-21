@@ -347,6 +347,31 @@ describe('the editor pane', () => {
     expect(remounted.state.doc.toString()).toBe('first\n  second\n')
   })
 
+  it('draws a kept file before its disk read answers, then applies what the disk says', async () => {
+    const first = mount()
+    const view = await editor(first.host)
+    editorOpen(taskId, 'a.ts', false)
+    await showing(() => view, 'const a = 1')
+    first.unmount()
+
+    // A new mount reads the remembered file beside the root, which the kept state doesn't need. The
+    // read that checks the kept state is the second.
+    let answer!: () => void
+    read.mockImplementationOnce(async (_taskId, path) => disk.get(path) ?? '')
+    read.mockImplementationOnce(async (_taskId, path) => {
+      await new Promise<void>((resolve) => {
+        answer = resolve
+      })
+      return disk.get(path) ?? ''
+    })
+    disk.set('a.ts', 'const a = 2\n')
+    const second = mount(true)
+    const reopened = await editor(second.host)
+    await showing(() => reopened, 'const a = 1')
+    answer()
+    await showing(() => reopened, 'const a = 2')
+  })
+
   it('uses chosen indentation for later commands without rewriting CRLF text', async () => {
     disk.set('a.ts', 'first\r\n  second\r\n')
     const { host } = mount()

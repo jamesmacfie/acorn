@@ -104,14 +104,14 @@ it('preserves the incoming read and hold when an outgoing read finally settles',
   requests[1].resolve(snapshot('B'))
   await incoming
   releaseA()
-  for (let i = 0; i < 4; i++) {
+  for (let i = 0; i < 6; i++) {
     const run = managedAgentStore.loadSnapshot(`other-${i}`)
     requests.at(-1)!.resolve(snapshot('B', 1, `other-${i}`))
     await run
   }
   expect(managedAgentStore.snapshots().same.events[0].id).toBe('B-1')
   releaseB()
-  expect(Object.keys(managedAgentStore.snapshots())).toHaveLength(3)
+  expect(Object.keys(managedAgentStore.snapshots())).toHaveLength(5)
 })
 
 it('does not start another page or resurrect a created row after switching Node', async () => {

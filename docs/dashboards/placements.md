@@ -116,6 +116,15 @@ Anything that puts a definition on Home, an agent's panel card or a plugin's cel
 `homeTabsToAddTo` and places with `placeOnHomeTab`, both in `cells.ts`. Each kind takes its size from
 the tuning table in `layout.ts`.
 
+## Drawing a panel
+
+Each placed panel draws inside its own `Suspense` (`PanelGridItem.tsx`), because a panel's queries
+suspend whatever boundary is above them. A panel still waiting for its revision or its run shows its
+title and a busy line while the others draw. Without the boundary, one slow panel held the whole page.
+
+On the Node, a run queries every source at once and then settles them in plan order, so its problems
+and budgets read the same as when each source waited for the one before it.
+
 ## The grid
 
 A placement is 12 columns of square cells (`COLS`), each panel at an explicit `{x, y, w, h}`. Twelve

@@ -1,6 +1,7 @@
 import { agentContextBudget, type AgentContextSnapshot } from '@acorn/protocol/agentContext.ts'
 import type { AgentInputPart } from '../../contract/wire.ts'
 import { managedAgentApi } from '../sessions/managedClient.ts'
+import { managedAgentStore } from '../sessions/managedStore.ts'
 import { parseFileMentions } from './fileMentions.ts'
 import { AUTOMATIC_TASK_CONTEXT_SOURCE } from './automaticTaskContext.ts'
 import type { ComposerOrigin } from './composerOrigin.ts'
@@ -68,7 +69,11 @@ export async function submitTurn({
       origin,
     )
     state.acknowledge(revisions, submittedAttachments, turnContexts)
-    if (origin.visible()) onSent()
+    // The turn shows from the answer. The socket's frame and the reload in `onSent` can both be late.
+    if (origin.visible()) {
+      managedAgentStore.upsertTurn(turn)
+      onSent()
+    }
     // Queued first, so a refused steer leaves the message where Enter would have put it.
     if (steer) {
       await managedAgentApi.steerQueuedTurn(session.id, turn.id, origin).catch((caught: unknown) => {

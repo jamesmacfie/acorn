@@ -39,6 +39,10 @@ export function captureEditorTreeFolder(
 export const editorTreeDirectoryOpen = (taskId: string, path: string, nodeId = activeNodeId()): boolean =>
   expandedByTask().get(ownerKey(taskId, nodeId))?.has(path) ?? false
 
+/** Every folder the task keeps open, including those under a collapsed parent. */
+export const editorTreeOpenDirectories = (taskId: string, nodeId = activeNodeId()): ReadonlySet<string> =>
+  expandedByTask().get(ownerKey(taskId, nodeId)) ?? new Set()
+
 export function setEditorTreeDirectoryOpen(taskId: string, path: string, open: boolean, nodeId = activeNodeId()): void {
   setExpandedByTask((current) => {
     const key = ownerKey(taskId, nodeId)

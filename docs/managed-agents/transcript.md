@@ -37,7 +37,7 @@ Its rules:
 - While you follow the live end, the Timeline trims back to 200 once it draws 400. It doesn't trim a
   card holding the selection or focus, or while you're away from the live end. The trim runs in the
   frame after the list grows.
-- Switching session or subagent starts on the newest page. Going back to one of the last three
+- Switching session or subagent starts on the newest page. Going back to one of the last five
   sessions reuses its projection from the store, so only the page's cards mount again
   ([what the store keeps](./transcript-store.md#what-the-store-keeps)).
 - **Chats only** is remembered per session until the app quits.

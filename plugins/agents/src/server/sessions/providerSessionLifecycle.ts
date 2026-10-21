@@ -109,6 +109,15 @@ export type ProviderLifecyclePorts = {
   shuttingDown(): boolean
 }
 
+// Runs steps together and waits for every one to settle, then throws the first failure in the order
+// given, or returns the values.
+async function settleAll<T extends readonly unknown[]>(steps: { [K in keyof T]: Promise<T[K]> }): Promise<T> {
+  const results = await Promise.allSettled(steps)
+  const failed = results.find((result) => result.status === 'rejected')
+  if (failed) throw failed.reason
+  return results.map((result) => (result as PromiseFulfilledResult<unknown>).value) as unknown as T
+}
+
 const RECONNECT_DELAYS_MS = [1_000, 2_000, 5_000]
 
 /** Owns provider generations, their children, callbacks, and process-specific timers. */
@@ -314,46 +323,56 @@ export class ProviderSessionLifecycle {
       }
       const prepare = <T>(phase: AgentStartupPhase, run: () => Promise<T>): Promise<T> =>
         startup ? startup.phase(phase, run) : run()
-      const read = <T>(query: () => Promise<T>): Promise<T> => {
+      // Async, so an aborted start rejects the step instead of throwing while the others are being set up.
+      const read = async <T>(query: () => Promise<T>): Promise<T> => {
         signal.throwIfAborted()
         return awaitWithSignal(query(), signal)
       }
-      const cwd = await prepare('task.root', () => read(() => this.ports.taskRoot(session.taskId)))
-      if (!live.workspaceId)
-        live.workspaceId = await prepare('workspace.read', () => read(() => this.ports.workspaceId(session.taskId)))
-      const noProviderExecutionHistory = !(await prepare('history.read', () =>
-        read(() => this.ports.hasProviderExecutionHistory(session.id)),
-      ))
+      // Nothing here waits on another step until `env`, so each group runs at once. `settleAll` fails only
+      // after every step has settled, and a step puts what it builds on `live` as it lands, so the cleanup
+      // below finds the skill folder and the MCP relays however the start ends.
       // Read at every start, like the hooks, so switching it applies from the next start. Decided before
       // the token is minted, because every execute tool runs outside the harness's sandbox, so a
       // sandboxed session's token stops at write tools (docs/managed-agents/read-block.md).
-      const sandboxed = live.driver.readBlock === true && (await read(() => this.ports.readBlockOn()))
-      signal.throwIfAborted()
+      const [cwd, workspaceId, hasHistory, sandboxed, accountHome, skills, loopHooks] = await settleAll([
+        prepare('task.root', () => read(() => this.ports.taskRoot(session.taskId))),
+        live.workspaceId
+          ? Promise.resolve(live.workspaceId)
+          : prepare('workspace.read', () => read(() => this.ports.workspaceId(session.taskId))),
+        prepare('history.read', () => read(() => this.ports.hasProviderExecutionHistory(session.id))),
+        live.driver.readBlock === true ? read(() => this.ports.readBlockOn()) : Promise.resolve(false),
+        // Every start and resume, because the CLI finds the session it resumes only in this folder.
+        read(() => this.ports.accountHome(session)),
+        // Read at every start and resume, like the MCP servers below, so a skill switched off or approved
+        // since the last one applies now. A process that keeps running keeps what it was given.
+        read(() => this.ports.skills(session, live.generation, live.driver.nativeSkills === true)).then((skills) => {
+          live.skills = skills
+          live.skillsOwed = true
+          return skills
+        }),
+        live.driver.loopHooks ? read(() => this.ports.loopHooks(session)) : Promise.resolve(null),
+      ])
+      live.workspaceId = workspaceId
+      const noProviderExecutionHistory = !hasHistory
       const env = this.ports.scopedEnvironment(session, sandboxed)
-      // Every start and resume, because the CLI finds the session it resumes only in this folder.
-      const accountHome = await read(() => this.ports.accountHome(session))
-      const mcp = await prepare('mcp.prepare', () => read(() => this.ports.mcpServers(session, env, signal)))
-      live.retireMcp = mcp.retire ?? null
-      signal.throwIfAborted()
+      const [mcp, readBlock] = await settleAll([
+        prepare('mcp.prepare', () => read(() => this.ports.mcpServers(session, env, signal))).then((mcp) => {
+          live.retireMcp = mcp.retire ?? null
+          return mcp
+        }),
+        sandboxed
+          ? read(() =>
+              this.ports.readBlock({
+                sessionId: session.id,
+                worktree: cwd,
+                env,
+                skillPaths: [...skills.folders, ...skills.plugins],
+              }),
+            )
+          : Promise.resolve(null),
+      ])
       // A warning write is durable work. Join it even if stop aborts the following driver start.
       if (mcp.unavailable.length) await this.ports.mcpUnavailable(session.id, mcp.unavailable)
-      signal.throwIfAborted()
-      // Read at every start and resume, like the MCP servers above, so a skill switched off or approved
-      // since the last one applies now. A process that keeps running keeps what it was given.
-      const skills = await read(() => this.ports.skills(session, live.generation, live.driver.nativeSkills === true))
-      live.skills = skills
-      live.skillsOwed = true
-      const loopHooks = live.driver.loopHooks ? await read(() => this.ports.loopHooks(session)) : null
-      const readBlock = sandboxed
-        ? await read(() =>
-            this.ports.readBlock({
-              sessionId: session.id,
-              worktree: cwd,
-              env,
-              skillPaths: [...skills.folders, ...skills.plugins],
-            }),
-          )
-        : null
       const { attendanceInstructions } = await import('./attendanceInstructions')
       const instructions = attendanceInstructions(sessionAttendance(session))
       signal.throwIfAborted()

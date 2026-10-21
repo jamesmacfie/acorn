@@ -96,11 +96,11 @@ const delegationLoads = new Map<string, Promise<void>>()
 const snapshotLoads = new Map<string, Promise<AgentSessionSnapshot>>()
 
 // Which snapshots the store keeps. A session keeps its snapshot while something draws it (`hold`),
-// and the three most recently drawn beyond those keep theirs too, which is what makes going back to
+// and the five most recently drawn beyond those keep theirs too, which is what makes going back to
 // one of them a short read (see loadSnapshot). The rest drop their events and keep their row, so the
-// rail, Agent Center and notices still draw them, and opening one reads it from the start. Only three,
+// rail, Agent Center and notices still draw them, and opening one reads it from the start. Only five,
 // because one long session's snapshot can run to megabytes of JSON.
-const KEEP_RECENT = 3
+const KEEP_RECENT = 5
 const holds = new Map<string, number>()
 // Every stored snapshot's id, least recently drawn first. A load and a release both move one to the end.
 const recent = new Set<string>()
@@ -767,6 +767,7 @@ export const managedAgentStore = {
   },
   upsertSession,
   upsertSessions,
+  upsertTurn,
   removeSession,
   captureRead,
   // Drop every node-scoped entry. Called on a node switch (the `onScopeEvicted` listener below):

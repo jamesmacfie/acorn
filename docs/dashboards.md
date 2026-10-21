@@ -24,7 +24,7 @@ There is one execution path:
    ([agent-built apps](./agent-built-apps.md#what-an-app-can-reach)). A run that leaves out an input the
    plan reads fails with the input's name.
 3. Ask the Node data-source runtime to describe each source and validate column bindings.
-4. Plan and share authorized reads, query each source, and run the plan on the Node.
+4. Plan and share authorized reads, query every source at once, and run the plan on the Node.
 5. Render the declared list, table, board, stat, or chart view.
 
 Primary sources contribute rows. A declared lookup attaches fields, and a declared children relation

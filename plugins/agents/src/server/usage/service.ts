@@ -188,22 +188,30 @@ export function createAgentUsageService(options: AgentUsageServiceOptions): Agen
     return snapshot
   }
 
+  const startRefresh = (pricing: AgentPricingPreferences, key: string, providerId: string | null) => {
+    const promise = refresh(pricing, key, providerId).finally(() => {
+      if (inFlight?.promise === promise) inFlight = null
+    })
+    inFlight = { key, providerId, promise }
+    return promise
+  }
+
   const read: AgentUsageService['read'] = async ({ userId, force = false }) => {
     const pricing = await pricingForUser(userId)
     const key = `${userId}\u0000${agentPricingFingerprint(pricing)}`
+    // A snapshot past its TTL still answers at once. The refresh behind it raises `onRefreshed`, and the
+    // client reads again then. Only a read with nothing to show waits for a probe.
+    if (!force && cached?.key === key) {
+      if (!inFlight && now() - cached.snapshot.refreshedAt >= ttlMs)
+        void startRefresh(pricing, key, null).catch(() => {})
+      return cached.snapshot
+    }
     if (inFlight) {
       if (inFlight.key === key && (!force || inFlight.providerId === null)) return joined(inFlight.promise)
       await joined(inFlight.promise)
       return read({ userId, force })
     }
-    if (!force && cached?.key === key && now() - cached.snapshot.refreshedAt < ttlMs) {
-      return cached.snapshot
-    }
-    const promise = refresh(pricing, key).finally(() => {
-      if (inFlight?.promise === promise) inFlight = null
-    })
-    inFlight = { key, providerId: null, promise }
-    return promise
+    return startRefresh(pricing, key, null)
   }
 
   const refreshProvider: AgentUsageService['refreshProvider'] = async ({ userId, providerId }) => {
@@ -217,11 +225,7 @@ export function createAgentUsageService(options: AgentUsageServiceOptions): Agen
       await joined(inFlight.promise)
       return refreshProvider({ userId, providerId })
     }
-    const promise = refresh(pricing, key, providerId).finally(() => {
-      if (inFlight?.promise === promise) inFlight = null
-    })
-    inFlight = { key, providerId, promise }
-    return promise
+    return startRefresh(pricing, key, providerId)
   }
 
   const depletedUntil: AgentUsageService['depletedUntil'] = async ({ userId, providerId, account = null }) => {

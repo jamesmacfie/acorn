@@ -22,6 +22,7 @@ export function refreshAutomaticContext(
 ): Promise<AgentContextSnapshot[]> {
   const { state, session } = owner
   if (state.automaticCapture?.key === key) return state.automaticCapture.run
+  if (state.automaticCapturedKey === key) return Promise.resolve(state.contexts())
   const run = (async () => {
     const before = state.contexts()
     if (
@@ -46,6 +47,7 @@ export function refreshAutomaticContext(
     const next = before.filter((context) => context.source !== AUTOMATIC_TASK_CONTEXT_SOURCE)
     if (automatic && automaticTaskContextPayload(automatic) !== dismissedPayload) next.push(automatic)
     state.setContexts(next)
+    state.automaticCapturedKey = key
     return next
   })().finally(() => {
     if (state.automaticCapture?.run === run) state.automaticCapture = undefined

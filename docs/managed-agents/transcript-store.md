@@ -11,7 +11,8 @@ that lists every session, and it wakes on any change.
 ## The transcript store
 
 A client sees about 25 events a second per streaming session, because the Node coalesces text deltas
-at 40 ms or 16 KB (`durableEventBuffer.ts`). Five rules keep each frame cheap:
+at 40 ms or 16 KB, except that the first chunk of a message goes at once so a reply starts on screen
+without waiting out the timer (`durableEventBuffer.ts`). Five rules keep each frame cheap:
 
 - **Events append in place, in sequence order.** A replayed event out of order walks back from the
   tail. A set of seen IDs answers "have I got this one". The store's signal, not the array's identity,
@@ -58,7 +59,9 @@ A snapshot read and the socket can disagree about a usage line, because both fol
 `GET /sessions/:id` returns at most 2,000 events, oldest first, which a session reaches in about half
 an hour of streaming. `loadSnapshot` compares the row's `lastEventSeq` with the highest event it holds
 and pages `GET /sessions/:id/events?afterSeq=` until they agree. Without that walk, a long transcript
-reopened hours behind its last message.
+reopened hours behind its last message. The pane draws the transcript once every page has been read, so
+a first open of a very long session waits for all of them. Until the task's session list answers, the
+Agent pane shows a busy line, not the start cards.
 
 A held session is read on from its mark, `completeThrough`: every event at or below it is held or
 folded into a held row. A load sets it where its walk ended. A streamed event moves it only when it's
@@ -70,9 +73,9 @@ The retention pass is the one exception to "nothing below the mark changes"
 
 ## What the store keeps
 
-The store keeps the snapshots on screen and the three drawn last, and drops the rest. A surface that
+The store keeps the snapshots on screen and the five drawn last, and drops the rest. A surface that
 draws a session holds it through `managedAgentStore.hold(sessionId)`: the conversation holds its
-session, and the sidebar holds each session waiting on you. Past the three most recent, an unheld
+session, and the sidebar holds each session waiting on you. Past the five most recent, an unheld
 snapshot drops its events, seen IDs, usage line, and mark. The row stays in the roster, with its draft,
 reading place, and live sequence. Opening it again reads from the start. Eight real sessions opened in
 turn used to hold 46 MB of JSON.

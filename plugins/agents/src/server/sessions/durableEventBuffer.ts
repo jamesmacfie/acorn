@@ -43,12 +43,16 @@ const takeUtf8Prefix = (text: string, maxBytes: number): [prefix: string, rest: 
 }
 
 // Serializes provider callbacks per session and coalesces only explicitly append-only display
-// deltas. Every other event first flushes the buffered text, preserving protocol order. Commits
-// remain small and bounded, and the caller can persist before broadcasting.
+// deltas. The first chunk of a message is committed at once, so a reply starts on screen without
+// waiting out the flush timer; the rest of it is batched. Every other event first flushes the buffered
+// text, preserving protocol order. Commits remain small and bounded, and the caller can persist before
+// broadcasting.
 export class DurableAgentEventBuffer {
   readonly #buffers = new Map<string, BufferedDelta>()
   readonly #timers = new Map<string, ReturnType<typeof setTimeout>>()
   readonly #chains = new Map<string, Promise<void>>()
+  // The newest delta each session accepted, without its text. A delta that continues it isn't a first chunk.
+  readonly #streams = new Map<string, BufferedDelta>()
 
   constructor(
     private readonly commit: (entry: PendingAgentEvent) => Promise<void>,
@@ -58,10 +62,14 @@ export class DurableAgentEventBuffer {
   accept(entry: PendingAgentEvent): Promise<void> {
     return this.#enqueue(entry.sessionId, async () => {
       if (!isAppendDelta(entry.event)) {
+        this.#streams.delete(entry.sessionId)
         await this.#flushNow(entry.sessionId)
         await this.commit(entry)
         return
       }
+      const previous = this.#streams.get(entry.sessionId)
+      const first = !previous || !sameStream(previous, entry)
+      this.#streams.set(entry.sessionId, { ...entry, event: { ...entry.event, text: '' } })
       const existing = this.#buffers.get(entry.sessionId)
       if (!existing || !sameStream(existing, entry)) {
         await this.#flushNow(entry.sessionId)
@@ -78,12 +86,18 @@ export class DurableAgentEventBuffer {
         if (rest) buffered.event.text = rest
         else this.#buffers.delete(entry.sessionId)
       }
-      if (this.#buffers.has(entry.sessionId)) this.#schedule(entry.sessionId)
+      if (!this.#buffers.has(entry.sessionId)) return
+      if (first) await this.#flushNow(entry.sessionId)
+      else this.#schedule(entry.sessionId)
     })
   }
 
+  // A caller's flush ends the stream, so the next delta starts a new one. The timer's doesn't.
   flush(sessionId: string): Promise<void> {
-    return this.#enqueue(sessionId, () => this.#flushNow(sessionId))
+    return this.#enqueue(sessionId, () => {
+      this.#streams.delete(sessionId)
+      return this.#flushNow(sessionId)
+    })
   }
 
   async flushAll(): Promise<void> {
@@ -94,7 +108,7 @@ export class DurableAgentEventBuffer {
     if (this.#timers.has(sessionId)) return
     const timer = setTimeout(() => {
       this.#timers.delete(sessionId)
-      void this.flush(sessionId)
+      void this.#enqueue(sessionId, () => this.#flushNow(sessionId))
     }, this.options.flushMs ?? 40)
     this.#timers.set(sessionId, timer)
   }

@@ -474,13 +474,16 @@ export default function AgentPaneDetail(props: { task: Task; model: AgentPaneMod
       <Show
         when={model.selected()}
         fallback={
-          archived() ? (
-            <EmptyState title="This task is archived">
-              Pick a session to read it. Restore the task to start a new one.
-            </EmptyState>
-          ) : (
-            <AgentProviderCards task={props.task} model={model} />
-          )
+          // The empty state would offer a new session while the list that may hold one is still coming.
+          <Show when={model.rosterSettled()} fallback={<EmptyState busy>Loading sessions…</EmptyState>}>
+            {archived() ? (
+              <EmptyState title="This task is archived">
+                Pick a session to read it. Restore the task to start a new one.
+              </EmptyState>
+            ) : (
+              <AgentProviderCards task={props.task} model={model} />
+            )}
+          </Show>
         }
       >
         {(narrowed) => (

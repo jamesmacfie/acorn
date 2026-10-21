@@ -2,28 +2,32 @@ import { describe, expect, it, vi } from 'vitest'
 import { DurableAgentEventBuffer, type PendingAgentEvent } from './durableEventBuffer'
 
 describe('DurableAgentEventBuffer', () => {
-  it('coalesces append deltas and flushes them before the next protocol event', async () => {
+  it('commits the first chunk at once, coalesces the rest, and flushes them before the next protocol event', async () => {
     const committed: PendingAgentEvent[] = []
     const buffer = new DurableAgentEventBuffer(async (entry) => {
       committed.push(structuredClone(entry))
     })
-    await buffer.accept({
+    const delta = (text: string, messageId = 'm'): PendingAgentEvent => ({
       sessionId: 's',
       turnId: 't',
-      event: { type: 'assistant_message', text: 'hel', messageId: 'm', append: true },
+      event: { type: 'assistant_message', text, messageId, append: true },
     })
-    await buffer.accept({
-      sessionId: 's',
-      turnId: 't',
-      event: { type: 'assistant_message', text: 'lo', messageId: 'm', append: true },
-    })
-    expect(committed).toEqual([])
+    await buffer.accept(delta('hel'))
+    expect(committed.map((entry) => entry.event)).toEqual([delta('hel').event])
+    await buffer.accept(delta('l'))
+    await buffer.accept(delta('o'))
+    expect(committed).toHaveLength(1)
 
     await buffer.accept({ sessionId: 's', turnId: 't', event: { type: 'turn_completed' } })
     expect(committed.map((entry) => entry.event)).toEqual([
-      { type: 'assistant_message', text: 'hello', messageId: 'm', append: true },
+      delta('hel').event,
+      delta('lo').event,
       { type: 'turn_completed' },
     ])
+
+    // A new message is a new stream: its first chunk goes at once as well.
+    await buffer.accept(delta('next', 'm2'))
+    expect(committed).toHaveLength(4)
   })
 
   it('bounds chunks and timer-flushes idle streams', async () => {

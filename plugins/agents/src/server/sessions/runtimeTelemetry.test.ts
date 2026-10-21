@@ -129,12 +129,10 @@ describe('what a session reports', () => {
     expect(start.parentSpanId).toBe(total.spanId)
     expect(total.attrs).toMatchObject({ 'task.id': taskId, outcome: 'ready' })
     const preparation = ctx.recorded.filter((record) => record.kind === 'span' && record.name === 'agent.session.phase')
-    expect(preparation.map((record) => record.attrs.phase)).toEqual([
-      'task.root',
-      'workspace.read',
-      'history.read',
-      'mcp.prepare',
-    ])
+    // The reads run together, so they end in any order. The MCP step needs their answers and ends last.
+    const phases = preparation.map((record) => record.attrs.phase)
+    expect([...phases].sort()).toEqual(['history.read', 'mcp.prepare', 'task.root', 'workspace.read'])
+    expect(phases.at(-1)).toBe('mcp.prepare')
     expect(
       preparation.every(
         (record) => record.kind === 'span' && record.traceId === total.traceId && record.parentSpanId === total.spanId,
@@ -251,7 +249,9 @@ describe('what a session reports', () => {
       await new FakeAgentDriver().probe(),
     )
     await expect(engine.ensureSession(accepted)).rejects.toThrow('private checkout path and credential')
-    const phase = spanNamed(ctx, 'agent.session.phase')!
+    const phase = ctx.recorded.find(
+      (record) => record.kind === 'span' && record.name === 'agent.session.phase' && record.attrs.phase === 'task.root',
+    ) as Extract<TelemetryRecord, { kind: 'span' }>
     expect(phase).toMatchObject({ status: 'error', attrs: { phase: 'task.root', outcome: 'error' } })
     const total = spanNamed(ctx, 'agent.session.start')!
     expect(phase.parentSpanId).toBe(total.spanId)
@@ -279,16 +279,16 @@ describe('what a session reports', () => {
     await vi.waitFor(() => expect(root).toHaveBeenCalledOnce())
     await runtime.stop()
     expect(await starting).toBeInstanceOf(Error)
-    expect(spanNamed(ctx, 'agent.session.phase')).toMatchObject({
-      status: 'error',
-      attrs: { phase: 'task.root', outcome: 'cancelled' },
-    })
+    const rootPhases = () =>
+      ctx.recorded.filter(
+        (record) =>
+          record.kind === 'span' && record.name === 'agent.session.phase' && record.attrs.phase === 'task.root',
+      )
+    expect(rootPhases()).toMatchObject([{ status: 'error', attrs: { outcome: 'cancelled' } }])
     expect(spanNamed(ctx, 'agent.session.start')?.attrs.outcome).toBe('cancelled')
     release(ctx.dataDir)
     await new Promise<void>((resolve) => setImmediate(resolve))
-    expect(
-      ctx.recorded.filter((record) => record.kind === 'span' && record.name === 'agent.session.phase'),
-    ).toHaveLength(1)
+    expect(rootPhases()).toHaveLength(1)
   })
 
   it('runs with no telemetry, because a test builds an engine with no host around it', async () => {

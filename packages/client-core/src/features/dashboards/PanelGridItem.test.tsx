@@ -1,5 +1,5 @@
 import { render } from 'solid-js/web'
-import type { Accessor, JSX } from 'solid-js'
+import { createResource, Suspense, type Accessor, type JSX } from 'solid-js'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { DashboardRevision, PanelPlan } from '@acorn/protocol/dashboards.ts'
 import { Menu } from '../../kit/components/overlays/Menu'
@@ -9,9 +9,14 @@ import type { PanelGridItemActions } from './PanelGridItem'
 
 // The placed panel loads its own revision and runs. Here it only hands the menu a revision.
 vi.mock('./PublishedDashboardPanel', () => ({
-  default: (props: { actions: (published: Accessor<DashboardRevision | undefined>) => JSX.Element }) => (
-    <div>{props.actions(() => revision)}</div>
-  ),
+  default: (props: {
+    definition: PanelDefinition
+    actions: (published: Accessor<DashboardRevision | undefined>) => JSX.Element
+  }) => {
+    // A panel whose read never answers. The read sits in the JSX, a tracking scope, as a query's does.
+    const never = props.definition.id === 'slow' ? createResource(() => new Promise<never>(() => {}))[0] : undefined
+    return <div>{never?.() ?? props.actions(() => revision)}</div>
+  },
 }))
 
 const { default: PanelGridItem } = await import('./PanelGridItem')
@@ -68,45 +73,41 @@ const published: PanelDefinition = {
   publication: { dashboardId: 'd1' },
 }
 
+const layout = {
+  collapsed: () => false,
+  style: () => ({}),
+  gestureKind: () => undefined,
+  keyboardActive: () => false,
+  announcement: () => '',
+  register: () => {},
+  unregister: () => {},
+  onKeyDown: () => {},
+  onBlur: () => {},
+  onBeginDrag: () => {},
+  onBeginResize: () => {},
+}
+const actions = (): PanelGridItemActions => ({
+  edit: () => {},
+  editWithAi: () => {},
+  openStudio: () => {},
+  quickEdit,
+  canDuplicate: () => true,
+  duplicate: () => {},
+  beginLayout: () => {},
+  canMove: () => true,
+  move: () => {},
+  moveTargets: () => [],
+  moveToTab: () => {},
+  remove: () => {},
+  delete: async () => {},
+  deleteFailed: () => {},
+})
+const gridItem = (definition: PanelDefinition) => (
+  <PanelGridItem definition={definition} scope={{ surface: 'home' }} layout={layout} actions={actions()} />
+)
+
 const openMenu = (definition = published) => {
-  dispose = render(
-    () => (
-      <PanelGridItem
-        definition={definition}
-        scope={{ surface: 'home' }}
-        layout={{
-          collapsed: () => false,
-          style: () => ({}),
-          gestureKind: () => undefined,
-          keyboardActive: () => false,
-          announcement: () => '',
-          register: () => {},
-          unregister: () => {},
-          onKeyDown: () => {},
-          onBlur: () => {},
-          onBeginDrag: () => {},
-          onBeginResize: () => {},
-        }}
-        actions={{
-          edit: () => {},
-          editWithAi: () => {},
-          openStudio: () => {},
-          quickEdit,
-          canDuplicate: () => true,
-          duplicate: () => {},
-          beginLayout: () => {},
-          canMove: () => true,
-          move: () => {},
-          moveTargets: () => [],
-          moveToTab: () => {},
-          remove: () => {},
-          delete: async () => {},
-          deleteFailed: () => {},
-        }}
-      />
-    ),
-    host,
-  )
+  dispose = render(() => gridItem(definition), host)
   host.querySelector<HTMLButtonElement>('button[aria-label="Pulls panel actions"]')!.click()
 }
 
@@ -206,5 +207,21 @@ describe('PanelGridItem menu', () => {
       'Remove from this dashboard',
     ])
     registration.dispose()
+  })
+
+  it('draws the other panels while one never answers', () => {
+    dispose = render(
+      () => (
+        <Suspense fallback={<p>Page loading</p>}>
+          {gridItem({ ...published, id: 'slow', title: 'Slow panel' })}
+          {gridItem(published)}
+        </Suspense>
+      ),
+      host,
+    )
+    expect(host.textContent).not.toContain('Page loading')
+    expect(host.textContent).toContain('Slow panel')
+    expect(host.textContent).toContain('Loading…')
+    expect(host.querySelector('button[aria-label="Pulls panel actions"]')).not.toBeNull()
   })
 })

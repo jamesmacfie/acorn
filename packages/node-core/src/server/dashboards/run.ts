@@ -451,19 +451,26 @@ export async function runDashboard(
     }
   }
   if (!problems.some((problem) => problem.severity === 'error')) {
-    for (const source of sources) {
+    // Every source reads at once, and the loop below settles them in plan order, so the problems and
+    // the budgets come out as they did when each read waited for the one before.
+    const readSource = async (source: PlanSource): Promise<DataSourceResult> => {
+      const reference = plan.sources.find((entry) => entry.id === source.instanceId)!.reference
+      source.query = plannedQuery(source.query, plan, source)
+      return reference.kind === 'supplied'
+        ? suppliedRead(reference, args.mode, evaluationTime)
+        : sharedRead(env, source, args.mode, evaluationTime, runInvocation)
+    }
+    const reads = await Promise.allSettled(sources.map(readSource))
+    for (const [position, source] of sources.entries()) {
       if (Date.now() - started > MAX_RUN_MS) {
         problems.push({ path: '/sources', message: 'Run time budget exceeded.', severity: 'error' })
         break
       }
       try {
         const index = plan.sources.findIndex((entry) => entry.id === source.instanceId)
-        const reference = plan.sources[index]!.reference
-        source.query = plannedQuery(source.query, plan, source)
-        source.result =
-          reference.kind === 'supplied'
-            ? suppliedRead(reference, args.mode, evaluationTime)
-            : await sharedRead(env, source, args.mode, evaluationTime, runInvocation)
+        const read = reads[position]!
+        if (read.status === 'rejected') throw read.reason
+        source.result = read.value
         const diagnostic = sourceDiagnostics.find((entry) => entry.id === source.instanceId)!
         diagnostic.completeness = source.result.completeness
         diagnostic.readTime = source.result.readTime

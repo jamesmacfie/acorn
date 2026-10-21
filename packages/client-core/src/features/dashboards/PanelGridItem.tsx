@@ -1,4 +1,4 @@
-import { createSignal, For, onCleanup, Show, type Accessor, type JSX } from 'solid-js'
+import { createSignal, For, onCleanup, Show, Suspense, type Accessor, type JSX } from 'solid-js'
 import { Dynamic } from 'solid-js/web'
 import { focusManager } from '@tanstack/solid-query'
 import type { DashboardRevision, PanelPlan } from '@acorn/protocol/dashboards.ts'
@@ -355,17 +355,34 @@ export default function PanelGridItem(props: {
           </Card>
         }
       >
-        <PublishedDashboardPanel
-          definition={props.definition}
-          workspaceId={props.workspaceId}
-          placement={props.scope}
-          actions={chrome}
-          {...(renaming()
-            ? { rename: { onDone: (title: string | undefined) => rename(title, props.definition.title) } }
-            : {})}
-          onEditPanel={props.actions.openStudio}
-          headProps={headProps()}
-        />
+        {/* A panel's queries suspend whatever boundary is above them. Its own keeps one slow panel from
+            holding the others off the screen. */}
+        <Suspense
+          fallback={
+            <Card>
+              <div class="dash-panel-head" {...headProps()}>
+                <Heading level={3}>{props.definition.title}</Heading>
+              </div>
+              <div class="dash-panel-body">
+                <EmptyState busy align="start" size="sm">
+                  Loading…
+                </EmptyState>
+              </div>
+            </Card>
+          }
+        >
+          <PublishedDashboardPanel
+            definition={props.definition}
+            workspaceId={props.workspaceId}
+            placement={props.scope}
+            actions={chrome}
+            {...(renaming()
+              ? { rename: { onDone: (title: string | undefined) => rename(title, props.definition.title) } }
+              : {})}
+            onEditPanel={props.actions.openStudio}
+            headProps={headProps()}
+          />
+        </Suspense>
       </Show>
       <Show when={about()}>
         {(revision) => (

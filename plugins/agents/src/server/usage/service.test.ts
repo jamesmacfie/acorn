@@ -1,7 +1,7 @@
 import { mkdtemp, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import { afterEach, describe, expect, it } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 import type { AgentProviderUsage, AgentUsageProviderId } from '../../shared/usage'
 import { emptyAgentPricingPreferences } from '../../shared/pricing'
 import { AgentUsageCollectorRegistry, type AgentUsageCollector } from './collectors'
@@ -110,7 +110,43 @@ describe('agent usage service', () => {
     expect(calls).toBe(2)
     clock += 101
     await service.read({ userId: 'james' })
-    expect(calls).toBe(3)
+    await vi.waitFor(() => expect(calls).toBe(3))
+  })
+
+  it('answers a read past its TTL from the last snapshot and refreshes behind it', async () => {
+    let clock = 1_000
+    let calls = 0
+    let refreshed = 0
+    let release = () => {}
+    const service = createAgentUsageService({
+      probeDir: await probeDir(),
+      ttlMs: 100,
+      now: () => clock,
+      onRefreshed: () => refreshed++,
+      collectors: collectorsFor(
+        async () => {
+          if (++calls > 1) await new Promise<void>((resolve) => (release = resolve))
+          return provider('claude', calls)
+        },
+        async () => provider('codex'),
+      ),
+    })
+    const first = await service.read({ userId: 'james' })
+    expect(refreshed).toBe(1)
+
+    clock += 101
+    // The collector is held, so only an answer from the snapshot can come back.
+    const stale = await service.read({ userId: 'james' })
+    expect(stale).toBe(first)
+    await vi.waitFor(() => expect(calls).toBe(2))
+    // A second read while that refresh is out starts no other.
+    await service.read({ userId: 'james' })
+    expect(calls).toBe(2)
+    expect(refreshed).toBe(1)
+
+    release()
+    await vi.waitFor(() => expect(refreshed).toBe(2))
+    expect((await service.read({ userId: 'james' })).providers[0].quotas[0].percentRemaining).toBe(2)
   })
 
   it('refreshes one provider without changing the other or postponing the full probe', async () => {
@@ -136,7 +172,7 @@ describe('agent usage service', () => {
 
     clock += 51
     await service.read({ userId: 'james' })
-    expect({ claudeCalls, codexCalls }).toEqual({ claudeCalls: 3, codexCalls: 2 })
+    await vi.waitFor(() => expect({ claudeCalls, codexCalls }).toEqual({ claudeCalls: 3, codexCalls: 2 }))
     expect(await service.refreshProvider({ userId: 'james', providerId: 'unknown' })).toBeNull()
   })
 

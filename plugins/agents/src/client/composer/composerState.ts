@@ -127,6 +127,8 @@ function createDraft(nodeId: string | null, sessionId: string) {
     },
     hydration: undefined as Promise<unknown> | undefined,
     automaticCapture: undefined as { key: string; run: Promise<AgentContextSnapshot[]> } | undefined,
+    /** The key of the last automatic capture that landed, so a send under the same key doesn't capture again. */
+    automaticCapturedKey: undefined as string | undefined,
     hydrated,
     // The Node still advertises pendingForkContext after hydration. Retain its consumed client
     // hydration until deletion, so reaping an empty draft cannot inject the same fork context again.

@@ -303,6 +303,17 @@ describe('the editor file tree', () => {
     )
   })
 
+  it('asks for every retained open folder at once, and not for one under a closed parent', async () => {
+    setEditorTreeDirectoryOpen(taskId, 'src', true)
+    setEditorTreeDirectoryOpen(taskId, 'src/nested', true)
+    setEditorTreeDirectoryOpen(taskId, 'lib/deep', true)
+    // Nothing answers, so a folder that waited for its parent's listing would never be asked for.
+    listing.mockImplementation(() => new Promise(() => {}))
+    mount()
+
+    await vi.waitFor(() => expect(listing.mock.calls.map(([, path]) => path).sort()).toEqual(['', 'src', 'src/nested']))
+  })
+
   it('opens a file as a preview on one click and keeps it on double-click', async () => {
     setEditorTreeDirectoryOpen(taskId, 'src', true)
     const onOpen = mount()

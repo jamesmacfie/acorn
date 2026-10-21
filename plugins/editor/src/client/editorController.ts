@@ -727,9 +727,7 @@ export function createEditorController(input: EditorControllerInput) {
       return
     }
     const entryAtShow = pool.files.get(relPath)
-    if (!entryAtShow) return
-    if (entryAtShow.stale) await revalidate(relPath)
-    if (!live() || !view || active() !== relPath || pool.files.get(relPath) !== entryAtShow || shown.aborted) return
+    if (!entryAtShow || !live()) return
     currentPath = relPath
     currentCustody = entryAtShow.custody
     releaseAdmission = admitGraphicalEditor(nodeId, taskId, relPath)
@@ -749,7 +747,9 @@ export function createEditorController(input: EditorControllerInput) {
     maybeReveal(relPath)
     const entry = pool.files.get(relPath)
     if (entry && Date.now() - entry.markersReadAt > 2_000) void refreshLineMarkers(relPath)
-    if (entry?.custody.writeBlock) void revalidate(relPath)
+    // The pooled text is on screen already. The disk read that checks it replaces the document in
+    // place if the file changed while the pane was away.
+    if (entry?.stale || entry?.custody.writeBlock) void revalidate(relPath)
   }
 
   // Consumes a pending cross-pane reveal for the file just shown: centers the target position and

@@ -83,7 +83,11 @@ and records the error in its ledger.
 
 The lifecycle owner installs a generation before reading the task, workspace, or session ledger. It
 gets those reads, the scoped environment, MCP configuration, and durable callbacks through specific
-engine ports. Callers receive immutable occupancy facts or a generation identity. The owner checks
+engine ports. A cold start runs its preparation in two groups. The task root, workspace, history, read
+block setting, account home, skills, and hooks are read together. The MCP servers and the read block
+guard, which need the first group's answers, are prepared together after it. A group fails only once
+every step in it has settled, so the skill folder and MCP relays a step built are retired with the
+rest. The start still runs inside the queue's scan, so a cold start holds the scan until it ends. Callers receive immutable occupancy facts or a generation identity. The owner checks
 that identity before a handle command or state transition. The engine keeps the one redaction list
 shared with event materialization and the durable event buffer.
 
