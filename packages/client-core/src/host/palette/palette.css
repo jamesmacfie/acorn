@@ -39,6 +39,8 @@
   text-overflow: ellipsis;
   font-family: var(--font-ui);
 }
+/* A trailing hint pinned to the row's right edge, so counts line up down the list. */
+.palette-hint.palette-end { flex: none; margin-left: auto; }
 .palette-empty { padding: var(--space-5) var(--space-6); font-size: var(--fs-sm); }
 /* Where in the command tree this frame is. Above the field, because it is the thing the query is
    being typed inside of. */

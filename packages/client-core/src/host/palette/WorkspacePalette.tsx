@@ -69,7 +69,7 @@ export default function WorkspacePalette() {
               <span class="palette-hint muted">{entry.node.label}</span>
             </Show>
             <Show when={words().singular === 'workspace' && w.projects.length}>
-              <span class="palette-hint muted">{projectCount(w.projects.length)}</span>
+              <span class="palette-hint palette-end muted">{projectCount(w.projects.length)}</span>
             </Show>
           </>
         )
