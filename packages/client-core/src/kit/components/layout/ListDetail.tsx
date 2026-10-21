@@ -1,7 +1,13 @@
 import { children, createMemo, createSignal, Show, type JSX } from 'solid-js'
 import { Dynamic } from 'solid-js/web'
 import { sidebarCollapse } from '../../lib/layout/collapseState'
-import { createNarrowView, isNarrow, type NarrowView } from '../../lib/layout/narrowView'
+import {
+  createNarrowView,
+  isNarrow,
+  narrowBackClaimed,
+  offerNarrowBack,
+  type NarrowView,
+} from '../../lib/layout/narrowView'
 import { keyedScrollStore, retainScroll } from '../../lib/layout/retainScroll'
 import { createSplitDrag, type SplitDrag } from '../../lib/layout/split'
 import { listWidthState } from '../../lib/layout/listWidthState'
@@ -57,21 +63,25 @@ export function CollapseEdge(props: {
 
 /* ViewSwitch: the control a narrow `list-detail` draws to cross between its two halves, **Back** above
    the detail and **Show detail** under the list. The kit's split and the host's layout
-   (host/layouts/ListDetail.tsx) draw the same one, so they read alike. */
+   (host/layouts/ListDetail.tsx) draw the same one, so they read alike. Where the shell's own Back has
+   been claimed, Back is that control instead, and this draws nothing. */
 export function ViewSwitch(props: { to: NarrowView; onSwitch: () => void }) {
   const toList = () => props.to === 'list'
+  if (toList()) offerNarrowBack(() => props.onSwitch())
   return (
-    <div class="ui-listdetail-switch" data-to={props.to}>
-      <Button variant="bare" onPress={() => props.onSwitch()}>
-        <Show when={toList()}>
-          <Icon name="chevron-left" />
-        </Show>
-        {toList() ? 'Back' : 'Show detail'}
-        <Show when={!toList()}>
-          <Icon name="chevron-right" />
-        </Show>
-      </Button>
-    </div>
+    <Show when={!(toList() && narrowBackClaimed())}>
+      <div class="ui-listdetail-switch" data-to={props.to}>
+        <Button variant="bare" onPress={() => props.onSwitch()}>
+          <Show when={toList()}>
+            <Icon name="chevron-left" />
+          </Show>
+          {toList() ? 'Back' : 'Show detail'}
+          <Show when={!toList()}>
+            <Icon name="chevron-right" />
+          </Show>
+        </Button>
+      </div>
+    </Show>
   )
 }
 

@@ -17,7 +17,8 @@
 //
 // Shared by the Timeline (../../components/content/Timeline.tsx) and the diff
 // (features/diff/diffLayout.ts). What each does with the answer differs and stays with it: the
-// Timeline spends one arm per gesture, the diff keeps a settling window open through momentum.
+// Timeline spends one arm per gesture and carries a touch through its coast, the diff keeps a settling
+// window open through momentum.
 
 /**
  * How long the reader's input stays the explanation for a move.

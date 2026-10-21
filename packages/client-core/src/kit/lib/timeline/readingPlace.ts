@@ -53,9 +53,8 @@ export const samePlace = (a: ReadingPlace, b: ReadingPlace): boolean =>
  * viewport now starts in. That is what stops "collapse the tools" and "show chats only" jumping to the
  * bottom, and what stops the end of a turn losing the tail.
  *
- * Ceiling: on a touchscreen, momentum after the finger lifts scrolls without re-arming the gesture, so
- * a hard flick that coasts to the foot will not resume following. Desktop wheel and trackpad scrolling
- * re-arm on every step, so they are unaffected; add a momentum-phase signal if a touch host needs it.
+ * A touchscreen's coast after the finger lifts sends no input, so the Timeline carries the gesture
+ * through it rather than this rule having to know about momentum.
  */
 export function placeAfterScroll(state: {
   place: ReadingPlace

@@ -17,9 +17,10 @@ differences itself, with `Only formFactors` and `formFactor()`. These parts were
   rows at the top of the session menu.
 - Every popover, menu, and select opens as a sheet along the bottom edge
   ([overlays](../ui-design/overlays.md#dialogs)).
-- The composer starts folded: the message box, a line that names the selects' values and counts what's
-  attached, **Steer** while a turn takes it, and **Send**. Opening the line shows the selects, the
-  transcript controls, the chips, and the other buttons. Pasting or dropping a file, attaching one, or
+- The composer starts folded: a line that names the selects' values and counts what's attached, the
+  message box, and its bar of **Goal**, **Attach**, **Context**, **Insert**, **Steer** while a turn
+  takes it, and **Send**. Opening the line shows the selects, the transcript controls, the chips, and
+  **Preview sent context**. Pasting or dropping a file, attaching one, or
   adding a context reference opens it. Whether it's open lasts as long as the page, since the phone
   restores no persisted state slices.
 - Opening a session leaves the keyboard down. It rises when someone taps the message box. Return adds

@@ -2034,8 +2034,10 @@ button.ui-chip:hover { background: var(--bg-hover); border-color: var(--accent);
   height: max(100%, 44px);
   transform: translate(-50%, -50%);
 }
-/* Wide enough that two extra small neighbours' tap areas, 8px past each edge, don't overlap. */
+/* Wide enough that two extra small neighbours' tap areas, 8px past each edge, don't overlap. A small
+   toolbar holds small controls, whose tap areas reach 6px past each edge. */
 :root[data-form-factor='narrow'] :is(.ui-toolbar, .ui-toolbar-group:not([data-joined])) { column-gap: var(--space-8); }
+:root[data-form-factor='narrow'] .ui-toolbar[data-size='sm'] { column-gap: var(--space-6); }
 /* An <a class="ui-btn"> has to shed the UA's link decoration and pick up the button's box. */
 a.ui-btn { text-decoration: none; }
 a.ui-btn:hover { text-decoration: none; }

@@ -298,6 +298,33 @@ describe('Timeline', () => {
     expect(turnTop('c')).toBe(0)
   })
 
+  it('lets a flick coast after the finger lifts, however long the coast runs', () => {
+    // The coast sends a scroll event a frame with no input behind any of them. Read as moves nobody
+    // made, each one scheduled a correction that pulled the view back, and the view shook until the
+    // coast ran out.
+    const [turns] = createSignal(['a', 'b', 'c', 'd', 'e'])
+    const view = mount(turns)
+    const box = scroller()!
+    box.dispatchEvent(new Event('touchmove', { bubbles: true }))
+    box.scrollTop = 100
+    box.dispatchEvent(new Event('scroll', { bubbles: true }))
+    // Longer than a second, so the last touch is too old to explain the end of it.
+    for (let top = 102; top <= 240; top += 2) {
+      vi.advanceTimersByTime(16)
+      box.scrollTop = top
+      box.dispatchEvent(new Event('scroll', { bubbles: true }))
+      settle(1)
+      expect(scrollTop).toBe(top)
+    }
+    expect(view.place()).toMatchObject({ at: 'turn', key: 'c', offset: 40 })
+    // Stopped, so a move with nobody behind it is put back again.
+    vi.advanceTimersByTime(200)
+    box.scrollTop = 300
+    box.dispatchEvent(new Event('scroll', { bubbles: true }))
+    settle()
+    expect(turnTop('c')).toBe(-40)
+  })
+
   it('keeps the reader on their turn while the content above it grows', () => {
     // The one a saved pixel offset can never do. A code fence streams, an image decodes, highlighting
     // lands: everything above the reader gets taller and their turn has to stay put.

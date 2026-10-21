@@ -41,9 +41,8 @@ share the choice. Sessions without a saved choice start collapsed.
 
 ## On a phone
 
-The composer folds its selects, chips, automatic context note, and the action bar's other buttons
-under one line, such as "GPT-5 · high · 2 attached". The message box, **Steer**, and **Send** stay
-out. Adding an attachment or a context reference opens the fold, so its chip can be seen and removed.
+The composer folds its selects, chips, automatic context note, and **Preview sent context** under one
+line, such as "GPT-5 · high · 2 attached". The message box and its action bar stay out. Adding an attachment or a context reference opens the fold, so its chip can be seen and removed.
 The return key adds a line, because the composer leaves `onSubmit` off the field, and **Send** sends.
 The **Shift+Enter for newline** hint isn't drawn. The Agent pane doesn't focus the field when a
 session opens, so the keyboard stays down until someone taps it. [The mobile web

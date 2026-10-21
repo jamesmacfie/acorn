@@ -100,3 +100,8 @@ the `list-detail` layout draws ([narrow `list-detail`](../panes/layout.md#narrow
 `selection` prop is the key of the selected row, or null for nothing. A key that changes to a new value
 shows the detail. Leave it out for a split with no row to pick, such as a form beside its preview. A
 node with only a detail column is not a split and isn't touched.
+
+A shell with a Back control of its own calls `claimNarrowBack()` from `kit/lib`. Then no split draws
+its **Back** row, and the shell's Back calls `narrowBack()`, which steps out of the detail that opened
+last. The phone's top bar does this, so Back leaves a session for the session list, and then the task
+for its workspace.

@@ -138,7 +138,8 @@ style tokens only. A shell turns it on by putting `data-form-factor="narrow"` on
 
 A small or extra small button or select draws under the 44-point tap guideline on iOS, so on a phone
 an invisible `::after` box centered on it keeps a 44px tap area (`primitives.css`). A toolbar on a
-phone spaces its controls 16px apart, so two neighbors' tap areas don't overlap.
+phone spaces its controls 16px apart, or 12px in a small toolbar, so two neighbors' tap areas don't
+overlap.
 
 Controls that appear on hover show on a touch screen by a `@media (hover: none)` rule beside each
 hover rule in `primitives.css` and `dashboards.css`. That rule doesn't depend on the attribute, so a

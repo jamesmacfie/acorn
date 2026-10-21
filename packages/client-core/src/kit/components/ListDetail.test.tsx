@@ -2,6 +2,7 @@ import { render } from 'solid-js/web'
 import { createSignal } from 'solid-js'
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 import { ListDetail } from './primitives'
+import { claimNarrowBack, narrowBack } from '../lib/layout/narrowView'
 
 // The list arrives in a prop, and a prop is a getter: every read re-runs the JSX the caller wrote
 // there. Reading it more than once builds the column several times over, the copies fight over the
@@ -148,6 +149,22 @@ describe('ListDetail on a phone', () => {
     press('Back')
     setSelection(null)
     expect(view()).toBe('list')
+  })
+
+  it('hands Back to a shell that claims it, and draws no Back row of its own', () => {
+    const release = claimNarrowBack()
+    try {
+      render(() => <ListDetail list={<span>the list</span>}>the detail</ListDetail>, host)
+      expect(narrowBack()).toBeUndefined()
+      press('Show detail')
+      expect(view()).toBe('detail')
+      expect(host.querySelector('.ui-listdetail-switch[data-to="list"]')).toBe(null)
+      narrowBack()!()
+      expect(view()).toBe('list')
+      expect(narrowBack()).toBeUndefined()
+    } finally {
+      release()
+    }
   })
 
   it('leaves a split of one column alone', () => {

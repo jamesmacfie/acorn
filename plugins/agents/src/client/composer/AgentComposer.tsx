@@ -543,6 +543,7 @@ export default function AgentComposer(props: {
         )
 
   // Drawn in their usual places on a desktop and in a terminal, and inside the fold on a phone.
+  // The draft's buttons stay beside Send on every form factor.
   const configSelects = () => (
     <Show when={configOptions().length || props.viewControls}>
       <Inline wrap>
@@ -662,6 +663,10 @@ export default function AgentComposer(props: {
         disabled={props.disabled}
         placement="top-start"
       />
+    </>
+  )
+  const contextPreview = () => (
+    <>
       <Show when={contexts().length}>
         {/* A Popover, not a <details> with an absolutely-positioned <pre>, which the composer's own
             overflow clips. Popover portals it and adds Escape + outside-click. */}
@@ -686,14 +691,6 @@ export default function AgentComposer(props: {
           </Stack>
         </Popover>
       </Show>
-      {/* Room for another plugin beside this pane's own controls. A `stack` point: several plugins
-          with something to offer a draft is a real answer, and four is the owner's ceiling because
-          it is the owner's bar. */}
-      <Slot
-        point={AGENT_COMPOSER_ACTIONS_POINT}
-        taskId={props.session.taskId}
-        props={() => ({ taskId: props.session.taskId, sessionId: props.session.id })}
-      />
     </>
   )
   // Such as "Opus · high · 2 attached": each select's current value, then what is attached.
@@ -742,16 +739,14 @@ export default function AgentComposer(props: {
       </Only>
 
       <Only formFactors={['desktop', 'tui']}>{attachedToTurn()}</Only>
-      {/* A phone folds everything but the message box and Send away, under one line that says what
-          is set and attached, so nothing hidden is out of mind. */}
+      {/* A phone folds the selects and what is attached under one line that says what is set and
+          attached, so nothing hidden is out of mind. */}
       <Only formFactors={['narrow']}>
         <Fold label={foldSummary()} level="sub" open={composerControlsOpen()} onOpenChange={setComposerControlsOpen}>
           <Stack gap="row">
             {configSelects()}
             {attachedToTurn()}
-            <Toolbar variant="actions" size="sm">
-              {draftActions()}
-            </Toolbar>
+            {contextPreview()}
           </Stack>
         </Fold>
       </Only>
@@ -814,10 +809,20 @@ export default function AgentComposer(props: {
       />
 
       <Toolbar variant="actions" size="sm">
-        <Only formFactors={['desktop', 'tui']}>{draftActions()}</Only>
-        <Toolbar.Spacer />
-        {/* Return adds a line on a phone, so there is no other key to name. */}
+        {draftActions()}
+        <Only formFactors={['desktop', 'tui']}>{contextPreview()}</Only>
+        {/* Room for another plugin beside this pane's own controls. A `stack` point: several plugins
+            with something to offer a draft is a real answer, and four is the owner's ceiling because
+            it is the owner's bar. */}
+        <Slot
+          point={AGENT_COMPOSER_ACTIONS_POINT}
+          taskId={props.session.taskId}
+          props={() => ({ taskId: props.session.taskId, sessionId: props.session.id })}
+        />
+        {/* Return adds a line on a phone, so there is no other key to name, and the bar's buttons
+            already sit at its right edge with Send. */}
         <Only formFactors={['desktop', 'tui']}>
+          <Toolbar.Spacer />
           <Text emphasis="muted">
             <Kbd size="xs">{formatChord('shift+enter')}</Kbd> for newline
           </Text>

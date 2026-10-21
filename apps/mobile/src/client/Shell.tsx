@@ -15,6 +15,7 @@ import {
 import { clientFor } from '@acorn/client-core/infra/node/fleet.ts'
 import { applyAppearance } from '@acorn/client-core/infra/persistence'
 import { QueryCacheProvider } from '@acorn/client-core/infra/persistence/QueryCacheProvider.tsx'
+import { claimNarrowBack } from '@acorn/client-core/kit/lib'
 import { prefsOptions, projectsKey, tasksKey, type Project, type Task } from '@acorn/client-core/infra/queries.ts'
 import { Button, EmptyState } from '@acorn/client-core/kit/components/primitives.tsx'
 import { signedOut } from './platform'
@@ -76,6 +77,8 @@ export function Shell() {
 function Frame(props: ParentProps) {
   trackKeyboardInset()
   trackThemeColor()
+  // The top bar's Back steps out of a pane's detail, so a pane draws no Back row of its own.
+  onCleanup(claimNarrowBack())
   const client = useQueryClient()
   setTaskLookup((taskId) => client.getQueryData<Task[]>(tasksKey)?.find((task) => task.id === taskId))
   setProjectsLookup(() => client.getQueryData<Project[]>(projectsKey) ?? [])

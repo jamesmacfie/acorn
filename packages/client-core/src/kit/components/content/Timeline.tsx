@@ -57,6 +57,10 @@ export type TimelineControls = {
  *  lands three seconds late gets another go when it does, without a frame loop running in between. */
 const CORRECTIONS = 24
 
+/** A coast sends a scroll event every frame, so a gap this long means it has stopped. The diff's
+ *  settling window is the same length (features/diff/diffLayout.ts). */
+const COAST_GAP_MS = 150
+
 /** How far from the viewport a deferred turn body is built: one scroller height either side, so a
  *  reader scrolling at an ordinary pace finds it drawn. */
 const NEAR_MARGIN = '100% 0px'
@@ -286,14 +290,18 @@ export function Timeline(props: {
   // write left it (`moved`).
   const author = createScrollAuthor()
   // Armed by the reader's own input and spent on the next scroll event, which is how a decision to
-  // scroll up is told apart from the browser clamping scrollTop under a shrinking list. Momentum
-  // keeps delivering scroll events long after the gesture, but the place is already captured by then.
+  // scroll up is told apart from the browser clamping scrollTop under a shrinking list.
   let userDriven = false
   // How long ago the reader last touched this is `author.fresh()`, which is a different question from
-  // `userDriven`: that says an input has not been spent yet, this says how recent it was. A scrollbar
-  // drag and a flick of momentum both deliver many scroll events for one gesture, and `userDriven` is
-  // spent on the first of them, so the rest would read as moves nobody made. Nothing scrolls a second
-  // after the reader stopped touching it (`GESTURE_MS`).
+  // `userDriven`: that says an input has not been spent yet, this says how recent it was. Without it, a
+  // click that scrolled nothing stays armed for the next unrelated move.
+  // A flick on a touchscreen coasts after the finger lifts, with no input to re-arm `userDriven`, so
+  // every coasting scroll event after the first read as a move nobody made, and the correction it
+  // scheduled pulled against the coast until it stopped: the view shook for about a second. So after a
+  // touch, a scroll event within `COAST_GAP_MS` of one the reader made is theirs too, which carries the
+  // gesture through a coast of any length. Wheel and trackpad send input all the way through theirs.
+  let touched = false
+  let coasted = -Infinity
   // Where the view was the last time anything here looked, so a report can say what the move was from
   // as well as to.
   let at = 0
@@ -495,7 +503,9 @@ export function Timeline(props: {
     // nothing stayed armed until something else moved the view, and that move was then adopted as the
     // reader's place and written to the caller's store, where it outlived the mount that invented it.
     const fresh = author.fresh()
-    const gesture = userDriven && fresh
+    const now = Date.now()
+    const gesture = (userDriven && fresh) || (touched && now - coasted < COAST_GAP_MS)
+    if (gesture && touched) coasted = now
     const top = scroller.scrollTop
     const geometry = { scrollTop: top, scrollHeight: scroller.scrollHeight, clientHeight: scroller.clientHeight }
     // Pressed against the very bottom with nobody having scrolled: the list shrank and the browser
@@ -515,7 +525,12 @@ export function Timeline(props: {
 
   const noteInput = () => {
     userDriven = true
+    touched = false
     author.input()
+  }
+  const noteTouch = () => {
+    noteInput()
+    touched = true
   }
 
   // Driven from outside, so they set the place by hand rather than inferring it from position: a jump
@@ -623,6 +638,7 @@ export function Timeline(props: {
         // spent on the first scroll event the new view produces. Whose input it was does not survive the
         // view it was made in.
         userDriven = false
+        coasted = -Infinity
         place = next
         if (next.at === 'live') pin()
         else correct()
@@ -644,7 +660,7 @@ export function Timeline(props: {
       }}
       onScroll={noteScroll}
       onWheel={noteInput}
-      onTouchMove={noteInput}
+      onTouchMove={noteTouch}
       onPointerDown={noteInput}
       onKeyDown={noteInput}
       // Focus counts as the reader's input, but only when it lands on a turn in this list: revealing a
