@@ -1,6 +1,6 @@
 # Build a mobile web app
 
-Date: October 17, 2026. Status: proposed. Implementation not started.
+Date: October 17, 2026. Status: in progress. Phase 1 shipped October 21, 2026.
 
 This programme plans a mobile web app that reaches a Node and draws the same plugin UI the desktop
 draws, at phone width. It starts small: the things you want from your phone while agents work. Read

@@ -1,0 +1,27 @@
+{
+  "name": "@acorn/mobile",
+  "version": "0.1.0",
+  "description": "The mobile web app and the gateway that gives a phone's browser a session on one Node.",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "gateway": "node --import tsx src/gateway/main.ts",
+    "lint": "tsc --noEmit",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@acorn/custody": "workspace:*",
+    "@acorn/node-core": "workspace:*",
+    "@acorn/protocol": "workspace:*",
+    "uqr": "^0.1.3",
+    "ws": "^8.21.0",
+    "zod": "catalog:"
+  },
+  "devDependencies": {
+    "@types/node": "^26.0.0",
+    "@types/ws": "^8.5.13",
+    "tsx": "^4.22.4",
+    "typescript": "^6.0.3",
+    "vitest": "^4.1.11"
+  }
+}

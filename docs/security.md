@@ -70,6 +70,9 @@ Deleting a workspace removes its datasets. Row and byte caps plus retention boun
   takes the row and action from that run, never from the browser, so the browser can't name a record
   or an action the source didn't offer, and an older app revision acts on nothing. The Node checks
   the confirmed risk against the action's own.
+- **A phone's browser** reaches one Node through the mobile gateway, a process on the Node's
+  computer that holds the device token and the pin and gives the phone a session cookie. The phone
+  has owner power minus a short route denylist ([mobile gateway](./security/mobile-gateway.md)).
 - **The terminal client** collapses the shell and helper into one process. UI code and the broker share
   a realm, so what the desktop holds as a process boundary this holds as a module boundary. The device
   token lives in the broker's module, the plugin cache and acknowledgements in one custody module, and

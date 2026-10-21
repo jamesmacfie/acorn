@@ -18,6 +18,9 @@
       // The helper and bridge bundles have their own Vite configs, built by `pnpm stage`.
       "entry": ["scripts/**/*.{mjs,ts}", "src/helper/helperMain.ts", "vite.*.config.ts"]
     },
+    "apps/mobile": {
+      "entry": ["src/gateway/main.ts"]
+    },
     "apps/node": {
       "entry": ["scripts/**/*.mjs", "test/__fixtures__/**/*.{js,mjs,ts}"]
     },
