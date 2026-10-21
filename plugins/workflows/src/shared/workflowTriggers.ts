@@ -59,6 +59,8 @@ export type WorkflowTriggerPreparation = {
   limits: WorkflowTriggerLimits
   loops: WorkflowTriggerLoop[]
   changes: Array<{ kind: 'workflow' | 'query' | 'field' | 'source'; label: string }>
+  /** The trigger reads core's Tasks source without excluding tasks an agent made. */
+  agentTasks: boolean
 }
 
 /** A record trigger's last check: when it ran, how many runs it started, and whether it read every

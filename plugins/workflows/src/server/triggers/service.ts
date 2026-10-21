@@ -175,6 +175,9 @@ export class WorkflowTriggerService {
       limits: effectiveTriggerLimits(resolved.graph, input.limits),
       loops: resolved.loops,
       changes: triggerChanges(approved, resolved.graph),
+      agentTasks:
+        input.when.kind === 'records' &&
+        (await (await recordsKind()).matchesAgentTasks(await this.#reader(), input.projectId, input.when)),
     }
   }
 

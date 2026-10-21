@@ -6,6 +6,7 @@ import { randomUUID } from 'node:crypto'
 import { and, count, desc, eq, gt, inArray, notInArray } from 'drizzle-orm'
 import type { PluginDatabase } from '@acorn/plugin-api/node'
 import { ScheduleSkipped } from '@acorn/plugin-api/node'
+import type { DataPredicate } from '@acorn/protocol/dataBindings.ts'
 import type { QueryReference, ResolvedQuery } from '@acorn/protocol/dataQueries.ts'
 import { readDataBinding } from '@acorn/protocol/dataQueryResolution.ts'
 import type { DataRecord, DataSourceQuery, DataSourceResult } from '@acorn/protocol/dataSources.ts'
@@ -141,6 +142,25 @@ export async function reviewRecords(
     if (binding.address.from !== 'item') throw new Error(`The input ${name} can only be bound to a record field.`)
   }
   return source
+}
+
+/** Whether a trigger on core's Tasks source could match a task an agent made: the query doesn't hold
+ *  `createdByTask` to missing. Core's Tasks source combines conditions with "all" only. */
+export async function matchesAgentTasks(
+  reader: TriggerRecordReader,
+  projectId: string,
+  when: WorkflowRecordsWhen,
+): Promise<boolean> {
+  const { query } = await reader.resolve(projectId, when.query, Date.now())
+  if (query.source.pluginId !== 'core' || query.source.sourceId !== 'tasks') return false
+  const excludes = (predicate?: DataPredicate): boolean =>
+    predicate?.kind === 'all'
+      ? predicate.predicates.some(excludes)
+      : predicate?.kind === 'comparison' &&
+        predicate.operator === 'missing' &&
+        predicate.left.address.from === 'item' &&
+        predicate.left.address.pointer === '/createdByTask'
+  return !excludes(query.predicate)
 }
 
 /** Approval's part for a record trigger: the review checks, then the query pinned at the saved

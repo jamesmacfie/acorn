@@ -1,5 +1,49 @@
 # Phase 3: hold agent-created tasks to their own project
 
+## Completion note
+
+Done October 21, 2026, on branch `phase-3-agent-created-tasks`.
+
+A task token that creates a task now gets 403 unless `projectId` is its own task's project, or if it
+sends `baseCommit` or `skipSetup: true`. A confined caller with no task ID is refused too. The Node
+stores origin `agent` whatever the body says, and records the caller's task in the new nullable
+`tasks.created_by_task_id` column (migration `0014_hard_wild_pack.sql`). A device's request is unchanged.
+
+Core's Tasks source serves `createdByTask` on a task an agent made and leaves the field out of every
+other task, so `present` and `missing` work on it. The description revision went from 2 to 3.
+`WorkflowTriggerPreparation` gained `agentTasks`. `prepare` sets it when a record trigger reads core's
+Tasks source and its query doesn't have `createdByTask missing` among its conditions. The trigger
+dialog shows "Agents can create tasks this trigger would match" when it's set. The coverage test's
+reason for `POST /v1/core/tasks` changed, and the task creation, transport and auth, authentication,
+and trigger docs say what a task token may create.
+
+Decisions and deviations:
+
+- No caller needed the old route. The `acorn` CLI in a task terminal already refuses `task create`
+  (`task_scope`), the workflows plugin creates tasks through core's in-process service, and no agent
+  tool or MCP path posts to `/v1/core/tasks`. So there is nothing to repair, and a command that needs
+  another project's task pairs as a device. `authentication.md` says so.
+- Refusals are 403 `forbidden`, as `worktreePath` already was, not 400.
+- The spec said a starter trigger on Tasks should exclude agent-made tasks by default. Core's Tasks
+  source offers no starter triggers, so there was nothing to change and I added none. A later starter
+  should use `createdByTask` with `missing`.
+- The warning checks only `all` groups, the only group core's Tasks source accepts. An `any` group
+  never counts as an exclusion.
+- `created_by_task_id` is not on the wire `Task` type. The Tasks source is where the owner and a
+  trigger read it.
+- The `/docs/automation/start-and-schedule-runs/` site page cites `TriggerDialog.tsx` but doesn't
+  describe record triggers, so I marked it current.
+- Not checked live in `pnpm dev:agent`: the service budget is red. The route test, the source test, and
+  the approval test cover the acceptance, but no trigger was run end to end against an agent's token.
+
+What later phases need to know:
+
+- The Node service graph grew by 710 bytes, from 1,932,203 to 1,932,913. The ceiling is still
+  1,931,900, so `pnpm --filter @acorn/node build` stays red by 1,013 bytes until the coordinator
+  raises it.
+- Phase 4 and 6 can cite `created_by_task_id` and `agent` origin as the way to tell an agent's task
+  from a person's.
+
 Date: October 21, 2026. Status: proposed. Severity: medium, when a trigger watches tasks.
 
 A task token may create tasks, because a task row was inert: nothing on it ran until a person opened

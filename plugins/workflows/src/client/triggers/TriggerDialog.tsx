@@ -662,6 +662,14 @@ function TriggerDialog(props: { request: TriggerRequest }) {
                       </Field>
                     </Stack>
                   </Fold>
+                  <Show when={reviewed().agentTasks}>
+                    <Alert tone="warn" title="Agents can create tasks this trigger would match">
+                      <Text wrap>
+                        An agent's task can start this workflow with text it wrote. Add a condition that Created by task
+                        is missing to leave those out.
+                      </Text>
+                    </Alert>
+                  </Show>
                   <Show when={reviewed().changes.length}>
                     <Alert tone="warn" title="Published dependencies changed">
                       <Stack gap="row">

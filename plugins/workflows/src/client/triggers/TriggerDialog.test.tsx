@@ -18,6 +18,7 @@ const preparation: WorkflowTriggerPreparation = {
     },
   ],
   changes: [],
+  agentTasks: false,
 }
 const active: WorkflowTriggerView = {
   id: 'trigger',

@@ -119,6 +119,11 @@ through the Workflow runs source, or the task it made for a run, through core's 
 daily cap the trigger moves to **Needs review** with "Started 50 runs today. Review the trigger before
 it starts more.", after starting what fit in that check. Re-approval starts a new day's count.
 
+**Tasks an agent made.** An agent can create a task in its own project, and the Node stamps it with
+`createdByTask`. A person's task has no such field. A trigger on core's Tasks source that doesn't hold
+`createdByTask` to **is missing** could start a workflow on text an agent wrote, so the approval sheet
+warns "Agents can create tasks this trigger would match" until the query excludes them.
+
 **Inputs.** Each record's inputs are the item rule from **Start workflow…**
 ([starting runs](./starting-runs.md#starting-a-run)) for the names the workflow declares, then the
 owner's values, then the trigger's bindings. Graph resolution at approval leaves the inputs a record

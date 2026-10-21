@@ -97,6 +97,13 @@ same 404 as a foreign one, so a caller can't learn which session ids exist. When
 wired, it still answers the bridge's 503 rather than its own 404, because the client's degraded mode
 keys on the 503.
 
+A task token may create a task, because a record trigger on core's Tasks source can start a workflow
+for a new one. The route holds it to its own task's project, refuses `baseCommit`, `worktreePath`, and
+`skipSetup: true`, and stamps the origin `agent` whatever the body says
+([task creation](../workspaces-and-tasks/task-creation.md)). The `acorn` CLI in a task's terminal
+can't create a task. A command that needs another project's task runs outside the session, as a
+paired device.
+
 Some lists are filtered rather than gated: `GET /v1/core/tasks`, `GET /v1/core/task-statuses`,
 `GET /v1/core/runs`, and terminal's session roster. A task token has a reason to ask about its own task
 and none to see every other task's title, branch, worktree path, and dirty count. `task-statuses`

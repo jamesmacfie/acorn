@@ -257,6 +257,21 @@ export const tasks = new Hono<AppEnv>()
     const seed = parsedSeed.data
     const db = getDb(c.env)
     const uid = ownerId(c)
+    // A trigger can act on a new task (docs/security/transport-and-auth.md), so an agent creates only
+    // in its own task's project, with no choice of start commit or setup, and the Node stamps where
+    // the task came from instead of taking the body's word.
+    const confined = isTaskConfined(c)
+    const callerTaskId = confined ? c.get('principal')!.taskId : undefined
+    if (confined) {
+      const [own] = callerTaskId
+        ? await db
+            .select({ projectId: schema.tasks.projectId })
+            .from(schema.tasks)
+            .where(eq(schema.tasks.id, callerTaskId))
+        : []
+      if (own?.projectId !== seed.projectId || seed.baseCommit !== undefined || seed.skipSetup)
+        return respondError(c, 403, 'forbidden')
+    }
     const project = await getProject(db, seed.projectId)
     if (!project) return respondError(c, 404, 'not_found', ['No such project.'])
     const requested = requestedChangeRequest(seed)
@@ -310,7 +325,8 @@ export const tasks = new Hono<AppEnv>()
             id,
             title,
             icon,
-            origin: seed.origin,
+            origin: confined ? 'agent' : seed.origin,
+            createdByTaskId: callerTaskId ?? null,
             projectId: project.id,
             branch: allocatedBranch,
             skipSetup: seed.skipSetup ?? false,
