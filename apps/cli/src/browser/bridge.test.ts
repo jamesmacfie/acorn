@@ -143,6 +143,12 @@ async function fakeNode(nodeId: string, options: { protocolVersion?: number } = 
     stateSaves: [] as { key: string; body: unknown }[],
     restores: [] as { key: string; body: unknown }[],
     restoreAnswers: new Map<string, number>(),
+    // Every data source action with its key, and the Node's answer to each key it has seen.
+    acts: [] as { key: string; body: unknown }[],
+    actAnswer: { outcome: 'done' } as Record<string, unknown>,
+    actAnswers: new Map<string, unknown>(),
+    // Act on the next action, then drop the connection before answering.
+    dropActReply: false,
   }
   const handler = async (req: IncomingMessage, res: ServerResponse) => {
     state.paths.push(req.url ?? '')
@@ -428,6 +434,19 @@ async function fakeNode(nodeId: string, options: { protocolVersion?: number } = 
       state.dashboardRuns.push(JSON.parse(body))
       await state.dashboardRunDelay
       return reply(200, state.dashboardRun)
+    }
+    if (url.pathname === '/v1/core/data-sources/act' && req.method === 'POST') {
+      let body = ''
+      for await (const chunk of req) body += chunk
+      const key = String(req.headers['idempotency-key'])
+      state.acts.push({ key, body: JSON.parse(body) })
+      // The Node answers a key it has seen with its first answer, and acts once.
+      if (!state.actAnswers.has(key)) state.actAnswers.set(key, state.actAnswer)
+      if (state.dropActReply) {
+        state.dropActReply = false
+        return req.socket.destroy()
+      }
+      return reply(200, state.actAnswers.get(key))
     }
     if (req.url === '/v1/core/projects') {
       await state.projectsDelay
@@ -1765,6 +1784,141 @@ describe('browser bridge app cards', () => {
       call({ op: 'app.run', ...target, revision: 1, plan: 'open', inputs: {}, viewerZone: 'UTC' }),
     ).rejects.toMatchObject({ code: 'not_found' })
     expect(node.state.dashboardRuns).toEqual([])
+  })
+})
+
+describe('browser bridge row actions', () => {
+  const plan = {
+    version: 2,
+    title: 'Issues',
+    time: { zone: 'UTC', mode: 'fixed', weekStart: 'monday' },
+    sources: [
+      {
+        id: 'issues',
+        label: 'Issues',
+        role: 'primary',
+        reference: {
+          kind: 'supplied',
+          origin: { says: 'The agent', readAt: 1 },
+          schema: { type: 'object', properties: {} },
+          fields: [],
+          rows: [],
+        },
+      },
+    ],
+    columns: [{ id: 'title', label: 'Title', type: 'text', bind: { issues: { field: '/title' } } }],
+    stages: [],
+    view: { kind: 'table' },
+  }
+  const record = { pluginId: 'tracker', sourceId: 'issues', recordId: '42' }
+  const close = { id: 'close', label: 'Close issue', risk: 'write', action: { verb: 'runNodeAction', path: '/close' } }
+  const appId = 'app-0123456789ab'
+  const panelTarget = { kind: 'panel', sessionId: 's1', toolId: 'call-1' }
+  const appTarget = { kind: 'app', taskId: 't1', appId, revision: 2, plan: 'open', inputs: { state: 'open' } }
+  const act = (target: Record<string, unknown>, extra: Record<string, unknown> = {}) => ({
+    op: 'row.act',
+    nodeId: 'node-a',
+    target,
+    rowId: 'issues:42',
+    actionId: 'close',
+    confirmedRisk: 'write',
+    viewerZone: 'UTC',
+    key: '5d1e2f3a-4b5c-4d6e-8f70-8192a3b4c5d6',
+    ...extra,
+  })
+
+  async function selected() {
+    const { call, node } = await paired()
+    await call({ op: 'node.select', nodeId: 'node-a' })
+    node.state.pluginAnswers.set('/v1/p/agents/sessions/s1/tools/call-1', {
+      tool: {
+        id: 'call-1',
+        name: 'panel_show',
+        title: 'panel_show',
+        status: 'completed',
+        input: JSON.stringify({ title: 'Open issues', plan }),
+        output: JSON.stringify({ panelId: 'issues', shownAt: 5, description: ['Open issues.'] }),
+      },
+      turnId: 'turn-1',
+      taskId: 't1',
+    })
+    const files = { program: 'root = Panel("open")', plans: { open: plan } }
+    node.state.apps.set(appId, {
+      summary: {
+        appId,
+        taskId: 't1',
+        name: 'Triage',
+        head: 2,
+        revisions: [
+          { revision: 1, note: 'First.' },
+          { revision: 2, note: 'Second.' },
+        ],
+      },
+      revisions: new Map([
+        [1, files],
+        [2, files],
+      ]),
+      state: {},
+    })
+    node.state.dashboardRun = {
+      plan,
+      rows: [{ id: 'issues:42', values: { title: 'Fix the login' }, records: [record], actions: [close] }],
+      groups: [],
+    }
+    return { call, node }
+  }
+
+  it.each([
+    ['a panel', panelTarget, undefined],
+    ['the head of an app', appTarget, { state: 'open' }],
+  ])("acts on %s's row as a fresh run found it, and answers the Node's outcome", async (_, target, inputs) => {
+    const { call, node } = await selected()
+    node.state.actAnswer = { outcome: 'ready', action: { verb: 'openUrl', url: 'https://tracker.example/42' } }
+    expect(await call(act(target))).toEqual({
+      nodeId: 'node-a',
+      outcome: 'ready',
+      action: { verb: 'openUrl', url: 'https://tracker.example/42' },
+    })
+    expect(node.state.dashboardRuns).toHaveLength(1)
+    expect(node.state.dashboardRuns[0]!.inputs).toEqual(inputs)
+    expect(node.state.acts).toEqual([
+      {
+        key: '5d1e2f3a-4b5c-4d6e-8f70-8192a3b4c5d6',
+        body: { ref: record, actionId: 'close', confirmedRisk: 'write' },
+      },
+    ])
+  })
+
+  it("refuses a row that's gone, and an action the row doesn't offer, without acting", async () => {
+    const { call, node } = await selected()
+    for (const request of [act(panelTarget, { rowId: 'issues:7' }), act(panelTarget, { actionId: 'reopen' })])
+      await expect(call(request)).rejects.toMatchObject({
+        code: 'not_found',
+        message: 'That row changed. Refresh and try again.',
+      })
+    expect(node.state.acts).toEqual([])
+  })
+
+  it("refuses an app revision that isn't the head, before running anything", async () => {
+    const { call, node } = await selected()
+    await expect(call(act({ ...appTarget, revision: 1 }))).rejects.toMatchObject({
+      code: 'not_found',
+      message: 'v1 of this app is read only, because v2 replaced it.',
+    })
+    expect(node.state.dashboardRuns).toEqual([])
+    expect(node.state.acts).toEqual([])
+  })
+
+  it('reports an answer that never came as uncertain, and a retry with the same key acts once', async () => {
+    const { call, node } = await selected()
+    node.state.dropActReply = true
+    await expect(call(act(panelTarget))).rejects.toMatchObject({ code: 'ambiguous_mutation' })
+    node.state.actAnswer = { outcome: 'no-longer-available' }
+    expect(await call(act(panelTarget))).toEqual({ nodeId: 'node-a', outcome: 'done' })
+    expect(node.state.acts.map((entry) => entry.key)).toEqual([
+      '5d1e2f3a-4b5c-4d6e-8f70-8192a3b4c5d6',
+      '5d1e2f3a-4b5c-4d6e-8f70-8192a3b4c5d6',
+    ])
   })
 })
 

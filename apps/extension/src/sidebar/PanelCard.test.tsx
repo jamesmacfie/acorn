@@ -1,4 +1,4 @@
-import { afterEach, expect, it, vi } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 import { createSignal } from 'solid-js'
 import { render } from 'solid-js/web'
 import type { DashboardRun } from '@acorn/dashboards-core/plan.ts'
@@ -172,13 +172,122 @@ it('opens link cells and link rows in a new tab, and offers Open in Acorn for a 
   expect(root.textContent).toContain('That row opens in Acorn.')
 })
 
-it("keeps a row whose action changes the source unpressable, because the sidebar doesn't act", async () => {
+it('does nothing for a press on a row whose own action is a Node route, which only the desktop calls', async () => {
   const plan = planFor({ kind: 'table' })
   const run = runOf(plan, [{ action: { verb: 'runNodeAction', path: '/close', risk: 'write' } }])
-  const { client } = answering(plan, run)
-  const { root } = mount(client)
+  const { client, requests } = answering(plan, run)
+  const { root, fake } = mount(client)
   await settle()
-  expect(root.querySelectorAll('tr[role="button"]')).toHaveLength(0)
+  root.querySelectorAll<HTMLElement>('tr[role="button"]')[0]!.click()
+  await settle()
+  expect(requests).toHaveLength(1)
+  expect(fake.createdTabs).toEqual([])
+  expect(root.querySelector('[role="alert"]')).toBeNull()
+})
+
+describe('row actions', () => {
+  const close = { id: 'close', label: 'Close issue', risk: 'write' as const, action: { verb: 'createTask' as const } }
+  const plan = planFor(
+    { kind: 'table' },
+    { actions: { buttons: [{ kind: 'action', label: 'Close issue', actionId: 'close' }] } },
+  )
+  // A host that runs the panel, and answers each row action with the next of `acts`.
+  function actingHost() {
+    return hostAnswering(async () => ({
+      nodeId: 'n1',
+      sessionId: 's1',
+      toolId: 'call-1',
+      plan,
+      run: runOf(plan, [{ actions: [close] }]),
+    }))
+  }
+  const button = (text: string) =>
+    [...document.querySelectorAll('button')].find((candidate) => candidate.textContent === text)
+  const actButton = (root: HTMLElement) => root.querySelector<HTMLButtonElement>('button[aria-label="Close issue"]')!
+
+  function host(...acts: (() => Promise<unknown>)[]) {
+    const { client, requests } = actingHost()
+    const answers = [...acts]
+    const call = client.call
+    client.call = (async (request: Record<string, unknown>) => {
+      if (request.op !== 'row.act') return call(request as never)
+      requests.push(request)
+      return answers.shift()!()
+    }) as BridgeClient['call']
+    return { client, requests, acts: () => requests.filter((request) => request.op === 'row.act') }
+  }
+
+  it('confirms with the action and the row, sends nothing when declined, and runs again after', async () => {
+    const { client, requests, acts } = host(async () => ({ nodeId: 'n1', outcome: 'done' }))
+    const { root } = mount(client)
+    await settle()
+    actButton(root).click()
+    await settle()
+    expect(root.textContent).toContain('Close issue? Close issue on Fix the login. This can change something.')
+    button('Cancel')!.click()
+    await settle()
+    expect(acts()).toEqual([])
+    expect(root.textContent).not.toContain('This can change something.')
+
+    actButton(root).click()
+    await settle()
+    button('Close issue')!.click()
+    await settle()
+    expect(acts()).toEqual([
+      {
+        op: 'row.act',
+        nodeId: 'n1',
+        target: { kind: 'panel', sessionId: 's1', toolId: 'call-1' },
+        rowId: 'issues:0',
+        actionId: 'close',
+        confirmedRisk: 'write',
+        viewerZone: 'UTC',
+        key: expect.stringMatching(/^[0-9a-f-]{36}$/),
+      },
+    ])
+    expect(requests.map((request) => request.op)).toEqual(['panel.run', 'row.act', 'panel.run'])
+    expect(root.textContent).toContain('Action completed.')
+  })
+
+  it('opens a link the action answers with only after the link confirm', async () => {
+    const { client } = host(async () => ({
+      nodeId: 'n1',
+      outcome: 'ready',
+      action: { verb: 'openUrl', url: 'https://tracker.example/1/closed' },
+    }))
+    const { root, fake } = mount(client)
+    await settle()
+    actButton(root).click()
+    await settle()
+    button('Close issue')!.click()
+    await settle()
+    expect(root.textContent).toContain('Open this link? https://tracker.example/1/closed')
+    expect(fake.createdTabs).toEqual([])
+    button('Open')!.click()
+    expect(fake.createdTabs).toEqual(['https://tracker.example/1/closed'])
+  })
+
+  it('keeps the key for a press again after an answer that never came, and only then', async () => {
+    const { client, acts } = host(
+      async () => {
+        throw new CallFailure('ambiguous_mutation', 'The Node did not confirm the change.')
+      },
+      async () => ({ nodeId: 'n1', outcome: 'done' }),
+      async () => ({ nodeId: 'n1', outcome: 'done' }),
+    )
+    const { root } = mount(client)
+    await settle()
+    for (let press = 0; press < 3; press++) {
+      actButton(root).click()
+      await settle()
+      button('Close issue')!.click()
+      await settle()
+    }
+    const keys = acts().map((request) => request.key)
+    expect(root.textContent).toContain('Action completed.')
+    expect(keys[1]).toBe(keys[0])
+    expect(keys[2]).not.toBe(keys[0])
+  })
 })
 
 it('keeps the last panel when a run fails, and says why above it', async () => {

@@ -43,6 +43,7 @@ request carries `v: 1` and a request `id`, and the host answers with the same `i
 | `app.run` | `nodeId`, `taskId`, `appId`, `revision`, `plan`, `inputs`, `viewerZone` | `{ nodeId, appId, revision, plan, run }` |
 | `app.state` | `nodeId`, `taskId`, `appId`, and `state` with `key` to save | `{ nodeId, appId, state }`, where `state` is null after a save |
 | `app.restore` | `nodeId`, `taskId`, `appId`, `revision`, `key` | `{ nodeId, appId, revision }`, the new head |
+| `row.act` | `nodeId`, `target`, `rowId`, `actionId`, `confirmedRisk`, `viewerZone`, `key` | `{ nodeId, outcome, action }`, the act route's answer; see [row actions](#row-actions) |
 
 A reply is `{ v, id, ok: true, result }` or `{ v, id, ok: false, error: { code, message } }`. The host
 also sends `{ v, event: 'status', status }` when the selected Node's connection changes, and
@@ -120,6 +121,41 @@ attachment.
 A revision never changes, so the host keeps the files of the last eight revisions it read, by Node,
 app, and revision, and a program's runs skip that read. It keeps nothing else between calls. A host
 from before `app.view` answers `bad_request`, and the sidebar draws the call's line instead.
+
+## Row actions
+
+`row.act` runs a data source's action on one row of a panel card or an app card
+([row actions](./transcript.md#row-actions)). It's the bridge's only operation that changes a data
+source's records. The browser names the card's plan, the row, and the action, never a record. The
+`target` is one of:
+
+- `{ kind: 'panel', sessionId, toolId }`, the call `panel.run` runs.
+- `{ kind: 'app', taskId, appId, revision, plan, inputs }`, the plan and inputs `app.run` ran.
+
+The host:
+
+1. Reads the target's plan as `panel.run` or `app.run` does, with the same refusals. An app target
+   must name the app's head, because an older revision is read only. Any other revision is
+   `not_found`.
+2. Runs the plan again, with the sidebar's `viewerZone` and the target's `inputs`.
+3. Finds the row by `rowId` in that run, and the action by `actionId` among the row's own actions. A
+   row that's gone, or that no longer offers the action, is `not_found`: "That row changed. Refresh
+   and try again." The host never acts on another row.
+4. Posts the row's first record, `actionId`, and `confirmedRisk` to `POST /v1/core/data-sources/act`,
+   with `key` as its `Idempotency-Key`. The act route takes only a UUID, so the schema does too. The
+   Node checks `confirmedRisk` against the action's own risk.
+5. Answers the route's `outcome`, and with `ready`, the `action` to take next, unchanged.
+
+The act route answers `done`, `no-longer-available`, or `ready` with a next action of any verb but
+`runNodeAction`, which it runs itself. The sidebar opens an `openUrl` in a new tab after the link
+confirm, and offers **Open in Acorn** for the rest. The route takes no task, so no action depends on
+the viewer's task. Only a next action's destination does, and the desktop finds that when it opens.
+
+The rerun costs one run of the plan for each action. The host keeps nothing between calls, so it can't
+trust what the sidebar last drew. An answer that never arrives is `ambiguous_mutation`. The sidebar
+keeps that press's key, and sends it again only when the person presses again. The Node answers a key
+it has seen with its first answer. If the action took effect and the row has gone from the rerun, the
+retry is `not_found`, and nothing acts twice.
 
 ## Limits
 

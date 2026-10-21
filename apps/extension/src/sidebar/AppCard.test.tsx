@@ -39,6 +39,7 @@ const run = {
       id: 'steps:0',
       values: { title: 'Back up the database' },
       records: [{ pluginId: 'tracker', sourceId: 'steps', recordId: '0' }],
+      actions: [{ id: 'close', label: 'Close step', risk: 'write', action: { verb: 'runNodeAction', path: '/close' } }],
     },
     {
       id: 'steps:1',
@@ -70,7 +71,13 @@ const summaryOf = (head: number, revisions: BridgeAppSummary['revisions'] = []):
 })
 
 // A host that answers each app operation from `node`, and the requests it was sent.
-function host(node: { head: number; state?: Record<string, unknown>; task?: null; restore?: () => Promise<unknown> }) {
+function host(node: {
+  head: number
+  state?: Record<string, unknown>
+  task?: null
+  restore?: () => Promise<unknown>
+  act?: Record<string, unknown>
+}) {
   const requests: Record<string, any>[] = []
   const client: BridgeClient = {
     call: (async (call: Record<string, any>) => {
@@ -88,6 +95,7 @@ function host(node: { head: number; state?: Record<string, unknown>; task?: null
       if (call.op === 'app.run') return { nodeId: 'n1', appId: APP_ID, revision: call.revision, plan, run }
       if (call.op === 'app.state') return { nodeId: 'n1', appId: APP_ID, state: call.state ? null : (node.state ?? {}) }
       if (call.op === 'app.restore') return node.restore?.()
+      if (call.op === 'row.act') return { nodeId: 'n1', outcome: 'done', ...node.act }
       throw new Error(`unexpected ${call.op}`)
     }) as BridgeClient['call'],
   }
@@ -167,12 +175,45 @@ it('opens a link in a new tab after showing it in full, and puts Ask the agent t
   expect(requests.some((request) => request.op === 'turn.submit')).toBe(false)
 })
 
-it('says a row action runs in the Acorn app', async () => {
-  const { client } = host({ head: 1 })
+it('runs a row action only after the confirm, then runs its plans again', async () => {
+  const { client, requests } = host({ head: 1 })
+  const { root } = mount(client)
+  await vi.waitFor(() => expect(root.textContent).toContain('Run the migration'))
+  const acts = () => requests.filter((request) => request.op === 'row.act')
+  button('Close').click()
+  await settle()
+  expect(document.body.textContent).toContain('Close step on Back up the database. This can change something.')
+  button('Cancel').click()
+  await settle()
+  expect(acts()).toEqual([])
+
+  const runs = requests.filter((request) => request.op === 'app.run').length
+  button('Close').click()
+  await settle()
+  button('Confirm').click()
+  await vi.waitFor(() => expect(acts()).toHaveLength(1))
+  expect(acts()[0]).toEqual({
+    op: 'row.act',
+    nodeId: 'n1',
+    target: { kind: 'app', taskId: 't1', appId: APP_ID, revision: 1, plan: 'steps', inputs: {} },
+    rowId: 'steps:0',
+    actionId: 'close',
+    confirmedRisk: 'write',
+    viewerZone: 'UTC',
+    key: expect.stringMatching(/^[0-9a-f-]{36}$/),
+  })
+  await vi.waitFor(() => expect(requests.filter((request) => request.op === 'app.run').length).toBeGreaterThan(runs))
+})
+
+it('offers Open in Acorn for an action that continues there', async () => {
+  const { client } = host({ head: 1, act: { outcome: 'ready', action: { verb: 'openTask' } } })
   const { root } = mount(client)
   await vi.waitFor(() => expect(root.textContent).toContain('Run the migration'))
   button('Close').click()
-  await vi.waitFor(() => expect(root.textContent).toContain('This action runs in the Acorn app.'))
+  await settle()
+  button('Confirm').click()
+  await vi.waitFor(() => expect(root.textContent).toContain('That action continues in Acorn.'))
+  expect(button('Copy Acorn link')).toBeDefined()
 })
 
 it('collapses an older revision, draws it read only, and restores it with one key across retries', async () => {

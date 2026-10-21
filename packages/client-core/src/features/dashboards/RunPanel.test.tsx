@@ -1,4 +1,4 @@
-import type { JSX } from 'solid-js'
+import { createSignal, type JSX } from 'solid-js'
 import { render } from 'solid-js/web'
 import { afterEach, expect, it, vi } from 'vitest'
 import type { DashboardRun } from '@acorn/dashboards-core/plan.ts'
@@ -102,6 +102,18 @@ it.each<[PanelPlan['view'], (host: HTMLElement) => void]>([
   const host = draw(() => <RunPanel plan={plan} run={runOf(plan)} />)
   expect(host.textContent).not.toContain("Can't")
   check(host)
+})
+
+it.each<PanelPlan['view']>([{ kind: 'list' }, { kind: 'table' }])('draws a later run’s rows in a %o', (view) => {
+  const plan = planFor(view)
+  const [run, setRun] = createSignal(runOf(plan))
+  const host = draw(() => <RunPanel plan={plan} run={run()} />)
+  const first = run()
+  setRun({
+    ...first,
+    rows: first.rows.map((row) => ({ ...row, values: { ...row.values, title: `${row.values.title} again` } })),
+  })
+  expect(host.textContent).toContain('Fix the login again')
 })
 
 it('says where supplied rows came from before the run arrives, and what an unread plan shows after', () => {

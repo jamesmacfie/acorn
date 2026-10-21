@@ -64,7 +64,12 @@ Deleting a workspace removes its datasets. Row and byte caps plus retention boun
   app's plans, save its state, and restore one of its revisions, for an app in a task that device can
   read, as the desktop's app card can ([app cards](./browser-extension/native-messaging.md#app-cards)).
   The host checks that the app belongs to the conversation's task, because the Node doesn't confine a
-  device to a task.
+  device to a task. It can run a data source's action on a row of either card, the bridge's only
+  write to a source's records ([row actions](./browser-extension/native-messaging.md#row-actions)).
+  The sidebar confirms with the action and the row first. The host runs the card's plan again and
+  takes the row and action from that run, never from the browser, so the browser can't name a record
+  or an action the source didn't offer, and an older app revision acts on nothing. The Node checks
+  the confirmed risk against the action's own.
 - **The terminal client** collapses the shell and helper into one process. UI code and the broker share
   a realm, so what the desktop holds as a process boundary this holds as a module boundary. The device
   token lives in the broker's module, the plugin cache and acknowledgements in one custody module, and

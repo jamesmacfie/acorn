@@ -1,6 +1,6 @@
 # Agent panels and apps in the browser extension
 
-Date: October 21, 2026. Status: phases 1 to 4 done, phase 5 proposed. Checked against `a6842f9b7`.
+Date: October 21, 2026. Status: phases 1 to 5 done. Checked against `a6842f9b7`.
 
 This programme makes the browser extension's sidebar draw what an agent builds in a conversation: the
 dashboard panel from `panel_show` and the app from `app_show`. Today the sidebar draws both as one

@@ -16,6 +16,7 @@ import { CallFailure } from '../messages'
 import type { BridgeClient } from './bridgeClient'
 import { errorGuidance } from './guidance'
 import { OpenInAcorn } from './OpenInAcorn'
+import { nextStep, rowActions } from './rowActions'
 
 // An agent's `app_show` call, running in the sidebar as the desktop's app card runs it
 // (docs/browser-extension/transcript.md § App cards). Only the card showing the app's head acts; an
@@ -203,6 +204,8 @@ export default function AppCard(props: {
                         revision={revision}
                         task={task()}
                         readOnly={!current()}
+                        href={props.href}
+                        opensLinks={props.opensLinks}
                         tabs={props.tabs}
                         compose={props.compose}
                       />
@@ -219,7 +222,8 @@ export default function AppCard(props: {
 }
 
 // One revision's program, with the sidebar's reach: its plans run by the host, the conversation's task
-// and message box, a new tab, and the app's saved state. Row actions run only in Acorn.
+// and message box, a new tab, the app's saved state, and row actions the host checks against a fresh
+// run.
 function Running(props: {
   client: BridgeClient
   target: DraftTarget
@@ -228,6 +232,8 @@ function Running(props: {
   revision: number
   task: NonNullable<AppView['task']>
   readOnly: boolean
+  href: string | null
+  opensLinks: boolean
   tabs: BrowserApi['tabs']
   compose(text: string): Promise<{ ok: boolean; reason?: string }>
 }) {
@@ -235,6 +241,10 @@ function Running(props: {
   const { appId, revision, task } = props
   const viewerZone = Intl.DateTimeFormat().resolvedOptions().timeZone
   const [visible, setVisible] = createSignal(false)
+  // Asks every query and panel to run again after a row action, so the rows show what it changed.
+  const [refreshes, setRefreshes] = createSignal<{ plans?: string[] }>({})
+  const [inAcorn, setInAcorn] = createSignal(false)
+  const act = rowActions(props.client, nodeId)
   const openTab = (url: string): boolean => {
     if (!webAddress(url)) return false
     void props.tabs.create({ url })
@@ -259,6 +269,19 @@ function Running(props: {
     task: async () => task,
     compose: (text) => props.compose(text),
     openUrl: (url) => void openTab(url),
+    // `AppRuntime` has found the row and action in the plan's last run and confirmed before this.
+    rowAction: async (plan, rowId, actionId, inputs, confirmedRisk) => {
+      setInAcorn(false)
+      const result = await act(
+        { kind: 'app', taskId, appId, revision, plan, inputs: inputs as Record<string, never> },
+        rowId,
+        { id: actionId, risk: confirmedRisk },
+      )
+      setRefreshes({})
+      const next = nextStep(result)
+      setInAcorn(next === 'acorn')
+      return { outcome: result.outcome, ...(next && next !== 'acorn' ? { url: next.url } : {}) }
+    },
     loadState: async () => (await props.client.call({ op: 'app.state', nodeId, taskId, appId })).state ?? {},
     saveState: async (state) => {
       await props.client.call({
@@ -271,34 +294,44 @@ function Running(props: {
       })
     },
   }
-  const Panel = (panel: AppPanelProps) => <AppPanel {...panel} host={host} openTab={openTab} />
+  const Panel = (panel: AppPanelProps) => <AppPanel {...panel} host={host} openTab={openTab} refreshes={refreshes} />
   return (
     <Card pad="sm">
-      <AppRuntime
-        program={props.view.program}
-        plans={props.view.plans}
-        readOnly={props.readOnly}
-        host={host}
-        placement="card"
-        active={visible}
-        Panel={Panel}
-        frame={(app) => <CardFrame onVisible={setVisible}>{app}</CardFrame>}
-      />
+      <Stack gap="row">
+        <AppRuntime
+          program={props.view.program}
+          plans={props.view.plans}
+          readOnly={props.readOnly}
+          host={host}
+          placement="card"
+          active={visible}
+          Panel={Panel}
+          refreshes={refreshes}
+          frame={(app) => <CardFrame onVisible={setVisible}>{app}</CardFrame>}
+        />
+        <Show when={inAcorn()}>
+          <Alert tone="muted" actions={<OpenInAcorn href={props.href} opensLinks={props.opensLinks} />}>
+            That action continues in Acorn.
+          </Alert>
+        </Show>
+      </Stack>
     </Card>
   )
 }
 
-// A program's Panel: the plan run by the host when it's on screen and again when its inputs change,
-// drawn read only with the dashboard's own views. Links open in a new tab.
-function AppPanel(props: AppPanelProps & { host: AppHost; openTab(url: string): boolean }) {
+// A program's Panel: the plan run by the host when it's on screen, again when its inputs change, and
+// after a row action, drawn read only with the dashboard's own views. Links open in a new tab.
+function AppPanel(
+  props: AppPanelProps & { host: AppHost; openTab(url: string): boolean; refreshes(): { plans?: string[] } },
+) {
   const [answer, setAnswer] = createSignal<{ plan: PanelPlan; run: DashboardRun }>()
   const [problem, setProblem] = createSignal<CallFailure | null>(null)
   let asked = 0
   createEffect(
     on(
-      () => (props.active ? JSON.stringify(props.inputs ?? {}) : undefined),
-      (inputs) => {
-        if (inputs === undefined) return
+      () => (props.active ? [JSON.stringify(props.inputs ?? {}), props.refreshes()] : undefined),
+      (watched) => {
+        if (watched === undefined) return
         const ask = ++asked
         props.host.runPlan(props.plan, props.inputs ?? {}).then(
           (next) => {

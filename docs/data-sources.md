@@ -141,6 +141,8 @@ also include `navigate` and `createTask`; host navigation and task creation use 
 context. A source that declares no named actions needs no `actions` handler.
 For `runNodeAction`, the plugin receives the press's idempotency key and must deduplicate any side
 effect by that key; a transport failure after dispatch can be retried without a stored response.
+Once the route has run, the Node drops every dashboard read it shares for five seconds, so a panel
+that runs again right after the action reads the source afresh.
 
 A source can also declare `writable` fields with an exact field pointer, its own confined plugin route,
 a write or execute risk tier, and a finite set of typed target values. A writable source must support

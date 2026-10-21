@@ -55,7 +55,7 @@ reads as the tool line it would have been. A call that failed its checks always 
 
 ### Panel cards
 
-A finished `panel_show` call draws as a live panel, with the dashboard's own views, read only.
+A finished `panel_show` call draws as a live panel, with the dashboard's own views.
 `PanelCard` in `apps/extension/src/sidebar/` draws it, and the conversation loads it with a dynamic
 import, together with `RunPanel`, `CardFrame`, and the views, so a conversation with no panels never
 loads them.
@@ -73,8 +73,11 @@ loads them.
   the last panel that had data, greyed out, under the run's problems.
 - A link cell opens in a new tab through the `tabs` API. A row whose press opens an address does the
   same. A row whose press opens a task, a pane, or an overlay says "That row opens in Acorn." with
-  **Open in Acorn**. Buttons, board moves, data source actions, and drill-downs are off, so a row with
-  only a data source action isn't pressable.
+  **Open in Acorn**. A row whose own press calls a Node route isn't pressable, because only the desktop
+  calls one.
+- A row's buttons and its menu offer the plan's buttons. An **open** button follows the row's press
+  rules, an action button runs the source's action ([row actions](#row-actions)), and **Start task**
+  says "That row opens in Acorn." Board moves, corrections, and drill-downs stay in the desktop.
 - A newer card with the same panel ID collapses an older one to "Commits by day. Replaced by a newer
   version." with **Show**, among the cards the sidebar has loaded. A collapsed card doesn't run.
   **Hide this version** collapses it again.
@@ -98,7 +101,8 @@ it, and the conversation loads it with a dynamic import, together with the trell
 - A link in the app shows its full address in a confirm, then opens in a new tab. **Ask the agent**
   puts the app's text in this conversation's message box, on a line after what's typed. It never
   sends.
-- A row action says "This action runs in the Acorn app."
+- A row action runs after the runtime's confirm ([row actions](#row-actions)), and then the app's
+  queries and panels run again.
 - An older revision collapses to "v2: Added owners. Replaced by v3." with **Show v2**, which draws it
   read only, and **Restore v2**, which sends `app.restore` and draws the new revision in its place. A
   retried restore keeps its key, so a restore the Node already made isn't made twice. A restore moves
@@ -106,6 +110,30 @@ it, and the conversation loads it with a dynamic import, together with the trell
   that was the head collapses at once. A restore made in the desktop shows on the next hint or reload.
 - In a task that's no longer active, the card draws one line: "Migration checklist · v3. This task is
   archived, so the app isn't drawn."
+
+### Row actions
+
+A data source's action on a card's row, such as **Close issue**, runs from the sidebar after the
+confirm the desktop shows. The card sends `row.act` with the card's plan, the row's ID, and the
+action's ID ([row actions](./native-messaging.md#row-actions)). The host runs the plan again and finds
+the row and action there, so the card can't act on a row the source no longer has.
+
+- An action that can change something asks first: "Close issue? Close issue on Fix the login
+  redirect. This can change something." An action that can run something says "This can run
+  something." A read action runs without asking, as on the desktop. **Cancel** sends nothing. In a
+  panel card, the confirm draws above the panel. In an app card, the app's runtime shows its own.
+- After an action, the card runs its plan again, so the row shows its new state. A panel card says
+  "Action completed." or "This action no longer applies."
+- An action that answers with a link shows "Open this link?" with the address, then opens it in a
+  new tab. One that answers with anything else, such as a task or a pane, says "That action
+  continues in Acorn." with **Open in Acorn**.
+- "That row changed. Refresh and try again." means the row, or its action, wasn't in the host's fresh
+  run.
+- When the host can't tell whether an action happened, the card says so. Pressing again sends the
+  same key, so the Node acts at most once. Any other press gets a new key.
+
+`rowActions` in `apps/extension/src/sidebar/rowActions.ts` holds the confirm's words, the keys, and
+the next step, for both cards.
 
 A request the agent waits on follows the transcript as the desktop's request card
 ([answering the agent](./conversations.md#answering-the-agent)).

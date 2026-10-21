@@ -1,6 +1,88 @@
 # Phase 5: row actions
 
-Date: October 21, 2026. Status: proposed. Needs phase 3 for panels, and phase 4 for apps.
+Date: October 21, 2026. Status: done. Needs phase 3 for panels, and phase 4 for apps.
+
+## Completion note
+
+Landed on October 21, 2026, on the `phase-5-row-actions` branch.
+
+What landed:
+
+- The bridge. `row.act` in `extensionBridge.ts` takes `nodeId`, `target`, `rowId`, `actionId`,
+  `confirmedRisk`, `viewerZone`, and `key`, and answers `{ nodeId, outcome, action }`. `actOnRow` in the
+  host's `bridge.ts` reads the target's plan, runs it again, finds the row and action in that run, and
+  posts the row's first record to the act route with `key` as the idempotency key. The plan readers
+  are split out of `panel.run` and `app.run` as `shownPanel` and `appPlan`, and all three share them.
+- The sidebar. `apps/extension/src/sidebar/rowActions.ts` holds the confirm's words, the keys, and
+  the next step, for both cards. `PanelCard` passes `onButton` and `onOpenRecord` to `RunPanel`, and
+  draws the confirm and the link confirm as alerts above the panel, as the desktop's panel does.
+  `AppCard`'s host gets a `rowAction`, and asks every query and panel to run again after one.
+- `AppHost.rowAction` takes a fifth argument, `confirmedRisk`, the risk `AppRuntime` confirmed. The
+  desktop's `AppView` ignores it, because it finds the action in its own last run.
+- Two fixes the live check found, both older than this phase. `TableView` and `ListView` read their
+  rows once, when they mounted, so a later run never redrew them, in the desktop too. Each now picks
+  between groups and rows inside JSX. And the Node shares a source read for five seconds, so a rerun
+  right after an action drew the rows from before it. `actOnDataRecord` now clears the shared reads
+  once it has dispatched an action.
+- Docs: native messaging, the conversation view, agent-built apps, security, and data sources. The
+  site page "Talk to an agent from the browser" too, marked checked.
+- Tests: checkpoints 1 and 2 as written, plus the link confirm, an action that continues in Acorn, a
+  later run's rows in a list and a table, and the shared read dropped after an action.
+
+Decisions and deviations:
+
+- `row.act` also takes `viewerZone`, which the doc didn't list. The rerun must find the same rows as
+  the card's run, and a plan that groups by time makes its row IDs in the viewer's zone.
+- `key` must be a UUID, because the act route refuses any other idempotency key.
+- An app target that isn't the head is `not_found`: "v1 of this app is read only, because v2
+  replaced it." `bad_request` would tell the card to update the CLI.
+- The confirm's words. The doc gives "Close issue? Close issue on Fix the login redirect. This can
+  change something." and also "the desktop's words for the action's risk". The card uses the first
+  shape, which the app runtime already uses, with the desktop panel's risk words: "change something"
+  for `write` and "run something" for `execute`. A `read` action runs without a confirm, as on the
+  desktop.
+- A press again after `ambiguous_mutation` reuses that press's key. Any other press gets a new one.
+  If the action took effect and the row has left the rerun, the retry answers `not_found`, and
+  nothing acts twice.
+- `onActivate` doesn't send `row.act`. A row's press is its own unnamed `action`, never a named one,
+  so it keeps phase 3's rules, and a row whose own action is `runNodeAction` still does nothing. The
+  plan's buttons and the row menu carry the named actions. **Start task** in the menu says "That row
+  opens in Acorn."
+- Passing `onButton` gives every table row a menu, so every row now has `role="button"`. The phase 3
+  test that counted pressable rows now checks that a press on such a row sends nothing.
+- A panel card says "Action completed." or "This action no longer applies." after an action, as the
+  desktop's panel does. An app card hands the outcome to the program.
+- Board moves (`fieldMove`) still don't drop the shared reads. They stay in the desktop, which doesn't
+  run again after a move.
+- Verify before building. The act route answers `done`, `no-longer-available`, or `ready` with a next
+  action of any verb but `runNodeAction`, which it runs itself. The sidebar opens an `openUrl` after
+  the link confirm and offers **Open in Acorn** for the rest. The route takes no task. Only a next
+  action's destination uses the viewer's task, and the desktop finds that when it opens.
+
+Checks:
+
+- The CLI (181 tests), the extension (291), protocol (325), trellis (49), node-core (1,931), and
+  client-core (2,912) pass. `tsc` passes in those packages, the terminal client, and the desktop.
+  Lint, the formatter, knip, and the arch tests (95) pass. In the combined run, client-core's
+  "posts one message per verb" in `host/frames/sdk.test.ts` failed once under load, and passed alone.
+- Checkpoint 3 ran without a live agent. A throwaway plugin loaded through `ACORN_BUNDLED_PLUGINS_DIR`
+  offered three issues in memory, with a **Close issue** write action on each open one. A seed script
+  wrote a `panel_show` table with a **Close issue** button, and an `app_show` app whose button runs
+  the action on the first issue, into a `pnpm dev:extension` session's Node. In the panel, the confirm
+  read "Close issue? Close issue on Write the release notes. This can change something." After
+  **Close issue**, the card said "Action completed." and the row read "closed" without a refresh. In
+  the app, the runtime's confirm read "Close issue? Close issue on Fix the login redirect. This can
+  change something.", and after **Confirm** the app's list showed it closed. The plugin's action
+  answers nothing next, so `openUrl` and **Open in Acorn** were checked only in the card tests.
+- Sizes. The Node service measured 1,915,694 B, under the 1,917,500 B ceiling, from 1,915,652 B after
+  phase 4. The 42 bytes are the read cache clear. The sidebar's bundle wasn't measured.
+
+For later work:
+
+- A row's own unnamed `action` with `runNodeAction`, and a risky `openUrl` one, still open in the
+  desktop only. Running them from the sidebar needs an operation that names the row's press, not a
+  named action.
+- Board moves, corrections, and drill-downs stay in the desktop.
 
 ## Goal
 

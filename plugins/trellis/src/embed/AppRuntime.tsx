@@ -40,12 +40,14 @@ export type AppHost = {
   compose(text: string): Promise<{ ok: boolean; reason?: string }>
   /** Called only with a web link the person confirmed. */
   openUrl(url: string): void
-  /** Absent where row actions don't run. `url` is a link the action answered with, to open next. */
+  /** Absent where row actions don't run. `confirmedRisk` is the risk the person confirmed. `url` is a
+   *  link the action answered with, to open next. */
   rowAction?(
     plan: string,
     row: string,
     action: string,
     inputs: Record<string, unknown>,
+    confirmedRisk: NamedAction['risk'],
   ): Promise<{ outcome: string; url?: string }>
   loadState(): Promise<AppState>
   saveState(state: AppState): Promise<void>
@@ -141,7 +143,7 @@ export default function AppRuntime(props: {
       }))
     )
       throw new Error('The person declined.')
-    const result = await rowAction(plan, row.id, action.id, last.inputs)
+    const result = await rowAction(plan, row.id, action.id, last.inputs, action.risk)
     if (result.url) await openUrl(result.url)
     return { outcome: result.outcome }
   }

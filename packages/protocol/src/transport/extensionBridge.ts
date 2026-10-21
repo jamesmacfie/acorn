@@ -14,6 +14,7 @@ import {
   type SiteAssociation,
 } from '../projects/siteAssociations.ts'
 import type { PanelPlan } from '../dashboards/panels.ts'
+import type { DataRecordAction } from '../data/dataActions.ts'
 import type { DataSchema } from '../data/values/dataSchemas.ts'
 import type { DataValue } from '../data/values/dataValues.ts'
 import type { NodeProbeResult, NodeRecord, NodeStatus } from './broker.ts'
@@ -88,6 +89,7 @@ const rowId = z.string().min(1).max(128)
 // The agents routes' own bounds on an idempotency key.
 const operationKey = z.string().min(8).max(200)
 const revision = z.number().int().positive()
+const appRunInputs = z.record(z.string(), z.json()).refine((inputs) => jsonBytes(inputs) <= APP_RUN_INPUTS_MAX_BYTES)
 const envelope = { v: z.literal(BROWSER_BRIDGE_PROTOCOL_VERSION), id: requestId }
 
 // The parts of an agents plugin turn the sidebar sends, in that plugin's shape (`AgentInputPart`), so
@@ -346,7 +348,7 @@ export const bridgeRequestSchema = z.discriminatedUnion('op', [
     appId: rowId,
     revision,
     plan: z.string().min(1).max(64),
-    inputs: z.record(z.string(), z.json()).refine((inputs) => jsonBytes(inputs) <= APP_RUN_INPUTS_MAX_BYTES),
+    inputs: appRunInputs,
     viewerZone: z.string().min(1).max(100),
   }),
   // Reads the app's saved state, or saves `state` with `key`.
@@ -372,6 +374,31 @@ export const bridgeRequestSchema = z.discriminatedUnion('op', [
     appId: rowId,
     revision,
     key: operationKey,
+  }),
+  // Runs a data source's action on one row of a panel card or an app card (docs/browser-extension/native-messaging.md
+  // § Row actions). The browser names the card's plan as `panel.run` or `app.run` would, and the row and
+  // action by ID. The host runs the plan again and takes both from that run, so the browser can't name a
+  // record or an action the source didn't offer. The key is the act route's, which takes only a UUID.
+  z.strictObject({
+    ...envelope,
+    op: z.literal('row.act'),
+    nodeId,
+    target: z.discriminatedUnion('kind', [
+      z.strictObject({ kind: z.literal('panel'), sessionId: rowId, toolId: z.string().min(1).max(256) }),
+      z.strictObject({
+        kind: z.literal('app'),
+        taskId: rowId,
+        appId: rowId,
+        revision,
+        plan: z.string().min(1).max(64),
+        inputs: appRunInputs,
+      }),
+    ]),
+    rowId: z.string().min(1).max(1_000),
+    actionId: z.string().min(1).max(64),
+    confirmedRisk: z.enum(['read', 'write', 'execute']),
+    viewerZone: z.string().min(1).max(100),
+    key: z.string().uuid(),
   }),
 ])
 export type BridgeRequest = z.infer<typeof bridgeRequestSchema>
@@ -642,6 +669,8 @@ export type BridgeResults = {
   'app.state': { nodeId: string; appId: string; state: Record<string, unknown> | null }
   // `revision` is the new head, holding the restored files.
   'app.restore': { nodeId: string; appId: string; revision: number }
+  // The act route's answer, unchanged: `outcome`, and with `ready`, the action to take next.
+  'row.act': { nodeId: string; outcome: string; action?: DataRecordAction }
 }
 
 // An app's name, head, and revisions, in the trellis plugin's `AppSummary` shape. A restored revision
