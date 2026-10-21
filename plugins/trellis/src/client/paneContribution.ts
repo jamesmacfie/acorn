@@ -55,6 +55,7 @@ export const appsPaneContribution: PaneLayoutContribution<AppsPaneModel> = {
   layout: 'list-detail',
   model: (task) => createAppsPaneModel(task),
   regions: { list: AppList, detail: AppDetail },
+  selection: (_task, model) => model.selected()?.appId ?? null,
   // Apps are files under the data root, not in the worktree, so an archived task keeps them. The
   // archived preview lists them and their programs, and draws none.
   readsArchived: true,

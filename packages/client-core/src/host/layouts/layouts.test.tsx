@@ -1,3 +1,4 @@
+import { createSignal, mergeProps } from 'solid-js'
 import { render } from 'solid-js/web'
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 import { LAYOUTS } from '.'
@@ -19,10 +20,12 @@ const text =
   () => <span data-region={name}>{name}</span>
 
 const mount = (layout: keyof typeof LAYOUTS, props: Partial<LayoutProps> = {}) => {
-  dispose = render(() => LAYOUTS[layout]({ stateKey: 'pane', label: 'Pane', regions: {}, ...props }), host)
+  dispose = render(() => LAYOUTS[layout](mergeProps({ stateKey: 'pane', label: 'Pane', regions: {} }, props)), host)
 }
 
-const regionOrder = () => [...host.querySelectorAll('[data-region]')].map((node) => node.getAttribute('data-region'))
+// The body, because a drawer is a portal.
+const regionOrder = () =>
+  [...document.body.querySelectorAll('[data-region]')].map((node) => node.getAttribute('data-region'))
 
 beforeEach(() => {
   host = document.createElement('div')
@@ -191,5 +194,97 @@ describe('per-pane layout state', () => {
     host.replaceChildren()
     mount('tabs', { tabs: [{ id: 'one', label: 'One' }], regions: { 'panel:one': text('panel:one') } })
     expect(regionOrder()).toEqual(['panel:one'])
+  })
+})
+
+// The phone's projections (docs/panes/layout.md § Named layouts). The shell sets the form factor on the
+// root element before anything draws, so the tests do too.
+describe('narrow', () => {
+  const press = (name: string) =>
+    [...document.body.querySelectorAll<HTMLButtonElement>('button')]
+      .find((button) => button.textContent === name)!
+      .click()
+  const buttons = () => [...document.body.querySelectorAll('button')].map((button) => button.textContent)
+  const listDetail = (props: Partial<LayoutProps> = {}) =>
+    mount('list-detail', mergeProps({ regions: { list: text('list'), detail: text('detail') } }, props))
+
+  beforeEach(() => {
+    document.documentElement.dataset.formFactor = 'narrow'
+  })
+  afterEach(() => {
+    delete document.documentElement.dataset.formFactor
+  })
+
+  it('list-detail draws the list alone, with no divider, and offers Show detail', () => {
+    listDetail()
+    expect(regionOrder()).toEqual(['list'])
+    expect(host.querySelector('[role="separator"]')).toBe(null)
+    expect(buttons()).toEqual(['Show detail'])
+    press('Show detail')
+    expect(regionOrder()).toEqual(['detail'])
+    expect(buttons()).toEqual(['Back'])
+  })
+
+  it('list-detail opens on the detail when something is already selected, and Back returns to the list', () => {
+    listDetail({ selection: 'one' })
+    expect(regionOrder()).toEqual(['detail'])
+    press('Back')
+    expect(regionOrder()).toEqual(['list'])
+    // The selection is untouched, so forward lands on the same item.
+    press('Show detail')
+    expect(regionOrder()).toEqual(['detail'])
+  })
+
+  it('list-detail pushes the detail when the selection changes to a key, and not when it clears', () => {
+    const [selection, setSelection] = createSignal<string | null>(null)
+    listDetail({
+      get selection() {
+        return selection()
+      },
+    })
+    // Nothing to show yet, so there is nothing to go forward to.
+    expect(buttons()).toEqual([])
+    setSelection('one')
+    expect(regionOrder()).toEqual(['detail'])
+    press('Back')
+    setSelection('two')
+    expect(regionOrder()).toEqual(['detail'])
+    press('Back')
+    setSelection(null)
+    expect(regionOrder()).toEqual(['list'])
+  })
+
+  it('list-detail keeps the list header and footer in the list, and the detail alone when the list is hidden', () => {
+    listDetail({
+      regions: {
+        list: text('list'),
+        detail: text('detail'),
+        'list-header': text('list-header'),
+        'list-footer': text('list-footer'),
+      },
+    })
+    expect(regionOrder()).toEqual(['list-header', 'list', 'list-footer'])
+    dispose?.()
+    host.replaceChildren()
+    listDetail({ hidden: ['list'] })
+    expect(regionOrder()).toEqual(['detail'])
+    expect(buttons()).toEqual([])
+  })
+
+  it.each([
+    ['document-over-frame', 'document', 'frame'],
+    ['frame-beside-document', 'document', 'frame'],
+    ['stack-split', 'top', 'bottom'],
+  ] as const)('%s fills the pane with its first region and opens the second in a drawer', (layout, first, second) => {
+    mount(layout, { regions: { [first]: text(first), [second]: text(second) } })
+    expect(regionOrder()).toEqual([first])
+    expect(host.querySelector('[role="separator"]')).toBe(null)
+    press('Show panel')
+    expect(regionOrder()).toEqual([first, second])
+    expect(document.body.querySelector('.ui-drawer')?.getAttribute('aria-label')).toBe('Pane panel')
+    expect(document.body.querySelector('.ui-drawer [data-region]')?.getAttribute('data-region')).toBe(second)
+    press('Close')
+    expect(regionOrder()).toEqual([first])
+    expect(document.body.querySelector('.ui-drawer')).toBe(null)
   })
 })

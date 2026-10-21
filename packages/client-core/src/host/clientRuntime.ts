@@ -12,8 +12,10 @@ import { watchWorkspaceChanges } from '../features/workspaces/watchWorkspaceChan
 import { nodeReady } from '../infra/node/activeNode'
 import { watchNodeEvents } from '../infra/node/watchNodeEvents'
 import { startDeviceConfigSync } from '../infra/persistence/deviceConfigSync'
+import { formFactor } from '../infra/platform'
 import { startClientTelemetry } from '../infra/telemetry/emitter'
 import { postTelemetryBatch } from '../infra/telemetry/post'
+import { installLongPressMenu } from '../kit/lib/controls/longPressMenu'
 import { watchPluginChanges } from './plugins/reload'
 import { setClientApp } from './plugins/clientApp'
 import { clientScheduleRegistry, startClientSchedules } from './registries/shell/schedules'
@@ -64,6 +66,8 @@ export async function startClientRuntime(host: ClientRuntimeHost): Promise<() =>
     clientScheduleRegistry.register(taskStatusScheduleContribution).dispose,
     startSchedulesWhenNodeReady(),
   ]
+  // iOS sends no `contextmenu` for a long press, so a phone's menus would never open without this.
+  if (formFactor() === 'narrow') stops.push(installLongPressMenu())
 
   // Third-party plugin bundles across the whole fleet. The watcher runs its first pass when a node
   // first becomes reachable and reconciles whenever one reloads a plugin (docs/plugins/dev-loop.md).

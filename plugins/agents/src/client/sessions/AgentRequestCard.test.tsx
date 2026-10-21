@@ -165,6 +165,30 @@ describe('answering a question that takes more than one answer', () => {
     expect(posted).toEqual([{ answers: { checks: 'Test' } }])
   })
 
+  describe('on a phone', () => {
+    beforeEach(() => {
+      document.documentElement.dataset.formFactor = 'narrow'
+    })
+    afterEach(() => {
+      delete document.documentElement.dataset.formFactor
+    })
+
+    it('answers a lone single-choice question with the tap on its option', async () => {
+      const host = draw(false)
+      expect(host.querySelector('select')).toBeNull()
+      expect([...host.querySelectorAll('button')].map((button) => button.textContent)).toEqual(['Lint', 'Test'])
+      host.querySelectorAll('button')[1]!.click()
+      await Promise.resolve()
+      expect(posted).toEqual([{ answers: { checks: 'Test' } }])
+    })
+
+    it('keeps the boxes and Submit for a question that takes several answers', () => {
+      const host = draw(true)
+      expect(host.querySelectorAll('input[type="checkbox"]')).toHaveLength(2)
+      expect([...host.querySelectorAll('button')].map((button) => button.textContent)).toEqual(['Submit answers'])
+    })
+  })
+
   it('keeps a secret free-text answer out of view while it is typed', () => {
     const host = drawRequest({
       ...request(false),

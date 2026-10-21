@@ -1,6 +1,7 @@
 import { lazy } from 'solid-js'
 import { createGitPaneModel, type GitPaneModel } from './paneModel'
 import { createChangesModel, type ChangesModel } from './changes/changesModel'
+import { changeKey } from './changes/model'
 import { GIT_PANE } from './gitPane'
 import { allProjects, type PaneLayoutContribution, type Task } from '@acorn/plugin-api/client'
 
@@ -48,5 +49,20 @@ export const gitPaneContribution: PaneLayoutContribution<GitTaskPaneModel> = {
   // Other plugins may mark the Git button (`core:pane`). A review, lint or CI plugin knows things about
   // a task's uncommitted work, and this button is where a reader looks before committing.
   statusAnnotations: true,
+  // Each tab keeps its own selection, so the key is the open tab's.
+  selection: (_task, model) => {
+    switch (model.section()) {
+      case 'changes': {
+        const change = model.changes.selected()
+        return change ? changeKey(change) : null
+      }
+      case 'history':
+        return model.commitId()
+      case 'stashes':
+        return model.stashId()
+      case 'worktrees':
+        return model.selected()
+    }
+  },
   regions: { 'list-header': GitPaneHeader, list: GitPaneList, 'list-footer': GitPaneFooter, detail: GitPaneDetail },
 }

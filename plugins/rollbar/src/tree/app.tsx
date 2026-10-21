@@ -200,7 +200,7 @@ export function RollbarPane(props: RollbarPaneProps & { bridge: AcornBridge }) {
   // column only appears when there is more than one linked item.
   return (
     <Show when={linkedTargets().length > 1} fallback={body()}>
-      <ListDetail split listWidth="narrow">
+      <ListDetail split listWidth="narrow" selection={view() ? targetKey(view()!.target) : null}>
         <ListColumn label="Linked Rollbar errors">
           <For each={linkedTargets()}>
             {(target) => (

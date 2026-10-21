@@ -5,6 +5,7 @@ export {
   cliInstaller,
   desktopExtras,
   deviceConfigBridge,
+  formFactor,
   pickFiles,
   pickFolder,
   previewViews,

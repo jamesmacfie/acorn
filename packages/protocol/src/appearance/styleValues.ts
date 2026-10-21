@@ -30,7 +30,7 @@ const families = {
   space:
     '--space-0 --space-1 --space-2 --space-3 --space-4 --space-5 --space-6 --space-7 --space-8 --space-9 --space-10 --space-11 --pane-pad --pane-pad-y --gap-inline --gap-row --gap-stack --gap-section --pad-control --pad-control-lg --pad-chip --pad-cell --pad-surface --pad-body --shell-pad --pane-gap',
   font: '--font-mono --font-ui --font-glyph --font-display',
-  fontSize: '--fs-2xs --fs-xs --fs-sm --fs --fs-md --fs-lg --fs-xl --label-size',
+  fontSize: '--fs-2xs --fs-xs --fs-sm --fs --fs-md --fs-lg --fs-xl --fs-input --label-size',
   lineHeight: '--lh --lh-tight --lh-diff',
   weight: '--fw-normal --fw-medium --fw-semibold --fw-bold --label-weight --heading-weight',
   transform: '--label-transform --heading-transform',

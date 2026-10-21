@@ -14,6 +14,9 @@ export type RailMarkerData = {
   priority?: number
 }
 
+/** The shape of screen a client draws for: the desktop's windows, a phone's one screen, or a terminal. */
+export type FormFactor = 'desktop' | 'narrow' | 'tui'
+
 export type RailData = {
   sources: readonly {
     id: string
@@ -24,7 +27,7 @@ export type RailData = {
   }[]
   workspaces: readonly { id: string; label: string; active: boolean }[]
   collapsed: boolean
-  formFactor: 'desktop' | 'narrow' | 'tui'
+  formFactor: FormFactor
   slots: { taskList: SlotRef }
 }
 

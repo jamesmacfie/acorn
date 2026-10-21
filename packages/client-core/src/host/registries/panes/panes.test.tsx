@@ -371,6 +371,26 @@ describe('paneAvailable', () => {
     }
     expect(paneAvailable(entry)).toBe(true)
   })
+
+  describe('by form factor', () => {
+    const availableOn = (factor: 'desktop' | 'narrow') => {
+      document.documentElement.dataset.formFactor = factor
+      return paneAvailable(paneRegistry.get('notes')!)
+    }
+    afterEach(() => {
+      delete document.documentElement.dataset.formFactor
+    })
+
+    it('offers a pane that names no form factor on every one', () => {
+      register(pane())
+      expect([availableOn('desktop'), availableOn('narrow')]).toEqual([true, true])
+    })
+
+    it('leaves out a pane that does not list the host’s form factor', () => {
+      register(pane({ formFactor: ['desktop'] }))
+      expect([availableOn('desktop'), availableOn('narrow')]).toEqual([true, false])
+    })
+  })
 })
 
 // The two pane spans (docs/telemetry/renderer.md § Renderer seams). Here rather than beside the emitter because
@@ -474,5 +494,26 @@ describe('the pane spans', () => {
     gate.resolve()
     await until(() => spansNamed('pane.region').length > 0)
     expect(spansNamed('pane.region')[0].attrs.owner).toBe('core')
+  })
+})
+
+// A narrow `list-detail` pushes the detail when the pane's selection changes, and the pane reports
+// that selection from the model it already keeps (docs/panes/layout.md § Layout model).
+describe('a pane’s selection', () => {
+  afterEach(() => {
+    delete document.documentElement.dataset.formFactor
+  })
+
+  it('reaches a narrow list-detail layout, which shows the detail when it changes', async () => {
+    document.documentElement.dataset.formFactor = 'narrow'
+    const [key, setKey] = createSignal<string | null>(null)
+    register(pane({ model: () => ({ key }), selection: (_task, model) => model.key() }))
+    const Pane = paneRegistry.get('notes')!.component
+    dispose = render(() => <Pane task={task} />, host)
+    const shown = () => [...host.querySelectorAll('[data-region]')].map((node) => node.getAttribute('data-region'))
+    await until(() => shown().length > 0)
+    expect(shown()).toEqual(['list'])
+    setKey('one')
+    expect(shown()).toEqual(['detail'])
   })
 })

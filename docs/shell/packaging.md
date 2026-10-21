@@ -51,7 +51,7 @@ October 2, 2026, it measured 269,402 B.
 plugin frame stylesheet, and the pinned Node runtime for the bundler. It fetches the runtime from
 nodejs.org and verifies it against that release's `SHASUMS256.txt`, and `node-runtime.json` is the one
 pin both this and `scripts/pack-node.mjs` read. Staging also copies the headless CLI bundle into
-`Resources/cli`. **Settings → Command line** asks the shell to write a launcher into a writable
+`Resources/cli`, with the phone's web app in `Resources/cli/mobile` for `acorn mobile`. **Settings → Command line** asks the shell to write a launcher into a writable
 directory on the login shell's `PATH` (`cli_install.rs`). The launcher points at that build's Node and
 CLI, and the renderer can't choose a path or command.
 

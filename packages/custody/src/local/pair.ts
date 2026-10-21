@@ -11,16 +11,16 @@ const COLLECT_EVERY_MS = 1_000
 export async function pairInteractively(
   endpoint: string,
   fleet: FleetStore,
-  node: { label: string; local: boolean },
+  node: { label: string; local: boolean; deviceName?: string },
 ): Promise<FleetNode> {
   if (!process.stdin.isTTY || !process.stdout.isTTY)
-    throw new Error('This node is not paired. Run acorn --node URL in a terminal to pair it.')
+    throw new Error('This Node is not paired. Run the same command in an interactive terminal to pair it.')
   const probe = await probeNode(endpoint)
   if (!probe.compatible)
     throw new Error(
       `${probe.endpoint} speaks acorn protocol ${probe.protocolVersion}; upgrade whichever side is older.`,
     )
-  const deviceName = `acorn on ${hostname()}`
+  const deviceName = node.deviceName ?? `acorn on ${hostname()}`
   const words = fingerprintPhrase(probe.fingerprint) ?? probe.fingerprint
   process.stderr.write(
     `\n  ${probe.endpoint}\n  Identity      ${words}\n\n  Compare these words with the node's boot output.\n`,

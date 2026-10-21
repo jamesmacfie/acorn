@@ -1,0 +1,22 @@
+/* Narrow: the sizes of a client that draws one screen at a time under a finger. A shell opts in with
+ * `data-form-factor="narrow"` on <html>; nothing here reads the window's width (formFactor() in
+ * infra/platform).
+ *
+ * This sheet loads after the style packs. Its selector has the same weight as a pack's, so source
+ * order is what lets a phone's sizes win in every pack (styles/tokenAxes.test.ts pins it). It sets
+ * style tokens only, and it is not a pack: it composes with all of them.
+ */
+:root[data-form-factor='narrow'] {
+  /* A tap target meets the 44-point guideline on iOS, so the small rungs rise to it too. */
+  --control-h: 44px;
+  --control-h-sm: 44px;
+  --control-h-xs: 44px;
+  --row-h: 48px;
+  --row-h-virt: 48px;
+  --row-h-sm: 44px;
+  --tab-h: 44px;
+
+  --pane-pad: var(--space-5);
+
+  --fs-input: 16px;
+}

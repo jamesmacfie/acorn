@@ -178,7 +178,7 @@ export function RollbarItemView(props: {
             </EmptyState>
           }
         >
-          <ListDetail split>
+          <ListDetail split selection={chosenId(props.occurrence) ?? null}>
             {/* Every occurrence of one error has the same class, so a row is told apart by when it
                 happened and where. */}
             <ListColumn label="Occurrences">

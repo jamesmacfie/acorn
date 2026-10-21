@@ -1,0 +1,50 @@
+{
+  "name": "@acorn/mobile",
+  "version": "0.1.0",
+  "description": "The mobile web app and the gateway that gives a phone's browser a session on one Node.",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build": "vite build && node scripts/check-startup-budget.mjs",
+    "dev:app": "node scripts/dev.mjs",
+    "gateway": "node --import tsx src/gateway/main.ts",
+    "lint": "tsc --noEmit",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@acorn/custody": "workspace:*",
+    "@acorn/node-core": "workspace:*",
+    "@acorn/protocol": "workspace:*",
+    "uqr": "^0.1.3",
+    "ws": "^8.21.0",
+    "zod": "catalog:"
+  },
+  "devDependencies": {
+    "@acorn/client-core": "workspace:*",
+    "@acorn/plugin-agents": "workspace:*",
+    "@acorn/plugin-bitbucket": "workspace:*",
+    "@acorn/plugin-context": "workspace:*",
+    "@acorn/plugin-docker": "workspace:*",
+    "@acorn/plugin-editor": "workspace:*",
+    "@acorn/plugin-git": "workspace:*",
+    "@acorn/plugin-github": "workspace:*",
+    "@acorn/plugin-gitlab": "workspace:*",
+    "@acorn/plugin-memory": "workspace:*",
+    "@acorn/plugin-notes": "workspace:*",
+    "@acorn/plugin-onboarding": "workspace:*",
+    "@acorn/plugin-preview": "workspace:*",
+    "@acorn/plugin-terminal": "workspace:*",
+    "@acorn/plugin-trellis": "workspace:*",
+    "@acorn/plugin-workflows": "workspace:*",
+    "@solidjs/router": "^0.16.1",
+    "@tanstack/solid-query": "^5.101.0",
+    "@types/node": "^26.0.0",
+    "@types/ws": "^8.5.13",
+    "solid-js": "catalog:",
+    "tsx": "^4.22.4",
+    "typescript": "^6.0.3",
+    "vite": "^8.0.16",
+    "vite-plugin-solid": "^2.11.12",
+    "vitest": "^4.1.11"
+  }
+}

@@ -16,6 +16,8 @@ import type { Region } from '../../layouts'
 import { suppliedLayout, suppliedRegionPlaceholder } from '../../layouts/table'
 import type { Task } from '../../../infra/queries'
 import { hasHostCapability, type HostCapabilityRequirement } from '../../../infra/node/hostCapabilities'
+import { formFactor } from '../../../infra/platform'
+import type { FormFactor } from '@acorn/protocol/chrome.ts'
 import { markPaneDrawn, paneDrawn, paneModel, paneModelScope } from './paneModels'
 import { recordSample, startSpan, type SpanHandle } from '../../../infra/telemetry/emitter'
 import { featureMounted } from '../../../infra/telemetry/featureOpening'
@@ -38,6 +40,8 @@ type PaneCommon = {
   showInSwitcher?: boolean
   defaultChord?: string
   requires?: HostCapabilityRequirement
+  /** The form factors the pane draws at. Absent means all of them, because a pane draws with the kit. */
+  formFactor?: readonly FormFactor[]
   when?: (task: Task) => boolean
   /** A linkable item currently selected in this pane, when the pane can report one. */
   selectedItem?: (task: Task) => string | undefined
@@ -133,6 +137,15 @@ export type PaneLayoutContribution<M = undefined> = PaneCommon & {
   collapsible?: boolean
   /** Use an empty rail when the list has no useful one-mark representation. */
   collapseContent?: 'rows' | 'empty'
+  /**
+   * `list-detail` only: what the list has selected, as a key, or null for nothing. A layout that shows
+   * one region at a time, which is the phone's, pushes the detail when this changes to a key
+   * (docs/panes/layout.md § Layout model). Read it from the selection the model already keeps.
+   *
+   * Without it the narrow layout stays on the list until someone presses **Show detail**, so a pane
+   * works on a phone before its author adds this.
+   */
+  selection?: (task: Task, model: M) => string | null
 }
 
 /** What the host tells a pane's model about the pane it belongs to. */
@@ -294,6 +307,10 @@ function drawLayout(entry: PaneLayoutContribution<any>, owner?: string): PaneCon
             },
             collapsible: entry.collapsible === true,
             collapseContent: entry.collapseContent ?? 'rows',
+            // A getter for the reason `hidden` is: the selection moves without the pane redrawing.
+            get selection() {
+              return entry.selection?.(props.task, model())
+            },
             get scrollScope() {
               return props.task.id
             },
@@ -319,6 +336,7 @@ export const paneContributions = (): readonly PaneContribution[] =>
 export const paneContribution = (id: PaneId): PaneContribution | undefined => paneRegistry.get(id)
 export const paneAvailable = (pane: PaneContribution, task?: Task): boolean =>
   hasHostCapability(pane.requires) &&
+  (!pane.formFactor || pane.formFactor.includes(formFactor())) &&
   (!task || task.status !== 'archived' || pane.readsArchived === true) &&
   (!task || !pane.when || pane.when(task))
 

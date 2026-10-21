@@ -35,6 +35,7 @@ import { schedulePanePrefetch } from '../../host/registries/panes/panes'
 import { projectPath } from '../../host/registries/commands/corePaths'
 import { activateTaskSignals, pathForTask } from '../tasks/activate'
 import { hasHostCapability } from '../../infra/node/hostCapabilities'
+import { formFactor } from '../../infra/platform'
 import { availableSources } from './railSources'
 import { parseRailVisibility, shownInRail } from './railVisibility'
 import { createSourceScope } from './sourceScope'
@@ -644,7 +645,7 @@ export default function TabRail() {
         active: workspace.id === activeWorkspace()?.id,
       })),
     collapsed: prefs.data?.[PrefKeys.leftCollapsed] === 'true',
-    formFactor: 'desktop',
+    formFactor: formFactor(),
     slots: { taskList: taskListRef },
     selectSource: (id) => {
       if (sources().some((source) => source.id === id)) selectSource(id)

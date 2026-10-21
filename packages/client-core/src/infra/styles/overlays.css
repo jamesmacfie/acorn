@@ -167,5 +167,28 @@
    top plus a bottom, with no inline height, is what makes the flex column fill. */
 .ui-drawer[data-maximized] { top: var(--topbar-h); }
 
+/* Narrow: a phone has no rails or task footer to sit between, so a drawer is a sheet over the whole
+   screen, padded clear of the notch and the home indicator. It reads the root attribute the phone's
+   shell sets, as narrow.css does (formFactor() in infra/platform). */
+:root[data-form-factor='narrow'] .ui-drawer {
+  inset: 0;
+  height: auto;
+  padding: env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left);
+}
+
+/* A dialog is a sheet over the whole screen too, down to the keyboard when one is up (--keyboard-inset,
+   which the phone's shell keeps). An alertdialog stays a box: its question is short. */
+:root[data-form-factor='narrow'] .overlay[role='dialog'] {
+  position: fixed;
+  inset: 0 0 var(--keyboard-inset, 0px);
+  width: auto;
+  max-height: none;
+  border: 0;
+  border-radius: var(--radius-0);
+  padding: env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left);
+}
+/* The actions sit at the foot of the sheet, not under a short form. */
+:root[data-form-factor='narrow'] .overlay[role='dialog'] .overlay-body { flex: 1; }
+
 /* The palette's hints line (PaletteSurface footer). */
 .palette-foot { padding: var(--space-3) var(--space-6); font-size: var(--fs-2xs); border-top: var(--chrome-divider); }

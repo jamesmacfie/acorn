@@ -52,8 +52,8 @@ There are eight names and seven components. `document-over-frame` and `frame-bes
 the same two regions with the axis flipped, so one component draws both. The position is in the name
 instead of a prop, so it's never a setting a plugin turns.
 
-Each layout carries three projections: the desktop one and the terminal one, both built, and a
-narrow one for a mobile web app, written down here and not built. Writing them is the layout's half
+Each layout carries three projections: the desktop one, the terminal one, and a narrow one for the
+[mobile web app](../mobile.md), all built. Writing them is the layout's half
 of the kit's admission rule ([the closed kit](../ui-design/closed-kit.md#the-closed-kit)). A layout
 earns a name when two or more surfaces need it and the existing layouts can't express it. Its
 regions are semantic names, not positions, and all three projections are on this page before it
@@ -62,13 +62,37 @@ lands. A new named layout is the answer, never a setting.
 | Layout | Regions | Desktop | Narrow | Terminal |
 | --- | --- | --- | --- | --- |
 | `single` | `body` | One region, with the pane's padding and focus group | Unchanged | One frame, titled with the pane's name |
-| `list-detail` | `list`, `detail`, optional `list-header` and `list-footer` | Two columns with a host-drawn split and drag handle. The list width is a style token, and `collapsible` adds a control that narrows it to a rail. | One region at a time. Selecting in the list shows the detail, and a back control returns. | As narrow below 80 columns, two columns above. A key switches groups. Two frames, `List` and `Detail`, with the header and footer strips inside the list's frame. |
+| `list-detail` | `list`, `detail`, optional `list-header` and `list-footer` | Two columns with a host-drawn split and drag handle. The list width is a style token, and `collapsible` adds a control that narrows it to a rail. | One region at a time, with no divider or collapse control. The pane's `selection` changing to a key shows the detail. **Back** at the top of the detail returns to the list and leaves the selection alone, and **Show detail** under the list goes forward again. See [Narrow `list-detail`](#narrow-list-detail). | As narrow below 80 columns, two columns above. A key switches groups. Two frames, `List` and `Detail`, with the header and footer strips inside the list's frame. |
 | `header-body-footer` | `header`, `body`, `footer`, all optional, so `header-body` is this layout with no footer | The body scrolls. The header and footer stay pinned. | Unchanged. The footer stays pinned. | The body is framed and titled with the pane's name. The pinned strips are bare, because a frame around one line costs three rows. |
-| `tabs` | One `panel:<tab id>` per entry in `tabs`. The host draws the bar. | The bar, then one panel at a time | The bar scrolls sideways | The bar is one line. The panel is framed and titled with the open tab. |
-| `document-over-frame` | `document`, `frame` | A host-owned editor over a plugin region, with the handle between | The frame region collapses to a sheet the document can open | Both halves, each framed. The document is a read-only host text view. |
+| `tabs` | One `panel:<tab id>` per entry in `tabs`. The host draws the bar. | The bar, then one panel at a time | The bar scrolls sideways, as the kit's tab strip already does | The bar is one line. The panel is framed and titled with the open tab. |
+| `document-over-frame` | `document`, `frame` | A host-owned editor over a plugin region, with the handle between | The document fills the pane. A bar above it holds **Show panel**, which opens the frame region in a full-screen `Drawer`. **Close** returns. The region mounts while the sheet is open. | Both halves, each framed. The document is a read-only host text view. |
 | `frame-beside-document` | The same two, with the axis flipped by the name | Side by side | As `document-over-frame` | The same |
-| `stack-split` | `top`, `bottom` | Two stacked regions with a handle | `bottom` becomes a full-height sheet | As on the desktop, each region framed |
+| `stack-split` | `top`, `bottom` | Two stacked regions with a handle | `top` fills the pane, and `bottom` opens from **Show panel** in a full-screen `Drawer`, as above | As on the desktop, each region framed |
 | `wizard` | `step`. The host draws the indicator and a footer with every action: skip, back, next, and finish on the last step. | One step at a time | Unchanged | The step is framed and titled with the pane's name |
+
+### Narrow `list-detail`
+
+A narrow `list-detail` can't see the pane's selection, so the pane reports it with `selection` on the
+contribution. It returns the selected item's key, or null for nothing. The pane derives it from the
+selection its model already keeps:
+
+```ts
+selection: (task, model) => model.selectedSessionId() ?? null,
+```
+
+The layout keeps its own record of which half shows, one per mounted pane. It opens on the detail when
+the pane already has a key. After that, a key that changes to a new value shows the detail, which is
+someone picking a row. A key that goes null leaves the view where it is. **Back** shows the list
+without touching the selection, so a second tap on the row that's already selected changes nothing.
+**Show detail** is the way forward from there, and it appears whenever the selection isn't null.
+
+A pane with no `selection` field shows the list, with **Show detail** always offered, so a pane from
+outside the repository works on a phone before its author adds one. A pane that hides the `list`
+region shows the detail alone, with nothing to go back to.
+
+The kit's `ListDetail` node takes the same value as a `selection` prop, which a tree sends as data like
+any other prop. It keeps both columns mounted and shows one, because the caller builds both as
+elements. A split that is two halves of one document, with no row to pick, leaves `selection` out.
 
 ### Terminal rules
 

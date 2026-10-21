@@ -1,13 +1,14 @@
 # Startup budget
 
-This page covers the build checks on what the desktop renderer and the terminal client load before
-they draw, and what the Node service loads before it answers. Read it before you add an import that
-runs at startup, or when a build fails its budget. It's part of [frontend](../frontend.md).
+This page covers the build checks on what the desktop renderer, the terminal client, and the phone's
+web app load before they draw, and what the Node service loads before it answers. Read it before you
+add an import that runs at startup, or when a build fails its budget. It's part of
+[frontend](../frontend.md).
 
 ## Startup budget
 
-Both clients have a build check over what they load before they draw. Each fails the build two ways:
-over a byte ceiling, or on a denied chunk or module name.
+Each client has a build check over what it loads before it draws. Each fails the build two ways: over
+a byte ceiling, or on a denied chunk or module name.
 
 ### The renderer
 
@@ -50,6 +51,15 @@ validation still runs before untrusted content is drawn. Other external imports 
 separately, and their package bytes aren't in the budget. The client imports narrow supported
 entrypoints for its model and host adapters, not broad `public.ts` barrels, which would pull DOM
 components and diff code into the closure.
+
+### The phone
+
+`apps/mobile/scripts/check-startup-budget.mjs` runs from `@acorn/mobile`'s `build`. It reads Vite's
+manifest in `apps/mobile/dist/.vite` and sums the entry's static closure, plus `src/client/start.tsx`,
+which `main.tsx` awaits before it draws. The ceilings are 507,000 B of scripts and 128,000 B of styles,
+about 3% above the 492,518 B and 124,054 B measured on October 21, 2026, after the Needs you list. The draft form behind **New task** loads when the button is pressed. It fails under 100,000 B of
+scripts, on a chunk named in the renderer's denylist, and when the built-in plugins in
+`src/client/plugins.ts` load with the first screen.
 
 ### The node service
 

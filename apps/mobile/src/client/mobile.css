@@ -1,0 +1,87 @@
+/* The phone's chrome: a bar on top, the screen under it, and on a task, a bar of its panes at the
+   bottom. Everything inside a screen is the kit's and the plugins'. The bars pad around the notch and
+   the home indicator, which `viewport-fit=cover` in index.html lets the page draw under. */
+
+.mobile-shell {
+  display: flex;
+  flex-direction: column;
+  /* The visible height, which changes as a phone's browser shows and hides its own toolbars. The
+     keyboard's inset comes from keyboardInset.ts: the browser doesn't shrink the page for it. */
+  height: calc(100dvh - var(--keyboard-inset, 0px));
+  background: var(--bg);
+}
+
+.mobile-bar {
+  display: flex;
+  flex-shrink: 0;
+  align-items: center;
+  gap: var(--space-2);
+  background: var(--bg-subtle);
+  border: 0 solid var(--border);
+}
+
+.mobile-top {
+  min-height: var(--control-h);
+  padding: calc(env(safe-area-inset-top) + var(--space-2)) max(var(--space-3), env(safe-area-inset-right))
+    var(--space-2) max(var(--space-3), env(safe-area-inset-left));
+  border-bottom-width: var(--bw);
+}
+
+.mobile-title {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.mobile-body {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  padding: 0 env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left);
+}
+
+.mobile-pane {
+  display: flex;
+  flex: 1;
+  min-height: 0;
+  overflow: hidden;
+  padding: 0 env(safe-area-inset-right) 0 env(safe-area-inset-left);
+}
+
+.mobile-pane > .pane {
+  flex: 1;
+  min-width: 0;
+}
+
+/* Scrolls sideways when the panes don't fit. */
+.mobile-panes {
+  overflow-x: auto;
+  padding: 0 env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left);
+  border-top-width: var(--bw);
+}
+
+/* The desktop switcher's rail controls fill a rail's width. Here each takes its label's width, with
+   the label under the icon. */
+.mobile-panes > .tabrail-tab {
+  flex: none;
+  flex-direction: column;
+  gap: var(--space-1);
+  width: auto;
+  min-width: var(--tabrail-w);
+  padding: 0 var(--space-3);
+}
+
+/* With the keyboard up the pane needs every line, and the bar's panes are out of reach under it. */
+:root[data-keyboard] .mobile-panes {
+  display: none;
+}
+
+.mobile-sign-in {
+  display: flex;
+  min-height: 100dvh;
+  flex-direction: column;
+  justify-content: center;
+  gap: var(--space-4);
+  padding: var(--space-6);
+}

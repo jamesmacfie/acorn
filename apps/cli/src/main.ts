@@ -12,11 +12,16 @@ import {
   stopNodeService,
 } from './supervision/lifecycle'
 import { pluginCommandHelp } from './pluginCommands'
+import { mobileGatewayArgs, runMobileGateway } from './mobile'
 import { hostTargets, installNativeHost, nativeHostStatus, uninstallNativeHost } from './browser/hostInstall'
 import { installNodeService, nodeServiceRegistration, uninstallNodeService } from './supervision/service'
 
 // The native host is its own bundle entry beside this one, so the browser never loads the CLI.
 const nativeHostEntry = fileURLToPath(new URL('./native-host.js', import.meta.url))
+// The phone gateway is a bundle entry too, and the staged phone app sits beside both
+// (scripts/stage.mjs in the desktop app, scripts/pack-node.mjs).
+const mobileGatewayEntry = fileURLToPath(new URL('./mobile-gateway.js', import.meta.url))
+const mobileAppDir = fileURLToPath(new URL('./mobile', import.meta.url))
 
 export async function main(argv: string[] = process.argv.slice(2)): Promise<number> {
   const outputAt = argv.indexOf('--output')
@@ -75,6 +80,8 @@ export async function main(argv: string[] = process.argv.slice(2)): Promise<numb
       )
       return 0
     }
+    if (args.positionals[0] === 'mobile')
+      return await runMobileGateway(mobileGatewayEntry, mobileGatewayArgs(args, mobileAppDir))
     if (args.positionals[0] === 'browser') {
       const targets = hostTargets({
         browser: args.options.browser,

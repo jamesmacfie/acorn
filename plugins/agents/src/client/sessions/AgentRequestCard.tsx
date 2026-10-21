@@ -2,6 +2,7 @@ import { createSignal, For, Show } from 'solid-js'
 import type { AgentRequest } from '../../contract/wire.ts'
 import { AGENT_REQUEST_CARD_POINT, type AgentRequestCardProps } from '@acorn/protocol/extensionPoints.ts'
 import { Alert, Button, Card, Checkbox, Field, Heading, Inline, Input, Select, Stack, Text } from '@acorn/plugin-api/ui'
+import { formFactor } from '@acorn/plugin-api/client'
 import { Slot } from '@acorn/plugin-api/ui/host'
 import { managedAgentApi } from './managedClient'
 import { appApprovalOf, approvalScopeNote, approvalTarget } from '../../contract/appApproval.ts'
@@ -50,6 +51,13 @@ export default function AgentRequestCard(props: {
         }>)
       : []
   const approval = () => appApprovalOf(payload().approval)
+  // On a phone every choice is a full-width button, and a lone single-choice question is answered by
+  // the tap on its option, with no select to open and no Submit to find.
+  const narrow = () => formFactor() === 'narrow'
+  const tapToAnswer = () => {
+    const [only] = questions()
+    return narrow() && questions().length === 1 && !only!.multiple && only!.options?.length ? only : undefined
+  }
 
   async function resolve(resolution: unknown) {
     if (busy() || props.request.status !== 'pending') return
@@ -112,15 +120,33 @@ export default function AgentRequestCard(props: {
                 <Show
                   when={question.multiple}
                   fallback={
-                    <Select
-                      label={question.prompt}
-                      value={typed(question.id)}
-                      onChange={(value) => setAnswers((current) => ({ ...current, [question.id]: value }))}
-                      options={[
-                        { value: '', label: 'Choose…' },
-                        ...(question.options ?? []).map((option) => ({ value: option.label, label: option.label })),
-                      ]}
-                    />
+                    <Show
+                      when={question !== tapToAnswer()}
+                      fallback={
+                        <Inline wrap even>
+                          <For each={question.options}>
+                            {(option) => (
+                              <Button
+                                disabled={busy() || props.request.status !== 'pending'}
+                                onPress={() => void resolve({ answers: { [question.id]: option.label } })}
+                              >
+                                {option.label}
+                              </Button>
+                            )}
+                          </For>
+                        </Inline>
+                      }
+                    >
+                      <Select
+                        label={question.prompt}
+                        value={typed(question.id)}
+                        onChange={(value) => setAnswers((current) => ({ ...current, [question.id]: value }))}
+                        options={[
+                          { value: '', label: 'Choose…' },
+                          ...(question.options ?? []).map((option) => ({ value: option.label, label: option.label })),
+                        ]}
+                      />
+                    </Show>
                   }
                 >
                   <Stack gap="row">
@@ -139,8 +165,8 @@ export default function AgentRequestCard(props: {
             </Field>
           )}
         </For>
-        <Inline wrap>
-          <Show when={questions().length}>
+        <Inline wrap even={narrow()}>
+          <Show when={questions().length && !tapToAnswer()}>
             <Button
               disabled={busy() || props.request.status !== 'pending'}
               onPress={() => void resolve({ answers: answers() })}
