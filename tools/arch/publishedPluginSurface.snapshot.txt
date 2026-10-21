@@ -809,6 +809,7 @@ acorn-plugin-types: member GenerateTextUsage.outputTokens
 acorn-plugin-types: member GitOptions.cwd
 acorn-plugin-types: member GitOptions.env
 acorn-plugin-types: member GitOptions.maxOutputBytes
+acorn-plugin-types: member GitOptions.priority
 acorn-plugin-types: member GitOptions.signal
 acorn-plugin-types: member GitOptions.stdin
 acorn-plugin-types: member GitOptions.timeoutMs
@@ -1023,6 +1024,7 @@ acorn-plugin-types: member ProcSpec.file
 acorn-plugin-types: member ProcSpec.killGraceMs
 acorn-plugin-types: member ProcSpec.maxOutputBytes
 acorn-plugin-types: member ProcSpec.passthrough
+acorn-plugin-types: member ProcSpec.priority
 acorn-plugin-types: member ProcSpec.signal
 acorn-plugin-types: member ProcSpec.stdin
 acorn-plugin-types: member ProcSpec.timeoutMs

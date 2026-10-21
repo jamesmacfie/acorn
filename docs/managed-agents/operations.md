@@ -38,7 +38,7 @@ fails that turn with a retry or review instruction. Optional `agents:before-send
 their independent failure behavior.
 
 The store captures provider settings and host attendance at the same acceptance boundary, including
-goal turns. Goal turns use the same admission hooks as person turns. Interactive and imported sessions resolve to `attended`,
+goal turns ([session goals](./session-goals.md)). Goal turns use the same admission hooks as person turns. Interactive and imported sessions resolve to `attended`,
 delegated sessions to `supervised`, and workflow sessions to `supervised` under `gated` or
 `autonomous` under the host's autonomous posture. Plugin follow-ups inherit their admitted origin's
 attendance. Usage-limit continuations retain the original row and policy. Unknown persisted values
@@ -57,40 +57,6 @@ turn to cancel.
 **Stop** remains available while a session reports `reconnecting`. It cancels a live turn through
 the provider. If the turn has already ended, it stops the provider generation and pending recovery,
 expires pending requests, and records `stopped`. Sending another turn resumes the session.
-
-## Session goals
-
-An interactive session can hold one goal of up to 2,000 characters. Set it from the conversation or
-the **Set session goal** palette command. If the session is idle, acorn queues the goal as its first
-turn. Goal turns use the normal queue and count against the same concurrency and usage limits.
-
-After a turn settles and its queue drains, acorn checks the goal against the event ledger. The check
-reads recent messages and shortened tool input and output, with a 12,000-character evidence limit.
-It uses a one-shot call on the session's harness. Claude Code uses its `haiku` alias; other harnesses
-use their configured default. A failed or invalid check blocks the goal and does not queue more work.
-
-Only a verdict that says useful work remains queues another **Goal** turn. A goal stops after eight
-continuations or two consecutive goal turns without a tool call or file change. **Stop** pauses an
-active goal. **Resume** queues a turn to carry on. A restart interrupts an active provider turn and
-pauses its goal, as does a provider disconnect during a turn. A dispatch failure blocks the goal.
-An admission refusal also blocks the goal and queues no turn.
-A completed turn whose check was interrupted is checked after startup. The session
-row stores the objective, counters, status, and last verdict, so every client sees the same state.
-
-The goal route is device-only: `PUT /v1/p/agents/sessions/:id/goal` accepts an objective or `null`
-to clear it, and `POST /v1/p/agents/sessions/:id/goal/resume` resumes a paused goal. Workflow,
-delegated, imported, terminal-controlled, and archived sessions cannot accept a goal.
-
-A workflow step's completion condition uses the same judge, evidence limit, and continuation limits
-(`judgeGoal` in `plugins/agents/src/server/sessions/sessionGoal.ts`), but the step owns it, not the
-session. `agents.sessionExecute` checks it inside the step's operation and queues the continuations
-itself, so interactive goal scheduling never sees a workflow session. Each verdict is an
-`agent_operations` row keyed by the attempt's opening turn and the turns it read
-(`workflow.goal.evaluate`), and the attempt's final state is one more (`workflow.goal`). A retry
-opens a new turn, so its state starts clean. Startup doesn't restart a step's goal work. Only the
-workflow runner's recovery and retry do. The run's own **Stop** and **Retry** control a workflow
-session, which has no goal **Edit**, **Clear**, or **Resume**. For the step's side, see
-[agent steps](../workflows/agent-steps.md#completion-conditions).
 
 ## Plan usage limits
 
@@ -127,6 +93,10 @@ escalates after 2 seconds, and waits 2 more for the exit. A failed exit rejects 
 and Linux, pipe children run in their own process group, and teardown signals that group and waits for
 it to empty. Windows acknowledges only the direct child's exit, and would need a job object for the
 same guarantee. Loaded manifest harnesses use the cancellable local ACP driver.
+
+Each pipe child starts at nice 5, just below the window, the helper, and the Node, and everything it
+starts inherits that. Nice lowers CPU share only, so an agent's builds keep their disk priority.
+Terminal sessions you type in keep theirs. If the platform refuses the change, the Node logs it once.
 
 A stream can drop without killing the provider, and the client reattaches from the session sequence.
 Cancellation, timeout, provider disconnect, and restart are explicit states.

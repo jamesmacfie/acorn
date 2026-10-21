@@ -8,6 +8,7 @@ import { makeTestPluginDb, type TestPluginDb } from '@acorn/plugin-api/testkit'
 import { terminalRuns } from '../node/schema'
 
 vi.mock('@acorn/plugin-api/node', () => ({
+  lowerPriority: () => {},
   getProfile: () => ({ id: 'shell', label: 'Shell', kind: 'shell', backendPreference: 'node-pty' }),
   interactiveProfile: () => true,
   resolveCommand: () => '/bin/cat',

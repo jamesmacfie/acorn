@@ -88,9 +88,9 @@ class DockerService {
     }
   }
 
-  async containers(): Promise<DockerContainerSummary[]> {
+  async containers(background = false): Promise<DockerContainerSummary[]> {
     return this.cachedList('containers', async () => {
-      const out = await docker(['ps', '-a', '--format', '{{json .}}'])
+      const out = await docker(['ps', '-a', '--format', '{{json .}}'], { background })
       return parsePsOutput(out)
     })
   }
@@ -140,7 +140,7 @@ class DockerService {
 
   private loadSnapshot(): Promise<ContainerSnapshot> {
     if (this.snapshotLoad) return this.snapshotLoad
-    const load: Promise<ContainerSnapshot> = this.containers().then(
+    const load: Promise<ContainerSnapshot> = this.containers(true).then(
       // A load that an invalidation or disposal replaced answers its own callers and remembers nothing.
       (list) => {
         const snapshot = { at: Date.now(), list }

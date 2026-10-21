@@ -1,5 +1,53 @@
 # Phase 4: give the window first claim on the CPU
 
+## Completion note
+
+Landed October 21, 2026, on branch `phase-4-process-priority`. The code, tests, and docs are done.
+The replay under load and the week of Sentry aren't taken, and need the owner at the machine.
+
+What landed:
+
+- `lowerPriority(pid, 'agent' | 'background')` in `core/proc.ts` sets nice 5 or 10 with `os.setPriority`.
+  A refusal is logged once, and a child that already exited is ignored. Plugins reach it through
+  `@acorn/plugin-api/node`.
+- `spawnOwnedProcess` lowers every agent pipe child to 5, so ACP and Codex agents and their builds
+  inherit it. Terminal sessions, the shell, the helper, and the Node stay at the default.
+- `runProcess` and the Git calls take `priority: 'interactive' | 'background'`, in the Node's types
+  and in the published plugin types. Background lowers the child to 10.
+- Background callers: the Git auto-fetch (`remotes.change` takes the priority), the local Git data
+  sources and the commit source, the Docker task-summary `docker ps`, and setup and teardown scripts.
+- The process-and-paths, agent operations, and Docker pages describe it. The session goals section
+  of the agent operations page moved to `session-goals.md`, because the page hit 200 lines.
+
+Decisions and deviations:
+
+1. Setup and teardown scripts don't go through `runProcess`. They run as terminal sessions, so
+   `terminal.ts` lowers a script session's PTY after spawn. A tmux session's command runs under the
+   tmux server, so tmux-backed scripts stay at the default.
+2. Docker uses `execFile`, not `runProcess`. `docker()` takes `background: true`, and only the task
+   summary's list read sets it. A user's refresh of the pane shares that cached read, so a refresh
+   that joins an in-flight summary read gets the lower priority.
+3. "`git fetch` outside a user action" is only the auto-fetch. The other fetches are button presses or
+   task creation.
+4. I found no trigger read that spawns a process. A trigger evaluates over data source records, and
+   the only spawns on that path are the local Git sources already marked.
+5. The two scripts in `data.ts` that read a database URL and schema stay interactive, because a
+   person is waiting on the answer.
+6. The nice value is set just after spawn, so a grandchild forked in the first microseconds could
+   keep the default. Nothing that matters starts that fast.
+7. Codex's usage probe also goes through `spawnOwnedProcess`, so it runs at 5. That is harmless for a
+   short background probe.
+8. Adding `priority` to `ProcSpec` and `GitOptions` changed `publishedPluginSurface.snapshot.txt` with
+   two member lines. It is additive, so the loaded-plugin major stays.
+
+Not done:
+
+- The loaded replay with `--load` and the `agents` fixture, which needs a visible window, and so the
+  frame gap and agent turn wall time. `taskpolicy -c utility` stays an option if nice isn't enough.
+- The week of Sentry for frame gaps over 250 ms under load.
+
+For later phases: the Node service bundle is 1,932,765 B against a ceiling of 1,934,100 B.
+
 Date: October 21, 2026. Status: proposed. Needs phase 1's loaded baseline.
 
 When the machine is busy, the window's frame gaps grow about 25-fold, and every agent, build, and

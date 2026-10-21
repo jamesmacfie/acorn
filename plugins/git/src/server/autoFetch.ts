@@ -82,6 +82,7 @@ export class AutoFetcher {
                   projectId,
                   { action: 'fetch', name: remote.name, expectedUrl: remote.fetchUrl },
                   combined,
+                  'background',
                 )
                 if (result.ok) fetched++
                 else failures++

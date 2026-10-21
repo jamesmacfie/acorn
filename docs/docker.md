@@ -122,7 +122,8 @@ Daemon path strings are compared directly; they are not resolved against this No
 
 Every window polls the device-only task summary every 15 seconds and on `docker:changed`. It answers
 from the Node's last `docker ps` list at once and reads it again behind the answer at most every 10
-seconds (`containerSnapshot` in `plugins/docker/src/server/dockerService.ts`). After a docker event, the
+seconds (`containerSnapshot` in `plugins/docker/src/server/dockerService.ts`), with the `docker ps` at
+a lower CPU priority. After a docker event, the
 next read waits for a fresh list. A failure is remembered for 30 seconds, and the last good list is
 served through it. Each entry's `observedAt` says when the list was read. Task listings, cleanup, and
 the archive check never get an old list.

@@ -1,7 +1,7 @@
 import { execFile } from 'node:child_process'
 import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { readFile } from 'node:fs/promises'
-import { tmpdir } from 'node:os'
+import { getPriority, tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { promisify } from 'node:util'
 import { afterAll, afterEach, describe, expect, it } from 'vitest'
@@ -76,6 +76,20 @@ describe('env allowlist', () => {
   it('spec.env wins over the allowlisted base', () => {
     const env = brokerEnv({ env: { PATH: '/override' } }, { PATH: '/usr/bin' })
     expect(env.PATH).toBe('/override')
+  })
+})
+
+describe('priority', () => {
+  // The child reads its own nice value after a pause, because the parent lowers it just after spawn.
+  const nice = async (overrides: Partial<Parameters<typeof runProcess>[0]>) =>
+    Number((await sh('sleep 0.3; ps -o nice= -p $$', overrides)).stdout.trim())
+
+  it('starts a background child at 10', async () => {
+    expect(await nice({ priority: 'background' })).toBe(10)
+  })
+
+  it('leaves an interactive child at the parent value', async () => {
+    expect(await nice({})).toBe(getPriority())
   })
 })
 

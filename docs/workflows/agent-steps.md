@@ -125,7 +125,7 @@ The agents plugin runs the loop in `agents.sessionExecute`
 1. The opening prompt carries the condition after the work request and before the result contract.
 2. Once the step's turns and any joined notes settle, a judge reads the evidence from this attempt's
    turns only. It's the same judge, evidence builder, verdict format, and model choice as
-   [session goals](../managed-agents/operations.md#session-goals). Each check gets at most 30
+   [session goals](../managed-agents/session-goals.md). Each check gets at most 30
    seconds, and never more than the time left in the step.
 3. The verdict is saved against the exact turns it read. If a turn or note joined while the judge
    ran, the verdict is dropped and the loop looks again.

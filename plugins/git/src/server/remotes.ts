@@ -136,7 +136,12 @@ export class RemoteService {
     return { repository, remotes, lastFetch }
   }
 
-  async change(projectId: string, change: RemoteChange, signal?: AbortSignal): Promise<RemoteChangeResult> {
+  async change(
+    projectId: string,
+    change: RemoteChange,
+    signal?: AbortSignal,
+    priority?: 'interactive' | 'background',
+  ): Promise<RemoteChangeResult> {
     const active = this.signal(signal)
     active.throwIfAborted()
     let roster = await this.readRoster(projectId, active)
@@ -197,6 +202,7 @@ export class RemoteService {
           timeoutMs: change.action === 'fetch' ? REMOTE_TIMEOUT_MS : 30_000,
           env: change.action === 'fetch' ? { GIT_SSH_COMMAND: 'ssh' } : undefined,
           signal: active,
+          priority,
         })
         command = {
           code: result.code,

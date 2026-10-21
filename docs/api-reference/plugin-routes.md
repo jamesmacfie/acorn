@@ -85,7 +85,7 @@ query is never logged. A path in either body is at most 4,096 characters.
 | `/v1/p/agents/sessions/:id/requests/:requestId/resolve` | Answer a permission or question request. A settled request answers as it is; a second answer while one is settling, or a button the request never offered, is 409 `agent_conflict` |
 | `/v1/p/agents/sessions/:id/{cancel,fork,compact}` | Session controls |
 | `/v1/p/agents/sessions/:id/subagents/:subagentId/cancel` | Stop a Codex child through its parent session ([subagents](../managed-agents/subagents.md#stop-a-codex-child)) |
-| `/v1/p/agents/sessions/:id/goal[/resume]` | Device-only interactive goal set, clear, and resume ([operations](../managed-agents/operations.md#session-goals)) |
+| `/v1/p/agents/sessions/:id/goal[/resume]` | Device-only interactive goal set, clear, and resume ([session goals](../managed-agents/session-goals.md)) |
 | `/v1/p/agents/sessions/:id/{handoff-terminal,implement-plan,regenerate-title}` | Session actions |
 | `/v1/p/agents/sessions/:id/{resume-managed,verify-imported-resume}`, `/transcript-imports` | Resume and transcript import |
 | `/v1/p/agents/attachments[/:id][/content]`, `/artifacts/:id[/content]` | Attachments and artifacts |

@@ -19,6 +19,7 @@ import {
   listProfiles,
   type CompiledPluginBroadcast,
   type PluginDatabase,
+  lowerPriority,
   registerAcornMcpBeforeSpawn,
   rendererBaseCheckout,
   resolveCommand,
@@ -755,6 +756,9 @@ async function spawnOne(
       pty = attachTmuxPty(meta.tmuxSession!, cols, rows)
     } else if (opts.command) {
       pty = spawn(env.SHELL || '/bin/sh', ['-lc', command], { name: 'xterm-256color', cols, rows, cwd, env })
+      // Setup and teardown scripts are the only sessions that carry `script`, and nobody types in them. A
+      // tmux session's command runs under the tmux server, so only this branch can lower it.
+      if (script) lowerPriority(pty.pid, 'background')
     } else {
       pty = spawn(command, launchArgs, { name: 'xterm-256color', cols, rows, cwd, env })
     }

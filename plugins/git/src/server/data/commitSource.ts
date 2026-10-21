@@ -104,7 +104,7 @@ async function projectCommits(core: Core, project: Project, since: number | null
       ...(since === null ? [] : [`--since=@${Math.floor(since / 1000)}`]),
     ],
     // C locale, because Git translates the --shortstat line.
-    { cwd: root, env: { LC_ALL: 'C' }, timeoutMs: 30_000, maxOutputBytes: 16 << 20, signal },
+    { cwd: root, env: { LC_ALL: 'C' }, timeoutMs: 30_000, maxOutputBytes: 16 << 20, signal, priority: 'background' },
   )
   signal.throwIfAborted()
   if (result.code !== 0 || result.timedOut) return { records: [], failed: true, full: false }

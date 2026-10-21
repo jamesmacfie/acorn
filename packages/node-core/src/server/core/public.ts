@@ -1,6 +1,6 @@
 export { git, gitOrThrow, gitText } from './git.ts'
 export { beginLoginShellPath } from './loginShellPath.ts'
 export type { PrefService } from './prefs.ts'
-export { brokerEnv } from './proc.ts'
+export { brokerEnv, lowerPriority } from './proc.ts'
 export { createProjectService } from './projectRefs.ts'
 export { createTaskService } from './tasks.ts'

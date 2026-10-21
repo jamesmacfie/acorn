@@ -3,7 +3,11 @@ import { PassThrough } from 'node:stream'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 const spawnMock = vi.fn()
-vi.mock('node:child_process', () => ({ spawn: spawnMock }))
+// The rest of the module stays real: `@acorn/plugin-api/node`, which the spawn helper imports, needs it.
+vi.mock('node:child_process', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('node:child_process')>()),
+  spawn: spawnMock,
+}))
 
 describe('JsonRpcProcess', () => {
   beforeEach(() => spawnMock.mockReset())

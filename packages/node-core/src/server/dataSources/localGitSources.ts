@@ -172,7 +172,9 @@ const pager = createDataSelectionPager()
 const key = (projectId: string, value: string) => createHash('sha256').update(`${projectId}\0${value}`).digest('hex')
 const time = async (path: string): Promise<number | null> => {
   try {
-    const value = Number(await gitText(['show', '-s', '--format=%ct', 'HEAD'], { cwd: path, timeoutMs: 10_000 }))
+    const value = Number(
+      await gitText(['show', '-s', '--format=%ct', 'HEAD'], { cwd: path, timeoutMs: 10_000, priority: 'background' }),
+    )
     return Number.isFinite(value) ? value * 1000 : null
   } catch {
     return null
@@ -186,7 +188,11 @@ const divergence = async (
   if (!base) return null
   try {
     const [ahead, behind] = (
-      await gitText(['rev-list', '--left-right', '--count', `${branch}...${base}`], { cwd: path, timeoutMs: 10_000 })
+      await gitText(['rev-list', '--left-right', '--count', `${branch}...${base}`], {
+        cwd: path,
+        timeoutMs: 10_000,
+        priority: 'background',
+      })
     )
       .split(/\s+/)
       .map(Number)
@@ -260,7 +266,9 @@ async function projectOptions(request: Extract<DataSourceRequest, { operation: '
 
 async function remoteRepository(path: string, remote: string): Promise<{ host: string; path: string } | null> {
   try {
-    return parseGitRemote(await gitText(['remote', 'get-url', remote], { cwd: path, timeoutMs: 5_000 }))
+    return parseGitRemote(
+      await gitText(['remote', 'get-url', remote], { cwd: path, timeoutMs: 5_000, priority: 'background' }),
+    )
   } catch {
     return null
   }
@@ -280,7 +288,7 @@ export async function localBranches(request: DataSourceRequest, env: Env) {
         '--format=%(refname:short)%00%(upstream:short)%00%(upstream:remotename)%00%(committerdate:unix)',
         'refs/heads',
       ],
-      { cwd: path, timeoutMs: 10_000 },
+      { cwd: path, timeoutMs: 10_000, priority: 'background' },
     )
     const rows = refs.split('\n').filter(Boolean)
     const remotes = [...new Set(rows.map((row) => row.split('\0')[2] || 'origin'))]
@@ -338,7 +346,11 @@ export async function localWorktrees(request: DataSourceRequest, env: Env) {
     const project = await projectPath(request, env)
     const observedAt = Date.now()
     const roster = parseLocalWorktrees(
-      await gitText(['worktree', 'list', '--porcelain', '-z'], { cwd: project.path!, timeoutMs: 10_000 }),
+      await gitText(['worktree', 'list', '--porcelain', '-z'], {
+        cwd: project.path!,
+        timeoutMs: 10_000,
+        priority: 'background',
+      }),
     )
     const tasks = await getDb(env)
       .select({ id: schema.tasks.id, path: schema.tasks.worktreePath })

@@ -3,7 +3,7 @@
 // Docker Desktop, OrbStack, and colima, whatever `docker context` points at.
 import { execFile } from 'node:child_process'
 import { promisify } from 'node:util'
-import { brokerEnv } from '@acorn/plugin-api/node'
+import { brokerEnv, lowerPriority } from '@acorn/plugin-api/node'
 
 const exec = promisify(execFile)
 
@@ -51,7 +51,8 @@ const DAEMON_DOWN_RE = /cannot connect to the docker daemon|docker daemon is not
 
 type ExecErr = { code?: number | string; killed?: boolean; stdout?: string; stderr?: string; message?: string }
 
-type DockerOpts = { timeout?: number; maxBuffer?: number }
+// `background` is for a poll nobody is waiting on: the CLI runs at a lower CPU priority.
+type DockerOpts = { timeout?: number; maxBuffer?: number; background?: boolean }
 
 // Run `docker <args>` and return stdout. Failures become DockerCliError so callers branch on kind.
 export async function docker(args: string[], opts: DockerOpts = {}): Promise<string> {
@@ -61,11 +62,13 @@ export async function docker(args: string[], opts: DockerOpts = {}): Promise<str
 // The same, with stderr too, for `docker logs`, which replays a container's stderr there.
 export async function dockerOutput(args: string[], opts: DockerOpts = {}): Promise<{ stdout: string; stderr: string }> {
   try {
-    return await exec('docker', args, {
+    const run = exec('docker', args, {
       timeout: opts.timeout ?? 20_000,
       maxBuffer: opts.maxBuffer ?? 16 * 1024 * 1024,
       env: dockerEnv(),
     })
+    if (opts.background) lowerPriority(run.child.pid, 'background')
+    return await run
   } catch (err) {
     const e = err as ExecErr
     if (e.code === 'ENOENT') throw new DockerCliError('not_installed', 'docker CLI not found on PATH')

@@ -1,4 +1,5 @@
 import { spawn, type ChildProcessWithoutNullStreams } from 'node:child_process'
+import { lowerPriority } from '@acorn/plugin-api/node'
 
 const PROTOCOL_CLOSE_MS = 1_000
 const SIGNAL_GRACE_MS = 2_000
@@ -100,6 +101,7 @@ export function spawnOwnedProcess(options: { command: string; args: string[]; cw
     stdio: ['pipe', 'pipe', 'pipe'],
     detached: process.platform !== 'win32',
   })
+  lowerPriority(child.pid, 'agent')
   const owner = new OwnedProcess(
     child.pid,
     (done) => {

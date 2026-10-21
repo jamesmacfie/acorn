@@ -1,5 +1,17 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { OwnedProcess, ProcessRetirementError } from './ownedProcess'
+import { getPriority } from 'node:os'
+import { OwnedProcess, ProcessRetirementError, spawnOwnedProcess } from './ownedProcess'
+
+describe('owned process priority', () => {
+  it('starts an agent at nice 5', async () => {
+    const { child, owner } = spawnOwnedProcess({ command: 'sleep', args: ['5'], env: process.env })
+    try {
+      expect(getPriority(child.pid)).toBe(5)
+    } finally {
+      await owner.stop()
+    }
+  })
+})
 
 describe('owned process exit acknowledgement', () => {
   afterEach(() => {

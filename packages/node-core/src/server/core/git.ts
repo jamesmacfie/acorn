@@ -28,6 +28,8 @@ export type GitOptions = {
   // For commands such as diff --no-index, where 1 means a complete answer with differences.
   // Output, deadline, cancellation, and spawn failures still throw.
   allowedExitCodes?: readonly number[]
+  /** `background` for a read or fetch nobody is waiting on (./proc.ts). */
+  priority?: 'interactive' | 'background'
 }
 
 const spec = (args: readonly string[], opts: GitOptions) => ({
@@ -57,6 +59,7 @@ const spec = (args: readonly string[], opts: GitOptions) => ({
   signal: opts.signal,
   stdin: opts.stdin,
   stdoutEncoding: opts.stdoutEncoding,
+  priority: opts.priority,
 })
 
 // Apple's /usr/bin/git is an Xcode selector. After an Xcode update it can refuse every command

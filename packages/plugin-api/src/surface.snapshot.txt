@@ -364,6 +364,7 @@ node: lazyFetch
 node: lazyRouter
 node: lineDelimitedJsonAdapter
 node: listProfiles
+node: lowerPriority
 node: mayActOnTask
 node: mirrorFootprintCapability
 node: ownerId

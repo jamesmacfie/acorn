@@ -142,7 +142,7 @@ export { git, gitOrThrow, gitText } from '@acorn/node-core/server/core'
 // `ctx.events.worktreeStatus(taskId)`. `worktreeGitText` is the same window for any other read-only
 // git command against the tree, such as the changes pane's line counts.
 export { invalidateWorktreeStatus, worktreeGitText, worktreeStatusText } from '@acorn/node-core/server/worktrees'
-export { brokerEnv } from '@acorn/node-core/server/core'
+export { brokerEnv, lowerPriority } from '@acorn/node-core/server/core'
 
 // ── Task, worktree and run configuration ──────────────────────────────────────────────────────
 export { buildSessionEnv, childEnv } from '@acorn/node-core/server/taskEnv.ts'

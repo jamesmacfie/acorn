@@ -19,6 +19,7 @@ const state = vi.hoisted(() => ({
   aliveTmux: '',
   failExitRegistration: false,
   exec: [] as string[][],
+  lowered: [] as string[],
 }))
 vi.mock('node-pty', () => ({
   spawn: (_command: string, args: string[]) => {
@@ -70,6 +71,7 @@ vi.mock('node:child_process', () => ({
   },
 }))
 vi.mock('@acorn/plugin-api/node', () => ({
+  lowerPriority: (_pid: number | undefined, level: string) => state.lowered.push(level),
   getProfile: () => ({
     id: 'shell',
     label: 'Shell',
@@ -190,6 +192,7 @@ afterEach(() => {
   state.spawnArgs.length = 0
   state.systemPrompt = false
   state.exec.length = 0
+  state.lowered.length = 0
   state.tmux = false
   state.agent = false
   state.aliveTmux = ''
@@ -639,6 +642,12 @@ it('runs setup by hand as a "Setup" session in the existing worktree', async () 
     cwd: '/tmp/worktree',
   })
   expect(f.core.taskScripts.report).toHaveBeenCalledWith(identity, { type: 'started', terminalSessionId: sessionId })
+  expect(state.lowered).toEqual(['background'])
+})
+
+it('keeps the priority of a session you type in', async () => {
+  await fixture().terminal.create({ taskId: 'task' })
+  expect(state.lowered).toEqual([])
 })
 
 it('fails a manual setup attempt when the spawn fails, and spawns nothing when core refuses', async () => {

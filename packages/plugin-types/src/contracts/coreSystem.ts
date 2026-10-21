@@ -29,6 +29,8 @@ export type GitOptions = {
   signal?: AbortSignal
   env?: Record<string, string>
   stdin?: string
+  /** `background` for a read or fetch nobody is waiting on. It runs at a lower CPU priority. */
+  priority?: 'interactive' | 'background'
 }
 
 /** Every child process: env allowlist, process-group kill, bounded capture. */
@@ -63,6 +65,9 @@ export type ProcSpec = {
   stdin?: string
   /** How long a group member gets between SIGTERM and SIGKILL. */
   killGraceMs?: number
+  /** `background` runs the child at a lower CPU priority than the default, for work nobody is waiting
+   *  on, such as a poll. Leave it `interactive` for anything a person waits for. */
+  priority?: 'interactive' | 'background'
 }
 
 export type ProcResult = {

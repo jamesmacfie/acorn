@@ -48,6 +48,12 @@ Short-lived work goes through the process broker, `packages/node-core/src/server
 uses explicit working directories, environment allowlists, process-group termination, bounded
 output, and production timeouts ([child environments](./credentials.md#child-environments)).
 
+A caller that spawns work nobody is waiting on passes `priority: 'background'` to `runProcess` or to
+a Git call. The child runs at nice 10, below an agent's 5. The default, `'interactive'`, keeps the
+Node's priority, so a read a person waits for isn't slowed. The setup and teardown scripts (when
+the terminal isn't using tmux), the Docker task-summary poll, the Git auto-fetch, and the local Git data
+sources run in the background.
+
 Long-lived engines own their own children under the same environment rules: a PTY, a JSON-RPC agent
 driver, a `docker logs -f` stream, a ripgrep scan, or a Postgres client. Each outlives a request and
 streams as it goes, which doesn't fit "run a bounded command and kill its group". They're an
