@@ -7,7 +7,7 @@ sources:
   - packages/protocol/src/plugin/cliCommands.ts
   - examples/plugins/acme-data/acorn-plugin.json
   - examples/plugins/acme-data/server/routes.js
-checked: f7af12472
+checked: 'cd6645657'
 ---
 
 import { Steps } from '@astrojs/starlight/components'
@@ -52,8 +52,10 @@ Read [Store data](/docs/build-plugins/node/store-data/). The code is from
 
    <ExampleCode file="acme-data/acorn-plugin.json" pick={['permissions.node.core']} />
 
-3. **Answer the route.** By the time your route runs, acorn has checked the device, that `nodeId` is
-   this Node, that the task exists, and that the input fits your schema.
+3. **Answer the route.** When someone runs the command, acorn checks the device, that `nodeId` is
+   this Node, that the task exists, and that the input fits your schema before your route runs. An
+   agent can't post to the route directly. Your own device can, which skips those checks, so check
+   anything that matters in the body yourself.
 
    <ExampleCode file="acme-data/server/routes.js" region="cli" />
 

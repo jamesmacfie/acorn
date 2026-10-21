@@ -1,6 +1,7 @@
 // Manifest routes become the same owner-bound schedule, task-check and hook registrations that
 // compiled plugins make through their context. The host decides when these registrations live.
 import type { Env } from '../bindings'
+import { PLUGIN_NAMESPACE, reserveHostDispatchedPath } from '../routes/registry'
 import type { LoadedPluginBinding } from './context'
 import type { NodePluginContext, PluginHookPoint } from './types'
 import { isHookMode } from './hooks'
@@ -79,5 +80,29 @@ export function registerManifestHooks(
       priority: entry.priority,
       run: (payload, signal) => runPluginHookRoute(env, name, entry.route!, payload, signal),
     })
+  }
+}
+
+/** Reserve every manifest route the host calls through a registration that holds a function rather than
+ *  the path, so the HTTP door refuses an internal caller there (`reserveHostDispatchedPath`). A data
+ *  source, discovery, run source, or node action carries its path, so its context seam reserves it
+ *  instead, which also covers one a plugin registers from its own code. Returns the release. */
+export function reserveManifestRoutes(name: string, binding: LoadedPluginBinding): () => void {
+  const paths = [
+    ...(binding.agentTools ?? []).map((tool) => tool.handler),
+    ...(binding.contextSections ?? []).map((section) => section.read),
+    ...(binding.cliCommands ?? []).map((command) => `${PLUGIN_NAMESPACE}/${name}${command.route.path}`),
+    ...(binding.schedules ?? []).map((schedule) => schedule.run),
+    ...(binding.taskChecks ?? []).flatMap((check) => (check.apply ? [check.check, check.apply] : [check.check])),
+    ...(binding.extensions ?? []).flatMap((entry) => (entry.route ? [entry.route] : [])),
+    ...(binding.harnesses ?? []).flatMap((harness) =>
+      [harness.probes?.usage, harness.probes?.auth].filter((path) => path !== undefined),
+    ),
+  ]
+  const reserved = paths.map((path) => reserveHostDispatchedPath(name, path))
+  const changeRequestApi = binding.codeHost?.changeRequest?.api
+  if (changeRequestApi) reserved.push(reserveHostDispatchedPath(name, changeRequestApi, true))
+  return () => {
+    for (const handle of reserved) handle.dispose()
   }
 }

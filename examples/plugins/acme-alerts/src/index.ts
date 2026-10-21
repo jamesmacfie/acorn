@@ -13,7 +13,9 @@ export default {
   init(ctx) {
     // #region raise
     // `acorn plugin acme-alerts raise` posts here, after the Node checks the input against the
-    // manifest's schema. Raising the same id twice stores one event, so it starts one run.
+    // manifest's schema. The Node refuses an agent on this path, because every trigger on the feed hears
+    // an alert. Your own device can still post here directly, so the feed checks each event against its
+    // schema. Raising the same id twice stores one event, so it starts one run.
     ctx.routes.fetch(async (request, context) => {
       const path = new URL(request.url).pathname
       // Every operation on the Host load source posts here, named by `operation`.

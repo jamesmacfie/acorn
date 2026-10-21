@@ -6,7 +6,7 @@ sources:
   - docs/security/secret-publication.md
   - docs/security/plugin-secrets-and-routes.md
   - docs/security.md
-checked: 52225e24f
+checked: 'cd6645657'
 ---
 
 This page covers where acorn stores credentials such as your GitHub token and API keys, why agents

@@ -18,7 +18,12 @@ import { declareCodeHost } from './codeHosts'
 import type { HostPluginContext, NodePlugin, PluginStorage } from './types'
 import { createLogger, describeError } from '../telemetry/logger'
 import { registerManifestRuntimeContributions } from './runtimeContributions'
-import { registerManifestSchedules, registerManifestTaskChecks, registerManifestHooks } from './manifestWork'
+import {
+  registerManifestSchedules,
+  registerManifestTaskChecks,
+  registerManifestHooks,
+  reserveManifestRoutes,
+} from './manifestWork'
 import { registerManifestHarnesses, registerManifestCustomAgents } from './manifestAgents'
 import {
   registerManifestDataSources,
@@ -211,9 +216,10 @@ export async function initPlugins(
   }
 
   // What a plugin declares rather than registers: its `emits`, its browser handoffs, its task address
-  // route and sidebar panel, and its code host. A loaded plugin's come from its binding, a built-in's
-  // from its own fields. The host owns these undos alongside context registrations; declarations follow
-  // the binding generation and are removed with that instance.
+  // route and sidebar panel, its code host, and the manifest routes the host calls itself. A loaded
+  // plugin's come from its binding, a built-in's from its own fields. The host owns these undos
+  // alongside context registrations; declarations follow the binding generation and are removed with
+  // that instance.
   const registerDeclarations = (
     plugin: NodePlugin,
     binding: LoadedPluginBinding | undefined,
@@ -228,6 +234,7 @@ export async function initPlugins(
       ),
     )
     onUndo(declareCodeHost(plugin.name, binding ? binding.codeHost : plugin.codeHost, !binding))
+    if (binding) onUndo(reserveManifestRoutes(plugin.name, binding))
   }
 
   // Roll a contained plugin back to its pre-init state: undo everything it registered, let it release

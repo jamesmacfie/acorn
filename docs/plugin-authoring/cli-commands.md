@@ -59,9 +59,12 @@ export const examplePlugin = () => ({
 })
 ```
 
-The Node has already checked the paired device, `nodeId`, and project existence before this handler
-runs. A real status command should read its status from a declared core service; this example only
-shows route registration and JSON response shape. The loaded fetch carrier can register a broad route prefix,
+When the CLI runs the command, the Node checks the paired device, `nodeId`, and project existence
+before this handler runs. The Node also refuses an agent on the command's route itself: a task token
+or other internal caller that posts to `/v1/p/<pluginId>/cli/<name>` gets `404`. The owner's own device
+can still post to that route directly, which skips the schema and scope checks, so a handler that
+matters validates its own body. A real status command should read its status from a declared core
+service; this example only shows route registration and JSON response shape. The loaded fetch carrier can register a broad route prefix,
 so manifest activation proves the command path is confined but cannot prove the exact handler
 exists. A missing handler fails at invocation. Use `validatePluginConfig` from
 `@acorn/plugin-api/testkit` for a built package's configuration and exercise the handler against a

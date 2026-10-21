@@ -1,6 +1,67 @@
 # Phase 1: keep agents off the paths the host dispatches
 
-Date: October 21, 2026. Status: proposed. Severity: high.
+## Completion note
+
+Done October 21, 2026, on branch `phase-1-plugin-handler-routes`.
+
+`servePluginFetch` answers `404 not_found` to an internal caller on any path the host calls itself.
+Devices pass. The set lives beside the route registry (`reserveHostDispatchedPath` and
+`isHostDispatchedPath` in `packages/node-core/src/server/routes/registry.ts`). Every reservation goes
+through the plugin's undo list, so a reload, a disable, or a contained failure replaces it along with
+the plugin's other registrations.
+
+Two feeders fill it:
+
+- `reserveManifestRoutes` in `pluginHost/manifestWork.ts` reserves the manifest routes the host turns
+  into function-backed registrations: agent tool handlers, context section reads, CLI command routes,
+  schedule runs, task check and cleanup routes, hook handler routes, harness probes, and everything
+  under a code host's `changeRequest.api`. The host calls it from `registerDeclarations`, at boot and
+  at a reload's commit. `LoadedPluginBinding` gained `cliCommands` for it.
+- The context seams that carry a path reserve it as they register: `dataSources.register` and
+  `discover`, `runs.register`, and `nodeActions.register`. This also covers sources a loaded plugin
+  registers from its own code, as Rollbar and Linear do, and built-ins that serve a source through
+  `ctx.routes.fetch`, such as GitLab and Bitbucket.
+
+Decisions and deviations:
+
+- The recheck against every `dispatchPluginRoute` call found four callers the list above missed: node
+  actions, run sources, the code host's change request API, and data source discoveries. All four
+  are closed too.
+- A task check doesn't put the task ID in its path. `runPluginTaskCheck` sends it as a `taskId` query
+  parameter, so its path matches exactly and needs no pattern. The templated case is the code host's
+  API, whose paths core builds as `{api}/{number}{view}`. That reservation covers the API path and
+  everything under it.
+- Paths compare after `decodeURI`, with repeated and trailing slashes dropped, so `/cli/%72aise` and
+  `/cli/raise/` are refused too. Hono decodes the same way before a plugin's router matches.
+- The rule covers fetch handlers only. Compiled routers keep their per-route gates, which
+  `pluginMountCoverage.test.ts` checks.
+- The scaffold's `/greeting`, and `examples/plugins/hello-pane/server/routes.js` with it, hold a
+  task-scoped caller to its own task. The tutorial shows that file, and the scaffold test compares
+  the two. The comments on acme-alerts' and the trigger template's raise routes say the Node refuses
+  an agent there, and that the feed checks each event a device posts directly.
+- Two site pages changed to match: the CLI command guide and the agent tools guide. The other pages
+  `stale --touching` listed are marked current.
+
+Checked on a standalone Node with acme-alerts loaded. A managed agent session's own task token got
+`404` from `POST /v1/p/acme-alerts/cli/raise`, from the hosts source handler, and from
+`/cli/%72aise`. The same token got `200` from its own task's tools. `acorn plugin acme-alerts raise`
+stored its event, and no agent event reached the feed. With acme-agent's `add_note` raised to
+`execute`, the agent got `404` both from the tool route and from the handler path, and no note was
+written.
+
+What later phases need to know:
+
+- The Node service graph grew by 1,426 bytes, from 1,930,625 to 1,932,051, which is 151 bytes over
+  this branch's 1,931,900-byte ceiling. All of it runs at boot or on every plugin request, so it
+  can't move behind a dynamic import. `pnpm --filter @acorn/node build` fails its size check until
+  the ceiling is raised, which is the coordinator's call.
+- A path that a source names in an answer, such as a row action's `runNodeAction` path or a writable
+  field's `path`, isn't known when the source registers, so it stays open to internal callers. Its
+  handler has to check the caller. Phase 6 should record this as a known limit or design a fix.
+- A new kind of manifest route the host dispatches needs a line in `reserveManifestRoutes`. A new
+  registration that carries a path needs a `reserveDispatched` call at its context seam.
+
+Date: October 21, 2026. Status: done. Severity: high.
 
 A loaded plugin declares paths the host calls for it: an agent tool's handler, a context section's
 read, a CLI command's route, a data source's handler, a schedule's run, a task check, and a hook

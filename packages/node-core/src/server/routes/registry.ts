@@ -92,6 +92,51 @@ export function removePluginRoutes(plugin: string): void {
   registry.remove(plugin)
 }
 
+// The paths in a plugin's namespace that the host calls itself, in process, after checks of its own: a
+// tool's handler after the tool tiers and ceiling, a CLI command's route after the device and schema
+// checks, a source's handler after source admission. Over HTTP the plugin sees the same principal the
+// host sends, so it can't tell a direct call from the host's, and `servePluginFetch` refuses an internal
+// caller on these paths instead.
+//
+// Each registration that will dispatch a path reserves it here, and its undo releases it, so a reload
+// or disable replaces the plugin's set along with its other registrations. `subtree` also covers every
+// path below, for a code host's change request API, whose paths core builds from a number.
+type HostDispatchedPath = { plugin: string; path: string; subtree: boolean }
+const hostDispatched: HostDispatchedPath[] = []
+
+// Compared in the loosest form a plugin's router might match: decoded the way Hono decodes, with
+// repeated and trailing slashes dropped. A false match only refuses an agent, so loose is the safe way.
+function comparablePath(path: string): string {
+  let decoded = path
+  try {
+    decoded = decodeURI(path)
+  } catch {
+    // A malformed escape stays escaped in Hono too, so the raw form is what a router would compare.
+  }
+  return decoded.replace(/\/{2,}/g, '/').replace(/(.)\/+$/, '$1')
+}
+
+export function reserveHostDispatchedPath(plugin: string, path: string, subtree = false): Disposable {
+  // The base only turns a declared route, which may carry a query, into a pathname.
+  const entry = { plugin, path: comparablePath(new URL(path, 'https://acorn.invalid').pathname), subtree }
+  hostDispatched.push(entry)
+  return {
+    dispose: () => {
+      const index = hostDispatched.indexOf(entry)
+      if (index >= 0) hostDispatched.splice(index, 1)
+    },
+  }
+}
+
+export function isHostDispatchedPath(plugin: string, path: string): boolean {
+  const candidate = comparablePath(path)
+  return hostDispatched.some(
+    (entry) =>
+      entry.plugin === plugin &&
+      (candidate === entry.path || (entry.subtree && candidate.startsWith(`${entry.path}/`))),
+  )
+}
+
 /** Which fetch-shaped contribution should serve `path`, resolved at request time.
  *
  * The app mounts one dispatcher over the whole plugin namespace and asks here per request, so this
