@@ -41,6 +41,9 @@ export const nodeFetchRequestSchema = z.strictObject({
   headers: z.record(z.string(), z.string()).default({}),
   body: nodeFetchBodySchema.optional(),
   timeoutMs: z.number().int().positive().optional(),
+  // A request that may hold its socket for minutes without a longer `timeoutMs`, such as a usage
+  // refresh. The broker sends it through a pool of its own, as it does any `timeoutMs` past its default.
+  long: z.boolean().optional(),
   // The renderer may ask for a stricter ceiling for previews. The broker always applies its own
   // 64 MiB maximum, so this field can only reduce its allocation.
   maxResponseBytes: z

@@ -112,6 +112,18 @@ it('accepts a device configuration patch over the helper socket', async () => {
   expect((await call(helper, 'config-write', 'not an object')).ok).toBe(false)
 })
 
+// The renderer retries a failed read, but never a timeout, so the reply has to say which it was.
+it("keeps a failure's name, so the renderer can tell a timeout from another failure", async () => {
+  const { helper } = stubHelper()
+  helper.broker.fetch = () =>
+    Promise.reject(Object.assign(new Error('The node did not answer within 30000ms'), { name: 'TimeoutError' }))
+  const fetch = { nodeId: 'local', request: { requestId: 'r1', path: '/v1/x' } }
+  const reply = await call(helper, 'node-fetch', fetch)
+  expect(reply).toMatchObject({ ok: false, name: 'TimeoutError', error: 'The node did not answer within 30000ms' })
+  helper.broker.fetch = () => Promise.reject(new Error('socket hang up'))
+  expect(await call(helper, 'node-fetch', fetch)).not.toHaveProperty('name')
+})
+
 describe('node-adopt checks the vouched fingerprint against the certificate', () => {
   it('refuses a node presenting an identity the provider did not vouch for', async () => {
     probeNode.mockResolvedValue({

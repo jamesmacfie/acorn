@@ -49,7 +49,12 @@ export type HelperReplyTiming = {
   /** Monotonic time spent awaiting and executing the helper handler. */
   handlerMs: number
 }
-export type HelperReply = ({ id: number; ok: true; value: unknown } | { id: number; ok: false; error: string }) & {
+// A failure keeps its error's `name`, such as the broker's `TimeoutError`, so the renderer can tell a
+// timeout from a refusal.
+export type HelperReply = (
+  | { id: number; ok: true; value: unknown }
+  | { id: number; ok: false; error: string; name?: string }
+) & {
   /** Optional so a renderer can tolerate a helper from before this diagnostic field existed. */
   timing?: HelperReplyTiming
 }
@@ -118,6 +123,7 @@ export type WireFetchRequest = {
   headers?: Record<string, string>
   body?: WireFetchBody
   timeoutMs?: number
+  long?: boolean
   maxResponseBytes?: number
 }
 export type WireFetchResponse = { status: number; headers: Record<string, string>; body: string }

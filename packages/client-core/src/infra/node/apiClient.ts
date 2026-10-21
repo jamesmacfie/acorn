@@ -4,7 +4,7 @@ import { apiRouteNamespace, formatTraceparent } from '@acorn/protocol/telemetry.
 import { nodeTransport } from '../platform'
 import { currentTrace, measure, recordSample, startSpan } from '../telemetry/emitter'
 import { activeNodeId } from './activeNode'
-import { nodeState } from './fleet'
+import { nodeState, nodeStatus } from './fleet'
 
 // The renderer's only HTTP surface. Every request goes through the desktop helper's connection broker
 // (docs/architecture/node-api.md § The platform seam), which owns the endpoint, the pinned
@@ -68,6 +68,9 @@ type SendOptions = {
   // which is less than one model call is allowed to take, so a caller that knows it is slow has to say
   // so. Unset keeps the broker's default.
   timeoutMs?: number
+  // For a request that may run for minutes without a long `timeoutMs`. The broker sends it through its
+  // own pool, so it never holds a socket that fast reads wait for.
+  long?: boolean
   /** A lower response ceiling for a preview that would otherwise allocate up to the broker maximum. */
   maxResponseBytes?: number
   // Who this request is for. `core` unless a plugin's frame asked for it, in which case the host
@@ -83,13 +86,6 @@ type SendOptions = {
 const isMutation = (method: string | undefined): boolean => {
   const verb = (method ?? 'GET').toUpperCase()
   return verb !== 'GET' && verb !== 'HEAD'
-}
-
-// A node whose connection state means a write cannot land. Read from the broker's projection rather
-// than attempted and timed out, because main already knows.
-const isWritable = (nodeId: string): boolean => {
-  const state = nodeState(nodeId)
-  return state !== 'offline' && state !== 'revoked'
 }
 
 /**
@@ -183,16 +179,17 @@ async function deliver(
     }
   }
 
-  // Mutations fail fast and keep the user's input as a draft, with no replay queue
+  // Fail fast rather than wait out the broker's request timeout, because main already knows the node is
+  // unreachable. Mutations keep the user's input as a draft, with no replay queue, and reads leave the
+  // cached answer on screen until a reconnect refetches it
   // (docs/architecture/fleet.md § Client state and fleet behavior).
   //
-  // Fail fast rather than wait out the broker's request timeout, because main already knows the node is
-  // unreachable. A read is still worth attempting: the broker may reconnect between the status update
-  // and the request, and a failed read costs a stale badge.
-  //
-  // `offline` and `revoked` only. `degraded` is WS down and HTTP up, where writes still work, and
-  // `incompatible` gets its own message from the route it fails on.
-  if (isMutation(method) && !isWritable(nodeId)) {
+  // `offline` and `revoked` only. `degraded` is WS down and HTTP up, where requests still work, and
+  // `incompatible` gets its own message from the route it fails on. A node the broker hasn't reported
+  // on yet counts as offline for a write, but a read still goes out, because the broker may already
+  // hold its connection.
+  const state = isMutation(method) ? nodeState(nodeId) : nodeStatus(nodeId)?.state
+  if (state === 'offline' || state === 'revoked') {
     throw new ApiError('This node is offline, so nothing was sent. Try again once it is back.', 0, 'node_offline', {
       retryable: true,
     })
@@ -211,6 +208,7 @@ async function deliver(
       headers,
       ...(body ? { body } : {}),
       ...(options.timeoutMs === undefined ? {} : { timeoutMs: options.timeoutMs }),
+      ...(options.long ? { long: true } : {}),
       ...(options.maxResponseBytes === undefined ? {} : { maxResponseBytes: options.maxResponseBytes }),
     })
     return toApiResponse(res)
@@ -371,6 +369,7 @@ export type WriteInit = {
   signal?: AbortSignal
   nodeId?: string | null
   timeoutMs?: number
+  long?: boolean
   // Both as on `SendOptions` above: who the request is for, and the poster's own opt-out.
   owner?: string
   unmeasured?: boolean

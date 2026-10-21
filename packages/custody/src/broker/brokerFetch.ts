@@ -6,7 +6,10 @@ import { measure, recordDuration, runWithTelemetry } from '@acorn/node-core/serv
 import { nodeRequest, NodeResponseTooLargeError } from './nodeRequest'
 
 const DEFAULT_TIMEOUT_MS = 30_000
-type Target = { node: { endpoint: string; token: string }; agent: HttpAgent | HttpsAgent }
+type Agent = HttpAgent | HttpsAgent
+// `longAgent` is a pool of its own for requests that may hold a socket for minutes, so the fast reads
+// waiting in `agent` never queue behind them.
+type Target = { node: { endpoint: string; token: string }; agent: Agent; longAgent: Agent }
 type Health = { result(response: NodeFetchResponse): void; failure(error: unknown): void }
 
 const countAll = (lists: NodeJS.ReadOnlyDict<readonly unknown[]>): number =>
@@ -26,15 +29,21 @@ export class BrokerFetch {
     if (this.inFlight.has(request.requestId)) throw new Error('A request with this transport ID is already in flight.')
     const controller = new AbortController()
     this.inFlight.set(request.requestId, controller)
-    let timedOut = false
     const timeoutMs = request.timeoutMs ?? DEFAULT_TIMEOUT_MS
-    const timeout = setTimeout(() => {
-      timedOut = true
+    const agent = request.long || timeoutMs > DEFAULT_TIMEOUT_MS ? target.longAgent : target.agent
+    // The request's own deadline starts when it gets a socket, so time spent queued in the helper isn't
+    // counted against the Node. The whole call gets twice that, so a request that never gets a socket
+    // still fails.
+    let timedOut: 'queue' | 'node' | undefined
+    const expire = (kind: 'queue' | 'node') => {
+      timedOut = kind
       controller.abort()
-    }, timeoutMs)
+    }
+    const callTimeout = setTimeout(() => expire('queue'), 2 * timeoutMs)
+    let nodeTimeout: NodeJS.Timeout | undefined
     const labels = { 'node.id': nodeId, method: request.method ?? 'GET' }
     // Sockets in use and requests waiting, read before this request joins the pool.
-    const pool = { 'pool.active': countAll(target.agent.sockets), 'pool.queued': countAll(target.agent.requests) }
+    const pool = { 'pool.active': countAll(agent.sockets), 'pool.queued': countAll(agent.requests) }
     const started = performance.now()
     let socketAt: number | undefined
     // The wait for a socket, which a full pool makes long. A request that never got one waited throughout.
@@ -49,13 +58,21 @@ export class BrokerFetch {
             method: request.method ?? 'GET',
             headers: { ...request.headers, authorization: `Bearer ${target.node.token}` },
             body: request.body,
-            agent: target.agent,
+            agent,
             signal: controller.signal,
             maxResponseBytes: limits.maxResponseBytes ?? request.maxResponseBytes,
-            onSocket: () => (socketAt = performance.now()),
+            onSocket: () => {
+              socketAt = performance.now()
+              nodeTimeout = setTimeout(() => expire('node'), timeoutMs)
+            },
           }),
         labels,
-        () => ({ route: apiRouteNamespace(request.path), 'queue.ms': queueMs(), ...pool }),
+        () => ({
+          route: apiRouteNamespace(request.path),
+          'queue.ms': queueMs(),
+          ...pool,
+          ...(timedOut ? { 'timeout.kind': timedOut } : {}),
+        }),
       )
     // Inside the renderer's trace, a slow request becomes a span beside the Node's own `http.request`,
     // so the trace shows how much of the wait was the queue.
@@ -70,14 +87,19 @@ export class BrokerFetch {
       // Both aborts describe this request. Heartbeats, not a route deadline, own Node liveness.
       if ((error as { name?: unknown } | null)?.name === 'AbortError') {
         if (!timedOut) throw error
-        throw Object.assign(new Error(`The node did not answer within ${timeoutMs}ms`), { name: 'TimeoutError' })
+        const message =
+          timedOut === 'node'
+            ? `The node did not answer within ${timeoutMs}ms`
+            : `The request did not finish within ${2 * timeoutMs}ms, most of it waiting for a connection to the node`
+        throw Object.assign(new Error(message), { name: 'TimeoutError' })
       }
       if (error instanceof NodeResponseTooLargeError) throw error
       health.failure(error)
       throw error
     } finally {
       recordDuration('core', 'broker.queue', queueMs(), labels)
-      clearTimeout(timeout)
+      clearTimeout(callTimeout)
+      clearTimeout(nodeTimeout)
       if (this.inFlight.get(request.requestId) === controller) this.inFlight.delete(request.requestId)
     }
   }

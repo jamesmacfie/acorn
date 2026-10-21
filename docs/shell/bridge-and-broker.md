@@ -92,6 +92,21 @@ broker adds the bearer, checks the pinned certificate, and returns response byte
 `online`, `degraded`, `offline`, `incompatible`, and `revoked`. Nothing asks the webview engine to talk
 to a Node, so there's no certificate-override path to get wrong.
 
+Each Node gets two capped pools of HTTP sockets. The ordinary pool holds 16 sockets for a loopback
+endpoint and 6 for a remote one, where parallel requests share one link. The long pool holds four, for
+a request that names `long: true` in `NodeFetchRequest` or asks for a `timeoutMs` over 30 seconds.
+Usage refresh and task archive name `long`. Workflow generation, MCP server installs, and every other
+caller with a longer `timeoutMs` land there too. So a request that runs for minutes never holds a
+socket that fast reads wait for. Neither pool is unbounded, so a
+polling storm can't open hundreds of connections to a Node.
+
+A request's deadline, 30 seconds unless it passes `timeoutMs`, starts when it gets a socket, so time
+spent queued in the helper doesn't count against the Node. The whole call gets twice that deadline,
+so a request that never gets a socket still fails. Both fail with a `TimeoutError`, and the slow
+`broker.request` span says which deadline fired as `timeout.kind`, `queue` or `node`
+(`packages/custody/src/broker/brokerFetch.ts`). The helper's reply keeps the error's name, so the
+renderer can tell a timeout from another failure.
+
 The broker buffers each response before it crosses to the renderer, so ordinary responses are capped
 at 64 MiB. A plugin bundle download has the bundle format's 8 MiB limit, the unverified pairing probe
 16 KiB, and the pinned pairing result 64 KiB. Each limit rejects an oversized `Content-Length` before
@@ -102,7 +117,9 @@ Both ends run a ping and pong watchdog. A sequence gap or watchdog failure makes
 the client reconnects and refetches. The exception is `ws:shed`, which says the Node dropped
 invalidation frames because this socket was behind. That's congestion, not loss, so the broker
 forwards it ([backpressure](../terminal/activity.md#backpressure)). A write is never queued while a Node is
-offline.
+offline, and the renderer sends no request to a Node the broker reports `offline` or `revoked`. The
+reconnect's protocol probe counts as HTTP working, so a Node whose socket can't open but whose HTTP
+answers still reaches `degraded`.
 
 The helper forwards one Node's frames. It reads which Node is active from the requests it answers:
 `node-fetch` and `node-send` name a Node, and the last one named is active

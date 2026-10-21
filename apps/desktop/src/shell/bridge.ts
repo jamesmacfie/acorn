@@ -149,7 +149,12 @@ const receive = (message: HelperMessage, receipt?: ReplyReceipt): void => {
   // tolerant in tests and if another host calls it directly.
   const observed = receipt ?? { receivedAt: Date.now(), parseMs: 0, payloadChars: 0 }
   if (message.ok) call.resolve(message.value, observed, message.timing)
-  else call.reject(new Error(message.error), observed, message.timing)
+  else
+    call.reject(
+      Object.assign(new Error(message.error), message.name ? { name: message.name } : {}),
+      observed,
+      message.timing,
+    )
 }
 
 // The node id is this end's business; the frame inside still holds the session id and is passed on

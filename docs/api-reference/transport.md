@@ -27,11 +27,14 @@ Core route builders and response types are published through `@acorn/protocol/ap
 source grouped by owner under `packages/protocol/src/transport/api/`. Plugin routes come from each
 plugin's own registration. The route modules own field and validation details.
 
-The desktop broker aborts a request after 30 seconds (`packages/custody/src/broker/brokerFetch.ts`).
-A caller that knows its route is slow passes `timeoutMs` on the request and the broker uses that
-instead. Three callers do: workflow generation asks for 240 seconds, the AI authoring turn for 11
-minutes, and the MCP server test for 45 seconds. A route that needs more than half a minute usually
-wants an event rather than a longer wait. A direct HTTP caller doesn't pass through the broker.
+The desktop broker aborts a request 30 seconds after it gets a socket, and any request 60 seconds
+after the call (`packages/custody/src/broker/brokerFetch.ts`). A caller that knows its route is slow
+passes `timeoutMs` on the request, and the broker uses that and twice that instead. Workflow
+generation asks for 240 seconds, the AI authoring turn for 11 minutes, and most MCP server calls for
+45 to 150 seconds. A request with a `timeoutMs` over 30 seconds, or one that names `long: true`, uses
+the Node's long pool ([connection broker](../shell/bridge-and-broker.md#connection-broker)). A route
+that needs more than half a minute usually wants an event rather than a longer wait. A direct HTTP
+caller doesn't pass through the broker.
 
 `pnpm dev:node` starts the API service on its own. It serves no renderer assets.
 

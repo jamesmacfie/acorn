@@ -10,7 +10,8 @@ export type AgentUsageClient = {
 
 export const agentUsageClient: AgentUsageClient = {
   read: () => readJson<AgentUsageSnapshot>(agentUsageRoute),
-  refresh: () => writeJson<AgentUsageSnapshot>(agentUsageRefreshRoute, { method: 'POST' }),
+  // A refresh asks each provider's CLI and can take minutes, so it goes through the broker's long pool.
+  refresh: () => writeJson<AgentUsageSnapshot>(agentUsageRefreshRoute, { method: 'POST', long: true }),
   refreshProvider: (providerId) =>
-    writeJson<AgentUsageSnapshot>(agentUsageProviderRefreshRoute(providerId), { method: 'POST' }),
+    writeJson<AgentUsageSnapshot>(agentUsageProviderRefreshRoute(providerId), { method: 'POST', long: true }),
 }

@@ -279,6 +279,25 @@ describe('broker HTTP', () => {
     expect(statuses.at(-1)).toMatchObject({ state: 'offline', error: { code: 'unreachable' } })
   })
 
+  // Four was the whole pool once, so four slow requests made every other read wait for one to finish.
+  it('answers a fast read while four slow requests are in flight', async () => {
+    const server = createHttpServer((req, res) => setTimeout(() => res.end('ok'), req.url === '/slow' ? 2_000 : 50))
+    servers.push(server)
+    await new Promise<void>((resolve) => server.listen(0, '127.0.0.1', resolve))
+    const origin = `http://127.0.0.1:${(server.address() as AddressInfo).port}`
+    const broker = makeBroker()
+    broker.upsert({ nodeId: 'n1', label: 'local', endpoint: origin, local: true, token: 't' })
+    const slow = [1, 2, 3, 4].map((n) =>
+      broker.fetch('n1', { requestId: `r-slow-${n}`, path: '/slow' }).catch(() => {}),
+    )
+
+    const started = performance.now()
+    await expect(broker.fetch('n1', { requestId: 'r-fast', path: '/fast' })).resolves.toMatchObject({ status: 200 })
+    expect(performance.now() - started).toBeLessThan(100)
+    broker.dispose()
+    await Promise.all(slow)
+  })
+
   it('rejects a request for an unknown node', async () => {
     await expect(makeBroker().fetch('nope', { requestId: 'r1', path: '/x' })).rejects.toThrow(/Unknown node/)
   })

@@ -56,7 +56,13 @@ const PROTOCOL_PROBE_MAX_BYTES = 16 * 1024
 // ws enforces this while assembling (including inflated messages), before toString/JSON.parse or
 // the helper IPC boundary can make another copy. A malicious node must not pick the allocation size.
 export { MAX_NODE_WS_MESSAGE_BYTES } from '@acorn/protocol/ws.ts'
-const MAX_NODE_HTTP_SOCKETS = 4
+// A cap per Node, never unbounded, so a polling storm can't open hundreds of connections to it. A loopback
+// socket costs only a file descriptor. A remote Node shares one link, where more parallel requests don't
+// help.
+const LOOPBACK_HTTP_SOCKETS = 16
+const REMOTE_HTTP_SOCKETS = 6
+const LONG_HTTP_SOCKETS = 4
+const LOOPBACK_HOSTS = new Set(['127.0.0.1', 'localhost', '[::1]'])
 
 // A node plus the material only the helper may hold: the bearer, and the certificate to pin against.
 export type BrokerNode = NodeRecord & { token: string; certPem?: string }
@@ -75,6 +81,8 @@ export type BrokerEvents = {
 type Connection = {
   node: BrokerNode
   agent: HttpAgent | HttpsAgent
+  // For requests that may hold a socket for minutes (`BrokerFetch`).
+  longAgent: HttpAgent | HttpsAgent
   ws: WebSocket | null
   // Frames the renderer sent before the socket was open. Kept here as well as in the renderer's own
   // outbox, because a reconnect happens inside the helper and the renderer never learns of it.
@@ -116,12 +124,15 @@ export class NodeBroker {
   // token or a moved endpoint cannot leave a socket on the previous credential.
   upsert(node: BrokerNode): void {
     this.remove(node.nodeId)
-    const agent = node.endpoint.startsWith('https:')
-      ? new HttpsAgent({ keepAlive: true, maxSockets: MAX_NODE_HTTP_SOCKETS, ...this.pinning(node) })
-      : new HttpAgent({ keepAlive: true, maxSockets: MAX_NODE_HTTP_SOCKETS })
+    const agentWith = (maxSockets: number) =>
+      node.endpoint.startsWith('https:')
+        ? new HttpsAgent({ keepAlive: true, maxSockets, ...this.pinning(node) })
+        : new HttpAgent({ keepAlive: true, maxSockets })
+    const loopback = LOOPBACK_HOSTS.has(new URL(node.endpoint).hostname)
     const connection: Connection = {
       node,
-      agent,
+      agent: agentWith(loopback ? LOOPBACK_HTTP_SOCKETS : REMOTE_HTTP_SOCKETS),
+      longAgent: agentWith(LONG_HTTP_SOCKETS),
       ws: null,
       viewers: new EventViewers((viewerId, error) => this.events.transportError?.(node.nodeId, error, viewerId)),
       state: 'offline',
@@ -186,6 +197,9 @@ export class NodeBroker {
         maxResponseBytes: PROTOCOL_PROBE_MAX_BYTES,
       })
       if (response.status !== 200) return null
+      // The renderer sends no reads to a Node reported offline, so this answer is what lets
+      // `downState` see HTTP working while the socket can't open, and report `degraded`.
+      connection.lastHttpOkAt = Date.now()
       const payload: unknown = JSON.parse(new TextDecoder().decode(response.body))
       const parsed = nodeInfoSchema.safeParse(payload)
       if (parsed.success) {
@@ -210,6 +224,7 @@ export class NodeBroker {
     this.stopHeartbeat(connection)
     connection.ws?.terminate()
     connection.agent.destroy()
+    connection.longAgent.destroy()
     connection.viewers.clear()
     this.connections.delete(nodeId)
   }

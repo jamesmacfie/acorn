@@ -13,8 +13,8 @@ selection across a refetch.
 ### Connection and staleness vocabulary
 
 Every Node-backed view can show live, refreshing, stale, offline, disabled, or error. Stale data keeps
-its last value and names the Node. Offline, reads come from the cache with a badge, and writes fail
-fast with a clear "Node offline" error and keep what you typed. An empty state says whether a feature
+its last value and names the Node. Offline, reads come from the cache with a badge and send nothing to
+the Node, and writes fail fast with a clear "Node offline" error and keep what you typed. An empty state says whether a feature
 is unconfigured, waiting on a provider, disabled, or has no data.
 
 The states rank like this:

@@ -463,7 +463,11 @@ export function startHelperServer(
       if (request.method === 'renderer-pulse') watchdogs.get(socket)?.receive(request.params)
       reply({ ok: true, value: (await handlers[request.method](request.params, owner)) ?? null })
     } catch (error) {
-      reply({ ok: false, error: error instanceof Error ? error.message : String(error) })
+      reply(
+        error instanceof Error
+          ? { ok: false, error: error.message, ...(error.name === 'Error' ? {} : { name: error.name }) }
+          : { ok: false, error: String(error) },
+      )
     }
   }
 

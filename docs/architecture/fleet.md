@@ -14,8 +14,10 @@ covers the split.
 ## Freshness
 
 Every Node-backed query renders with a `live`, `refreshing`, `stale`, `offline`, `disabled`, or
-`error` status. Cached reads stay visible when a Node is offline. Mutations fail fast and keep the
-user's text as a draft. There's no automatic mutation queue.
+`error` status. Cached reads stay visible when a Node is offline. The client sends no request to a
+Node the broker reports `offline` or `revoked`: a read fails at once and leaves the cached answer on
+screen, and a mutation fails fast and keeps the user's text as a draft. A reconnect refetches what's
+on screen. There's no automatic mutation queue.
 
 ## Connection states
 
@@ -41,7 +43,9 @@ unavailable" answer arrives before the client draws "this machine is unavailable
 deadlines when you change the client's window.
 
 A route that misses its deadline says something about that route, not the Node. The broker doesn't
-read its own request timeout as a sign the Node is gone. Liveness comes from the WebSocket heartbeat,
+read its own request timeout as a sign the Node is gone, and the client doesn't retry it, because a
+second try would wait in the same queue. The broker's deadline starts when a request gets a socket
+([connection broker](../shell/bridge-and-broker.md#connection-broker)). Liveness comes from the WebSocket heartbeat,
 and a Node that misses two pings is terminated and reconnected.
 
 ## The Fleet view

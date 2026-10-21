@@ -88,6 +88,32 @@ describe('query failure reports', () => {
   })
 })
 
+describe('read retries', () => {
+  let key = 0
+  const attempts = async (error: Error) => {
+    let calls = 0
+    await clientFor('node-a')
+      .client.fetchQuery({
+        queryKey: ['retry', (key += 1)],
+        queryFn: () => {
+          calls += 1
+          return Promise.reject(error)
+        },
+        retryDelay: 0,
+      })
+      .catch(() => {})
+    return calls
+  }
+
+  it('retries a failure once, and never a timeout, a 4xx answer, or a read refused as offline', async () => {
+    expect(await attempts(new Error('socket hang up'))).toBe(2)
+    expect(await attempts(Object.assign(new Error('unavailable'), { status: 503 }))).toBe(2)
+    expect(await attempts(Object.assign(new Error('slow'), { name: 'TimeoutError' }))).toBe(1)
+    expect(await attempts(Object.assign(new Error('missing'), { status: 404 }))).toBe(1)
+    expect(await attempts(Object.assign(new Error('offline'), { status: 0, code: 'node_offline' }))).toBe(1)
+  })
+})
+
 describe('per-node cache partitioning', () => {
   it('does not collide when two nodes hold the same resource UUID', () => {
     // Two nodes may coincidentally hold the same UUID; that must never collide in the client

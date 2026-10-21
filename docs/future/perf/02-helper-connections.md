@@ -1,5 +1,73 @@
 # Phase 2: stop fast reads waiting behind slow ones
 
+## Completion note
+
+Landed October 21, 2026, on branch `phase-2-helper-connections`. The code, tests, and docs are done.
+The working day of Sentry that the acceptance asks for isn't taken, and needs the owner's machine.
+
+What landed:
+
+- Each Node's ordinary pool holds 16 sockets on loopback and 6 on a remote endpoint. A second pool of
+  four takes any request that names `long: true` in `NodeFetchRequest` or asks for a `timeoutMs` over
+  30 seconds. Usage refresh, both its routes, and task archive name `long`. Workflow generation, the
+  AI authoring turn, MCP server calls, and session summaries already ask for more than 30 seconds, so
+  they move without a change.
+- The request's own deadline starts on its `socket` event. The whole call gets twice that, which is
+  60 seconds for the default. The slow `broker.request` span carries `timeout.kind`, `queue` or `node`,
+  through `slowAttrs`. Both fail as a `TimeoutError`, with different messages.
+- The helper's failure reply keeps the error's `name`, and the desktop bridge restores it. The renderer
+  couldn't tell a timeout from any other failure before this.
+- The query client's default `retry` retries once. It never retries a `TimeoutError`, a 4xx answer, or
+  a `node_offline` refusal.
+- `apiClient` refuses a read to a Node the broker reports `offline` or `revoked`, with the same
+  `node_offline` error a write gets. Nothing reaches the helper.
+- The broker, transport, fleet, states, caching, and telemetry pages describe the two pools, the
+  deadlines, and the read refusal.
+
+Decisions and deviations:
+
+1. No `onlineManager`. TanStack's `onlineManager` is one global for every `QueryClient`, so `fleet.ts`
+   can't set it per Node. Driving it from the active Node would pause fan-out reads to Nodes that
+   are up. It would also park the 28 awaited `fetchQuery` and `ensureQueryData` calls until the Node
+   returned, and queue mutations for replay, which the fleet design rules out. A refused read fails
+   at once instead. The active Node's reconnect already invalidates its active queries (`wsClient`
+   `reconnectSubs`), which is what turns them back on. The cost: a query that refetches during a
+   WebSocket blip, while the broker briefly reports `offline`, shows an error until that refetch,
+   where before its read went through over HTTP.
+2. Only a reported state refuses a read. A Node with no status yet still gets reads, because the
+   broker may already hold its connection. A write still counts no status as offline, as before.
+3. The reconnect's protocol probe now counts as HTTP working (`lastHttpOkAt`). Before, only renderer
+   reads moved a Node with a dead socket and live HTTP from `offline` to `degraded`. With reads
+   refused while `offline`, that Node would have stayed `offline`. No test covers it, because
+   reaching `degraded` takes about seven seconds of reconnect backoff.
+4. The call deadline is twice the request's deadline, not a fixed 60 seconds. A fixed 60 would cut an
+   11-minute workflow generation off at one minute. `queue` means the call deadline fired. Because the
+   Node's deadline didn't, more than half the call was spent waiting for a socket, so the message
+   says so even when the socket came late.
+5. `nodeRequest` settles the call itself on abort. Node reports a destroyed request that's still
+   queued for a socket only once the agent frees one. Before this, a queued read never timed out
+   while the pool stayed full, and the queue deadline couldn't have fired.
+6. A 5xx answer retries once, like a failure in transit. The doc names only timeouts and 4xx as
+   never retried. The default also reaches `fetchQuery` and `ensureQueryData`, which TanStack left
+   unretried when no default was set, so they now retry a failure in transit once.
+7. The CLI's browser bridge sends task archive through its own broker and doesn't mark it `long`. It
+   carries only extension traffic.
+
+Not done:
+
+- The acceptance's working day in Sentry: `broker.queue` p95, renderer against Node p95 for
+  `/v1/core/plugins` and `/v1/core/tasks/:id`, and offline `status:0` timeouts.
+- The programme README still lists this phase. Trim it when the programme closes, as phase 1 did.
+
+For later phases:
+
+- Phase 3: reads to an offline Node no longer reach the helper, so a dead paired Node stops counting
+  toward polls. Count the remaining polls with that in mind.
+- Phase 9: queue waits should mostly be gone. Measure the opens again before building.
+- `broker.queue` has no pool label, so long-pool waits share the ordinary pool's series. There are a
+  handful a day against thousands of reads.
+- The Node service bundle is 1,930,648 bytes against a ceiling of 1,931,900, unchanged by this phase.
+
 Date: October 21, 2026. Status: proposed. Needs phase 1's `queue.ms`.
 
 Every renderer read goes through the helper, which holds four sockets to each Node. Slow requests

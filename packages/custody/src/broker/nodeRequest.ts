@@ -134,6 +134,9 @@ export function nodeRequest(options: NodeRequestOptions): Promise<NodeFetchRespo
 
     const onAbort = () => {
       req.destroy(abortError())
+      // A request still waiting for a socket reports its error only once the agent frees one, so the
+      // abort settles the call itself.
+      reject(abortError())
     }
     signal.addEventListener('abort', onAbort, { once: true })
     if (options.onSocket) req.once('socket', options.onSocket)

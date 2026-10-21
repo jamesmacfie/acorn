@@ -111,8 +111,13 @@ later remount restores again. Hydration keeps fresher in-memory rows.
   rejects if any step fails.
 
 The persisted cache gives fast last-known reads, not mutation confirmation. While a Node is reconnecting
-or offline, cached answers stay visible with freshness badges. A reconnect or sequence gap marks data
-stale and fetches again. There's no history cursor and no offline mutation queue.
+or offline, cached answers stay visible with freshness badges, and a refetch fails without a request.
+A reconnect or sequence gap marks data stale and fetches again. There's no history cursor and no
+offline mutation queue.
+
+A failed read retries once by default (`clientFor` in `packages/client-core/src/infra/node/fleet.ts`).
+It doesn't retry a timeout, which already waited out the broker's deadline, a 4xx answer, or a read
+refused because the Node is offline. A query can set its own `retry`.
 
 A query whose options set `meta: { persist: false }` stays in memory only. Provider search answers do,
 so a relaunch never shows an old answer as though it had just arrived. GitHub job logs and dashboard

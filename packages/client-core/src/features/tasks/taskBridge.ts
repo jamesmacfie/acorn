@@ -20,7 +20,7 @@ import {
   taskStatusesRoute,
 } from '@acorn/protocol/api.ts'
 import type { ProjectConfigPatch, ProjectConfigResponse } from '@acorn/protocol/api.ts'
-import { readJson, writeJson } from '../../infra/node/apiClient'
+import { readJson, writeJson, type WriteInit } from '../../infra/node/apiClient'
 import { createLogger } from '../../infra/telemetry/logger'
 
 const log = createLogger('tasks')
@@ -47,12 +47,12 @@ export type TaskBridge = {
   }
 }
 
-const post = <T>(url: string, body?: unknown, nodeId?: string | null) =>
+const post = <T>(url: string, body?: unknown, init: Pick<WriteInit, 'nodeId' | 'long'> = {}) =>
   writeJson<T>(url, {
     method: 'POST',
     headers: body === undefined ? undefined : { 'content-type': 'application/json' },
     body: body === undefined ? undefined : JSON.stringify(body),
-    nodeId,
+    ...init,
   })
 const put = <T>(url: string, body: unknown) =>
   writeJson<T>(url, { method: 'PUT', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body) })
@@ -70,7 +70,9 @@ export const taskBridge = (): TaskBridge => {
     previewUrl: (taskId, script) =>
       post<{ ok: boolean; url?: string; reason?: string }>(taskPreviewUrlRoute(taskId), { script }),
     task: {
-      archive: (id, opts) => post<ArchiveResult>(taskArchiveRoute(id), opts ?? {}),
+      // Archive tears down a whole task tree and removes each worktree, which can take minutes, so it
+      // goes through the broker's long pool.
+      archive: (id, opts) => post<ArchiveResult>(taskArchiveRoute(id), opts ?? {}, { long: true }),
       archiveConcerns: (id) =>
         readJson<{ concerns?: TaskArchiveConcern[] }>(taskArchiveConcernsRoute(id))
           .then((body) => body?.concerns ?? [])
@@ -80,7 +82,8 @@ export const taskBridge = (): TaskBridge => {
           }),
       restore: (id, opts) => post<RestoreResult>(taskRestoreRoute(id), opts ?? {}),
       delete: (id, opts) => post<DeleteResult>(taskDeleteRoute(id), opts ?? {}),
-      onCreated: (id, nodeId) => post<{ ok: boolean }>(taskOnCreatedRoute(id), undefined, nodeId).then(() => undefined),
+      onCreated: (id, nodeId) =>
+        post<{ ok: boolean }>(taskOnCreatedRoute(id), undefined, { nodeId }).then(() => undefined),
       statuses: () => readJson<TaskStatus[]>(taskStatusesRoute),
     },
   }

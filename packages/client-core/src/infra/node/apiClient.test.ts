@@ -11,27 +11,27 @@ import {
   startInteraction,
 } from '../telemetry/emitter'
 
-// The offline-mutation contract (docs/ui-design/states.md § Connection and staleness vocabulary): "reads come from
+// The offline contract (docs/ui-design/states.md § Connection and staleness vocabulary): reads come from
 // cache with badges; mutations fail fast with a clear 'node offline' error and keep the user's input as a
-// draft. Nothing is queued for later automatic replay."
+// draft. Nothing is queued for later automatic replay.
 
 const node: NodeRecord = { nodeId: 'n1', label: 'Node One', endpoint: 'https://127.0.0.1:9443', local: true }
 
-let attempted: { path: string; method: string; timeoutMs?: number }[] = []
+let attempted: { path: string; method: string; timeoutMs?: number; long?: boolean }[] = []
 let headers: Record<string, string>[] = []
 
-function installBroker(state: NodeConnectionState): void {
+function installBroker(state: NodeConnectionState | null): void {
   attempted = []
   headers = []
   // An event target, because the telemetry emitter listens on the window for diagnostic phases.
   ;(globalThis as { window?: unknown }).window = Object.assign(new EventTarget(), {
     acorn: {
       desktop: true,
-      fleetList: () => Promise.resolve({ nodes: [node], statuses: [{ nodeId: 'n1', state }] }),
+      fleetList: () => Promise.resolve({ nodes: [node], statuses: state ? [{ nodeId: 'n1', state }] : [] }),
       onNodeStatus: () => () => {},
       nodeFetch: (
         _nodeId: string,
-        request: { path: string; method: string; headers: Record<string, string>; timeoutMs?: number },
+        request: { path: string; method: string; headers: Record<string, string>; timeoutMs?: number; long?: boolean },
       ) => {
         headers.push(request.headers)
         // Recorded only when it is there, so the requests that ask for nothing keep the shape the
@@ -40,6 +40,7 @@ function installBroker(state: NodeConnectionState): void {
           path: request.path,
           method: request.method,
           ...(request.timeoutMs === undefined ? {} : { timeoutMs: request.timeoutMs }),
+          ...(request.long === undefined ? {} : { long: request.long }),
         })
         return Promise.resolve({ status: 200, headers: {}, body: new TextEncoder().encode('{"ok":true}') })
       },
@@ -48,7 +49,7 @@ function installBroker(state: NodeConnectionState): void {
   })
 }
 
-const ready = async (state: NodeConnectionState) => {
+const ready = async (state: NodeConnectionState | null) => {
   _resetFleet()
   installBroker(state)
   await refreshFleet()
@@ -98,8 +99,8 @@ describe('request cancellation and encoding', () => {
   })
 })
 
-describe('mutations against an unreachable node', () => {
-  it.each(['offline', 'revoked'] as const)('fails fast without attempting the request (%s)', async (state) => {
+describe('requests to an unreachable node', () => {
+  it.each(['offline', 'revoked'] as const)('fails a mutation fast without attempting it (%s)', async (state) => {
     await ready(state)
     // Fail here rather than waiting out the broker's request timeout. Main already holds the socket, so it
     // already knows the node is unreachable.
@@ -110,9 +111,21 @@ describe('mutations against an unreachable node', () => {
     expect(attempted).toEqual([])
   })
 
-  it('still ATTEMPTS a read, because a stale badge costs less than a blocked pane', async () => {
-    await ready('offline')
+  // A read to a node the broker knows is gone would wait out the broker's deadline, and hold a socket
+  // that reads to every other surface queue for. The cached answer stays on screen.
+  it.each(['offline', 'revoked'] as const)('fails a read fast without attempting it (%s)', async (state) => {
+    await ready(state)
+    const error = await readJson('/v1/core/workspaces').catch((e: unknown) => e)
+    expect(error).toMatchObject({ name: 'ApiError', code: 'node_offline', status: 0 })
+    expect(attempted).toEqual([])
+  })
+
+  // Before the first status, the broker may already hold the connection, so a read is worth sending.
+  // A write still waits for a status that says it can land.
+  it('still sends a read to a node the broker has not reported on', async () => {
+    await ready(null)
     await expect(readJson('/v1/core/workspaces')).resolves.toEqual({ ok: true })
+    await expect(writeJson('/v1/core/workspaces', { method: 'POST', body: '{}' })).rejects.toThrow(/offline/)
     expect(attempted).toEqual([{ path: '/v1/core/workspaces', method: 'GET' }])
   })
 
@@ -125,8 +138,8 @@ describe('mutations against an unreachable node', () => {
   })
 
   it('classifies by verb, not by helper: DELETE is a mutation too', async () => {
-    await ready('offline')
-    await expect(readJson('/v1/core/workspaces')).resolves.toEqual({ ok: true })
+    await ready(null)
+    await expect(writeJson('/v1/core/devices/d1', { method: 'GET' })).resolves.toEqual({ ok: true })
     await expect(writeJson('/v1/core/devices/d1', { method: 'DELETE' })).rejects.toThrow(/offline/)
     expect(attempted.map((a) => a.method)).toEqual(['GET'])
   })
@@ -139,9 +152,11 @@ describe('a caller that knows its request is slow', () => {
     await ready('online')
     await readJson('/v1/core/workspaces')
     await writeJson('/v1/p/workflows/defs/generate', { method: 'POST', body: '{}', timeoutMs: 150_000 })
+    await writeJson('/v1/p/agents/usage/refresh', { method: 'POST', long: true })
     expect(attempted).toEqual([
       { path: '/v1/core/workspaces', method: 'GET' },
       { path: '/v1/p/workflows/defs/generate', method: 'POST', timeoutMs: 150_000 },
+      { path: '/v1/p/agents/usage/refresh', method: 'POST', long: true },
     ])
   })
 })

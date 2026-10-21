@@ -104,6 +104,20 @@ const failureCaches = () => ({
   }),
 })
 
+/**
+ * Whether a failed read gets its one retry.
+ *
+ * Not a timeout, which already waited out the broker's deadline, and whose second try would join the
+ * same queue. Not a 4xx, which the node would answer the same way again. Not a read refused because the
+ * node is offline, which a reconnect refetches. Read structurally, because `ApiError` lives in
+ * apiClient.ts, which imports this file.
+ */
+const retryReadOnce = (failureCount: number, error: unknown): boolean => {
+  const { name, status, code } = (error ?? {}) as { name?: unknown; status?: unknown; code?: unknown }
+  if (failureCount >= 1 || name === 'TimeoutError' || code === 'node_offline') return false
+  return !(typeof status === 'number' && status >= 400 && status < 500)
+}
+
 // The partition used when there is no broker: a renderer served by a node (`dev:node` in a browser),
 // where the origin is the node and no nodeId is known. A named constant rather than `''` so the
 // IndexedDB key stays readable.
@@ -234,6 +248,7 @@ export function clientFor(nodeId: string): NodeCache {
         refetchOnWindowFocus: true,
         staleTime: 30_000,
         gcTime: 1000 * 60 * 60 * 24,
+        retry: retryReadOnce,
       },
     },
   })
