@@ -1,4 +1,14 @@
-import { For, Show, createEffect, createMemo, createResource, createSignal, on, onCleanup } from 'solid-js'
+import {
+  For,
+  Show,
+  createEffect,
+  createMemo,
+  createResource,
+  createSignal,
+  on,
+  onCleanup,
+  type Accessor,
+} from 'solid-js'
 import { createQuery, useQueryClient } from '@tanstack/solid-query'
 import {
   activeNodeId,
@@ -78,7 +88,11 @@ const CHANGES_ROUTE_KEY = 'changes'
 
 export type ChangesModel = ReturnType<typeof createChangesModel>
 
-export function createChangesModel(task: Task, pane: PaneModelContext) {
+/** The commands and chords of the one model whose Git pane is on screen (`createChangesModel`). */
+let commandHolder: { dispose(): void } | null = null
+
+/** `shown` is the Changes tab on screen; `paneShown` is the Git pane on screen, on any tab. */
+export function createChangesModel(task: Task, pane: PaneModelContext & { paneShown: Accessor<boolean> }) {
   const projects = createQuery(() => projectsOptions(true))
   const project = () => projects.data?.find((candidate) => candidate.id === task.projectId)
   const [selectedKey, setSelectedKey] = createSignal<string | null>(null)
@@ -504,23 +518,30 @@ export function createChangesModel(task: Task, pane: PaneModelContext) {
     },
   })
 
-  // The commit pair, the three remote palette rows, and the two chords, all registered for as long
-  // as this model lives. The model outlives every region of the pane and is disposed
-  // before the next task's is built, so the registry never sees a duplicate id.
-  const commands = registerCommands(
-    changesCommands({
-      commit: () => void editor.commit(),
-      amend: () => void editor.amendCommit(),
-      remote: (action) => void remote(action),
-      // The model can be held for a task nobody is looking at, so a remote row asks the host which
-      // pane has focus rather than assuming its own does.
-      inPane: () => focusedPane(task.id) === GIT_PANE && project()?.vcs === 'git',
-    }),
-  )
-  const bindings = registerKeybindings(changesBindings(editor.editorFocused))
-  onCleanup(() => {
-    bindings.dispose()
-    commands.dispose()
+  // The commit pair, the three remote palette rows, and the two chords. Their ids are global and the
+  // host keeps a model for each recent task, so only the task whose Git pane is on screen holds them.
+  // Solid gives no order between one task's pane hiding and the next one's showing, so whichever
+  // shows takes them over, and a hiding model lets go only of what it still holds.
+  const commands = changesCommands({
+    commit: () => void editor.commit(),
+    amend: () => void editor.amendCommit(),
+    remote: (action) => void remote(action),
+    // The model can be held for a task nobody is looking at, so a remote row asks the host which
+    // pane has focus rather than assuming its own does.
+    inPane: () => focusedPane(task.id) === GIT_PANE && project()?.vcs === 'git',
+  })
+  const bindings = changesBindings(editor.editorFocused)
+  createEffect(() => {
+    if (!pane.paneShown()) return
+    commandHolder?.dispose()
+    const held = [registerCommands(commands), registerKeybindings(bindings)]
+    const mine = { dispose: () => held.forEach((registration) => registration.dispose()) }
+    commandHolder = mine
+    onCleanup(() => {
+      if (commandHolder !== mine) return
+      commandHolder = null
+      mine.dispose()
+    })
   })
 
   // The bar's four verbs, behind one busy flag. One flag rather than four: they all talk to the same

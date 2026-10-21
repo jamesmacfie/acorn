@@ -9,13 +9,21 @@ import { afterEach, expect, it, vi } from 'vitest'
 const projects = vi.hoisted(() => ({ data: undefined as unknown }))
 vi.mock('@tanstack/solid-query', () => ({ createQuery: () => projects, useQueryClient: () => ({}) }))
 const inline = vi.hoisted(() => ({ capability: undefined as unknown }))
+// The command ids registered right now, refusing a duplicate as the host's registry does.
+const live = vi.hoisted(() => new Set<string>())
 vi.mock('@acorn/plugin-api/client', async (original) => ({
   ...(await original<Record<string, unknown>>()),
   registerKeybindings: () => ({ dispose() {} }),
   clientCapability: () => inline.capability,
   isArchiving: () => false,
   taskStatusRevision: () => 0,
-  registerCommands: () => ({ dispose() {} }),
+  registerCommands: (commands: { id: string }[]) => {
+    for (const { id } of commands) {
+      if (live.has(id)) throw new Error(`command contribution already registered: ${id}`)
+      live.add(id)
+    }
+    return { dispose: () => commands.forEach(({ id }) => live.delete(id)) }
+  },
   readJson: async () => [],
   clientEvents: { on: () => () => {}, emit: () => {} },
   projectsOptions: () => ({}),
@@ -105,7 +113,10 @@ it('refreshes dependency evidence on scope and status edits and ignores an earli
     })
   const model = createRoot((dispose) => {
     disposers.push(dispose)
-    return createChangesModel({ id: 't1', projectId: 'p1' } as never, { shown: () => true } as never)
+    return createChangesModel(
+      { id: 't1', projectId: 'p1' } as never,
+      { shown: () => true, paneShown: () => true } as never,
+    )
   })
   await vi.waitFor(() => expect(api.dependencies).toHaveBeenCalledTimes(1))
   model.select({ path: 'package.json', staged: true })
@@ -162,7 +173,10 @@ it('drops the dependency review once no dependency file is left in the scope', a
   })
   const model = createRoot((dispose) => {
     disposers.push(dispose)
-    return createChangesModel({ id: 't1', projectId: 'p1' } as never, { shown: () => true } as never)
+    return createChangesModel(
+      { id: 't1', projectId: 'p1' } as never,
+      { shown: () => true, paneShown: () => true } as never,
+    )
   })
   await vi.waitFor(() => expect(model.dependencies()?.revision).toBe(FIRST))
   changes = []
@@ -194,7 +208,10 @@ it.each(['.pnpmfile.cjs', 'npm.config.js', 'requirements.txt', 'pyproject.toml',
     })
     const model = createRoot((dispose) => {
       disposers.push(dispose)
-      return createChangesModel({ id: 't1', projectId: 'p1' } as never, { shown: () => true } as never)
+      return createChangesModel(
+        { id: 't1', projectId: 'p1' } as never,
+        { shown: () => true, paneShown: () => true } as never,
+      )
     })
     await vi.waitFor(() => expect(model.dependencies()?.coverage).toBe('partial'))
     expect(api.dependencies).toHaveBeenCalledWith('t1', 'unstaged')
@@ -214,7 +231,10 @@ it('reads the document again after a revision conflict and draws the new revisio
   api.segments.mockRejectedValue(Object.assign(new Error('changed'), { status: 409, code: 'revision_conflict' }))
   const model = createRoot((dispose) => {
     disposers.push(dispose)
-    return createChangesModel({ id: 't1', projectId: 'p1' } as never, { shown: () => true } as never)
+    return createChangesModel(
+      { id: 't1', projectId: 'p1' } as never,
+      { shown: () => true, paneShown: () => true } as never,
+    )
   })
   await vi.waitFor(() => expect(model.source.topology()?.files[0]?.patchKey).toBe(FIRST))
 
@@ -240,7 +260,10 @@ it('does not read the document again for any other failure', async () => {
   api.segments.mockRejectedValue(Object.assign(new Error('broken'), { status: 500 }))
   const model = createRoot((dispose) => {
     disposers.push(dispose)
-    return createChangesModel({ id: 't1', projectId: 'p1' } as never, { shown: () => true } as never)
+    return createChangesModel(
+      { id: 't1', projectId: 'p1' } as never,
+      { shown: () => true, paneShown: () => true } as never,
+    )
   })
   await vi.waitFor(() => expect(model.source.topology()?.files[0]?.patchKey).toBe(FIRST))
   await expect(
@@ -263,7 +286,10 @@ it('keeps the last document when a read of it fails', async () => {
   api.segments.mockRejectedValue(Object.assign(new Error('changed'), { status: 409, code: 'revision_conflict' }))
   const model = createRoot((dispose) => {
     disposers.push(dispose)
-    return createChangesModel({ id: 't1', projectId: 'p1' } as never, { shown: () => true } as never)
+    return createChangesModel(
+      { id: 't1', projectId: 'p1' } as never,
+      { shown: () => true, paneShown: () => true } as never,
+    )
   })
   await vi.waitFor(() => expect(model.source.topology()?.files[0]?.patchKey).toBe(FIRST))
   api.document.mockRejectedValue(Object.assign(new Error('broken'), { status: 500 }))
@@ -292,7 +318,10 @@ it("keeps an open inline card mounted while the task's sessions update", async (
   answering(FIRST)
   const model = createRoot((dispose) => {
     disposers.push(dispose)
-    return createChangesModel({ id: 't1', projectId: 'p1' } as never, { shown: () => true } as never)
+    return createChangesModel(
+      { id: 't1', projectId: 'p1' } as never,
+      { shown: () => true, paneShown: () => true } as never,
+    )
   })
   await vi.waitFor(() => expect(model.source.topology()?.files[0]?.patchKey).toBe(FIRST))
   const row = { path: 'a.txt', kind: 'add', newNo: 1, oldNo: null, raw: '+x' } as never
@@ -306,4 +335,37 @@ it("keeps an open inline card mounted while the task's sessions update", async (
   setSessions([{ id: 'other', taskId: 't1', lastEventSeq: 2 }])
   expect(Card).toHaveBeenCalledTimes(1)
   expect(host.querySelector('textarea')).toBe(textarea)
+})
+
+it('hands the commit commands to whichever task shows its Git pane', () => {
+  api.status.mockResolvedValue({
+    branch: 'main',
+    upstream: null,
+    ahead: null,
+    behind: null,
+    operation: null,
+    changes: [],
+  })
+  api.document.mockResolvedValue({ files: [] })
+  const [first, setFirst] = createSignal(true)
+  const [second, setSecond] = createSignal(false)
+  for (const [id, paneShown] of [
+    ['t1', first],
+    ['t2', second],
+  ] as const) {
+    createRoot((dispose) => {
+      disposers.push(dispose)
+      createChangesModel({ id, projectId: 'p1' } as never, { shown: paneShown, paneShown } as never)
+    })
+  }
+  expect(live.has('changes.commit')).toBe(true)
+  // The next task's pane showing before the last one's hides is the order that used to throw.
+  setSecond(true)
+  setFirst(false)
+  expect(live.has('changes.commit')).toBe(true)
+  setSecond(false)
+  setFirst(true)
+  expect(live.has('changes.commit')).toBe(true)
+  setFirst(false)
+  expect(live.size).toBe(0)
 })
