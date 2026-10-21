@@ -2,7 +2,8 @@ import { createEffect, createMemo, createSignal, For, on, onMount, Show, type JS
 import { Portal } from 'solid-js/web'
 import { createAnchoredPopover, type Placement } from '../../lib/controls/anchor'
 import PickerRow from './PickerRow'
-import { Button, type ButtonProps } from './Button'
+import type { ButtonProps } from './Button'
+import { DropdownTrigger } from './DropdownTrigger'
 import { ConfirmButton } from './ConfirmButton'
 import Icon from '../content/Icon'
 import { claimField, FieldProvider, NO_FIELD } from './controlAttrs'
@@ -151,25 +152,20 @@ export default function Picker<T>(props: PickerProps<T>) {
 
   return (
     <div class="repo-picker" ref={rootRef}>
-      {/* The kit's own Button, not a second one styled to look like it: height, radius, hover,
-          focus ring and the disabled state all came out slightly different, and a picker beside a
-          button stood 6px taller than it wherever the two met. */}
-      <Button
+      {/* The trigger every dropdown draws, which is the kit's own button, so a picker beside a
+          button or a select matches it in height, radius, hover, focus ring, and disabled state. */}
+      <DropdownTrigger
         label={props.ariaLabel}
         id={field?.id}
         describedBy={field?.describedBy()}
         size={props.size}
         variant={props.variant}
-        opens="listbox"
         expanded={open()}
         disabled={props.disabled}
         onPress={toggle}
       >
-        <span class="repo-picker-label">{props.label}</span>
-        <span class="repo-picker-chevron" aria-hidden="true">
-          ▾
-        </span>
-      </Button>
+        {props.label}
+      </DropdownTrigger>
       <Show when={open()}>
         {/* A control a caller puts in `tools` is not the one the caption names. */}
         <FieldProvider value={NO_FIELD}>

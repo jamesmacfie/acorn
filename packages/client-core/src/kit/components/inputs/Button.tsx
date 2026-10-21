@@ -63,7 +63,9 @@ export type ButtonProps = Tipped & {
   children?: JSX.Element
 }
 
-const buttonAttrs = (own: ButtonProps) => ({
+/** The attributes that make an element the kit's button. Exported for `DropdownTrigger`, which is a
+ *  button with a dropdown's own wiring. */
+export const buttonAttrs = (own: ButtonProps) => ({
   class: 'ui-btn',
   ...tipAttrs(own),
   'data-variant': own.variant ?? 'outline',

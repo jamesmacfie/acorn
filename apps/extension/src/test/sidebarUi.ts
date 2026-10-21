@@ -92,7 +92,7 @@ export async function pickFrom(root: ParentNode, name: string, label: string) {
 
 // What the kit picker named `name` shows as its value.
 export const chosen = (root: ParentNode, name: string) =>
-  button(root, name)?.querySelector('.repo-picker-label')?.textContent
+  button(root, name)?.querySelector('.ui-dropdown-label')?.textContent
 
 // Home's task rows, each the kit's row with its title.
 export const taskRows = (root: ParentNode) => [
