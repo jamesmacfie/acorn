@@ -54,8 +54,18 @@ npm create acorn-plugin release-readiness -- --data-source
 
 It asks what one row represents and which sources it reads, then writes a Vite and Vitest package
 with `src/source.ts`, a passing test, and a build step that bundles `dist/node.js` and rewrites the
-manifest's inputs. This is the one template with dependencies and a build
-([derived sources](./derived-sources.md)).
+manifest's inputs ([derived sources](./derived-sources.md)).
+
+For a plugin whose only job is to notice things and fire triggers, generate an event feed:
+
+```sh
+npm create acorn-plugin my-alerts -- --trigger
+```
+
+It writes the same Vite and Vitest package with `src/feed.ts`, a `raise` CLI command in
+`src/index.ts` that appends to the feed, one suggested trigger, and `src/feed.test.ts`, which runs
+`testTrigger` over three reads. The build rewrites the manifest's feed entry from the code
+([plugin triggers](./triggers.md)).
 
 To extend another plugin's UI after your own pane works, add an `extensions` entry for one of its
 published points. For example, `agents:tool-card` accepts a tree, and `git:diff-line` accepts
@@ -98,7 +108,8 @@ type-checks its node files outside the repository against the packed declaration
 catches dependencies that resolve only inside the workspace. It also type-checks the
 [complete example](./complete-example.md) and checks that the manifest examples on these pages speak
 the current API major. For `--data-source`, it installs the packed SDK into a generated package
-outside the repository, then runs its test, type-checks it, builds it, and loads it.
+outside the repository, then runs its test, type-checks it, builds it, and loads it. It does the
+same for `--trigger`.
 `examples/plugins/test/examples.test.ts` builds the [extension example](./extension-example.md) the same
 way, from its folder, with the shared helpers in `examples/plugins/test/packed.ts`.
 

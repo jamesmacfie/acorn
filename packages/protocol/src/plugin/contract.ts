@@ -3,7 +3,11 @@
 // and retains the public wire types used by older roster rows.
 import { z } from 'zod'
 import { ACORN_BASELINE } from '../baseline.ts'
-import { dataSourceDiscoverySchema, dataSourceRegistrationSchema } from '../data/dataSourceContributions.ts'
+import {
+  dataFeedRegistrationSchema,
+  dataSourceDiscoverySchema,
+  dataSourceRegistrationSchema,
+} from '../data/dataSourceContributions.ts'
 import { PLUGIN_API_MAJOR, PLUGIN_API_RANGE_RE } from './apiVersion.ts'
 import { pluginCliCommandDescriptorSchema } from './cliCommands.ts'
 import { browserHandoffDescriptor, browserPanelDescriptor } from './handoffs.ts'
@@ -341,10 +345,12 @@ const contributionsShape = z.looseObject({
     .default([])
     .describe("Hover and diagnostics for Editor's files in one language, from your routes."),
   dataSources: z
-    .array(dataSourceRegistrationSchema)
+    .array(z.union([dataSourceRegistrationSchema, dataFeedRegistrationSchema]))
     .max(32)
     .optional()
-    .describe('Typed data sources your Node half serves, for dashboards and workflows.'),
+    .describe(
+      'Typed data sources your Node half serves, or event feeds acorn stores for it, for dashboards and workflows.',
+    ),
   dataSourceDiscoveries: z
     .array(dataSourceDiscoverySchema)
     .max(8)
@@ -849,7 +855,10 @@ export type PluginContributions = {
   extensionPoints?: PluginExtensionPointDescriptor[]
   extensions?: PluginExtensionDescriptor[]
   documentServices?: PluginDocumentService[]
-  dataSources?: import('../data/dataSources').DataSourceRegistration[]
+  dataSources?: (
+    | import('../data/dataSources').DataSourceRegistration
+    | import('../data/dataSources').DataFeedRegistration
+  )[]
   dataSourceDiscoveries?: import('../data/dataSources').DataSourceDiscovery[]
   schedules?: PluginScheduleDescriptor[]
   taskChecks?: PluginTaskCheckDescriptor[]

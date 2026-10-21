@@ -14,6 +14,8 @@ const modes = {
     register: 'sync',
     discover: 'sync',
     changed: 'sync',
+    registerFeed: 'sync',
+    append: 'async',
     list: 'async',
     discoverAvailable: 'async',
     invoke: 'async',

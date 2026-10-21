@@ -31,8 +31,9 @@ export const pluginCliCommandDescriptorSchema = z
       .string()
       .min(1)
       .max(64)
+      .optional()
       .describe(
-        'The core facet the command needs, such as `projects:read`. Declare it in `permissions.node.core` too: this field grants nothing.',
+        "The core facet the command needs, such as `projects:read`. Declare it in `permissions.node.core` too: this field grants nothing. Leave it out for a command that touches only your plugin's own data, such as appending to its feed.",
       ),
     inputSchema: boundedPluginToolSchema.describe(
       "A JSON Schema for the command's input, of type `object`, in the same language as an agent tool's.",

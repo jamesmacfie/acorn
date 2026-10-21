@@ -3,11 +3,12 @@ import type { DataBinding, DataField } from '@acorn/protocol/dataBindings.ts'
 import type { QueryReference } from '@acorn/protocol/dataQueries.ts'
 import type { DataSchema } from '@acorn/protocol/dataSchemas.ts'
 import type { Cadence } from '@acorn/protocol/schedules.ts'
+import type { RecordChange } from '@acorn/protocol/starterTriggers.ts'
 import type { ResolvedWorkflowGraph, WorkflowBudget } from './workflowContracts'
 import type { WorkflowRepeatPolicy } from './workflowProcessing'
 
 /** Which records start a run: one that's new, starts matching, or changes in the fields named. */
-export type WorkflowRecordChange = { on: 'new' } | { on: 'enters' } | { on: 'changes'; fields: string[] }
+export type WorkflowRecordChange = RecordChange
 
 /** A record trigger. Its pointers address the record envelope `{ ref, data, display }`, as a For each
  *  loop's do, so a field of the record's data is `/data/<field>`. */

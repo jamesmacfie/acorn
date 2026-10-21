@@ -104,6 +104,19 @@ export function validateDataValue(
   return parsed
 }
 
+/** The schema of the field a pointer names, or undefined when the schema has no such property. */
+export function sourceFieldSchema(schema: DataSchema, pointer: string): DataSchema | undefined {
+  const keys = parseDataPointer(pointer)
+  if (!keys) return undefined
+  let current = schema
+  for (const key of keys) {
+    const next = current.properties && Object.hasOwn(current.properties, key) ? current.properties[key] : undefined
+    if (!next) return undefined
+    current = next
+  }
+  return current
+}
+
 /** A value that doesn't fit its schema, with the pointer of the field at fault, so a person can be
  *  told which field to fix. */
 export class DataValueError extends Error {

@@ -10,7 +10,7 @@ describe('cascadeDeletePluginData', () => {
   let core: TestDb
   afterEach(() => core?.cleanup())
 
-  it('takes the plugin’s prefs and schedule rows, and leaves everything else', async () => {
+  it('takes the plugin’s prefs, schedule rows, and feed events, and leaves everything else', async () => {
     core = makeTestDb()
     await core.db.insert(schema.prefs).values([
       { userId: 'u1', key: pluginStateKey('ntfy', 'board'), value: '1' },
@@ -29,6 +29,12 @@ describe('cascadeDeletePluginData', () => {
       { key: 'core:measures', startedAt: 1, status: 'ok' },
     ])
 
+    const event = { sourceId: 'alerts', time: 1, dataJson: '{}' }
+    await core.db.insert(schema.dataFeedEvents).values([
+      { ...event, pluginId: 'ntfy', eventId: 'a' },
+      { ...event, pluginId: 'ntfy-pro', eventId: 'b' },
+    ])
+
     await cascadeDeletePluginData(core.db, 'ntfy')
 
     expect((await core.db.select().from(schema.prefs)).map((row) => row.key).sort()).toEqual([
@@ -40,5 +46,6 @@ describe('cascadeDeletePluginData', () => {
       'ntfy-pro:sweep',
     ])
     expect((await core.db.select().from(schema.scheduleRuns)).map((row) => row.key)).toEqual(['core:measures'])
+    expect((await core.db.select().from(schema.dataFeedEvents)).map((row) => row.pluginId)).toEqual(['ntfy-pro'])
   })
 })

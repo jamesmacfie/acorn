@@ -4,7 +4,7 @@
   "name": "Acme Code",
   "version": "1.0.0",
   "baseline": "acorn-1",
-  "apiVersion": "5",
+  "apiVersion": "6",
   "permissions": { "api": [], "events": [] },
   "contributions": {
     "harnesses": [

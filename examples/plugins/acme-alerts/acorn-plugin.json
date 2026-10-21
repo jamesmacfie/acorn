@@ -1,0 +1,148 @@
+{
+  "$schema": "https://acorn.sh/schemas/acorn-plugin.schema.json",
+  "id": "acme-alerts",
+  "name": "Acme load alerts",
+  "version": "1.0.0",
+  "baseline": "acorn-1",
+  "apiVersion": "6",
+  "node": "./dist/node.js",
+  "permissions": {
+    "api": [],
+    "events": [],
+    "node": {
+      "core": [],
+      "capabilities": [],
+      "secrets": false,
+      "exec": false,
+      "net": []
+    }
+  },
+  "contributions": {
+    "dataSources": [
+      {
+        "sourceId": "alerts",
+        "name": "Load alerts",
+        "singular": "Alert",
+        "plural": "Alerts",
+        "identityScope": "An event ID is unique within this feed.",
+        "titlePointer": "/host",
+        "feed": {
+          "schema": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "host": {
+                "type": "string"
+              },
+              "load": {
+                "type": "number"
+              }
+            },
+            "required": [
+              "host",
+              "load"
+            ]
+          },
+          "fields": [
+            {
+              "pointer": "/host",
+              "label": "Host",
+              "origin": "declared",
+              "display": {
+                "kind": "text",
+                "role": "title"
+              }
+            },
+            {
+              "pointer": "/load",
+              "label": "Load",
+              "origin": "declared",
+              "display": {
+                "kind": "number"
+              }
+            }
+          ],
+          "starterTriggers": [
+            {
+              "id": "high-load",
+              "label": "A host’s load goes above 4",
+              "description": "Starts a run for each load alert above 4.",
+              "predicate": {
+                "kind": "comparison",
+                "left": {
+                  "address": {
+                    "from": "item",
+                    "pointer": "/load"
+                  }
+                },
+                "operator": "gt",
+                "right": {
+                  "address": {
+                    "from": "literal",
+                    "value": 4
+                  }
+                }
+              },
+              "change": {
+                "on": "new"
+              }
+            }
+          ]
+        }
+      }
+    ],
+    "cliCommands": [
+      {
+        "name": "raise",
+        "title": "Raise a load alert",
+        "summary": "Record that a host’s load crossed a line, so a trigger can start a workflow.",
+        "effects": "Adds a load alert to the Load alerts feed. An id the feed already holds is skipped.",
+        "risk": "write",
+        "scope": "node",
+        "route": {
+          "method": "POST",
+          "path": "/cli/raise"
+        },
+        "inputSchema": {
+          "type": "object",
+          "properties": {
+            "nodeId": {
+              "type": "string"
+            },
+            "host": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 200
+            },
+            "load": {
+              "type": "number"
+            },
+            "id": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 200
+            }
+          },
+          "required": [
+            "nodeId",
+            "host",
+            "load"
+          ],
+          "additionalProperties": false
+        },
+        "outputSchema": {
+          "type": "object",
+          "properties": {
+            "stored": {
+              "type": "number"
+            }
+          },
+          "required": [
+            "stored"
+          ],
+          "additionalProperties": false
+        }
+      }
+    ]
+  }
+}

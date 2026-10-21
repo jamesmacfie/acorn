@@ -3,7 +3,7 @@
   "name": "Acme review",
   "version": "1.0.0",
   "baseline": "acorn-1",
-  "apiVersion": "5",
+  "apiVersion": "6",
   "node": "./node.js",
   "client": "./dist/client.js",
   "requires": { "plugins": [{ "id": "agents" }] },

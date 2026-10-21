@@ -2,6 +2,7 @@ import { z } from 'zod'
 import { dataFieldsSchema, dataPointerSchema, parseDataPredicate, type DataPredicate } from './values/dataBindings'
 import { parseDataSchema } from './values/dataSchemas'
 import { DATA_LIMITS, parseDataValue } from './values/dataValues'
+import type { StarterTrigger } from './starterTriggers'
 import { dataRecordActionSchema, dataRecordTargetSchema, namedDataRecordActionSchema } from './dataActions'
 import {
   DATA_SOURCE_INPUT_NAME,
@@ -11,11 +12,14 @@ import {
   type DataSourceDescriptor,
 } from './dataSourceContributions'
 
+export { DATA_FEED_LIMITS } from './eventFeeds'
 export {
+  dataFeedRegistrationSchema,
   dataSourceDiscoverySchema,
   dataSourceRegistrationSchema,
   parseDataSourceInputRef,
   SOURCE_INPUTS_WITH_PROVIDER,
+  type DataFeedRegistration,
   type DataSourceDiscovery,
   type DataSourceInput,
   type DataSourceRegistration,
@@ -167,6 +171,9 @@ export const dataSourceDescriptionSchema = z
     coverage: dataSourceCoverageSchema.optional(),
     /** Optional host-validated plan suggestions; a source never draws the resulting panel. */
     starterPlans: z.array(z.unknown()).max(10).optional(),
+    /** Suggested record triggers. Not checked here, so one bad starter can't fail the description: the
+     *  Node runs `starterTriggerCheck` right after parsing, and drops each starter that fails it. */
+    starterTriggers: z.array(z.custom<StarterTrigger>()).max(10).optional(),
     /** Action and target metadata is structural; current eligibility is checked per record. */
     actions: z
       .array(z.object({ id, label: id, icon: id.optional(), risk: z.enum(['read', 'write', 'execute']) }).strict())

@@ -42,5 +42,6 @@ export const cascadeDeletePluginData = async (db: AppDatabase, pluginId: string)
     db.delete(schema.prefs).where(like(schema.prefs.key, `${pluginStateKey(pluginId, '')}%`)),
     db.delete(schema.scheduleState).where(like(schema.scheduleState.key, `${pluginId}:%`)),
     db.delete(schema.scheduleRuns).where(like(schema.scheduleRuns.key, `${pluginId}:%`)),
+    db.delete(schema.dataFeedEvents).where(eq(schema.dataFeedEvents.pluginId, pluginId)),
   ])
 }

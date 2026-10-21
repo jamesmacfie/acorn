@@ -1,7 +1,7 @@
 import { type DataSourceDescription, type DataSourceQuery } from '@acorn/protocol/dataSources.ts'
 import { type DataField, type DataPredicate } from '@acorn/protocol/dataBindings.ts'
-import { validateDataValue, type DataSchema } from '@acorn/protocol/dataSchemas.ts'
-import { MISSING, parseDataPointer, readDataPointer } from '@acorn/protocol/dataValues.ts'
+import { sourceFieldSchema, validateDataValue } from '@acorn/protocol/dataSchemas.ts'
+import { MISSING, readDataPointer } from '@acorn/protocol/dataValues.ts'
 
 export type DataSourceErrorCode =
   | 'unavailable'
@@ -28,18 +28,6 @@ export class DataSourceError extends Error {
   ) {
     super([code, detail?.input && `input ${detail.input}`, detail?.reason].filter(Boolean).join(': '))
   }
-}
-
-export function sourceFieldSchema(schema: DataSchema, pointer: string): DataSchema | undefined {
-  const keys = parseDataPointer(pointer)
-  if (!keys) return undefined
-  let current = schema
-  for (const key of keys) {
-    const next = current.properties && Object.hasOwn(current.properties, key) ? current.properties[key] : undefined
-    if (!next) return undefined
-    current = next
-  }
-  return current
 }
 
 export function validateDescription(description: DataSourceDescription): void {

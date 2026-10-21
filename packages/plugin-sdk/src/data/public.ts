@@ -2,6 +2,7 @@
 // docs/plugin-authoring/derived-sources.md for the walkthrough. The implementation in ./derived.ts
 // imports its types from here, and contract.test.ts holds the two together.
 import type {
+  DataFeedRegistration,
   DataField,
   DataPrimitive,
   DataRecordAction,
@@ -15,7 +16,9 @@ import type {
   DataSourceRequest,
   DataSourceResult,
   DataValue,
+  NodePluginContext,
   PluginFetchHandler,
+  StarterTrigger,
 } from 'acorn-plugin-types'
 
 // ── Fields ────────────────────────────────────────────────────────────────────────────────────────
@@ -130,6 +133,8 @@ export type DerivedSourceDefinition<I extends InputSpecs, F extends FieldSpecs, 
   /** How fresh the data is. Defaults to a sentence saying it's read from the inputs each time. */
   consistency?: string
   starterPlans?: unknown[]
+  /** Triggers the trigger dialog suggests for this source. Test them with `checkStarterTriggers`. */
+  starterTriggers?: StarterTrigger[]
   query(args: DerivedQueryArgs<I, P>): DerivedRecord<F>[] | Promise<DerivedRecord<F>[]>
 }
 
@@ -153,3 +158,50 @@ export declare function defineDerivedSource<
 export declare function derivedSourceManifest(
   source: DerivedSource<InputSpecs, FieldSpecs, FieldSpecs>,
 ): DataSourceRegistration
+
+// ── Event feeds ───────────────────────────────────────────────────────────────────────────────────
+
+export type EventFeedDefinition<F extends FieldSpecs> = {
+  /** The feed's source id, unique within your plugin. */
+  id: string
+  name: string
+  singular: string
+  plural: string
+  /** The fields of an event's `data`. Acorn adds a `time` field to every record, so don't declare one. */
+  fields: F
+  icon?: string
+  /** What makes an event's id unique. Defaults to "An event ID is unique within this feed." */
+  identityScope?: string
+  starterTriggers?: StarterTrigger[]
+  /** At most and by default 14. */
+  retentionDays?: number
+  /** At most and by default 10,000. Past it, the oldest events go. */
+  maxEvents?: number
+}
+
+/** One event. Its `id` is unique within the feed, so the same event appended twice is stored once.
+ *  `time` is milliseconds since the epoch. */
+export type FeedEvent<F extends FieldSpecs> = {
+  id: string
+  time: number
+  data: FieldValues<F>
+  title?: string
+  url?: string
+}
+
+export type EventFeed<F extends FieldSpecs> = {
+  readonly definition: EventFeedDefinition<F>
+  /** The `contributions.dataSources` entry for the manifest, or what `ctx.dataSources.registerFeed` takes. */
+  readonly manifest: DataFeedRegistration
+  /** What acorn's `describe` answers for the feed, `time` included. */
+  readonly description: DataSourceDescription
+  /** Store events and say the feed changed. Resolves to how many were new. */
+  append(
+    ctx: { dataSources: Pick<NodePluginContext['dataSources'], 'append'> },
+    events: FeedEvent<F>[],
+  ): Promise<number>
+}
+
+/** Declares an event feed from `field` builders, so the manifest entry and an event's type can't
+ *  disagree. Acorn stores what you append and serves it as a source. */
+export declare function defineEventFeed<const F extends FieldSpecs>(definition: EventFeedDefinition<F>): EventFeed<F>

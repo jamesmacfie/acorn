@@ -157,7 +157,8 @@ export const plugins = new Hono<AppEnv>()
         ? row.active.contributions.cliCommands?.find((command) => command.name === c.req.param('name'))
         : undefined
     if (!descriptor) return respondError(c, 404, 'not_found')
-    if (!row?.active?.permissions.node.core.includes(descriptor.capability)) return respondError(c, 403, 'forbidden')
+    if (descriptor.capability && !row?.active?.permissions.node.core.includes(descriptor.capability))
+      return respondError(c, 403, 'forbidden')
     if (descriptor.risk === 'write' && !c.req.header('idempotency-key')) {
       return respondError(c, 400, 'bad_request', ['Write commands require an Idempotency-Key.'])
     }

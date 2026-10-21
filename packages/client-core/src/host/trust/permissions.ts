@@ -35,6 +35,7 @@ import {
   pluginWebviewGrants,
 } from '@acorn/protocol/plugin/grants.ts'
 import { describeCadence } from '@acorn/protocol/schedules.ts'
+import { DATA_FEED_LIMITS } from '@acorn/protocol/eventFeeds.ts'
 import { formatChord } from '../../features/tasks/paneShortcuts'
 import { describeChannel } from '../frames/channels'
 import { describeScope, GRANTABLE_SCOPES } from '../frames/scopes'
@@ -546,12 +547,29 @@ export const codeHostLines = (contributions: PluginContributions): PermissionLin
   ]
 }
 
-/** Each data source the plugin registers. Its name is the plugin's own, which is what a person picks it by. */
+/** Each data source the plugin registers. Its name is the plugin's own, which is what a person picks it by.
+ *  An event feed adds a line for what acorn stores, with the cap in the key, so a version that keeps
+ *  more reads as newly requested. */
 export const providedSourceLines = (contributions: PluginContributions): PermissionLine[] =>
-  (contributions.dataSources ?? []).map((source) => ({
-    key: `provides:${source.sourceId}`,
-    text: `A data source, ${source.name}`,
-    detail: 'You can use it in panels, workflows, and datasets.',
-    icon: 'table',
-    high: false,
-  }))
+  (contributions.dataSources ?? []).flatMap((source) => {
+    const provides: PermissionLine = {
+      key: `provides:${source.sourceId}`,
+      text: `A data source, ${source.name}`,
+      detail: 'You can use it in panels, workflows, and datasets.',
+      icon: 'table',
+      high: false,
+    }
+    if (!('feed' in source)) return [provides]
+    const events = source.feed.maxEvents ?? DATA_FEED_LIMITS.maxEvents
+    const days = source.feed.retentionDays ?? DATA_FEED_LIMITS.retentionDays
+    return [
+      provides,
+      {
+        key: `stores:${source.sourceId}:${events}`,
+        text: `Store up to ${events.toLocaleString('en-US')} events from this plugin`,
+        detail: `${source.name} keeps each event for ${days === 1 ? '1 day' : `${days} days`}.`,
+        icon: 'database',
+        high: false,
+      },
+    ]
+  })

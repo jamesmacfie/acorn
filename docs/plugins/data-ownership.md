@@ -46,7 +46,8 @@ migrations](../plugin-authoring/storage.md) covers the chain an author writes.
 
 Uninstall removes the package directory and its lockfile. With `purgeData`, it also removes the
 plugin's SQLite file and its WAL files, then everything in the core database keyed by the plugin id:
-the `plugin:<id>:*` preference rows and the `schedule_state` and `schedule_runs` rows under `<id>:`.
+the `plugin:<id>:*` preference rows, the `schedule_state` and `schedule_runs` rows under `<id>:`, and
+the plugin's [event feed](../data-sources/event-feeds.md) rows in `data_feed_events`.
 That last part is `cascadeDeletePluginData` (`packages/node-core/src/server/db/cascade.ts`). Disk goes
 first and the database second, so a failure leaves the plugin gone, not a running plugin whose state
 was deleted under it.

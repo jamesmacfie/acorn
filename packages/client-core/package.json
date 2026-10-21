@@ -9,6 +9,7 @@
     "./features/archive/ArchivePage.tsx": "./src/features/archive/ArchivePage.tsx",
     "./features/dataSources/AuthoringConversation.tsx": "./src/features/dataSources/AuthoringConversation.tsx",
     "./features/dataSources/SourceQueryEditor.tsx": "./src/features/dataSources/SourceQueryEditor.tsx",
+    "./features/dataSources/SuggestedTriggers.tsx": "./src/features/dataSources/SuggestedTriggers.tsx",
     "./features/dataSources/TypedBindingPicker.tsx": "./src/features/dataSources/TypedBindingPicker.tsx",
     "./features/dataSources/fieldPickerModel.ts": "./src/features/dataSources/fieldPickerModel.ts",
     "./features/dashboards/CardFrame.tsx": "./src/features/dashboards/CardFrame.tsx",

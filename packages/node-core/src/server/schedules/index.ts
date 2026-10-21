@@ -113,6 +113,15 @@ export function createScheduler(db: AppDatabase, options: CreateSchedulerOptions
         return `${pruneDatasetRows(db)} expired dataset rows removed`
       },
     })
+    scheduler.register({
+      key: 'core:prune-feeds',
+      name: 'Prune event feed retention',
+      cadence: { daily: '03:55' },
+      run: async () => {
+        const { pruneFeedEvents } = await import('../dataSources/feedStore')
+        return `${pruneFeedEvents(db)} expired feed events removed`
+      },
+    })
   }
 
   return scheduler

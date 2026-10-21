@@ -1,5 +1,13 @@
 import { z } from 'zod'
-import { DATA_LIMITS, MISSING, parseDataPointer, parseDataValue, type DataRead, type DataValue } from './dataValues'
+import {
+  DATA_LIMITS,
+  MISSING,
+  parseDataPointer,
+  parseDataValue,
+  readDataPointer,
+  type DataRead,
+  type DataValue,
+} from './dataValues'
 
 export const dataPointerSchema = z.string().refine((value) => parseDataPointer(value) !== null, 'Invalid data pointer')
 const valueSchema = z.unknown().transform((value, ctx): DataValue => {
@@ -182,4 +190,20 @@ export function compareDataValues(left: DataRead, operator: DataOperator, right:
   if (operator === 'lte') return left <= right
   if (operator === 'gt') return left > right
   return left >= right
+}
+
+/** Whether a record's data matches a predicate of literal comparisons, the way a host-served source
+ *  filters. Throws on an operand that isn't a field of the record or a literal. */
+export function dataPredicateMatches(data: DataValue, predicate: DataPredicate): boolean {
+  if (predicate.kind !== 'comparison')
+    return predicate.kind === 'all'
+      ? predicate.predicates.every((part) => dataPredicateMatches(data, part))
+      : predicate.predicates.some((part) => dataPredicateMatches(data, part))
+  if (predicate.left.address.from !== 'item' || (predicate.right && predicate.right.address.from !== 'literal'))
+    throw new Error('invalid_operand')
+  return compareDataValues(
+    readDataPointer(data, predicate.left.address.pointer),
+    predicate.operator,
+    predicate.right?.address.from === 'literal' ? predicate.right.address.value : MISSING,
+  )
 }

@@ -49,6 +49,31 @@ vi.mock('../workflowsClient', () => ({
   },
 }))
 vi.mock('@solidjs/router', () => ({ useNavigate: () => () => undefined }))
+// One suggestion, as a source that offers "A deploy fails" would list it.
+const suggestion = {
+  key: 'deploys|fails',
+  label: 'A deploy fails',
+  description: 'Starts when a deploy fails.',
+  source: 'Acme deploys',
+  change: { on: 'changes', fields: ['/status'] },
+  reference: {
+    kind: 'inline',
+    bindings: {},
+    content: {
+      name: 'A deploy fails',
+      parameters: { type: 'object', properties: {}, additionalProperties: false },
+      sourceParameters: {},
+      query: { source: { pluginId: 'acme-data', sourceId: 'deploys' }, scope: { parameters: {} }, sort: [] },
+    },
+  },
+}
+vi.mock('@acorn/plugin-api/ui/data-sources', () => ({
+  SuggestedTriggers: (props: { onPick(value: typeof suggestion): void }) => (
+    <button onClick={() => props.onPick(suggestion)}>{suggestion.label}</button>
+  ),
+  SourceQueryEditor: () => null,
+  TypedBindingPicker: () => null,
+}))
 vi.mock('@tanstack/solid-query', () => ({
   createQuery: () => ({ data: [{ id: 'project', name: 'Project', status: 'active' }] }),
   useQueryClient: () => ({ invalidateQueries: async () => undefined }),
@@ -93,7 +118,26 @@ afterEach(() => {
 })
 
 describe('workflow trigger setup', () => {
+  it('opens on suggestions, and a picked one fills When', async () => {
+    expect(document.body.textContent).toContain('Start from a suggestion')
+    expect(document.body.textContent).not.toContain('On a schedule')
+    await press('A deploy fails')
+    expect(document.body.textContent).toContain('When records change')
+    await press('Save draft')
+    expect(saveTrigger).toHaveBeenCalledWith(
+      expect.objectContaining({
+        when: expect.objectContaining({
+          kind: 'records',
+          query: suggestion.reference,
+          change: { on: 'changes', fields: ['/data/status'] },
+        }),
+        cadence: { every: 300 },
+      }),
+    )
+  })
+
   it('progressively reveals record policy, first check, concrete times, and limits', async () => {
+    await press('Set it up yourself')
     expect(document.body.textContent).toContain('On a schedule')
     expect(document.body.textContent).not.toContain('Repeat handling')
     expect(document.body.textContent).not.toContain('Activation is a separate device action')
@@ -107,6 +151,7 @@ describe('workflow trigger setup', () => {
   })
 
   it('saves a disabled draft separately and retains history on activation by default', async () => {
+    await press('Set it up yourself')
     await press('Review activation')
     await press('Save draft')
     expect(saveTrigger).toHaveBeenCalledOnce()
@@ -120,6 +165,7 @@ describe('workflow trigger setup', () => {
 
   it('reports an offline activation failure without retrying or queueing it', async () => {
     approveTrigger.mockRejectedValueOnce(new Error('Node offline'))
+    await press('Set it up yourself')
     await press('Review activation')
     await press('Activate')
     expect(document.body.textContent).toContain('Node offline')

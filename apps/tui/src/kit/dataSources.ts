@@ -4,3 +4,5 @@ export { default as SourceQueryEditor } from '@acorn/client-core/features/dataSo
 export { default as TypedBindingPicker } from '@acorn/client-core/features/dataSources/TypedBindingPicker.tsx'
 export { default as AuthoringConversation } from '@acorn/client-core/features/dataSources/AuthoringConversation.tsx'
 export type { AuthoringConversationProps } from '@acorn/client-core/features/dataSources/AuthoringConversation.tsx'
+export { default as SuggestedTriggers } from '@acorn/client-core/features/dataSources/SuggestedTriggers.tsx'
+export type { SuggestedTrigger } from '@acorn/client-core/features/dataSources/SuggestedTriggers.tsx'

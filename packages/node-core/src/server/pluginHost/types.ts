@@ -2,6 +2,7 @@
 // registration/disposal records; cross-plugin behavior is resolved through typed capabilities,
 // provider registries and contracts, and clients are told about change through broadcasts.
 import type { Hono } from 'hono'
+import type { DataFeedEvent } from '@acorn/protocol/eventFeeds.ts'
 import type { Cadence } from '@acorn/protocol/schedules.ts'
 import type { CompiledCoreServices, CoreServices } from '../core'
 import type { PluginDatabase } from '../plugins/storage'
@@ -441,6 +442,9 @@ export type NodePluginContext = {
     // Fire and forget. Core coalesces it per source and publishes `data-source:changed`
     // (docs/data-sources/changes.md).
     changed(sourceId: string, hint?: { connectionId?: string }): void
+    // A feed is a source the host stores and serves (docs/data-sources/event-feeds.md).
+    registerFeed(feed: import('@acorn/protocol/dataSources.ts').DataFeedRegistration): void
+    append(sourceId: string, events: DataFeedEvent[]): Promise<number>
     list(
       scope: import('@acorn/protocol/dataSources.ts').DataSourceScope,
       invocation: import('../dataSources/authority').DataSourceInvocation,

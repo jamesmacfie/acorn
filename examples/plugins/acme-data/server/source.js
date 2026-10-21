@@ -37,6 +37,23 @@ const starter = {
 }
 // #endregion
 
+// #region trigger
+// A trigger the trigger dialog suggests for this source. It names no workflow or account: the person
+// picks those. "Starts matching" fires again if a deploy that failed is retried and fails again.
+const failing = {
+  id: 'deploy-fails',
+  label: 'A deploy fails',
+  description: 'Starts a run when a deploy’s status becomes failed.',
+  predicate: {
+    kind: 'comparison',
+    left: { address: { from: 'item', pointer: '/status' } },
+    operator: 'eq',
+    right: { address: { from: 'literal', value: 'failed' } },
+  },
+  change: { on: 'enters' },
+}
+// #endregion
+
 // #region describe
 const ENVIRONMENTS = [
   { id: 'staging', label: 'Staging' },
@@ -72,28 +89,40 @@ export const description = {
     {
       pointer: '/status', label: 'Status', origin: 'declared',
       display: { kind: 'status', role: 'status' }, choices: { kind: 'static', values: STATUSES },
+      // The one filter this source runs: the host sends it only `status` equal to a value.
+      query: { operators: ['eq'], sortable: false },
     },
     { pointer: '/at', label: 'Deployed', origin: 'declared', display: { kind: 'datetime', role: 'updated' } },
   ],
   parameters: { type: 'object', additionalProperties: false, properties: {} },
   parameterFields: [],
-  // No field takes a query operator, so the host never sends a filter this handler would have to apply.
   operations: { query: true, options: false, details: false, incremental: false, groups: ['all'] },
   consistency: 'Live reads of this Node’s deploy table.',
   starterPlans: [starter],
+  starterTriggers: [failing],
 }
 // #endregion
 
 // #region query
 /**
+ * The statuses a query asks for. The host checked the predicate against the description, so it holds
+ * only `status` `eq` comparisons, alone or in an `all` group.
+ * @param {any} predicate
+ * @returns {string[]}
+ */
+const wantedStatuses = (predicate) =>
+  !predicate ? [] : (predicate.kind === 'all' ? predicate.predicates : [predicate]).map((test) => test.right.address.value)
+
+/**
  * Answers a `query`: one page of records, and whether there's more.
  * @param {ReturnType<import('./store.js').createStore>} store
- * @param {{ cursor?: string, pageSize?: number }} request
+ * @param {{ cursor?: string, pageSize?: number, query?: { predicate?: unknown } }} request
  */
 export function queryPage(store, request) {
   const from = Number(request.cursor ?? 0)
   const size = request.pageSize ?? 25
-  const deploys = store.all()
+  const statuses = wantedStatuses(request.query?.predicate)
+  const deploys = store.all().filter((deploy) => statuses.every((status) => deploy.status === status))
   const page = deploys.slice(from, from + size)
   return {
     records: page.map(({ id, taskId, environment, status, sha, at }) => ({

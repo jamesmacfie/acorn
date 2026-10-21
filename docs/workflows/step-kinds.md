@@ -16,8 +16,8 @@ The built-in kinds are `agent`, `gate-human`, `gate-policy`, `ci-loop`, `decide`
 | `workflows:policy` | a verdict source for `gate-policy` | a step's `policy` |
 
 A plugin can't start a workflow. It adds to triggers through data sources: it describes its records,
-and a workflow reads them. The [workflow triggers proposal](../future/triggers/README.md) describes
-triggers that start a run when those records change.
+says when they changed, and suggests triggers, and an approved trigger starts the run
+([plugin triggers](../plugin-authoring/triggers.md)).
 
 **A contributed kind is addressed by its qualified id, a built-in by a bare word.** `kind = "agent"`
 is the built-in; `kind = "http:request"` is the http plugin's. That is deliberate: the file says which

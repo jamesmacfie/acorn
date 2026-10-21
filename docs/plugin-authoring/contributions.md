@@ -33,7 +33,7 @@ for pixels.
 | `contextMenus` | 32 | A row on a host-drawn menu ([context menus](./ui-contributions.md#context-menus)) |
 | `extensionPoints` | 16 | A place inside one of your surfaces other plugins may fill ([extensions](./extensions.md)) |
 | `extensions` | 16 | What you bring to another plugin's point ([extensions](./extensions.md)) |
-| `dataSources` | 32 | A Node-owned typed record source: `{ sourceId, name, singular, plural, identityScope, handler, icon?, providerId?, titlePointer?, urlPointer? }` ([typed data sources](../data-sources.md)) |
+| `dataSources` | 32 | A Node-owned typed record source: `{ sourceId, name, singular, plural, identityScope, handler, icon?, providerId?, titlePointer?, urlPointer? }` ([typed data sources](../data-sources.md)), or an event feed with `feed` in place of `handler` and `providerId` ([event feeds](../data-sources/event-feeds.md)) |
 | `dataSourceDiscoveries` | 8 | A bounded source catalogue for resources unknown at install: `{ discoveryId, handler, providerId? }` |
 | `schedules` | 4 | Work the Node runs on a timer: `{ id, name, run, cadence, timeout? }`. `timeout` defaults to 60 seconds ([schedules](../plugins/more-descriptors.md#schedules)) |
 | `taskChecks` | 4 | What you say when the owner archives a task. See [task checks](#task-checks) |

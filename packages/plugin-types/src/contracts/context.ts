@@ -12,6 +12,8 @@ import type { PluginBroadcast } from './events.js'
 import type { CoreServices } from './coreServices.js'
 import type { Logger, PluginTelemetry } from './telemetry.js'
 import type {
+  DataFeedEvent,
+  DataFeedRegistration,
   DataSourceCatalog,
   DataSourceDiscoveryPage,
   DataSourceDiscoveryRequest,
@@ -64,6 +66,11 @@ export type NodePluginContext<Conn = unknown, Items = unknown> = {
      *  when you know which one. Fire and forget: it never throws, and a name that isn't yours is logged
      *  and dropped. */
     changed(sourceId: string, hint?: { connectionId?: string }): void
+    /** Declare an event feed, as a manifest's `contributions.dataSources` entry with `feed` does. */
+    registerFeed(feed: DataFeedRegistration): void
+    /** Store events in one of your feeds and say it changed. Each must fit the feed's schema. An id the
+     *  feed already holds is skipped. At most 100 a call. Resolves to how many were stored. */
+    append(sourceId: string, events: DataFeedEvent[]): Promise<number>
     list(
       scope: DataSourceScope,
       invocation: { principal: PluginRequestContext['principal']; signal: AbortSignal },

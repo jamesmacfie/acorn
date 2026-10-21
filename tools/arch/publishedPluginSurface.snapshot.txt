@@ -1,4 +1,4 @@
-# loaded plugin API major: 5
+# loaded plugin API major: 6
 acorn-plugin-sdk/data: member DerivedQueryArgs.evaluationTime
 acorn-plugin-sdk/data: member DerivedQueryArgs.inputs
 acorn-plugin-sdk/data: member DerivedQueryArgs.mode
@@ -23,6 +23,26 @@ acorn-plugin-sdk/data: member DerivedSourceDefinition.plural
 acorn-plugin-sdk/data: member DerivedSourceDefinition.query
 acorn-plugin-sdk/data: member DerivedSourceDefinition.singular
 acorn-plugin-sdk/data: member DerivedSourceDefinition.starterPlans
+acorn-plugin-sdk/data: member DerivedSourceDefinition.starterTriggers
+acorn-plugin-sdk/data: member EventFeed.append
+acorn-plugin-sdk/data: member EventFeed.definition
+acorn-plugin-sdk/data: member EventFeed.description
+acorn-plugin-sdk/data: member EventFeed.manifest
+acorn-plugin-sdk/data: member EventFeedDefinition.fields
+acorn-plugin-sdk/data: member EventFeedDefinition.icon
+acorn-plugin-sdk/data: member EventFeedDefinition.id
+acorn-plugin-sdk/data: member EventFeedDefinition.identityScope
+acorn-plugin-sdk/data: member EventFeedDefinition.maxEvents
+acorn-plugin-sdk/data: member EventFeedDefinition.name
+acorn-plugin-sdk/data: member EventFeedDefinition.plural
+acorn-plugin-sdk/data: member EventFeedDefinition.retentionDays
+acorn-plugin-sdk/data: member EventFeedDefinition.singular
+acorn-plugin-sdk/data: member EventFeedDefinition.starterTriggers
+acorn-plugin-sdk/data: member FeedEvent.data
+acorn-plugin-sdk/data: member FeedEvent.id
+acorn-plugin-sdk/data: member FeedEvent.time
+acorn-plugin-sdk/data: member FeedEvent.title
+acorn-plugin-sdk/data: member FeedEvent.url
 acorn-plugin-sdk/data: member FieldChoice.id
 acorn-plugin-sdk/data: member FieldChoice.label
 acorn-plugin-sdk/data: member FieldChoice.rank
@@ -57,6 +77,9 @@ acorn-plugin-sdk/data: type DerivedQueryArgs
 acorn-plugin-sdk/data: type DerivedRecord
 acorn-plugin-sdk/data: type DerivedSource
 acorn-plugin-sdk/data: type DerivedSourceDefinition
+acorn-plugin-sdk/data: type EventFeed
+acorn-plugin-sdk/data: type EventFeedDefinition
+acorn-plugin-sdk/data: type FeedEvent
 acorn-plugin-sdk/data: type FieldChoice
 acorn-plugin-sdk/data: type FieldOptions
 acorn-plugin-sdk/data: type FieldSpec
@@ -70,6 +93,7 @@ acorn-plugin-sdk/data: type InputRead
 acorn-plugin-sdk/data: type InputRecord
 acorn-plugin-sdk/data: type InputSpecs
 acorn-plugin-sdk/data: value defineDerivedSource
+acorn-plugin-sdk/data: value defineEventFeed
 acorn-plugin-sdk/data: value derivedSourceManifest
 acorn-plugin-sdk/data: value field
 acorn-plugin-sdk/remote: member KitNodeProps.children
@@ -196,11 +220,21 @@ acorn-plugin-sdk/testing: member TestRow.display
 acorn-plugin-sdk/testing: member TestRow.display.url
 acorn-plugin-sdk/testing: member TestRow.id
 acorn-plugin-sdk/testing: member TestRow.taskId
+acorn-plugin-sdk/testing: member TriggerCheck.starts
+acorn-plugin-sdk/testing: member TriggerRead.completeness
+acorn-plugin-sdk/testing: member TriggerRead.records
+acorn-plugin-sdk/testing: member TriggerRecord.data
+acorn-plugin-sdk/testing: member TriggerRecord.id
 acorn-plugin-sdk/testing: type TestInputs
 acorn-plugin-sdk/testing: type TestResult
 acorn-plugin-sdk/testing: type TestRow
+acorn-plugin-sdk/testing: type TriggerCheck
+acorn-plugin-sdk/testing: type TriggerRead
+acorn-plugin-sdk/testing: type TriggerRecord
+acorn-plugin-sdk/testing: value checkStarterTriggers
 acorn-plugin-sdk/testing: value fixtures
 acorn-plugin-sdk/testing: value testDerivedSource
+acorn-plugin-sdk/testing: value testTrigger
 acorn-plugin-sdk: member AcornBridge.api
 acorn-plugin-sdk: member AcornBridge.api.del
 acorn-plugin-sdk: member AcornBridge.api.get
@@ -551,6 +585,17 @@ acorn-plugin-types: member DataColumn.dataType
 acorn-plugin-types: member DataColumn.isPk
 acorn-plugin-types: member DataColumn.name
 acorn-plugin-types: member DataColumn.nullable
+acorn-plugin-types: member DataFeedEvent.data
+acorn-plugin-types: member DataFeedEvent.id
+acorn-plugin-types: member DataFeedEvent.time
+acorn-plugin-types: member DataFeedEvent.title
+acorn-plugin-types: member DataFeedEvent.url
+acorn-plugin-types: member DataFeedRegistration.feed
+acorn-plugin-types: member DataFeedRegistration.feed.fields
+acorn-plugin-types: member DataFeedRegistration.feed.maxEvents
+acorn-plugin-types: member DataFeedRegistration.feed.retentionDays
+acorn-plugin-types: member DataFeedRegistration.feed.schema
+acorn-plugin-types: member DataFeedRegistration.feed.starterTriggers
 acorn-plugin-types: member DataField.choices
 acorn-plugin-types: member DataField.choices.dependsOn
 acorn-plugin-types: member DataField.choices.kind
@@ -647,6 +692,7 @@ acorn-plugin-types: member DataSourceDescription.reach.parameter
 acorn-plugin-types: member DataSourceDescription.revision
 acorn-plugin-types: member DataSourceDescription.schema
 acorn-plugin-types: member DataSourceDescription.starterPlans
+acorn-plugin-types: member DataSourceDescription.starterTriggers
 acorn-plugin-types: member DataSourceDescription.targets
 acorn-plugin-types: member DataSourceDescription.writable
 acorn-plugin-types: member DataSourceDescriptor.icon
@@ -799,6 +845,7 @@ acorn-plugin-types: member NodePluginContext.codeHosts
 acorn-plugin-types: member NodePluginContext.codeHosts.claim
 acorn-plugin-types: member NodePluginContext.core
 acorn-plugin-types: member NodePluginContext.dataSources
+acorn-plugin-types: member NodePluginContext.dataSources.append
 acorn-plugin-types: member NodePluginContext.dataSources.changed
 acorn-plugin-types: member NodePluginContext.dataSources.discover
 acorn-plugin-types: member NodePluginContext.dataSources.discoverAvailable
@@ -806,6 +853,7 @@ acorn-plugin-types: member NodePluginContext.dataSources.invoke
 acorn-plugin-types: member NodePluginContext.dataSources.list
 acorn-plugin-types: member NodePluginContext.dataSources.queryPublication
 acorn-plugin-types: member NodePluginContext.dataSources.register
+acorn-plugin-types: member NodePluginContext.dataSources.registerFeed
 acorn-plugin-types: member NodePluginContext.dataSources.resolveQuery
 acorn-plugin-types: member NodePluginContext.dataSources.setQueryConsumer
 acorn-plugin-types: member NodePluginContext.events
@@ -1073,6 +1121,8 @@ acorn-plugin-types: member QueryRevision.revision
 acorn-plugin-types: member QueryRevision.sourceRevision
 acorn-plugin-types: member QueryScope.projectId
 acorn-plugin-types: member QueryScope.workspaceId
+acorn-plugin-types: member RecordChange.fields
+acorn-plugin-types: member RecordChange.on
 acorn-plugin-types: member ResolvedQuery.parameters
 acorn-plugin-types: member ResolvedQuery.published
 acorn-plugin-types: member ResolvedQuery.query
@@ -1101,6 +1151,11 @@ acorn-plugin-types: member SessionMessageResult.reason
 acorn-plugin-types: member SessionMessageResult.turnId
 acorn-plugin-types: member SessionMessenger.queue
 acorn-plugin-types: member SessionMessengerContribution.connect
+acorn-plugin-types: member StarterTrigger.change
+acorn-plugin-types: member StarterTrigger.description
+acorn-plugin-types: member StarterTrigger.id
+acorn-plugin-types: member StarterTrigger.label
+acorn-plugin-types: member StarterTrigger.predicate
 acorn-plugin-types: member TaskChangeRequest.host
 acorn-plugin-types: member TaskChangeRequest.number
 acorn-plugin-types: member TaskChangeRequest.path
@@ -1206,6 +1261,8 @@ acorn-plugin-types: type DataBinding
 acorn-plugin-types: type DataBindingAddress
 acorn-plugin-types: type DataCell
 acorn-plugin-types: type DataColumn
+acorn-plugin-types: type DataFeedEvent
+acorn-plugin-types: type DataFeedRegistration
 acorn-plugin-types: type DataField
 acorn-plugin-types: type DataOperator
 acorn-plugin-types: type DataPredicate
@@ -1313,6 +1370,7 @@ acorn-plugin-types: type QueryPublicationResult
 acorn-plugin-types: type QueryReference
 acorn-plugin-types: type QueryRevision
 acorn-plugin-types: type QueryScope
+acorn-plugin-types: type RecordChange
 acorn-plugin-types: type ResolvedQuery
 acorn-plugin-types: type RouteFailure
 acorn-plugin-types: type RouteResult
@@ -1322,6 +1380,7 @@ acorn-plugin-types: type SessionMessageResult
 acorn-plugin-types: type SessionMessenger
 acorn-plugin-types: type SessionMessengerContribution
 acorn-plugin-types: type SetupTrigger
+acorn-plugin-types: type StarterTrigger
 acorn-plugin-types: type TaskChangeRequest
 acorn-plugin-types: type TaskLinkRef
 acorn-plugin-types: type TaskPullRelation

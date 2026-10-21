@@ -1,7 +1,7 @@
 import { createHash, randomUUID } from 'node:crypto'
 import type { DataSourcePage, DataSourceQuery, DataSourceRequest } from '@acorn/protocol/dataSources.ts'
-import { compareDataValues, type DataPredicate } from '@acorn/protocol/dataBindings.ts'
-import { DATA_LIMITS, MISSING, readDataPointer } from '@acorn/protocol/dataValues.ts'
+import { dataPredicateMatches, type DataPredicate } from '@acorn/protocol/dataBindings.ts'
+import { DATA_LIMITS, readDataPointer } from '@acorn/protocol/dataValues.ts'
 
 // Selecting and paging a source's read. See docs/data-sources/serve-a-query.md.
 
@@ -15,20 +15,6 @@ export function dataComparisons(predicate?: DataPredicate): Extract<DataPredicat
   return [predicate]
 }
 
-function matches(data: SourceRecord['data'], predicate: DataPredicate): boolean {
-  if (predicate.kind !== 'comparison')
-    return predicate.kind === 'all'
-      ? predicate.predicates.every((part) => matches(data, part))
-      : predicate.predicates.some((part) => matches(data, part))
-  if (predicate.left.address.from !== 'item' || (predicate.right && predicate.right.address.from !== 'literal'))
-    throw new Error('invalid_operand')
-  return compareDataValues(
-    readDataPointer(data, predicate.left.address.pointer),
-    predicate.operator,
-    predicate.right?.address.from === 'literal' ? predicate.right.address.value : MISSING,
-  )
-}
-
 /** Literal comparisons, in `all` or `any` groups, and numeric sorts only. Ties, and a query with no
  *  sort, fall back to record ID order, or with `readOrder` keep the order the records came in.
  *  Providers validate their advertised subset first and prove exhaustion of the bounded candidate set
@@ -39,20 +25,20 @@ export function selectDataRecords<T extends SourceRecord>(
   { readOrder = false } = {},
 ) {
   const { predicate } = query
-  const selected = (predicate ? records.filter((record) => matches(record.data, predicate)) : [...records]).sort(
-    (a, b) => {
-      for (const sort of query.sort) {
-        const left = readDataPointer(a.data, sort.pointer)
-        const right = readDataPointer(b.data, sort.pointer)
-        if (left === right) continue
-        if (left === null) return -1
-        if (right === null) return 1
-        if (typeof left !== 'number' || typeof right !== 'number') throw new Error('unsupported_sort')
-        return (left - right) * (sort.direction === 'asc' ? 1 : -1)
-      }
-      return readOrder ? 0 : a.recordId < b.recordId ? -1 : a.recordId > b.recordId ? 1 : 0
-    },
-  )
+  const selected = (
+    predicate ? records.filter((record) => dataPredicateMatches(record.data, predicate)) : [...records]
+  ).sort((a, b) => {
+    for (const sort of query.sort) {
+      const left = readDataPointer(a.data, sort.pointer)
+      const right = readDataPointer(b.data, sort.pointer)
+      if (left === right) continue
+      if (left === null) return -1
+      if (right === null) return 1
+      if (typeof left !== 'number' || typeof right !== 'number') throw new Error('unsupported_sort')
+      return (left - right) * (sort.direction === 'asc' ? 1 : -1)
+    }
+    return readOrder ? 0 : a.recordId < b.recordId ? -1 : a.recordId > b.recordId ? 1 : 0
+  })
   return {
     records: query.take ? selected.slice(0, query.take) : selected,
     completeness:

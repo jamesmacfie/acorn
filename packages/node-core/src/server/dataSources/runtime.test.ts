@@ -8,6 +8,7 @@ import { createCoreServices, SecretService } from '../core'
 import { makeTestDb, testEnv, testCoreSeams } from '../../testkit/db'
 import { CapabilityRegistry } from '../pluginHost/capabilities'
 import { clearRegistrations, initPlugins } from '../pluginHost/host'
+import { registerManifestDataSources } from '../pluginHost/manifestCatalog'
 import type { NodePlugin, PluginFetchHandler, PluginStorage } from '../pluginHost/types'
 import { pluginManifestSchema } from '../plugins/manifest'
 import type { AppEnv } from '../middleware/auth'
@@ -59,8 +60,7 @@ async function world(loaded = true, handler = fixtureModule.fetchSource) {
     init(ctx) {
       ctx.routes.fetch(handler, { prefix: '/source' })
       if (!loaded) {
-        for (const source of binding.dataSources ?? []) ctx.dataSources.register(source)
-        for (const discovery of binding.dataSourceDiscoveries ?? []) ctx.dataSources.discover(discovery)
+        registerManifestDataSources(ctx, binding)
       }
     },
   }

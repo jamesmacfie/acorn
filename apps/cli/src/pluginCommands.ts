@@ -30,7 +30,7 @@ const resource = (nodeId: string, pluginId: string, descriptor: PluginCliCommand
   effects: descriptor.effects ?? null,
   risk: descriptor.risk,
   scope: descriptor.scope,
-  capability: descriptor.capability,
+  capability: descriptor.capability ?? null,
   inputSchema: descriptor.inputSchema,
   outputSchema: descriptor.outputSchema,
 })
@@ -40,7 +40,7 @@ export async function pluginCommandHelp(node: CliNode, args: ParsedArgs): Promis
   const row = await active(node, id!)
   const descriptor = row.active!.contributions.cliCommands?.find((entry) => entry.name === command)
   if (!descriptor) throw new CliError('not_found', `Plugin ${id} has no command ${command} on this Node.`, 4)
-  return `Usage: acorn plugin ${id} ${command} --input-file FILE|- [--request-id UUID]\n${descriptor.title}: ${descriptor.summary}\nRisk: ${descriptor.risk}; scope: ${descriptor.scope}; capability: ${descriptor.capability}\n${descriptor.effects ? `Effects: ${descriptor.effects}\n` : ''}Input schema: ${JSON.stringify(descriptor.inputSchema, null, 2)}\nOutput schema: ${JSON.stringify(descriptor.outputSchema, null, 2)}\n`
+  return `Usage: acorn plugin ${id} ${command} --input-file FILE|- [--request-id UUID]\n${descriptor.title}: ${descriptor.summary}\nRisk: ${descriptor.risk}; scope: ${descriptor.scope}${descriptor.capability ? `; capability: ${descriptor.capability}` : ''}\n${descriptor.effects ? `Effects: ${descriptor.effects}\n` : ''}Input schema: ${JSON.stringify(descriptor.inputSchema, null, 2)}\nOutput schema: ${JSON.stringify(descriptor.outputSchema, null, 2)}\n`
 }
 
 export async function runPluginCommand(node: CliNode, args: ParsedArgs): Promise<unknown> {

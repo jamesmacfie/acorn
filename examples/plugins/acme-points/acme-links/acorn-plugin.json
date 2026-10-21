@@ -4,7 +4,7 @@
   "name": "Acme links",
   "version": "1.0.0",
   "baseline": "acorn-1",
-  "apiVersion": "5",
+  "apiVersion": "6",
   "node": "./node.js",
   "client": "./client.js",
   "permissions": {

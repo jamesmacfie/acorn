@@ -48,6 +48,33 @@ export type DataSourceRegistration = DataSourceDescriptor & {
   handler: string
   inputs?: Record<string, DataSourceInput>
 }
+/** An event feed: a source acorn stores and serves for you, so it has no handler. `schema` and `fields`
+ *  describe an event's `data`; acorn adds a `time` field to every record it serves. */
+export type DataFeedRegistration = Omit<DataSourceDescriptor, 'providerId'> & {
+  feed: {
+    schema: DataSchema
+    fields: DataField[]
+    starterTriggers?: StarterTrigger[]
+    /** At most and by default 14. */
+    retentionDays?: number
+    /** At most and by default 10,000. Past it, the oldest events go. */
+    maxEvents?: number
+  }
+}
+/** One event to append. `id` is unique within the feed, so the same event appended twice is stored once.
+ *  `time` is milliseconds since the epoch. */
+export type DataFeedEvent = { id: string; time: number; data: DataValue; title?: string; url?: string }
+/** Which records start a run: one that's new, starts matching, or changes in the fields named. */
+export type RecordChange = { on: 'new' } | { on: 'enters' } | { on: 'changes'; fields: string[] }
+/** A suggested trigger. Its predicate and watched fields point into the source's records, and it names
+ *  no workspace, account, or workflow: the person picks those. */
+export type StarterTrigger = {
+  id: string
+  label: string
+  description: string
+  predicate?: DataPredicate
+  change: RecordChange
+}
 export type DataSourceDescription = {
   schema: DataSchema
   fields: DataField[]
@@ -71,6 +98,7 @@ export type DataSourceDescription = {
   projectScope?: { kind: 'repository' | 'external-project'; parameter: string; record: string }
   coverage?: { kind: 'snapshot' } | { kind: 'events'; retention?: string; earliestTime?: number; complete: boolean }
   starterPlans?: unknown[]
+  starterTriggers?: StarterTrigger[]
   actions?: { id: string; label: string; icon?: string; risk: 'read' | 'write' | 'execute' }[]
   writable?: { field: string; path: string; risk: 'read' | 'write' | 'execute'; values: DataValue[] }[]
   targets?: { kind: string }[]

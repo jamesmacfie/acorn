@@ -78,7 +78,7 @@ export const field: typeof Field = {
 /** A field name as a JSON pointer: `~` and `/` are escaped. */
 const pointerOf = (name: string) => `/${name.replaceAll('~', '~0').replaceAll('/', '~1')}`
 
-function describeFields(specs: FieldSpecs) {
+export function describeFields(specs: FieldSpecs) {
   const entries = Object.entries(specs)
   return {
     schema: {
@@ -264,6 +264,7 @@ export function defineDerivedSource<
         .map((input) => input.label)
         .join(', ')} each time it's read.`,
     ...(definition.starterPlans ? { starterPlans: definition.starterPlans } : {}),
+    ...(definition.starterTriggers ? { starterTriggers: definition.starterTriggers } : {}),
   }
   const generic = definition as unknown as DerivedSourceDefinition<InputSpecs, FieldSpecs, FieldSpecs>
 

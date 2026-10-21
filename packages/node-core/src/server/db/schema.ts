@@ -3,6 +3,7 @@ import { blob, index, integer, primaryKey, real, sqliteTable, text, uniqueIndex 
 export { queryDrafts, queryRevisions, queryConsumers, queryPublicationHolds } from '../queries/schema'
 export { dashboardDrafts, dashboardRevisions } from '../dashboards/schema'
 export { pluginModelGrants, pluginModelCalls } from '../modelProviders/grantSchema'
+export { dataFeedEvents } from '../dataSources/feedSchema'
 export {
   datasets,
   datasetVersions,

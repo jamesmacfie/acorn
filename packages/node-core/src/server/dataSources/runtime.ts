@@ -31,7 +31,7 @@ import {
   type DerivedReadState,
 } from './inputs'
 import { developmentPlugins } from '../plugins/developmentState'
-import { describeError } from '../telemetry/logger'
+import { createLogger, describeError } from '../telemetry/logger'
 import { dispatchSource } from './dispatch'
 import {
   registeredDataSource,
@@ -67,10 +67,14 @@ const publicSource = ({
   handler: _handler,
   coreHandler: _coreHandler,
   loaded: _loaded,
+  feed: _feed,
   ...source
 }: RegisteredDataSource) => source
 
 const sourceRequestScheduler = new ProviderRequestScheduler()
+const log = createLogger('data-sources')
+// Every read describes its source, so each dropped starter is logged once per description revision.
+const droppedStarters = new Set<string>()
 
 const dispatchRegistered = async (
   env: Env,
@@ -219,6 +223,17 @@ async function describe(
     throw new DataSourceError('invalid-response')
   if (new Set(result.actions?.map((action) => action.id)).size !== (result.actions?.length ?? 0))
     throw new DataSourceError('invalid-response')
+  if (result.starterTriggers) {
+    const { starterTriggerCheck } = await import('@acorn/protocol/starterTriggers.ts')
+    const { kept, dropped } = starterTriggerCheck(result, result.starterTriggers)
+    for (const { id, problems } of dropped) {
+      const key = `${source.pluginId}:${source.sourceId}:${id}:${result.revision}`
+      if (droppedStarters.has(key)) continue
+      droppedStarters.add(key)
+      log.warn(`Dropped suggested trigger '${id}' of ${source.pluginId}:${source.sourceId}: ${problems.join(' ')}`)
+    }
+    return { ...result, starterTriggers: kept }
+  }
   return result
 }
 

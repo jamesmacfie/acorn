@@ -1,7 +1,7 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://acorn.sh/schemas/acorn-plugin.schema.json",
-  "title": "acorn plugin manifest (plugin API major 5)",
+  "title": "acorn plugin manifest (plugin API major 6)",
   "type": "object",
   "properties": {
     "$schema": {
@@ -124,7 +124,7 @@
       "minLength": 1,
       "maxLength": 16,
       "pattern": "^\\d{1,4}(-\\d{1,4})?(\\s*\\|\\|\\s*\\d{1,4}(-\\d{1,4})?)*$",
-      "description": "The plugin API majors your plugin works with: one major such as `\"5\"`, a list such as `\"4 || 5\"`, or a span such as `\"4-5\"`. A range that leaves out acorn's major doesn't load."
+      "description": "The plugin API majors your plugin works with: one major such as `\"6\"`, a list such as `\"5 || 6\"`, or a span such as `\"5-6\"`. A range that leaves out acorn's major doesn't load."
     },
     "requires": {
       "description": "What your plugin needs from the rest of the Node before it can work.",
@@ -3631,111 +3631,215 @@
           }
         },
         "dataSources": {
-          "description": "Typed data sources your Node half serves, for dashboards and workflows.",
+          "description": "Typed data sources your Node half serves, or event feeds acorn stores for it, for dashboards and workflows.",
           "maxItems": 32,
           "type": "array",
           "items": {
-            "type": "object",
-            "properties": {
-              "sourceId": {
-                "type": "string",
-                "minLength": 1,
-                "maxLength": 200,
-                "description": "The source's ID, unique in this manifest. Others name it as `<pluginId>:<sourceId>`."
-              },
-              "name": {
-                "type": "string",
-                "minLength": 1,
-                "maxLength": 80,
-                "description": "The source's name, such as `Release readiness`."
-              },
-              "singular": {
-                "type": "string",
-                "minLength": 1,
-                "maxLength": 80,
-                "description": "What one record is called, such as `Issue`."
-              },
-              "plural": {
-                "type": "string",
-                "minLength": 1,
-                "maxLength": 80,
-                "description": "What several are called, such as `Issues`."
-              },
-              "identityScope": {
-                "type": "string",
-                "minLength": 1,
-                "maxLength": 2048,
-                "description": "A sentence saying what a record's ID is and what keeps it stable, such as `GitHub GraphQL node ID; stable across renames`."
-              },
-              "icon": {
-                "description": "A Lucide icon name, or a `brand:` mark.",
-                "type": "string",
-                "maxLength": 80
-              },
-              "providerId": {
-                "description": "The integration whose connection each query picks. Not with `inputs`.",
-                "type": "string",
-                "minLength": 1,
-                "maxLength": 200
-              },
-              "titlePointer": {
-                "description": "A pointer to the field that titles a record.",
-                "type": "string"
-              },
-              "urlPointer": {
-                "description": "A pointer to the field that holds a record's web address.",
-                "type": "string"
-              },
-              "handler": {
-                "type": "string",
-                "minLength": 1,
-                "maxLength": 2048,
-                "description": "The route on your Node half that answers the source's operations."
-              },
-              "inputs": {
+            "anyOf": [
+              {
                 "type": "object",
-                "propertyNames": {
-                  "type": "string",
-                  "pattern": "^[a-z][a-zA-Z0-9]{0,31}$"
-                },
-                "additionalProperties": {
-                  "type": "object",
-                  "properties": {
-                    "source": {
-                      "type": "string",
-                      "maxLength": 401,
-                      "pattern": "^[^:]+:.+$",
-                      "description": "The source this input reads, as `<pluginId>:<sourceId>`. It must be registered statically, not discovered."
-                    },
-                    "label": {
-                      "type": "string",
-                      "minLength": 1,
-                      "maxLength": 80,
-                      "description": "The input's name where the person picks an account for it."
-                    },
-                    "optional": {
-                      "description": "Whether the person may skip it. A skipped input is `undefined` in your query.",
-                      "type": "boolean"
-                    }
+                "properties": {
+                  "sourceId": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 200,
+                    "description": "The source's ID, unique in this manifest. Others name it as `<pluginId>:<sourceId>`."
                   },
-                  "required": [
-                    "source",
-                    "label"
-                  ],
-                  "additionalProperties": false
+                  "name": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 80,
+                    "description": "The source's name, such as `Release readiness`."
+                  },
+                  "singular": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 80,
+                    "description": "What one record is called, such as `Issue`."
+                  },
+                  "plural": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 80,
+                    "description": "What several are called, such as `Issues`."
+                  },
+                  "identityScope": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 2048,
+                    "description": "A sentence saying what a record's ID is and what keeps it stable, such as `GitHub GraphQL node ID; stable across renames`."
+                  },
+                  "icon": {
+                    "description": "A Lucide icon name, or a `brand:` mark.",
+                    "type": "string",
+                    "maxLength": 80
+                  },
+                  "providerId": {
+                    "description": "The integration whose connection each query picks. Not with `inputs`.",
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 200
+                  },
+                  "titlePointer": {
+                    "description": "A pointer to the field that titles a record.",
+                    "type": "string"
+                  },
+                  "urlPointer": {
+                    "description": "A pointer to the field that holds a record's web address.",
+                    "type": "string"
+                  },
+                  "handler": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 2048,
+                    "description": "The route on your Node half that answers the source's operations."
+                  },
+                  "inputs": {
+                    "type": "object",
+                    "propertyNames": {
+                      "type": "string",
+                      "pattern": "^[a-z][a-zA-Z0-9]{0,31}$"
+                    },
+                    "additionalProperties": {
+                      "type": "object",
+                      "properties": {
+                        "source": {
+                          "type": "string",
+                          "maxLength": 401,
+                          "pattern": "^[^:]+:.+$",
+                          "description": "The source this input reads, as `<pluginId>:<sourceId>`. It must be registered statically, not discovered."
+                        },
+                        "label": {
+                          "type": "string",
+                          "minLength": 1,
+                          "maxLength": 80,
+                          "description": "The input's name where the person picks an account for it."
+                        },
+                        "optional": {
+                          "description": "Whether the person may skip it. A skipped input is `undefined` in your query.",
+                          "type": "boolean"
+                        }
+                      },
+                      "required": [
+                        "source",
+                        "label"
+                      ],
+                      "additionalProperties": false
+                    },
+                    "description": "For a derived source: other sources the host reads for you, by input name, at most eight. The person approves them before your plugin reads anything."
+                  }
                 },
-                "description": "For a derived source: other sources the host reads for you, by input name, at most eight. The person approves them before your plugin reads anything."
+                "required": [
+                  "sourceId",
+                  "name",
+                  "singular",
+                  "plural",
+                  "identityScope",
+                  "handler"
+                ],
+                "additionalProperties": false
+              },
+              {
+                "type": "object",
+                "properties": {
+                  "sourceId": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 200,
+                    "description": "The source's ID, unique in this manifest. Others name it as `<pluginId>:<sourceId>`."
+                  },
+                  "name": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 80,
+                    "description": "The source's name, such as `Release readiness`."
+                  },
+                  "singular": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 80,
+                    "description": "What one record is called, such as `Issue`."
+                  },
+                  "plural": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 80,
+                    "description": "What several are called, such as `Issues`."
+                  },
+                  "identityScope": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 2048,
+                    "description": "A sentence saying what a record's ID is and what keeps it stable, such as `GitHub GraphQL node ID; stable across renames`."
+                  },
+                  "icon": {
+                    "description": "A Lucide icon name, or a `brand:` mark.",
+                    "type": "string",
+                    "maxLength": 80
+                  },
+                  "titlePointer": {
+                    "description": "A pointer to the field that titles a record.",
+                    "type": "string"
+                  },
+                  "urlPointer": {
+                    "description": "A pointer to the field that holds a record's web address.",
+                    "type": "string"
+                  },
+                  "feed": {
+                    "type": "object",
+                    "properties": {
+                      "schema": {
+                        "type": "object",
+                        "propertyNames": {
+                          "type": "string"
+                        },
+                        "additionalProperties": {},
+                        "description": "The JSON schema of an event's `data`: an object. The host adds `time` to each record."
+                      },
+                      "fields": {
+                        "maxItems": 64,
+                        "type": "array",
+                        "items": {},
+                        "description": "What each of the event data's fields means to a person."
+                      },
+                      "starterTriggers": {
+                        "description": "Suggested triggers over this feed, offered first in the trigger dialog.",
+                        "maxItems": 10,
+                        "type": "array",
+                        "items": {}
+                      },
+                      "retentionDays": {
+                        "description": "How many days the host keeps an event. At most and by default 14.",
+                        "type": "integer",
+                        "minimum": 1,
+                        "maximum": 14
+                      },
+                      "maxEvents": {
+                        "description": "How many events the host keeps, dropping the oldest. At most and by default 10,000.",
+                        "type": "integer",
+                        "minimum": 1,
+                        "maximum": 10000
+                      }
+                    },
+                    "required": [
+                      "schema",
+                      "fields"
+                    ],
+                    "additionalProperties": false,
+                    "description": "Makes this entry an event feed: the host stores what your Node half appends, and serves it."
+                  }
+                },
+                "required": [
+                  "sourceId",
+                  "name",
+                  "singular",
+                  "plural",
+                  "identityScope",
+                  "feed"
+                ],
+                "additionalProperties": false
               }
-            },
-            "required": [
-              "sourceId",
-              "name",
-              "singular",
-              "plural",
-              "identityScope",
-              "handler"
-            ],
-            "additionalProperties": false
+            ]
           }
         },
         "dataSourceDiscoveries": {
@@ -4450,10 +4554,10 @@
                 "description": "What the command acts on. `inputSchema` must require `nodeId`, and the ID this scope names, as strings."
               },
               "capability": {
+                "description": "The core facet the command needs, such as `projects:read`. Declare it in `permissions.node.core` too: this field grants nothing. Leave it out for a command that touches only your plugin's own data, such as appending to its feed.",
                 "type": "string",
                 "minLength": 1,
-                "maxLength": 64,
-                "description": "The core facet the command needs, such as `projects:read`. Declare it in `permissions.node.core` too: this field grants nothing."
+                "maxLength": 64
               },
               "inputSchema": {
                 "type": "object",
@@ -4499,7 +4603,6 @@
               "summary",
               "risk",
               "scope",
-              "capability",
               "inputSchema",
               "outputSchema",
               "route"

@@ -502,6 +502,8 @@ ui/dashboards: placeOnHomeTab
 ui/data-sources: AuthoringConversation
 ui/data-sources: AuthoringConversationProps
 ui/data-sources: SourceQueryEditor
+ui/data-sources: SuggestedTrigger
+ui/data-sources: SuggestedTriggers
 ui/data-sources: TypedBindingPicker
 ui/diff: CodeRow
 ui/diff: DiffDocumentFile

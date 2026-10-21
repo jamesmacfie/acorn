@@ -27,6 +27,7 @@ import { registerAgentTool } from '../agentTools/registry'
 import { registerDataSource, registerDataSourceDiscovery } from '../dataSources/registry'
 import { discoverDataSources, invokeDataSource, listDataSources } from '../dataSources/runtime'
 import { dataSourceChanged } from '../dataSources/changes'
+import { registerDataFeed } from '../dataSources/feeds'
 import { authorizeQueryScope, resolveQuery } from '../queries/runtime'
 import { queryPublication } from '../queries/publication'
 import { queryStore } from '../queries/store'
@@ -92,7 +93,10 @@ export type LoadedPluginBinding = {
   // loader is the one place that reads the file.
   schedules?: readonly PluginScheduleDescriptor[]
   // Node-owned sources are registered here so dashboards and schedules do not depend on a client.
-  dataSources?: readonly import('@acorn/protocol/dataSources.ts').DataSourceRegistration[]
+  dataSources?: readonly (
+    | import('@acorn/protocol/dataSources.ts').DataSourceRegistration
+    | import('@acorn/protocol/dataSources.ts').DataFeedRegistration
+  )[]
   dataSourceDiscoveries?: readonly import('@acorn/protocol/dataSources.ts').DataSourceDiscovery[]
   // And its commands, of which the host reads one thing: which are `runNodeAction`, so a person can put
   // one on a schedule (`registerNodeAction`). A command's palette entry, keybinding and category
@@ -309,6 +313,12 @@ export function buildPluginContext(options: PluginContextOptions): HostPluginCon
       discover: (discovery) => recordUndo(registerDataSourceDiscovery(plugin, discovery).dispose),
       // Bound to the caller, so a plugin can only say its own sources changed.
       changed: (sourceId, hint) => dataSourceChanged(plugin, sourceId, hint),
+      registerFeed: (feed) => recordUndo(registerDataFeed(plugin, feed).dispose),
+      // Bound to the caller too, so a plugin appends only to its own feeds.
+      append: async (sourceId, events) => {
+        if (!options.env) throw new Error('Event feeds require host bindings')
+        return (await import('../dataSources/feedStore')).appendToFeed(options.env, plugin, sourceId, events)
+      },
       invoke: (request, invocation) => {
         if (!options.env) throw new Error('Source invocation requires host bindings')
         // Loaded code may invoke its own sources here. It reads another plugin's source only as a

@@ -7,7 +7,9 @@ export function registerManifestDataSources(
   ctx: Pick<NodePluginContext, 'dataSources'>,
   binding: LoadedPluginBinding | undefined,
 ): void {
-  for (const source of binding?.dataSources ?? []) ctx.dataSources.register(source)
+  for (const source of binding?.dataSources ?? [])
+    if ('feed' in source) ctx.dataSources.registerFeed(source)
+    else ctx.dataSources.register(source)
   for (const discovery of binding?.dataSourceDiscoveries ?? []) ctx.dataSources.discover(discovery)
 }
 

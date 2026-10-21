@@ -10,7 +10,7 @@ import { pathToFileURL } from 'node:url'
  * The plugin API major this scaffold writes into `apiVersion`. Hardcoded because this package is
  * published standalone and can't import the constant. The scaffold tests compare it with the host.
  */
-export const API_VERSION = '5'
+export const API_VERSION = '6'
 export const BASELINE = 'acorn-1'
 
 /**
@@ -41,6 +41,7 @@ export function toDisplayName(id) {
  * manifest with the host's parser instead of trusting this file. */
 export function scaffoldFiles(id, name = toDisplayName(id), options = {}) {
   if (options.dataSource) return dataSourceFiles(id, name, options.dataSource)
+  if (options.trigger) return triggerFiles(id, name)
   // A tree unless the author asked for pixels. The default is what most plugins want and the one that
   // gets the shell's keyboard handling, focus, ARIA and style pack for free; a rectangle is the
   // deliberate choice you make when the surface owns its own pixels.
@@ -578,7 +579,7 @@ function mount(slot, props, context, bridgePort) {
  * The SDK release that has `acorn-plugin-sdk/data` and `/testing`. Hardcoded for the same reason as
  * API_VERSION; index.test.ts compares it with the SDK's own version.
  */
-export const SDK_VERSION = '1.2.0'
+export const SDK_VERSION = '1.3.0'
 
 /**
  * The built-in and first-party sources a derived source can read, with the field that names a record.
@@ -838,13 +839,236 @@ The full guide is \`docs/plugin-authoring/derived-sources.md\` in the acorn repo
 `
 }
 
+// ── The trigger template ──────────────────────────────────────────────────────────────────────────
+// `--trigger` writes a plugin whose only job is to notice things: an event feed, a CLI command that
+// appends to it, and one suggested trigger. See docs/plugin-authoring/triggers.md.
+
+const SEVERITIES = [
+  { id: 'info', label: 'Info', tone: 'muted' },
+  { id: 'warning', label: 'Warning', tone: 'warn' },
+  { id: 'critical', label: 'Critical', tone: 'bad' },
+]
+
+/** The feed entry `defineEventFeed` builds from the generated feed module. The build writes it again
+ *  from the code, and index.test.ts holds the two equal. */
+const alertFeed = {
+  sourceId: 'alerts',
+  name: 'Alerts',
+  singular: 'Alert',
+  plural: 'Alerts',
+  identityScope: 'An event ID is unique within this feed.',
+  titlePointer: '/subject',
+  feed: {
+    schema: {
+      type: 'object',
+      additionalProperties: false,
+      properties: { subject: { type: 'string' }, severity: { type: 'string', enum: SEVERITIES.map((choice) => choice.id) } },
+      required: ['subject', 'severity'],
+    },
+    fields: [
+      { pointer: '/subject', label: 'Subject', origin: 'declared', display: { kind: 'text', role: 'title' } },
+      {
+        pointer: '/severity', label: 'Severity', origin: 'declared', display: { kind: 'status', role: 'status' },
+        choices: { kind: 'static', values: SEVERITIES },
+      },
+    ],
+    starterTriggers: [
+      {
+        id: 'critical',
+        label: 'A critical alert is raised',
+        description: 'Starts a run for each critical alert.',
+        predicate: {
+          kind: 'comparison',
+          left: { address: { from: 'item', pointer: '/severity' } },
+          operator: 'eq',
+          right: { address: { from: 'literal', value: 'critical' } },
+        },
+        change: { on: 'new' },
+      },
+    ],
+  },
+}
+
+export function triggerFiles(id, name) {
+  const raise = {
+    name: 'raise', title: 'Raise an alert', summary: 'Record an alert, so a trigger can start a workflow.',
+    effects: 'Adds an alert to the Alerts feed. An id the feed already holds is skipped.',
+    risk: 'write', scope: 'node', route: { method: 'POST', path: '/cli/raise' },
+    inputSchema: {
+      type: 'object',
+      properties: {
+        nodeId: { type: 'string' },
+        subject: { type: 'string', minLength: 1, maxLength: 200 },
+        severity: { type: 'string', enum: SEVERITIES.map((choice) => choice.id) },
+        id: { type: 'string', minLength: 1, maxLength: 200 },
+      },
+      required: ['nodeId', 'subject', 'severity'],
+      additionalProperties: false,
+    },
+    outputSchema: { type: 'object', properties: { stored: { type: 'number' } }, required: ['stored'], additionalProperties: false },
+  }
+  return {
+    'acorn-plugin.json': JSON.stringify({
+      $schema: SCHEMA_URL, id, name, version: '1.0.0', baseline: BASELINE, apiVersion: API_VERSION,
+      node: './dist/node.js',
+      permissions: { api: [], events: [], node: { core: [], capabilities: [], secrets: false, exec: false, net: [] } },
+      // `npm run build` rewrites the feed entry from the feed module, so the two can't disagree.
+      contributions: { dataSources: [alertFeed], cliCommands: [raise] },
+    }, null, 2) + '\n',
+    'package.json': JSON.stringify({
+      name: id, version: '1.0.0', private: true, type: 'module',
+      scripts: { build: 'vite build && node scripts/manifest.mjs', test: 'vitest run' },
+      devDependencies: { 'acorn-plugin-sdk': `^${SDK_VERSION}`, 'acorn-plugin-types': '^1.0.0', vite: '^8.0.16', vitest: '^4.1.11' },
+    }, null, 2) + '\n',
+    'tsconfig.json': JSON.stringify({
+      compilerOptions: { target: 'ES2023', module: 'ESNext', moduleResolution: 'bundler', lib: ['ES2023', 'DOM'], strict: true, noEmit: true, skipLibCheck: true },
+      include: ['src'],
+    }, null, 2) + '\n',
+    'vite.config.ts': dataSourceViteConfig(),
+    'scripts/manifest.mjs': `// The build's last step: rewrite the manifest's feed entry from the built feed, so the fields and the
+// suggested trigger acorn reads are the ones the code declares.
+import { readFileSync, writeFileSync } from 'node:fs'
+import { alerts } from '../dist/node.js'
+
+const manifest = JSON.parse(readFileSync('acorn-plugin.json', 'utf8'))
+manifest.contributions = { ...manifest.contributions, dataSources: [alerts.manifest] }
+writeFileSync('acorn-plugin.json', JSON.stringify(manifest, null, 2) + '\\n')
+`,
+    'src/feed.ts': `import { defineEventFeed, field } from 'acorn-plugin-sdk/data'
+
+// Acorn stores what this plugin appends and serves it as a source, so a trigger, a panel, or a workflow
+// step reads alerts like any other records. Acorn adds a \`time\` field to every event.
+export const alerts = defineEventFeed({
+  id: 'alerts',
+  name: 'Alerts',
+  singular: 'Alert',
+  plural: 'Alerts',
+  fields: {
+    subject: field.text({ label: 'Subject', role: 'title' }),
+    severity: field.choice({
+      label: 'Severity',
+      role: 'status',
+      choices: [
+${SEVERITIES.map((choice) => `        { id: '${choice.id}', label: '${choice.label}', tone: '${choice.tone}' },`).join('\n')}
+      ],
+    }),
+  },
+  // The trigger dialog offers this first. The person still picks the workflow and its inputs.
+  starterTriggers: [
+    {
+      id: 'critical',
+      label: 'A critical alert is raised',
+      description: 'Starts a run for each critical alert.',
+      predicate: {
+        kind: 'comparison',
+        left: { address: { from: 'item', pointer: '/severity' } },
+        operator: 'eq',
+        right: { address: { from: 'literal', value: 'critical' } },
+      },
+      change: { on: 'new' },
+    },
+  ],
+})
+`,
+    'src/index.ts': `import type { NodePlugin } from 'acorn-plugin-types'
+import { alerts } from './feed'
+
+// scripts/manifest.mjs reads the feed from the build to write the manifest entry.
+export { alerts }
+
+type Raise = { nodeId: string; subject: string; severity: 'info' | 'warning' | 'critical'; id?: string }
+
+export default {
+  // Must equal the manifest id.
+  name: '${id}',
+  init(ctx) {
+    // \`acorn plugin ${id} raise\` posts here, after the Node checks the input against the manifest's
+    // schema. Raising the same id twice stores one event, so it starts one run.
+    ctx.routes.fetch(async (request) => {
+      if (request.method !== 'POST' || new URL(request.url).pathname !== '/cli/raise')
+        return new Response(null, { status: 404 })
+      const { subject, severity, id } = (await request.json()) as Raise
+      const time = Date.now()
+      const stored = await alerts.append(ctx, [{ id: id ?? crypto.randomUUID(), time, data: { subject, severity } }])
+      return Response.json({ stored })
+    })
+  },
+} satisfies NodePlugin
+`,
+    'src/feed.test.ts': `import { expect, it } from 'vitest'
+import { checkStarterTriggers, testTrigger } from 'acorn-plugin-sdk/testing'
+import { alerts } from './feed'
+
+// Both helpers run the Node's own rules, so what passes here is what the app does.
+const alert = (id: string, severity: 'info' | 'warning' | 'critical') => ({
+  id,
+  data: { subject: 'Disk full on web-1', severity, time: 1 },
+})
+const [starter] = alerts.description.starterTriggers!
+
+it('suggests a trigger the Node keeps', () => {
+  checkStarterTriggers(alerts.description)
+})
+
+it('starts one run for each new critical alert', () => {
+  const result = testTrigger(
+    alerts.description,
+    starter!.change,
+    [[alert('a', 'critical')], [alert('a', 'critical'), alert('b', 'info')], [alert('c', 'critical')]],
+    { predicate: starter!.predicate! },
+  )
+  expect(result.map((read) => read.starts.length)).toEqual([1, 0, 1])
+})
+`,
+    'README.md': `# ${name}
+
+An acorn plugin that notices things. It declares an event feed, **Alerts**, and a command that appends
+to it, so a script, a git hook, or a CI job on this machine can fire a trigger. Its source suggests one
+trigger: **A critical alert is raised**.
+
+\`\`\`text
+acorn-plugin.json      the manifest: the feed, the raise command, and the suggested trigger
+src/feed.ts            the feed's fields and its suggested trigger
+src/index.ts           the node half: the raise command's route appends to the feed
+src/feed.test.ts       testTrigger over three reads, and checkStarterTriggers
+scripts/manifest.mjs   rewrites the manifest's feed entry from src/feed.ts on each build
+\`\`\`
+
+## Build and test
+
+\`\`\`sh
+npm install
+npm test
+npm run build
+\`\`\`
+
+## Install it and raise an alert
+
+**Settings › Plugins › Install… › Local folder**, with this directory. Then add a trigger to a workflow
+and pick **A critical alert is raised**. To raise one:
+
+\`\`\`sh
+NODE_ID="$(acorn node info --output json | jq -r .nodeId)"
+jq -n --arg nodeId "$NODE_ID" '{nodeId: $nodeId, subject: "Disk full on web-1", severity: "critical"}' |
+  acorn plugin ${id} raise --input-file -
+\`\`\`
+
+Pass an \`id\` to make a retry safe: raising the same id twice stores one alert and starts one run.
+
+The full guide is \`docs/plugin-authoring/triggers.md\` in the acorn repository.
+`,
+  }
+}
+
 // ── CLI ───────────────────────────────────────────────────────────────────────────────────────────
 
 async function main(argv) {
   // `--rectangle` picks the render path. A tree by default; see docs/plugin-authoring/the-client-half.md § Two ways
-  // to draw for when a rectangle is the right answer. `--data-source` writes a derived source instead.
+  // to draw for when a rectangle is the right answer. `--data-source` writes a derived source instead,
+  // and `--trigger` an event feed with a command that appends to it.
   const rectangle = argv.includes('--rectangle')
   const wantsDataSource = argv.includes('--data-source')
+  const trigger = argv.includes('--trigger')
   // Opened only when there's something to ask. Answers come off the line iterator rather than
   // `question`, so answers piped in ahead of the prompts aren't dropped.
   let rl
@@ -883,7 +1107,7 @@ async function main(argv) {
     return
   }
 
-  const files = scaffoldFiles(id, toDisplayName(id), { rectangle, dataSource })
+  const files = scaffoldFiles(id, toDisplayName(id), { rectangle, dataSource, trigger })
   for (const [path, contents] of Object.entries(files)) {
     const target = join(dir, path)
     mkdirSync(dirname(target), { recursive: true })

@@ -36,8 +36,10 @@ Put this descriptor inside `contributions.cliCommands` in `acorn-plugin.json` (o
 }
 ```
 
-Declare the named core capability in `permissions.node.core`. The command does not grant the
-worker any new core, filesystem, network, secret, or process permission. The Node owns the route
+Declare the named core capability in `permissions.node.core`. A command that touches only the
+plugin's own data, such as one that appends to its [event feed](../data-sources/event-feeds.md),
+leaves `capability` out. The command does not grant the worker any new core, filesystem, network,
+secret, or process permission. The Node owns the route
 prefix `/v1/p/<pluginId>`; the descriptor names only `/cli/<name>`. Register that handler through
 `ctx.routes.fetch` and return JSON. For example, a Node entry can register a handler with the same
 path as the descriptor:

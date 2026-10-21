@@ -9,7 +9,7 @@ import { DATA_LIMITS, parseDataPointer } from '@acorn/protocol/dataValues.ts'
 import type { Env } from '../bindings'
 import type { AppDatabase } from '../db'
 import { registerCoreDataSource, registeredDataSource } from '../dataSources/registry'
-import { sourceFieldSchema } from '../dataSources/validation'
+import { sourceFieldSchema } from '@acorn/protocol/dataSchemas.ts'
 import {
   DatasetError,
   assertDatasetScope,

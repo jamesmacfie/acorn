@@ -814,8 +814,9 @@ describe('architecture boundaries', () => {
       // a plugin can name, which custody reads without the manifest contract, and the manifest vocabulary
       // the plugin_authoring tool and the public site's plugin reference share, and the artwork reference
       // and rail presentation answer, which the tree host, the rail, and the examples read without it,
-      // and the record change rules that workflow loops, record triggers, and their preview share.
-      '@acorn/protocol': 91,
+      // the record change rules that workflow loops, record triggers, and their preview share, and the
+      // starter trigger check and event feed description the Node and the plugin SDK share.
+      '@acorn/protocol': 93,
       // client-core publishes narrow entrypoints where a consumer can't take a barrel that pulls in
       // renderer-only modules. Pure leaves the terminal, logic tests or remote trees need: model-provider
       // error guidance, `kit/lib/savedSignal`, `kit/lib/formatChord`, `kit/lib/ansi`, and the address
@@ -825,7 +826,7 @@ describe('architecture boundaries', () => {
       // page, the model picker popover, `features/editor/documentCustody`, `ContributionBoundary`, and
       // `LinkPreviewHost` (docs/frontend/startup-budget.md). The token and style pack stylesheets, which
       // the browser extension loads without the app's own stylesheet.
-      '@acorn/client-core': 205, // Includes the agent panel card the agents plugin draws and the terminal's reader for it, the capability keys agents and workflows provide for a kept dashboard panel, the card frame and plan panel an app card draws with, the registry of dashboard cells a plugin draws, with its Add to dashboard, the no-projects surface, workspace rail, device preference reader, SelectionActions, the Markdown fence model and view, the four stylesheets the extension sidebar loads, TreeHost for the site's component pages, the anchored popover and focus restore the sidebar's Go to task draws on, Artwork for the plugin API's components barrel, the Inter font file the site preloads, and the Performance settings page.
+      '@acorn/client-core': 206, // Includes the agent panel card the agents plugin draws and the terminal's reader for it, the capability keys agents and workflows provide for a kept dashboard panel, the card frame and plan panel an app card draws with, the registry of dashboard cells a plugin draws, with its Add to dashboard, the no-projects surface, workspace rail, device preference reader, SelectionActions, the Markdown fence model and view, the four stylesheets the extension sidebar loads, TreeHost for the site's component pages, the anchored popover and focus restore the sidebar's Go to task draws on, Artwork for the plugin API's components barrel, the Inter font file the site preloads, the Performance settings page, and the trigger dialog's suggested triggers.
       // Includes `mcp/fileGuard`, the read block's file guard, a build entry like `mcp/loopHook`
       // (docs/managed-agents/read-block.md). The manifest parser and the core facet list, which the
       // public site's plugin reference reads to check its examples and list the grants. `mcp/toolOutputDir`,

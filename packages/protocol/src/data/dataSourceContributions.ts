@@ -1,5 +1,6 @@
 import { z } from 'zod'
 import { parseDataPointer } from './values/dataValues'
+import { DATA_FEED_LIMITS } from './eventFeeds'
 
 // Keep the manifest carrier independent of the invocation contract. Every client parses installed
 // plugin manifests during startup, while query schemas and value validation belong to the lazy data
@@ -59,6 +60,39 @@ export const dataSourceRegistrationSchema = dataSourceDescriptorSchema.extend({
   inputs: dataSourceInputsSchema.optional(),
 })
 
+// An event feed: a source the host stores and serves, so it has no handler or provider. The schema and
+// fields stay unparsed here for the reason at the top of this file; the Node checks them on register.
+export const dataFeedRegistrationSchema = dataSourceDescriptorSchema.omit({ providerId: true }).extend({
+  feed: z
+    .object({
+      schema: z
+        .record(z.string(), z.unknown())
+        .describe("The JSON schema of an event's `data`: an object. The host adds `time` to each record."),
+      fields: z.array(z.unknown()).max(64).describe("What each of the event data's fields means to a person."),
+      starterTriggers: z
+        .array(z.unknown())
+        .max(10)
+        .optional()
+        .describe('Suggested triggers over this feed, offered first in the trigger dialog.'),
+      retentionDays: z
+        .number()
+        .int()
+        .min(1)
+        .max(DATA_FEED_LIMITS.retentionDays)
+        .optional()
+        .describe(`How many days the host keeps an event. At most and by default ${DATA_FEED_LIMITS.retentionDays}.`),
+      maxEvents: z
+        .number()
+        .int()
+        .min(1)
+        .max(DATA_FEED_LIMITS.maxEvents)
+        .optional()
+        .describe('How many events the host keeps, dropping the oldest. At most and by default 10,000.'),
+    })
+    .strict()
+    .describe('Makes this entry an event feed: the host stores what your Node half appends, and serves it.'),
+})
+
 export const SOURCE_INPUTS_WITH_PROVIDER = "A source with inputs can't also own a provider."
 
 /** Split an input's `<pluginId>:<sourceId>`. A source id may itself contain colons. */
@@ -85,3 +119,4 @@ export type DataSourceDescriptor = z.infer<typeof dataSourceDescriptorSchema>
 export type DataSourceRegistration = z.infer<typeof dataSourceRegistrationSchema>
 export type DataSourceInput = z.infer<typeof dataSourceInputSchema>
 export type DataSourceDiscovery = z.infer<typeof dataSourceDiscoverySchema>
+export type DataFeedRegistration = z.infer<typeof dataFeedRegistrationSchema>

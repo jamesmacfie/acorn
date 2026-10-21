@@ -44,7 +44,8 @@ Read [Store data](/docs/build-plugins/node/store-data/). The code is from
    - `scope` is `node`, `workspace`, `project`, or `task`. The input must require `nodeId` and, for any
      scope but `node`, that scope's id, as strings.
    - `capability` names the core facet the command needs, such as `tasks`. It grants nothing: ask for
-     the same facet in `permissions.node.core`.
+     the same facet in `permissions.node.core`. Leave it out when the command touches only your
+     plugin's own data.
    - `inputSchema` and `outputSchema` use the same small JSON Schema language as an agent tool's.
 
 2. **Ask for the facet.**

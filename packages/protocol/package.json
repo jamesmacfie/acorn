@@ -33,6 +33,8 @@
     "./dataSchemas.ts": "./src/data/values/dataSchemas.ts",
     "./dataSources.ts": "./src/data/dataSources.ts",
     "./datasets.ts": "./src/data/datasets.ts",
+    "./eventFeeds.ts": "./src/data/eventFeeds.ts",
+    "./starterTriggers.ts": "./src/data/starterTriggers.ts",
     "./dataValues.ts": "./src/data/values/dataValues.ts",
     "./deviceConfig.ts": "./src/device/deviceConfig.ts",
     "./documentSurface.ts": "./src/content/documentSurface.ts",

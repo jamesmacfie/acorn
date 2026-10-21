@@ -1,4 +1,5 @@
 import { describeCadence, type Cadence } from '@acorn/protocol/schedules.ts'
+import type { RecordChange } from '@acorn/protocol/starterTriggers.ts'
 import type {
   WorkflowRecordChange,
   WorkflowTriggerDisplayState,
@@ -130,3 +131,8 @@ export const whenSummary = (trigger: Pick<WorkflowTriggerView, 'cadence' | 'when
     ? `${line}, when a record ${changeLabel(trigger.when.change.on).toLowerCase()}`
     : line
 }
+
+/** A suggested trigger's change rule as a record trigger's. A suggestion's watched fields point into the
+ *  source's records, and a trigger's into the record envelope, under `/data`. */
+export const starterChange = (change: RecordChange): WorkflowRecordChange =>
+  change.on === 'changes' ? { on: 'changes', fields: change.fields.map((field) => `/data${field}`) } : change

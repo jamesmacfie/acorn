@@ -2,10 +2,9 @@ import { createHash, randomUUID } from 'node:crypto'
 import type { DataField } from '@acorn/protocol/dataBindings.ts'
 import type { DataSchema } from '@acorn/protocol/dataSchemas.ts'
 import { canonicalDataEncoding, MISSING, readDataPointer, type DataValue } from '@acorn/protocol/dataValues.ts'
-import { validateDataValue } from '@acorn/protocol/dataSchemas.ts'
+import { sourceFieldSchema, validateDataValue } from '@acorn/protocol/dataSchemas.ts'
 import type { DatasetCreate, DatasetRefresh, DatasetWrite } from '@acorn/protocol/datasets.ts'
 import type { AppDatabase } from '../db'
-import { sourceFieldSchema } from '../dataSources/validation'
 
 export type DatasetDefinition = {
   id: string

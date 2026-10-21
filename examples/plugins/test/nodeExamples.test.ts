@@ -14,6 +14,7 @@ import { makeTestNodeContext, readPackageSkill, schema, SecretService } from '@a
 import { panelPlanSchema } from '@acorn/protocol/dashboards.ts'
 import { dataSourceDescriptionSchema, dataSourcePageSchema } from '@acorn/protocol/dataSources.ts'
 import { validatePluginCliValue } from '@acorn/protocol/plugin/cliCommands.ts'
+import { starterTriggerCheck } from '@acorn/protocol/starterTriggers.ts'
 import {
   browserHandoffResolution,
   browserPanelView,
@@ -323,7 +324,7 @@ describe('acme-data', () => {
     expect(await check()).toEqual({ concern: null })
   })
 
-  it('describes its source with a starter panel that fits it, and pages its records', async () => {
+  it('describes its source with a starter panel and a suggested trigger that fit it, and pages its records', async () => {
     node = await startNode(readExample('acme-data'))
     const source = { pluginId: 'acme-data', sourceId: 'deploys' }
     const description = dataSourceDescriptionSchema.parse(
@@ -339,6 +340,9 @@ describe('acme-data', () => {
       })
       expect(validatePanelPlan(plan, sources), plan.title).toEqual([])
     }
+    // The suggested trigger passes the check the Node drops a starter with.
+    expect(starterTriggerCheck(description, description.starterTriggers)).toMatchObject({ dropped: [] })
+    expect(description.starterTriggers?.map((starter) => starter.label)).toEqual(['A deploy fails'])
     const [step] = stepKinds()
     for (const sha of ['a1b2c3d', 'b2c3d4e', 'c3d4e5f'])
       await step!.value.handler({ run: { taskId: TASK }, def: { with: { environment: 'production', sha } } })
@@ -357,6 +361,13 @@ describe('acme-data', () => {
     const second = dataSourcePageSchema.parse(await json(node.call('/v1/p/acme-data/source', post(query('2')))))
     expect(second.records).toHaveLength(1)
     expect(second.completeness).toEqual({ kind: 'complete' })
+    const failed = {
+      ...query(),
+      query: { ...query().query, predicate: description.starterTriggers![0]!.predicate },
+    }
+    expect(dataSourcePageSchema.parse(await json(node.call('/v1/p/acme-data/source', post(failed)))).records).toEqual(
+      [],
+    )
   })
 
   it('syncs deploys on its schedule with the Acme Cloud key, without storing it', async () => {
@@ -487,6 +498,44 @@ describe('acme-readiness', () => {
         '/title',
         '/stage',
         '/deploys',
+      ])
+    } finally {
+      rmSync(dir, { recursive: true, force: true })
+    }
+  }, 120_000)
+})
+
+describe('acme-alerts', () => {
+  it('passes its own test, builds, and its raise command stores each alert once', async () => {
+    const dir = mkdtempSync(join(tmpdir(), 'acme-alerts-'))
+    try {
+      cpSync(join(EXAMPLES, 'acme-alerts'), dir, { recursive: true })
+      const modules = join(dir, 'node_modules')
+      unpackPublishedPackage('plugin-sdk', join(modules, 'acorn-plugin-sdk'))
+      unpackPublishedPackage('plugin-types', join(modules, 'acorn-plugin-types'))
+      copyNodeTypes(modules)
+      for (const tool of ['vite', 'vitest']) linkTool(tool, modules)
+      const node_ = (...args: string[]) => run(process.execPath, args, dir)
+      expect(node_('node_modules/vitest/vitest.mjs', 'run')).toMatch(/2 passed/)
+      node_(TSC, '--noEmit')
+      node_('node_modules/vite/bin/vite.js', 'build', '--logLevel', 'error')
+      // The build writes the manifest's feed entry from the code, and the committed one already matches.
+      node_('scripts/manifest.mjs')
+      expect(readFileSync(join(dir, 'acorn-plugin.json'), 'utf8')).toBe(
+        readFileSync(join(EXAMPLES, 'acme-alerts/acorn-plugin.json'), 'utf8'),
+      )
+
+      node = await startNode({ ...readExample('acme-alerts'), dir })
+      const command = readExample('acme-alerts').manifest.contributions.cliCommands![0]!
+      const raise = () =>
+        json(node!.call('/v1/p/acme-alerts/cli/raise', post({ nodeId: 'n1', host: 'web-1', load: 6.2, id: 'a1' })))
+      const first = await raise()
+      expect(first).toEqual({ stored: 1 })
+      expect(validatePluginCliValue(command.outputSchema, first)).toEqual([])
+      // The same alert raised twice is stored once, so a trigger starts one run for it.
+      expect(await raise()).toEqual({ stored: 0 })
+      expect(await node.ctx.db.select().from(schema.dataFeedEvents)).toMatchObject([
+        { pluginId: 'acme-alerts', sourceId: 'alerts', eventId: 'a1', title: 'web-1 load 6.2' },
       ])
     } finally {
       rmSync(dir, { recursive: true, force: true })

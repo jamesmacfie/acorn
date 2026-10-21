@@ -356,7 +356,7 @@ Each feature landing page above has topic pages in a folder of the same name:
   sources](./data-sources/derived-sources.md), [Provider data
   sources](./data-sources/provider-sources.md), [Workspace query
   library](./data-sources/query-library.md), [Serve a query](./data-sources/serve-a-query.md), [Say
-  when records changed](./data-sources/changes.md).
+  when records changed](./data-sources/changes.md), [Event feeds](./data-sources/event-feeds.md).
 - [github-integration.md](./github-integration.md): [The GitHub
   mirror](./github-integration/mirror.md), [GitHub from the command
   palette](./github-integration/palette.md), [Reads and
@@ -438,7 +438,8 @@ Each plugin landing page above has topic pages in a folder of the same name:
   pages](./plugin-authoring/settings-pages.md), [Start from the
   scaffold](./plugin-authoring/start-from-the-scaffold.md), [Storage and
   migrations](./plugin-authoring/storage.md), [Telemetry and logging](./plugin-authoring/telemetry.md),
-  [Testing a plugin](./plugin-authoring/testing.md), [The bridge](./plugin-authoring/the-bridge.md),
+  [Testing a plugin](./plugin-authoring/testing.md), [Plugin triggers](./plugin-authoring/triggers.md),
+  [The bridge](./plugin-authoring/the-bridge.md),
   [The client half](./plugin-authoring/the-client-half.md), [The
   manifest](./plugin-authoring/the-manifest.md), [The node half](./plugin-authoring/the-node-half.md),
   [UI contributions](./plugin-authoring/ui-contributions.md).

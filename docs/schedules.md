@@ -48,6 +48,8 @@ disabling a plugin doesn't delete the owner's pause or run history.
   history trend, recording one number each ([sampling a published dashboard](#sampling-a-published-dashboard)).
 - `core:compact-history`, daily at 03:40: measure history's own retention.
 - `core:compact-datasets`, daily: removes dataset rows and coverage beyond each dataset's retention.
+- `core:prune-feeds`, daily at 03:55: removes events older than each event feed keeps
+  ([event feeds](./data-sources/event-feeds.md)).
 - `agents:usage-refresh`, every 30 minutes, off by default. It probes the agent CLIs for plan usage so
   the numbers are fresh when you open the panel. It spawns those CLIs to fill a cache nothing reads
   while no client is open, so turning it on is the owner's call, with the toggle on its row.

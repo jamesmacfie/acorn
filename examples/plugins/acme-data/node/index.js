@@ -15,11 +15,13 @@ export default {
     // #endregion
 
     // #region publish
-    // After a write: tell other plugins with the verb the manifest declares under `emits`, and tell
-    // clients to read this plugin's badges and marks again.
+    // After a write: tell other plugins with the verb the manifest declares under `emits`, tell
+    // clients to read this plugin's badges and marks again, and tell acorn the deploys source changed,
+    // so a trigger on it checks now rather than on its cadence.
     const changed = (/** @type {string} */ taskId) => {
       ctx.events.send({ channel: 'plugin:acme-data:deploys-changed', taskId })
       ctx.events.status()
+      ctx.dataSources.changed('deploys')
     }
     // #endregion
 

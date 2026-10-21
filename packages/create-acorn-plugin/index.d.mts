@@ -17,6 +17,7 @@ export declare function toInputName(source: string, taken?: Set<string>): string
 export declare function scaffoldFiles(
   id: string,
   name?: string,
-  options?: { rectangle?: boolean; dataSource?: DataSourceStarter },
+  options?: { rectangle?: boolean; dataSource?: DataSourceStarter; trigger?: boolean },
 ): Record<string, string>
+export declare function triggerFiles(id: string, name: string): Record<string, string>
 export declare function dataSourceFiles(id: string, name: string, starter: DataSourceStarter): Record<string, string>

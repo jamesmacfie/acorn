@@ -170,6 +170,18 @@ const PROBES: Record<string, Probe> = {
     present: () =>
       registeredDataSources().some((source) => source.pluginId === PLUGIN && source.sourceId === 'records'),
   },
+  'dataSources.registerFeed': {
+    register: (ctx) =>
+      ctx.dataSources.registerFeed({
+        sourceId: 'events',
+        name: 'Events',
+        singular: 'Event',
+        plural: 'Events',
+        identityScope: 'Stable',
+        feed: { schema: { type: 'object', properties: {} }, fields: [] },
+      }),
+    present: () => registeredDataSources().some((source) => source.pluginId === PLUGIN && source.sourceId === 'events'),
+  },
   // A discovery and a source it found, which goes with it.
   'dataSources.discover': {
     register: (ctx) => {
@@ -354,6 +366,7 @@ const NOT_REGISTRATIONS = new Set([
   'core.telemetry.enabled',
   // Writes to a table, which outlive the plugin on purpose.
   'dataSources.setQueryConsumer',
+  'dataSources.append',
   'datasets.writeForTask',
   'audit.record',
   // Broadcasts, which are gone once sent.

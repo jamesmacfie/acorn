@@ -9,7 +9,7 @@ import {
 } from '@acorn/protocol/dataSources.ts'
 import { confinePluginPath } from '../pluginHost/dispatch'
 import { canonicalDataEncoding } from '@acorn/protocol/dataValues.ts'
-import type { DataSourceScope } from '@acorn/protocol/dataSources.ts'
+import type { DataSourceDescription, DataSourceScope } from '@acorn/protocol/dataSources.ts'
 import type { Disposable } from '../pluginHost/capabilities'
 
 export type CoreDataSourceHandler = (
@@ -17,11 +17,15 @@ export type CoreDataSourceHandler = (
   env: import('../bindings').Env,
   signal: AbortSignal,
 ) => Promise<unknown> | unknown
-/** `loaded` marks a source from a loaded plugin, whose input reads need the person's grant. */
+/** What the host serves for an event feed: its description, and how long and how much it keeps. */
+export type DataFeedSettings = { description: DataSourceDescription; retentionDays: number; maxEvents: number }
+/** `loaded` marks a source from a loaded plugin, whose input reads need the person's grant. `feed`
+ *  marks one the host stores and serves for the plugin (./feeds.ts). */
 export type RegisteredDataSource = DataSourceRegistration & {
   pluginId: string
   loaded?: boolean
   coreHandler?: CoreDataSourceHandler
+  feed?: DataFeedSettings
 }
 type RegisteredDiscovery = DataSourceDiscovery & { pluginId: string }
 const sources = new Map<string, RegisteredDataSource>()
@@ -56,6 +60,31 @@ export function registerCoreDataSource(
 ): void {
   const source = dataSourceRegistrationSchema.parse({ ...input, handler: '/v1/core/data-sources/internal' })
   sources.set(key('core', source.sourceId), { ...source, pluginId: 'core', coreHandler: handler })
+}
+
+/** A plugin's event feed, served by the host under the plugin's own id. */
+export function registerFeedSource(
+  pluginId: string,
+  source: Omit<DataSourceRegistration, 'handler' | 'inputs' | 'providerId'>,
+  feed: DataFeedSettings,
+  handler: CoreDataSourceHandler,
+): Disposable {
+  const id = key(pluginId, source.sourceId)
+  const old = sources.get(id)
+  if (old && !old.feed) throw new Error('Duplicate data source')
+  const registered: RegisteredDataSource = {
+    ...source,
+    handler: '/v1/core/data-sources/feed',
+    pluginId,
+    coreHandler: handler,
+    feed,
+  }
+  sources.set(id, registered)
+  return {
+    dispose: () => {
+      if (sources.get(id) === registered) sources.delete(id)
+    },
+  }
 }
 
 export function registerDataSourceDiscovery(pluginId: string, input: DataSourceDiscovery): Disposable {

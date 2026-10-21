@@ -9,6 +9,8 @@ import { runDerived } from '../data/derived.ts'
 import type { fixtures as Fixtures, testDerivedSource as TestDerivedSource } from './public.ts'
 import lists from './sourceFields.json' with { type: 'json' }
 
+export { checkStarterTriggers, testTrigger } from './triggers.ts'
+
 type FieldList = { name: string; schema: DataSchema; fields: DataField[] }
 const sourceFields = lists as unknown as Record<string, FieldList>
 

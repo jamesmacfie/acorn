@@ -115,7 +115,10 @@ export function grantCoversInput(
 }
 
 /** The inputs a manifest's data sources declare, keyed the way a grant keys them. */
-export function declaredInputs(dataSources: readonly DataSourceRegistration[] | undefined): InputGrant['sources'] {
+/** An event feed has no inputs, so it reads as a source that declares none. */
+type DeclaredSource = Pick<DataSourceRegistration, 'sourceId' | 'inputs'>
+
+export function declaredInputs(dataSources: readonly DeclaredSource[] | undefined): InputGrant['sources'] {
   const sources: InputGrant['sources'] = {}
   for (const source of dataSources ?? []) {
     if (!source.inputs || !Object.keys(source.inputs).length) continue
@@ -147,7 +150,7 @@ export function sameInputs(left: InputGrant['sources'], right: InputGrant['sourc
  * can't word its own disclosure. Undefined when the plugin declares no inputs.
  */
 export function pluginInputs(
-  dataSources: readonly DataSourceRegistration[] | undefined,
+  dataSources: readonly DeclaredSource[] | undefined,
   grant: InputGrant | undefined,
   describe: (source: string) => { plural?: string; provider?: string },
 ): PluginInputs | undefined {

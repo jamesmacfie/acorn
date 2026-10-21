@@ -33,6 +33,7 @@ describe('what core declares', () => {
       'core:compact-datasets',
       'core:compact-history',
       'core:idempotency-sweep',
+      'core:prune-feeds',
       'core:sample-measures',
     ])
   })

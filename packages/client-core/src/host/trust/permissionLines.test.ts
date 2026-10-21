@@ -679,4 +679,27 @@ describe('providedSourceLines', () => {
       },
     ])
   })
+
+  it('says once per event feed how many events acorn stores', () => {
+    const lines = providedSourceLines({
+      dataSources: [
+        {
+          sourceId: 'alerts',
+          name: 'Load alerts',
+          singular: 'Alert',
+          plural: 'Alerts',
+          identityScope: 'alert',
+          feed: { schema: { type: 'object' }, fields: [] },
+        },
+      ],
+    } as unknown as PluginContributions)
+    expect(lines.map((line) => [line.key, line.text, line.detail])).toEqual([
+      ['provides:alerts', 'A data source, Load alerts', 'You can use it in panels, workflows, and datasets.'],
+      [
+        'stores:alerts:10000',
+        'Store up to 10,000 events from this plugin',
+        'Load alerts keeps each event for 14 days.',
+      ],
+    ])
+  })
 })

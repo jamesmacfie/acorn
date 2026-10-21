@@ -292,7 +292,7 @@ it('runs the packed scaffold and type-checks it against the packed declarations 
     expect(declarations.length).toBeGreaterThan(10)
     expect(declarations.every((name) => name.endsWith('.d.ts'))).toBe(true)
     expect(readdirSync(join(types, 'dist')).sort()).toEqual(['contracts', 'index.d.ts'])
-    expect(readFileSync(join(dir, 'acorn-plugin.json'), 'utf8')).toContain('"apiVersion": "5"')
+    expect(readFileSync(join(dir, 'acorn-plugin.json'), 'utf8')).toContain('"apiVersion": "6"')
 
     writeFileSync(
       join(dir, 'tsconfig.json'),
@@ -562,6 +562,65 @@ it('asks what a row is and what it reads under --data-source', () => {
         pullRequests: { source: 'github:pull-requests', optional: true },
       },
     })
+  } finally {
+    rmSync(cwd, { recursive: true, force: true })
+  }
+})
+
+// ── --trigger ─────────────────────────────────────────────────────────────────────────────────────
+
+it('emits a trigger manifest the host parses, with a feed, a command, and a suggested trigger', () => {
+  const files = scaffoldFiles('my-alerts', 'My alerts', { trigger: true }) as Record<string, string>
+  const result = parsePluginManifest(JSON.parse(files['acorn-plugin.json']!))
+  expect(result.ok ? null : result.reason).toBe(null)
+  const { dataSources, cliCommands } = JSON.parse(files['acorn-plugin.json']!).contributions
+  expect(dataSources[0]).toMatchObject({ sourceId: 'alerts', feed: { starterTriggers: [{ id: 'critical' }] } })
+  expect(cliCommands.map((command: { name: string }) => command.name)).toEqual(['raise'])
+  expect(Object.keys(files)).toEqual(expect.arrayContaining(['src/feed.ts', 'src/index.ts', 'src/feed.test.ts']))
+})
+
+it('builds, tests, and loads a trigger package from the packed SDK outside the repository', async () => {
+  // The acceptance test for `--trigger`: the generated package passes its own test against the packed
+  // SDK, type-checks, builds, writes the feed entry the scaffold already wrote, and loads.
+  const root = mkdtempSync(join(tmpdir(), 'scaffold-trigger-'))
+  try {
+    const files = scaffoldFiles('my-alerts', 'My alerts', { trigger: true }) as Record<string, string>
+    const dir = join(root, 'my-alerts')
+    for (const [path, contents] of Object.entries(files)) {
+      mkdirSync(dirname(join(dir, path)), { recursive: true })
+      writeFileSync(join(dir, path), contents)
+    }
+    unpackPublishedPackage('plugin-sdk', join(dir, 'node_modules', 'acorn-plugin-sdk'))
+    unpackPublishedPackage('plugin-types', join(dir, 'node_modules', 'acorn-plugin-types'))
+    copyNodeTypes(join(dir, 'node_modules'))
+    for (const tool of ['vite', 'vitest']) linkTool(tool, join(dir, 'node_modules'))
+    const node = (...args: string[]) => run(process.execPath, args, dir)
+    expect(node('node_modules/vitest/vitest.mjs', 'run')).toMatch(/2 passed/)
+    node(TSC, '--noEmit')
+    node('node_modules/vite/bin/vite.js', 'build')
+    node('scripts/manifest.mjs')
+    expect(readFileSync(join(dir, 'acorn-plugin.json'), 'utf8')).toBe(files['acorn-plugin.json'])
+    expect(readFileSync(join(dir, 'dist/node.js'), 'utf8')).not.toMatch(/from ['"]acorn-plugin-sdk/)
+
+    const dataRoot = join(root, 'data')
+    const installed = join(pluginInstallDir(dataRoot), 'my-alerts')
+    mkdirSync(installed, { recursive: true })
+    cpSync(join(dir, 'acorn-plugin.json'), join(installed, 'acorn-plugin.json'))
+    cpSync(join(dir, 'dist'), join(installed, 'dist'), { recursive: true })
+    const { loaded, failures } = await loadExternalPlugins(dataRoot, { builtins: [] })
+    expect(failures).toEqual([])
+    expect(loaded[0]?.manifest.contributions.dataSources?.[0]).toMatchObject({ sourceId: 'alerts' })
+    await loaded[0]?.plugin.dispose?.()
+  } finally {
+    rmSync(root, { recursive: true, force: true })
+  }
+}, 120_000)
+
+it('writes the trigger template under --trigger', () => {
+  const cwd = mkdtempSync(join(tmpdir(), 'acorn scaffold-'))
+  try {
+    execFileSync(process.execPath, [CLI, 'my-alerts', '--trigger'], { cwd, stdio: 'pipe' })
+    expect(readdirSync(join(cwd, 'my-alerts', 'src')).sort()).toEqual(['feed.test.ts', 'feed.ts', 'index.ts'])
   } finally {
     rmSync(cwd, { recursive: true, force: true })
   }

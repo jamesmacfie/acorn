@@ -59,6 +59,7 @@ export function validateNodeDeclarations(refs: ManifestReferences): void {
       ctx.addIssue({ code: 'custom', path: [...at, 'name'], message: `duplicate CLI command '${entry.name}'` })
     cliNames.add(entry.name)
     if (!manifest.node) ctx.addIssue({ code: 'custom', path: at, message: 'a CLI command requires a node entry' })
+    if (entry.capability === undefined) return
     if (!(NODE_CORE_FACETS as readonly string[]).includes(entry.capability))
       ctx.addIssue({
         code: 'custom',
@@ -147,6 +148,8 @@ export function validateRuntimeContributions(refs: ManifestReferences): void {
   })
   refResolvers.forEach((entry, i) => route(entry.resolve, ['contributions', 'refResolvers', i, 'resolve']))
   manifest.contributions.dataSources?.forEach((entry, i) => {
+    // An event feed has no route: the host serves it.
+    if ('feed' in entry) return
     route(entry.handler, ['contributions', 'dataSources', i, 'handler'])
     // A derived source reads accounts only through its inputs (../../dataSources/inputs.ts).
     if (entry.inputs && entry.providerId) {

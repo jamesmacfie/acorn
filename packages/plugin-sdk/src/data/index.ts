@@ -1,11 +1,15 @@
-// Published entry point for `acorn-plugin-sdk/data`: the derived source helper for a plugin's node
-// half. Its declaration is ./public.ts, copied to dist/data.d.ts.
+// Published entry point for `acorn-plugin-sdk/data`: the derived source and event feed helpers for a
+// plugin's node half. Its declaration is ./public.ts, copied to dist/data.d.ts.
 export { defineDerivedSource, derivedSourceManifest, field } from './derived.ts'
+export { defineEventFeed } from './feed.ts'
 export type {
   DerivedQueryArgs,
   DerivedRecord,
   DerivedSource,
   DerivedSourceDefinition,
+  EventFeed,
+  EventFeedDefinition,
+  FeedEvent,
   FieldChoice,
   FieldOptions,
   FieldSpec,
