@@ -47,6 +47,7 @@ import { DataSourceError, validateDescription, validateSourceQuery } from './val
 import { ProviderRequestScheduler } from '../integrations/budgetRuntime'
 import { connectionProviderRegistry } from '../integrations/connectionProviders/registry'
 import type { DataRecordAction } from '@acorn/protocol/dataActions.ts'
+import { clearDashboardReadCache } from '../dashboards/readCache'
 import { getDb } from '../db'
 import { getConnection } from '../integrations/connections'
 import { cachedSourceIdentity, rememberSourceIdentity } from './identityCache'
@@ -452,6 +453,8 @@ export async function actOnDataRecord(
     DATA_LIMITS.detailBytes,
     { providerId: source.providerId, connectionId: scope.connectionId },
   )
+  // The action may have changed what any source answers, so a run right after it reads afresh.
+  clearDashboardReadCache()
   return { outcome: 'done' }
 }
 

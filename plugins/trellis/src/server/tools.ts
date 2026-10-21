@@ -1,6 +1,7 @@
 import { z } from 'zod'
 import type { AgentToolContribution } from '@acorn/plugin-api/node'
-import { appCreateInput, appPatchInput, appReadInput, appShowInput, appWriteInput } from '../shared/api'
+import { appShowInput } from '../contract/appShowCall'
+import { appCreateInput, appPatchInput, appReadInput, appWriteInput } from '../shared/api'
 import type { AppToolDeps } from './handlers'
 
 // The seven app tools (docs/agent-tools.md § Apps). Only these declarations are on the Node's boot

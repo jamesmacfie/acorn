@@ -164,6 +164,36 @@ describe('browser bridge requests', () => {
   })
 })
 
+describe('app card requests', () => {
+  const app = { v: 1, id: 'a', nodeId: 'n1', taskId: 't1', appId: 'app-0123456789ab' }
+  const save = (state: Record<string, unknown>) => ({ ...app, op: 'app.state', state, key: 'k'.repeat(36) })
+
+  it('accepts a read, a save with its key, a run, and a restore', () => {
+    for (const request of [
+      { ...app, op: 'app.view', revision: 2 },
+      { ...app, op: 'app.run', revision: 2, plan: 'open', inputs: { taskId: 't1' }, viewerZone: 'UTC' },
+      { ...app, op: 'app.state' },
+      save({ $done: ['a'] }),
+      save({ $notes: 'x'.repeat(256 * 1024 - 20) }),
+      { ...app, op: 'app.restore', revision: 1, key: 'k'.repeat(36) },
+    ])
+      expect(bridgeRequestSchema.safeParse(request).success).toBe(true)
+  })
+
+  it('refuses a state over 256 KiB, a save without a key, and a plan sent from the browser', () => {
+    for (const request of [
+      save({ $notes: 'x'.repeat(256 * 1024) }),
+      { ...app, op: 'app.state', state: { $done: [] } },
+      { ...app, op: 'app.state', key: 'k'.repeat(36) },
+      save({ notVariable: 1 }),
+      { ...app, op: 'app.run', revision: 2, plan: { version: 2 }, inputs: {}, viewerZone: 'UTC' },
+      { ...app, op: 'app.run', revision: 2, plan: 'open', inputs: {}, viewerZone: 'UTC', content: {} },
+      { ...app, op: 'app.restore', revision: 1 },
+    ])
+      expect(bridgeRequestSchema.safeParse(request).success).toBe(false)
+  })
+})
+
 describe('native host registration', () => {
   it('allows exactly one extension in the form each browser expects', () => {
     expect(nativeHostRegistration('chrome', 'com.acorn.browser_bridge', '/x/host')).toEqual({

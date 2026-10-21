@@ -4,7 +4,6 @@ import { useNavigate } from '@solidjs/router'
 import { createQuery, useQueryClient } from '@tanstack/solid-query'
 import {
   deriveDrilldownPlan,
-  displayPlanGroups,
   displayPlanRun,
   type DisplayPlanGroup,
   type DashboardRun,
@@ -19,8 +18,8 @@ import { integrationsOptions } from '../../infra/queries'
 import { dataSourceCatalogOptions } from '../dataSources/queries'
 import { failureContext } from './planInputs'
 import SourceFailureAlert from './SourceFailureAlert'
-import SuppliedOrigin from './SuppliedOrigin'
 import KeptOrigin from './KeptOrigin'
+import RunPanel from './RunPanel'
 import { runChromeAction } from '../../host/chrome/actions'
 import {
   availableContentPresentations,
@@ -34,11 +33,10 @@ import { descriptorPromotion } from '../../host/chrome/promotion'
 import { writeJson } from '../../infra/node/apiClient'
 import { pluginLabel } from '../../host/plugins/pluginLabel'
 import { activeCacheId } from '../../infra/node/activeNode'
-import { Alert, Button, Card, EmptyState, Textarea } from '../../kit/components/primitives'
+import { Alert, Button, Card, Textarea } from '../../kit/components/primitives'
 import { Modal } from '../../kit/components/overlays/Modal'
 import { Heading } from '../../kit/components/content/Heading'
 import Icon from '../../kit/components/content/Icon'
-import { Text } from '../../kit/components/content/Text'
 import { dashboardClient, publishedDashboardPanelKey } from './dashboardClient'
 import { dashboardRecoveryStore } from './dashboardRecovery'
 import { createWorkspaceWords } from '../workspaces/words'
@@ -166,21 +164,28 @@ export default function PublishedDashboardPanel(props: {
     const pending = optimisticBoard()
     if (pending && loaded.dataUpdatedAt > pending.startedAt) setOptimisticBoard(undefined)
   })
-  const display = createMemo(() => {
+  /** The run as drawn. A board move shows at once, before the source confirms it. */
+  const shown = createMemo(() => {
     const current = run()
-    if (!current) return undefined
-    const result = displayPlanRun(current.plan, current.rows)
     const moving = optimisticBoard()
-    return moving
+    return current && moving
       ? {
-          ...result,
-          rows: result.rows.map((row) =>
+          ...current,
+          rows: current.rows.map((row) =>
             row.id === moving.rowId
               ? { ...row, values: { ...row.values, [moving.move.columnId]: moving.move.choiceId } }
               : row,
           ),
         }
-      : result
+      : current
+  })
+  /** The board's grouped column, which a move changes. The display schema depends only on the plan,
+   *  so no rows are passed. */
+  const boardGroup = createMemo(() => {
+    const current = run()
+    return (
+      current && groupField(displayPlanRun(current.plan, []).schema, { groupBy: current.plan.group?.[0]?.column })?.id
+    )
   })
   const navigate = useNavigate()
   const queryClient = useQueryClient()
@@ -362,13 +367,13 @@ export default function PublishedDashboardPanel(props: {
   }
   const moveReason = (row: DashboardDisplayRow, choiceId: string): string | undefined => {
     const current = run()
-    const group = display() && groupField(display()!.schema, { groupBy: current?.plan.group?.[0]?.column })?.id
+    const group = boardGroup()
     return current && group ? boardMove(current, row, group, choiceId).reason : 'This board has no grouped column.'
   }
   const boardWrite = createBoardWrite({
     resolve: (row, choiceId) => {
       const current = run()
-      const group = display() && groupField(display()!.schema, { groupBy: current?.plan.group?.[0]?.column })?.id
+      const group = boardGroup()
       return current && group
         ? boardMove(current, row, group, choiceId)
         : { reason: 'This board has no grouped column.' }
@@ -647,7 +652,6 @@ export default function PublishedDashboardPanel(props: {
         {props.actions?.(() => published.data)}
       </div>
       <div class="dash-panel-body">
-        <Show when={supplied()}>{(reference) => <SuppliedOrigin origin={reference().origin} />}</Show>
         <Show when={kept()}>
           {(dataset) => (
             <KeptOrigin
@@ -658,76 +662,57 @@ export default function PublishedDashboardPanel(props: {
             />
           )}
         </Show>
-        <Show
-          when={!loaded.error || loaded.data}
-          fallback={
-            <EmptyState
-              align="start"
-              size="sm"
-              title="Couldn't load this panel"
-              action={
-                <Button size="sm" onPress={() => void loaded.refetch()}>
-                  Try again
-                </Button>
-              }
-            >
-              Edit the panel to repair its source or column.
-            </EmptyState>
+        <RunPanel
+          plan={props.plan ?? published.data?.content}
+          run={shown()}
+          stale={stale()}
+          // An unpublished plan says what it shows, because nobody has read it in the studio.
+          describe={!!props.plan}
+          error={!!loaded.error}
+          onRetry={() => void loaded.refetch()}
+          problems={
+            <For each={fresh()?.diagnostics.problems ?? []}>
+              {(problem) => (
+                <Show
+                  when={problem.failure}
+                  fallback={
+                    <Alert tone="warn">{`${planPartLabel(fresh()!.plan, problem.path)}: ${problem.message}`}</Alert>
+                  }
+                >
+                  {(failure) => (
+                    <SourceFailureAlert
+                      failure={failure()}
+                      severity={problem.severity}
+                      context={failureContext(
+                        { ...problem, failure: failure() },
+                        fresh()!.plan,
+                        catalog.data?.sources ?? [],
+                        integrations.data?.integrations ?? [],
+                      )}
+                      onRetry={() => void loaded.refetch()}
+                      {...(props.onEditPanel && props.definition.publication
+                        ? { onChooseAccount: () => props.onEditPanel!(props.definition.publication!.dashboardId) }
+                        : {})}
+                    />
+                  )}
+                </Show>
+              )}
+            </For>
           }
+          panelId={props.definition.id}
+          onActivate={activate}
+          canActivate={canActivate}
+          onButton={activateButton}
+          onOpenRecord={openRecordItem}
+          onDrilldown={openDrilldown}
+          onMeasureDrilldown={measureDrillable() ? openMeasureDrilldown : undefined}
+          onCorrect={(row) => {
+            setCorrecting(row)
+            setCorrection('null')
+          }}
+          boardMoveReason={moveReason}
+          onBoardMove={boardWrite.request}
         >
-          <Show when={loaded.error && loaded.data}>
-            <Alert tone="warn">Couldn't refresh. Showing the last data we got.</Alert>
-          </Show>
-          <For each={fresh()?.diagnostics.problems ?? []}>
-            {(problem) => (
-              <Show
-                when={problem.failure}
-                fallback={
-                  <Alert tone="warn">{`${planPartLabel(fresh()!.plan, problem.path)}: ${problem.message}`}</Alert>
-                }
-              >
-                {(failure) => (
-                  <SourceFailureAlert
-                    failure={failure()}
-                    severity={problem.severity}
-                    context={failureContext(
-                      { ...problem, failure: failure() },
-                      fresh()!.plan,
-                      catalog.data?.sources ?? [],
-                      integrations.data?.integrations ?? [],
-                    )}
-                    onRetry={() => void loaded.refetch()}
-                    {...(props.onEditPanel && props.definition.publication
-                      ? { onChooseAccount: () => props.onEditPanel!(props.definition.publication!.dashboardId) }
-                      : {})}
-                  />
-                )}
-              </Show>
-            )}
-          </For>
-          <Show when={run()?.diagnostics.asOf}>
-            {(time) => <span>{`As of ${new Date(time()).toLocaleString()}`}</span>}
-          </Show>
-          <Show when={run()?.diagnostics.sources.some((source) => source.coverageWindows?.length)}>
-            <Alert tone="muted">
-              {run()!
-                .diagnostics.sources.flatMap((source) =>
-                  (source.coverageWindows ?? [])
-                    .slice(0, 3)
-                    .map(
-                      (window) =>
-                        `${source.label}: ${window.kind === 'complete' ? 'events covered' : 'coverage gap'} ${new Date(window.fromTime).toLocaleDateString()}–${new Date(window.toTime).toLocaleDateString()}${window.reason ? ` (${window.reason})` : ''}`,
-                    ),
-                )
-                .join(' · ')}
-            </Alert>
-          </Show>
-          <Show when={run()?.rows.some((row) => row.partial && Object.keys(row.partial).length)}>
-            <Alert tone="warn">
-              {[...new Set(run()!.rows.flatMap((row) => Object.values(row.partial ?? {})))].join(' ')} Measures marked
-              partial may leave out unknown values.
-            </Alert>
-          </Show>
           <Show when={outcome()}>{(message) => <Alert tone="muted">{message()}</Alert>}</Show>
           <Show when={boardWrite.retry()}>
             {(intent) => (
@@ -808,58 +793,7 @@ export default function PublishedDashboardPanel(props: {
               >{`This asks ${pluginLabel(item().row.pluginId)} to ${RISK_CONFIRM[item().action.risk ?? '']?.says ?? 'act'}.`}</Alert>
             )}
           </Show>
-          {/* An unpublished plan says what it shows, because nobody has read it in the studio. */}
-          <Show when={props.plan && run()?.description.length ? run()!.description : undefined}>
-            {(lines) => (
-              <Text tone="muted" wrap>
-                {lines().join(' ')}
-              </Text>
-            )}
-          </Show>
-          <Show
-            when={display()}
-            fallback={
-              <EmptyState align="start" size="sm" busy={loaded.isPending}>
-                Loading…
-              </EmptyState>
-            }
-          >
-            {(value) => (
-              <div class="dash-panel-data" data-stale={stale() ? '' : undefined} inert={stale()}>
-                <PanelBody
-                  view={run()!.plan.view}
-                  panelId={props.definition.id}
-                  schema={value().schema}
-                  fields={value().fields}
-                  rows={value().rows}
-                  groups={displayPlanGroups(run()!.groups, value().rows)}
-                  {...(run()!.plan.group?.[0] ? { groupBy: run()!.plan.group![0]!.column } : {})}
-                  provenance={run()!.plan.sources.length > 1}
-                  onActivate={activate}
-                  canActivate={canActivate}
-                  pressConfigured={!!press()}
-                  onButton={activateButton}
-                  onOpenRecord={openRecordItem}
-                  onDrilldown={openDrilldown}
-                  onMeasureDrilldown={measureDrillable() ? openMeasureDrilldown : undefined}
-                  onCorrect={(row) => {
-                    setCorrecting(row)
-                    setCorrection('null')
-                  }}
-                  buttons={run()!.plan.actions?.buttons ?? []}
-                  boardChoices={
-                    run()!.plan.columns.find(
-                      (column) =>
-                        column.id === groupField(value().schema, { groupBy: run()!.plan.group?.[0]?.column })?.id,
-                    )?.choices ?? []
-                  }
-                  boardMoveReason={moveReason}
-                  onBoardMove={boardWrite.request}
-                />
-              </div>
-            )}
-          </Show>
-        </Show>
+        </RunPanel>
       </div>
       <Show when={taskRow()}>
         {(row) => (

@@ -31,6 +31,7 @@ import type {
   AgentOpenRequestList,
   AgentSessionList,
   AgentSessionSnapshot,
+  AgentToolCallRead,
   AgentTurn,
 } from '../../contract/wire.ts'
 import {
@@ -102,6 +103,8 @@ export type ManagedAgentsBridge = {
   setGoal(sessionId: string, objective: string | null): Promise<AgentSession>
   resumeGoal(sessionId: string): Promise<AgentSession>
   events(sessionId: string, afterSeq?: number, limit?: number, foldTools?: boolean): Promise<AgentEventPage>
+  /** Rejects with a 404 for a call the session doesn't have. */
+  toolCall(sessionId: string, toolId: string): Promise<AgentToolCallRead>
   enqueueTurn(sessionId: string, input: EnqueueAgentTurnInput): Promise<AgentTurn>
   implementCodexPlan(sessionId: string, itemId: string): Promise<AgentTurn>
   patchQueuedTurn(
@@ -484,6 +487,10 @@ export const managedAgents = new Hono<AppEnv>()
       bridge.events(c.req.param('sessionId'), parsed.data.afterSeq, parsed.data.limit, parsed.data.fold === '1'),
     )
   })
+  // One tool call folded across the session, such as a `panel_show` call a client draws on its own.
+  .get('/sessions/:sessionId/tools/:toolId', (c) =>
+    viaBridge(c, MANAGED_AGENTS, (bridge) => bridge.toolCall(c.req.param('sessionId'), c.req.param('toolId'))),
+  )
   .patch('/sessions/:sessionId', async (c) => {
     const parsed = patchAgentSessionSchema.safeParse(await c.req.json().catch(() => null))
     if (!parsed.success) return respondError(c, 400, 'bad_request')

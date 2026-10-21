@@ -161,6 +161,12 @@ export function managedAgentsBridge(
         const events = foldTools ? foldToolEvents(foldUsageEvents(page.events)) : page.events
         return { ...page, events }
       }),
+    toolCall: (sessionId, toolId) =>
+      guarded(async () => {
+        const read = await runtime.store.toolCall(sessionId, toolId)
+        if (!read) throw new BridgeError(404, 'not_found', 'This session has no such tool call.')
+        return read
+      }),
     enqueueTurn: (sessionId, input) => guarded(() => runtime.enqueueTurn(sessionId, input)),
     implementCodexPlan: (sessionId, itemId) => guarded(() => runtime.implementCodexPlan(sessionId, itemId)),
     patchQueuedTurn: (sessionId, turnId, patch) => guarded(() => runtime.patchQueuedTurn(sessionId, turnId, patch)),

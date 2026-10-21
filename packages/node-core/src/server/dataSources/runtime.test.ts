@@ -1,9 +1,10 @@
 import { readFileSync } from 'node:fs'
 import { fileURLToPath } from 'node:url'
 import { Hono } from 'hono'
-import { afterEach, describe, expect, it } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 import { dataSourceRequestSchema, type DataSourceRequest } from '@acorn/protocol/dataSources.ts'
 import { memoryIdentityStore } from '../activeIdentity'
+import { dashboardSharedRead } from '../dashboards/readCache'
 import { createCoreServices, SecretService } from '../core'
 import { makeTestDb, testEnv, testCoreSeams } from '../../testkit/db'
 import { CapabilityRegistry } from '../pluginHost/capabilities'
@@ -208,10 +209,15 @@ describe('typed source transport conformance', () => {
     )
     expect(calls).toBe(0)
     eligible = true
+    // A read shared before the action isn't answered after it.
+    const load = vi.fn(async () => 'before')
+    await dashboardSharedRead('shared-read', load)
     expect(await actOnDataRecord(env, { ref, actionId: 'retry', confirmedRisk: 'execute' }, key, invocation())).toEqual(
       { outcome: 'done' },
     )
     expect(calls).toBe(1)
+    await dashboardSharedRead('shared-read', load)
+    expect(load).toHaveBeenCalledTimes(2)
   })
   it('uses source-declared baseline and opaque continuation, not page cursors', async () => {
     const { env } = await world()

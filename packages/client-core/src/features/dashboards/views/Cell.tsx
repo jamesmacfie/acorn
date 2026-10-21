@@ -1,12 +1,10 @@
-import { createMemo, Match, Show, Switch } from 'solid-js'
-import { useNavigate } from '@solidjs/router'
+import { createMemo, Match, Show, Switch, useContext } from 'solid-js'
 import type { DashboardDisplayCell, DashboardDisplayField } from '@acorn/dashboards-core/render'
-import { openInAppUrl } from '../../../host/registries/panes/contentLinks'
-import { activeTaskId } from '../../tasks/tasks'
 import Icon from '../../../kit/components/content/Icon'
 import { StatusDot } from '../../../kit/components/primitives'
 import { formatCell, type FormattedCell } from '../format'
 import { cellText } from '@acorn/dashboards-core/format.ts'
+import { PanelViewHostContext } from './host'
 import { panelDotTone } from './props'
 
 // One cell, drawn by its semantic field type. Every decision worth testing is in `formatCell`; this file
@@ -20,7 +18,7 @@ export default function Cell(props: {
   const cell = createMemo(() =>
     formatCell(props.unit ? { ...props.field, unit: props.unit } : props.field, props.value),
   )
-  const navigate = useNavigate()
+  const host = useContext(PanelViewHostContext)
   // Narrows the union for `Match`, which can't do it from a `kind ===` comparison on its own.
   const of =
     <K extends FormattedCell['kind']>(kind: K) =>
@@ -67,13 +65,12 @@ export default function Cell(props: {
             rel="noopener noreferrer"
             // The row around this one has its own declared action, and a link click isn't that click.
             // The href stays the real external URL, which is what a middle-click, a copy-link and a
-            // modified click should all give. Only a plain left click is taken, and only when the URL
-            // names something acorn has a surface for (`openInAppUrl`).
+            // modified click should all give. Only a plain left click is taken, and only when the client
+            // opens the URL itself (`PanelViewHost.openLink`).
             onClick={(event) => {
               event.stopPropagation()
               if (event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return
-              if (openInAppUrl(value().url, { taskId: activeTaskId(), prefer: 'route', navigate }))
-                event.preventDefault()
+              if (host.openLink?.(value().url)) event.preventDefault()
             }}
           >
             {value().text}

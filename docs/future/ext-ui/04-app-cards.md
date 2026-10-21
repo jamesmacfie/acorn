@@ -1,6 +1,94 @@
 # Phase 4: app cards in the sidebar
 
-Date: October 21, 2026. Status: proposed. Needs phase 3.
+Date: October 21, 2026. Status: done. Needs phase 3.
+
+## Completion note
+
+Landed on October 21, 2026, on the `phase-4-app-cards` branch.
+
+What landed:
+
+- The split. `plugins/trellis/src/embed/AppRuntime.tsx` runs a program and holds every check that
+  bounds one: plain data, the web-only rule for links, the confirms, the read-only rule, and the row
+  check against the plan's last run. `bindings.tsx` and `plainData.ts` moved to `embed/`, and
+  `embed/appState.ts` holds `keepState` with the 400 millisecond save delay. The desktop's
+  `client/AppView.tsx` builds an `AppHost` from `writeJson`, `taskById`, and `composeForAgent`, and
+  `client/appState.ts` keeps the query cache copy that a card and the pane share.
+- The bridge. `app.view`, `app.run`, `app.state`, and `app.restore` in `extensionBridge.ts`, and the
+  host's handlers in `apps/cli/src/browser/bridge.ts`, with the trellis routes and the revision cache
+  in `browser/apps.ts`. `runDraftPlan` and `activeTask` are shared with `panel.run`.
+- The sidebar. `AppCard.tsx` loads with `lazy` from `Conversation.tsx`. The composer hands the
+  conversation an insert function through `insertRef`, which **Ask the agent** uses.
+  `apps/extension/src/sidebar/appKit.ts` is the sidebar's `@acorn/plugin-api/ui`.
+- Docs: native messaging, the conversation view, agent-built apps, security, conventions, package
+  shape, and first-party plugins. The site page "Talk to an agent from the browser" too, marked
+  checked.
+- Tests: checkpoints 2 and 3 as written, plus the schema's caps, an archived task, an older host, a
+  hint that collapses a card, and a restore that collapses another card.
+
+Decisions and deviations:
+
+- `embed/` is an eighth plugin folder name, not a package. It's trellis's library, bindings, and
+  runtime together, and splitting the library into a package would have moved the Node's checks too.
+  The arch tests hold `embed/` to the client tier's rules: kit purity, the client side, and app
+  imports only through a listed edge. The exports map names each `embed/` file, not a wildcard, so
+  `plainData.test.ts` can stay beside its module.
+- Requirement 3 isn't met as written. A program's `Panel` draws with a `Panel` component the client
+  hands `AppRuntime`, not with `RunPanel` everywhere. The desktop passes `PlanPanel`, so its panels
+  keep their row menus, drill-downs, refresh intervals, and pause when off screen, none of which
+  `RunPanel` has without the 873 lines of `PublishedDashboardPanel` around it. The terminal keeps its
+  one line. The sidebar passes a `RunPanel` that runs through `host.runPlan`. Importing `RunPanel` in
+  `embed/` would also have made trellis depend on client-core at run time.
+- `AppHost.rowAction` answers `{ outcome, url? }`, not `{ outcome }`. The desktop's action can answer
+  with a link, and the runtime confirms and opens it, so the confirm stays in the runtime.
+- `loadState` is on `AppHost`, but the desktop reads state through its shared query, whose query
+  function is `loadState`. `AppRuntime` calls `loadState` itself only when its client passes no shared
+  copy, as the sidebar doesn't.
+- The runtime refuses a state over 256 KiB before it calls a host, so both clients say the same
+  thing. `APP_STATE_MAX_BYTES` moved to trellis's `shared/api.ts` from its store. The bridge schema
+  has its own copy, because protocol can't import trellis.
+- `app.view` answers the task, or null once it isn't active. That gives the card its task for
+  `Query("task")` and tells it to draw one line, with no extra operation.
+- `app.run` inputs are capped at 64 KiB of JSON. The doc set no cap.
+- `@acorn/plugin-api/ui` needed an alias. client-core has no `sideEffects` flag, so the facade's
+  barrel would have pulled the whole kit, the diff viewer, and the editor into the sidebar. The alias
+  is in `vite.config.ts`, `vitest.config.ts`, and `tsconfig.json`'s `paths`, as the terminal's is.
+- A restore moves an app's head without a hint, and each sidebar card reads its own summary. So
+  `Conversation` counts restores and every app card reads again on one. The real sidebar check found
+  this: the head's card stayed interactive after another card restored.
+- Verify before building. The summary's `taskId` is the task's ID for a task app, and absent for a
+  project app. Every `/v1/*` route honors `Idempotency-Key`, so a restore retried with the same key
+  makes one revision. The desktop debounces saves by 400 milliseconds and flushes on unmount, and the
+  sidebar uses the same code.
+
+Checks:
+
+- Trellis (49 tests), the extension (287), the CLI (176), protocol (325), the terminal client (866),
+  and the arch tests (95) pass. `tsc` passes in those packages, the desktop, and plugin-api.
+- Checkpoint 1 wasn't run in `pnpm dev:agent`. The desktop's trellis tests and the terminal's
+  `trellis.test.tsx` pass unchanged, apart from one import path.
+- Checkpoint 4 ran without a live agent. A seed script wrote a task, a two-revision app, and two
+  `app_show` calls into a `pnpm dev:extension` session's Node. The sidebar drew v2 with its panel, and
+  collapsed v1 to "v1: First checklist. Replaced by v2." Two ticks reached the app's `state.json` on
+  the Node and came back after a reload. The link confirm showed `https://example.com/runbook?step=2`
+  and opened it in a new tab. **Ask the agent** added "Which step should I do next?" on a line after
+  "Hi" in the message box and sent nothing. **Restore v1** made v3, which the v1 card drew. **Restore
+  v2** made v4, and the v3 card collapsed at once. The desktop's Apps pane wasn't opened, so a tick
+  showing there was checked only by the shared `state.json`.
+- Sizes. The sidebar's first load went from 374,984 B to 385,440 B of JavaScript, 116,621 B to
+  119,866 B gzipped, measured against a build with the app card import cut out. Rollup moved the kit's
+  `Modal` and more of Zod into chunks the card shares with the sidebar. The first app card loads
+  `AppCard`'s chunk, 102,124 B (34,533 B gzipped), and `RunPanel`'s shared chunk, 148,162 B in all
+  (49,456 B gzipped). The Node service measured 1,915,652 B, under the 1,917,500 B ceiling, from
+  1,915,624 B after phase 3. The native host's bundle wasn't measured.
+
+For phase 5:
+
+- Give the sidebar's `AppHost` a `rowAction` that sends `row.act`. The runtime already finds the row
+  and action in the plan's last run, confirms, and passes the inputs the plan last ran with. The
+  "This action runs in the Acorn app." refusal is the runtime's answer to a host with no `rowAction`.
+- The sidebar's `AppPanel` in `AppCard.tsx` draws `RunPanel` with no press handlers, as
+  `PanelCard` did before phase 5.
 
 ## Goal
 

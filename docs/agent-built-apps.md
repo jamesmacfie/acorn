@@ -49,9 +49,10 @@ the first call, about 100 KB.
 
 The library is the set of components and functions a program can use. Nothing else parses. The spec
 half, each component's props and description, is `plugins/trellis/src/shared/library.ts`. The Node
-validates programs and writes the guide from it. The client half, `plugins/trellis/src/client/bindings.tsx`,
+validates programs and writes the guide from it. The client half, `plugins/trellis/src/embed/bindings.tsx`,
 draws each component with a kit component through `@acorn/plugin-api/ui`, so one binding draws in the
-desktop app and the terminal client.
+desktop app, the terminal client, and the browser extension. `Panel` draws with the panel each client
+hands the runtime.
 
 | Kind | Members |
 | --- | --- |
@@ -106,6 +107,13 @@ A card caps at 480 pixels with **Expand**. Its plans first run when it comes int
 pause while it's off screen. `$placement` is `card`. A card in an archived task's transcript draws one
 line and not the app, because the task's data may not resolve.
 
+The browser extension's sidebar draws the app too, with the same runtime, as its own card. Its saved
+state, collapse, **Show**, and **Restore** work as on the desktop. **Open in Acorn** opens the task's
+Apps pane on the app, where **Publish to project** is. Row actions run only in the desktop for now
+([the conversation view](./browser-extension/transcript.md#app-cards)). The card's schemas and its
+transcript reader, `readAppShowCall`, are in `plugins/trellis/src/contract/appShowCall.ts`, so the
+extension's native host reads a call the same way.
+
 ## The Apps pane
 
 The task's **Apps** pane is `plugins/trellis/src/client/paneContribution.ts`, a `list-detail` pane
@@ -144,7 +152,11 @@ The host saves a program's `$` variables, except `$placement`, to the app's `sta
 mounts, so ticks and typed values come back after a reload and a restart. Every interactive view of the
 head saves: the head's card and the pane. Views in one window share one copy, so ticking in the pane
 ticks the card beside it, and the last change wins. A read-only older revision neither reads nor
-saves state.
+saves state. A save waits 400 milliseconds after the last change, and a state over 256 KiB isn't sent.
+
+The browser extension's sidebar keeps its own copy. The sidebar and the desktop each save what they
+hold, and the last save wins, as two desktop windows do. A tick in the desktop shows in the sidebar
+when its card next mounts and reads the state again.
 
 State survives revisions by variable name. A view seeds only the variables its revision declares, so
 one a revision dropped is gone at the next save, and a new one starts at its declared default. The host
@@ -153,17 +165,20 @@ person set.
 
 ## What an app can reach
 
-A program reaches only what its view hands it, a card or the pane, and the view checks each call. The code is
-`plugins/trellis/src/client/AppView.tsx`.
+A program reaches only what its client hands it as an `AppHost`, and the runtime checks each call. The
+runtime is `plugins/trellis/src/embed/AppRuntime.tsx`, and it holds every check in the table below:
+plain data, the web-only rule for links, the confirms, and the read-only rule. The desktop's and the
+terminal's host is `plugins/trellis/src/client/AppView.tsx`, and the browser extension's is
+`apps/extension/src/sidebar/AppCard.tsx`. Neither host calls a value a program handed it.
 
 | What | In a program | What the host does |
 | --- | --- | --- |
 | The app's plans | `Query("name", inputs, defaults)`, `Panel("name", inputs)` | Runs the plan from the revision's files through the dashboard run route, under the viewer's device. A query's rows are each row's values plus `_id` and `_actions`. A plan can carry rows the agent gathered itself ([supplied rows](./dashboards/supplied-rows.md)), and a `Panel` over one says where they came from, as a panel card does. |
 | Plan inputs | The second argument to `Query` or `Panel` | Sent as the run's `inputs`. The Node fills the plan's `{ from: "input" }` addresses with them, and the run fails if a plan reads one that wasn't passed. |
 | The task | `Query("task", {}, {})` | Returns the ID, title, and branch of the task the app is drawn in. A project app drawn in the Apps source has no task, and the query fails. |
-| Row actions | `Mutation("rowAction", {plan, row, action})` and `@Run` | Finds the row and action in its own last run of that plan, shows a confirm, and then calls the data source's action route. A program can't name a record or an action the source didn't offer. |
-| Compose | `@ToAssistant(text, context)` | Puts the text in the task's agent composer as a draft. It never sends. |
-| Links | `@OpenUrl(url)` | Opens HTTP and HTTPS URLs only, after a confirm that shows the full URL. Anything else does nothing and says why. In the terminal, the confirm copies the link instead. |
+| Row actions | `Mutation("rowAction", {plan, row, action})` and `@Run` | Finds the row and action in its own last run of that plan, shows a confirm, and then calls the data source's action route. A program can't name a record or an action the source didn't offer. In the browser extension, the native host runs the plan again and finds the row and action in that fresh run too, because it can't trust the sidebar's last run ([row actions](./browser-extension/native-messaging.md#row-actions)). An older revision acts on nothing. A client without row actions says "This action runs in the Acorn app." |
+| Compose | `@ToAssistant(text, context)` | Puts the text in the task's agent composer as a draft. It never sends. In the browser extension, it goes in the conversation's message box. |
+| Links | `@OpenUrl(url)` | Opens HTTP and HTTPS URLs only, after a confirm that shows the full URL. Anything else does nothing and says why. In the terminal, the confirm copies the link instead. In the browser extension, the link opens in a new tab. |
 
 The host copies every value that leaves a program into plain JSON data first (`plainData`). A program
 can read a built-in function off any value and put it on an object as `toString` or `toJSON`, and

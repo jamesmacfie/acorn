@@ -47,6 +47,18 @@ afterEach(async () => {
 })
 
 // A Node that answers the routes pairing and project reads use, with knobs for each failure.
+type FakeApp = {
+  summary: {
+    appId: string
+    taskId?: string
+    name: string
+    head: number
+    revisions: { revision: number; note: string; restoredFrom?: number }[]
+  }
+  revisions: Map<number, { program: string; plans: Record<string, unknown> }>
+  state: Record<string, unknown>
+}
+
 async function fakeNode(nodeId: string, options: { protocolVersion?: number } = {}) {
   const state = {
     revoked: false,
@@ -121,6 +133,22 @@ async function fakeNode(nodeId: string, options: { protocolVersion?: number } = 
     workflowDefs: [] as Record<string, unknown>[],
     workflowStartAnswer: { runId: 'run-1' } as Record<string, unknown>,
     workflowStarts: [] as { key: string; body: unknown }[],
+    // What the dashboards run route answers, every body it was sent, and a hold on its answer.
+    dashboardRun: { rows: [] } as unknown,
+    dashboardRuns: [] as Record<string, unknown>[],
+    dashboardRunDelay: null as Promise<void> | null,
+    // The trellis plugin's apps, each with its summary, revisions, and saved state, and every state save
+    // and restore with its key.
+    apps: new Map<string, FakeApp>(),
+    stateSaves: [] as { key: string; body: unknown }[],
+    restores: [] as { key: string; body: unknown }[],
+    restoreAnswers: new Map<string, number>(),
+    // Every data source action with its key, and the Node's answer to each key it has seen.
+    acts: [] as { key: string; body: unknown }[],
+    actAnswer: { outcome: 'done' } as Record<string, unknown>,
+    actAnswers: new Map<string, unknown>(),
+    // Act on the next action, then drop the connection before answering.
+    dropActReply: false,
   }
   const handler = async (req: IncomingMessage, res: ServerResponse) => {
     state.paths.push(req.url ?? '')
@@ -400,6 +428,26 @@ async function fakeNode(nodeId: string, options: { protocolVersion?: number } = 
       }
       return reply(200, row)
     }
+    if (url.pathname === '/v1/core/dashboards/run' && req.method === 'POST') {
+      let body = ''
+      for await (const chunk of req) body += chunk
+      state.dashboardRuns.push(JSON.parse(body))
+      await state.dashboardRunDelay
+      return reply(200, state.dashboardRun)
+    }
+    if (url.pathname === '/v1/core/data-sources/act' && req.method === 'POST') {
+      let body = ''
+      for await (const chunk of req) body += chunk
+      const key = String(req.headers['idempotency-key'])
+      state.acts.push({ key, body: JSON.parse(body) })
+      // The Node answers a key it has seen with its first answer, and acts once.
+      if (!state.actAnswers.has(key)) state.actAnswers.set(key, state.actAnswer)
+      if (state.dropActReply) {
+        state.dropActReply = false
+        return req.socket.destroy()
+      }
+      return reply(200, state.actAnswers.get(key))
+    }
     if (req.url === '/v1/core/projects') {
       await state.projectsDelay
       return reply(200, { projects: state.projects })
@@ -416,6 +464,37 @@ async function fakeNode(nodeId: string, options: { protocolVersion?: number } = 
         state.sites.set(projectId, patch.siteAssociations)
       }
       return reply(200, { projectId, config: { siteAssociations: state.sites.get(projectId) ?? [] } })
+    }
+    const appPath = /^\/v1\/p\/trellis\/apps\/([^/]+)(?:\/(.+))?$/.exec(url.pathname)
+    const app = appPath && state.apps.get(appPath[1]!)
+    if (app) {
+      const rest = appPath[2]
+      const files = rest?.startsWith('revisions/') && app.revisions.get(Number(rest.slice('revisions/'.length)))
+      if (!rest) return reply(200, app.summary)
+      if (files) return reply(200, files)
+      if (rest === 'state' && req.method === 'GET') return reply(200, { state: app.state })
+      let body = ''
+      for await (const chunk of req) body += chunk
+      const key = String(req.headers['idempotency-key'])
+      if (rest === 'state' && req.method === 'PUT') {
+        state.stateSaves.push({ key, body: JSON.parse(body) })
+        app.state = (JSON.parse(body) as { state: Record<string, unknown> }).state
+        res.writeHead(204)
+        return res.end()
+      }
+      if (rest === 'restore' && req.method === 'POST') {
+        state.restores.push({ key, body: JSON.parse(body) })
+        // The Node answers a key it has seen with its first answer, and changes nothing.
+        const answered = state.restoreAnswers.get(key)
+        if (answered) return reply(200, { revision: answered })
+        const { revision } = JSON.parse(body) as { revision: number }
+        const head = app.summary.head + 1
+        app.summary.head = head
+        app.summary.revisions.push({ revision: head, note: `Restored v${revision}.`, restoredFrom: revision })
+        app.revisions.set(head, app.revisions.get(revision)!)
+        state.restoreAnswers.set(key, head)
+        return reply(200, { revision: head })
+      }
     }
     reply(404, { error: { code: 'not_found', message: 'Not found.' } })
   }
@@ -1463,6 +1542,383 @@ describe('browser bridge handoffs', () => {
       task: { id: made.task.id },
     })
     expect(node.state.createdTasks).toHaveLength(1)
+  })
+})
+
+describe('browser bridge panel cards', () => {
+  const plan = {
+    version: 2,
+    title: 'Plan title',
+    time: { zone: 'UTC', mode: 'fixed', weekStart: 'monday' },
+    sources: [
+      {
+        id: 'rows',
+        label: 'Rows',
+        role: 'primary',
+        reference: {
+          kind: 'supplied',
+          origin: { says: 'The agent', readAt: 1 },
+          schema: { type: 'object', properties: {} },
+          fields: [],
+          rows: [],
+        },
+      },
+    ],
+    columns: [{ id: 'title', label: 'Title', type: 'text', bind: { rows: { field: '/title' } } }],
+    stages: [],
+    view: { kind: 'table' },
+  }
+  const shown = {
+    id: 'call-1',
+    name: 'panel_show',
+    title: 'panel_show',
+    status: 'completed',
+    input: JSON.stringify({ title: 'Open pull requests', plan }),
+    output: JSON.stringify({ panelId: 'prs', shownAt: 5, description: ['Open pull requests.'] }),
+  }
+  const toolPath = '/v1/p/agents/sessions/s1/tools/call-1'
+  const request = {
+    op: 'panel.run',
+    nodeId: 'node-a',
+    sessionId: 's1',
+    toolId: 'call-1',
+    viewerZone: 'Pacific/Auckland',
+  }
+
+  async function selected() {
+    const { call, node } = await paired()
+    await call({ op: 'node.select', nodeId: 'node-a' })
+    node.state.pluginAnswers.set(toolPath, { tool: shown, turnId: 'turn-1', taskId: 't1' })
+    node.state.dashboardRun = { plan, rows: [{ id: 'rows:0', values: { title: 'One' } }], groups: [] }
+    return { call, node }
+  }
+
+  it("runs the call's plan as a draft in its task's workspace, in the sidebar's time zone", async () => {
+    const { call, node } = await selected()
+    const titled = { ...plan, title: 'Open pull requests' }
+    expect(await call(request)).toEqual({
+      nodeId: 'node-a',
+      sessionId: 's1',
+      toolId: 'call-1',
+      plan: titled,
+      run: node.state.dashboardRun,
+    })
+    expect(node.state.dashboardRuns).toEqual([
+      {
+        operation: 'run',
+        scope: { workspaceId: 'w' },
+        target: { kind: 'draft', content: titled },
+        mode: 'execution',
+        viewerZone: 'Pacific/Auckland',
+      },
+    ])
+  })
+
+  it('refuses a call that drew no panel, and one whose plan no longer validates', async () => {
+    const { call, node } = await selected()
+    const answer = (tool: Record<string, unknown>) =>
+      node.state.pluginAnswers.set(toolPath, { tool: { ...shown, ...tool }, turnId: 'turn-1', taskId: 't1' })
+    for (const tool of [
+      { name: 'app_show' },
+      { status: 'failed' },
+      // A harness records a refused call as completed, with the error as its output.
+      { output: 'Error: the plan has problems' },
+    ]) {
+      answer(tool)
+      await expect(call(request)).rejects.toMatchObject({
+        code: 'not_found',
+        message: "That call didn't draw a panel.",
+      })
+    }
+    answer({ input: JSON.stringify({ title: 'Open pull requests', plan: { ...plan, view: { kind: 'globe' } } }) })
+    await expect(call(request)).rejects.toMatchObject({
+      code: 'not_found',
+      message: "Open pull requests no longer passes its checks, so it can't be drawn.",
+    })
+    node.state.pluginAnswers.delete(toolPath)
+    await expect(call(request)).rejects.toMatchObject({ code: 'not_found' })
+    expect(node.state.dashboardRuns).toEqual([])
+  })
+
+  it('discards a run that finishes after the selection moved', async () => {
+    const { call, node } = await selected()
+    let release!: () => void
+    node.state.dashboardRunDelay = new Promise((resolve) => (release = resolve))
+    const late = call(request)
+    await vi.waitFor(() => expect(node.state.dashboardRuns).toHaveLength(1))
+    await call({ op: 'node.select', nodeId: null })
+    release()
+    await expect(late).rejects.toMatchObject({ code: 'not_selected' })
+  })
+})
+
+describe('browser bridge app cards', () => {
+  const plan = {
+    version: 2,
+    title: 'Open items',
+    time: { zone: 'UTC', mode: 'fixed', weekStart: 'monday' },
+    sources: [
+      {
+        id: 'rows',
+        label: 'Rows',
+        role: 'primary',
+        reference: {
+          kind: 'supplied',
+          origin: { says: 'The agent', readAt: 1 },
+          schema: { type: 'object', properties: {} },
+          fields: [],
+          rows: [],
+        },
+      },
+    ],
+    columns: [{ id: 'title', label: 'Title', type: 'text', bind: { rows: { field: '/title' } } }],
+    stages: [],
+    view: { kind: 'table' },
+  }
+  const appId = 'app-0123456789ab'
+  const files = { program: 'root = Panel("open")', plans: { open: plan } }
+  const target = { nodeId: 'node-a', taskId: 't1', appId }
+
+  async function selected() {
+    const { call, node } = await paired()
+    await call({ op: 'node.select', nodeId: 'node-a' })
+    node.state.apps.set(appId, {
+      summary: { appId, taskId: 't1', name: 'Checklist', head: 1, revisions: [{ revision: 1, note: 'First.' }] },
+      revisions: new Map([[1, files]]),
+      state: { $done: ['a'] },
+    })
+    // Another task's app, which this conversation must not reach.
+    node.state.apps.set('app-ffffffffffff', {
+      summary: { appId: 'app-ffffffffffff', taskId: 't2', name: 'Other', head: 1, revisions: [] },
+      revisions: new Map([[1, files]]),
+      state: { $secret: true },
+    })
+    node.state.dashboardRun = { plan, rows: [{ id: 'rows:0', values: { title: 'One' } }], groups: [] }
+    return { call, node }
+  }
+
+  it("answers the app's summary, the revision's program and plan names, and the task", async () => {
+    const { call } = await selected()
+    expect(await call({ op: 'app.view', ...target, revision: 1 })).toEqual({
+      nodeId: 'node-a',
+      appId,
+      revision: 1,
+      summary: { appId, name: 'Checklist', head: 1, revisions: [{ revision: 1, note: 'First.' }] },
+      program: files.program,
+      plans: ['open'],
+      task: { id: 't1', title: 'Fix it', branch: 'fix' },
+    })
+  })
+
+  it("runs the revision's named plan as a draft, and reads the revision's files once", async () => {
+    const { call, node } = await selected()
+    await call({ op: 'app.view', ...target, revision: 1 })
+    const run = { op: 'app.run', ...target, revision: 1, plan: 'open', inputs: { taskId: 't1' }, viewerZone: 'UTC' }
+    expect(await call(run)).toEqual({ nodeId: 'node-a', appId, revision: 1, plan, run: node.state.dashboardRun })
+    await call(run)
+    expect(node.state.dashboardRuns[0]).toEqual({
+      operation: 'run',
+      scope: { workspaceId: 'w' },
+      target: { kind: 'draft', content: plan },
+      mode: 'execution',
+      viewerZone: 'UTC',
+      inputs: { taskId: 't1' },
+    })
+    expect(node.state.paths.filter((path) => path.includes('/revisions/'))).toEqual([
+      `/v1/p/trellis/apps/${appId}/revisions/1`,
+    ])
+  })
+
+  it('refuses a plan the revision has no file for', async () => {
+    const { call, node } = await selected()
+    await expect(
+      call({ op: 'app.run', ...target, revision: 1, plan: 'nope', inputs: {}, viewerZone: 'UTC' }),
+    ).rejects.toMatchObject({ code: 'not_found', message: 'This app has no plan called nope.' })
+    expect(node.state.dashboardRuns).toEqual([])
+  })
+
+  it("refuses every operation on another task's app", async () => {
+    const { call, node } = await selected()
+    const other = { ...target, appId: 'app-ffffffffffff' }
+    for (const request of [
+      { op: 'app.view', ...other, revision: 1 },
+      { op: 'app.run', ...other, revision: 1, plan: 'open', inputs: {}, viewerZone: 'UTC' },
+      { op: 'app.state', ...other },
+      { op: 'app.state', ...other, state: { $secret: false }, key: 'key-0001' },
+      { op: 'app.restore', ...other, revision: 1, key: 'key-0002' },
+    ])
+      await expect(call(request)).rejects.toMatchObject({
+        code: 'not_found',
+        message: 'That app is not part of this task.',
+      })
+    expect(node.state.dashboardRuns).toEqual([])
+    expect(node.state.stateSaves).toEqual([])
+    expect(node.state.restores).toEqual([])
+  })
+
+  it('reads the saved state, and saves it with its key', async () => {
+    const { call, node } = await selected()
+    expect(await call({ op: 'app.state', ...target })).toEqual({ nodeId: 'node-a', appId, state: { $done: ['a'] } })
+    expect(await call({ op: 'app.state', ...target, state: { $done: ['a', 'b'] }, key: 'save-0001' })).toEqual({
+      nodeId: 'node-a',
+      appId,
+      state: null,
+    })
+    expect(node.state.stateSaves).toEqual([{ key: 'save-0001', body: { state: { $done: ['a', 'b'] } } }])
+  })
+
+  it('restores a revision once when the restore is retried with the same key', async () => {
+    const { call, node } = await selected()
+    const restore = { op: 'app.restore', ...target, revision: 1, key: '7f3c9a52-1b2d-4e5f-8a9b-0c1d2e3f4a5b' }
+    expect(await call(restore)).toEqual({ nodeId: 'node-a', appId, revision: 2 })
+    expect(await call(restore)).toEqual({ nodeId: 'node-a', appId, revision: 2 })
+    expect(node.state.apps.get(appId)!.summary.head).toBe(2)
+    expect(node.state.restores.map((restore) => restore.key)).toEqual([restore.key, restore.key])
+  })
+
+  it('answers no task for an archived task, and runs nothing in it', async () => {
+    const { call, node } = await selected()
+    node.state.tasks = node.state.tasks.filter((task) => task.id !== 't1')
+    expect(await call({ op: 'app.view', ...target, revision: 1 })).toMatchObject({ task: null })
+    await expect(
+      call({ op: 'app.run', ...target, revision: 1, plan: 'open', inputs: {}, viewerZone: 'UTC' }),
+    ).rejects.toMatchObject({ code: 'not_found' })
+    expect(node.state.dashboardRuns).toEqual([])
+  })
+})
+
+describe('browser bridge row actions', () => {
+  const plan = {
+    version: 2,
+    title: 'Issues',
+    time: { zone: 'UTC', mode: 'fixed', weekStart: 'monday' },
+    sources: [
+      {
+        id: 'issues',
+        label: 'Issues',
+        role: 'primary',
+        reference: {
+          kind: 'supplied',
+          origin: { says: 'The agent', readAt: 1 },
+          schema: { type: 'object', properties: {} },
+          fields: [],
+          rows: [],
+        },
+      },
+    ],
+    columns: [{ id: 'title', label: 'Title', type: 'text', bind: { issues: { field: '/title' } } }],
+    stages: [],
+    view: { kind: 'table' },
+  }
+  const record = { pluginId: 'tracker', sourceId: 'issues', recordId: '42' }
+  const close = { id: 'close', label: 'Close issue', risk: 'write', action: { verb: 'runNodeAction', path: '/close' } }
+  const appId = 'app-0123456789ab'
+  const panelTarget = { kind: 'panel', sessionId: 's1', toolId: 'call-1' }
+  const appTarget = { kind: 'app', taskId: 't1', appId, revision: 2, plan: 'open', inputs: { state: 'open' } }
+  const act = (target: Record<string, unknown>, extra: Record<string, unknown> = {}) => ({
+    op: 'row.act',
+    nodeId: 'node-a',
+    target,
+    rowId: 'issues:42',
+    actionId: 'close',
+    confirmedRisk: 'write',
+    viewerZone: 'UTC',
+    key: '5d1e2f3a-4b5c-4d6e-8f70-8192a3b4c5d6',
+    ...extra,
+  })
+
+  async function selected() {
+    const { call, node } = await paired()
+    await call({ op: 'node.select', nodeId: 'node-a' })
+    node.state.pluginAnswers.set('/v1/p/agents/sessions/s1/tools/call-1', {
+      tool: {
+        id: 'call-1',
+        name: 'panel_show',
+        title: 'panel_show',
+        status: 'completed',
+        input: JSON.stringify({ title: 'Open issues', plan }),
+        output: JSON.stringify({ panelId: 'issues', shownAt: 5, description: ['Open issues.'] }),
+      },
+      turnId: 'turn-1',
+      taskId: 't1',
+    })
+    const files = { program: 'root = Panel("open")', plans: { open: plan } }
+    node.state.apps.set(appId, {
+      summary: {
+        appId,
+        taskId: 't1',
+        name: 'Triage',
+        head: 2,
+        revisions: [
+          { revision: 1, note: 'First.' },
+          { revision: 2, note: 'Second.' },
+        ],
+      },
+      revisions: new Map([
+        [1, files],
+        [2, files],
+      ]),
+      state: {},
+    })
+    node.state.dashboardRun = {
+      plan,
+      rows: [{ id: 'issues:42', values: { title: 'Fix the login' }, records: [record], actions: [close] }],
+      groups: [],
+    }
+    return { call, node }
+  }
+
+  it.each([
+    ['a panel', panelTarget, undefined],
+    ['the head of an app', appTarget, { state: 'open' }],
+  ])("acts on %s's row as a fresh run found it, and answers the Node's outcome", async (_, target, inputs) => {
+    const { call, node } = await selected()
+    node.state.actAnswer = { outcome: 'ready', action: { verb: 'openUrl', url: 'https://tracker.example/42' } }
+    expect(await call(act(target))).toEqual({
+      nodeId: 'node-a',
+      outcome: 'ready',
+      action: { verb: 'openUrl', url: 'https://tracker.example/42' },
+    })
+    expect(node.state.dashboardRuns).toHaveLength(1)
+    expect(node.state.dashboardRuns[0]!.inputs).toEqual(inputs)
+    expect(node.state.acts).toEqual([
+      {
+        key: '5d1e2f3a-4b5c-4d6e-8f70-8192a3b4c5d6',
+        body: { ref: record, actionId: 'close', confirmedRisk: 'write' },
+      },
+    ])
+  })
+
+  it("refuses a row that's gone, and an action the row doesn't offer, without acting", async () => {
+    const { call, node } = await selected()
+    for (const request of [act(panelTarget, { rowId: 'issues:7' }), act(panelTarget, { actionId: 'reopen' })])
+      await expect(call(request)).rejects.toMatchObject({
+        code: 'not_found',
+        message: 'That row changed. Refresh and try again.',
+      })
+    expect(node.state.acts).toEqual([])
+  })
+
+  it("refuses an app revision that isn't the head, before running anything", async () => {
+    const { call, node } = await selected()
+    await expect(call(act({ ...appTarget, revision: 1 }))).rejects.toMatchObject({
+      code: 'not_found',
+      message: 'v1 of this app is read only, because v2 replaced it.',
+    })
+    expect(node.state.dashboardRuns).toEqual([])
+    expect(node.state.acts).toEqual([])
+  })
+
+  it('reports an answer that never came as uncertain, and a retry with the same key acts once', async () => {
+    const { call, node } = await selected()
+    node.state.dropActReply = true
+    await expect(call(act(panelTarget))).rejects.toMatchObject({ code: 'ambiguous_mutation' })
+    node.state.actAnswer = { outcome: 'no-longer-available' }
+    expect(await call(act(panelTarget))).toEqual({ nodeId: 'node-a', outcome: 'done' })
+    expect(node.state.acts.map((entry) => entry.key)).toEqual([
+      '5d1e2f3a-4b5c-4d6e-8f70-8192a3b4c5d6',
+      '5d1e2f3a-4b5c-4d6e-8f70-8192a3b4c5d6',
+    ])
   })
 })
 

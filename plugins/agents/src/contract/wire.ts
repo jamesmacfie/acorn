@@ -605,6 +605,13 @@ export type AgentEventPage = {
   nextCursor: number | null
 }
 
+/** One tool call folded across the whole session, with the turn it ran in and the session's task. */
+export type AgentToolCallRead = {
+  tool: AgentToolCall
+  turnId: string | null
+  taskId: string
+}
+
 export type AgentDeleteResult = {
   local: 'deleted'
   provider: 'deleted' | 'unsupported' | 'failed'

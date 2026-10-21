@@ -4,6 +4,7 @@ import type {
   AgentInputPart,
   AgentRequest,
   AgentSessionSnapshot,
+  AgentToolCall,
 } from '@acorn/plugin-agents/contract/wire.ts'
 import type { BridgeAgentHint } from '@acorn/protocol/extensionBridge.ts'
 import { agentHints, bridgeRequest, bridgeSessionRead } from './agents'
@@ -119,6 +120,129 @@ describe('session pages for the sidebar', () => {
       { type: 'user_message', text: 'Continue.\n\n[Attachment: a1]' },
     ])
     expect(read.queued).toEqual([{ id: 'next', text: 'Look', attachments: sent }])
+  })
+})
+
+describe('panel and app calls for the sidebar', () => {
+  // A tool's result as a harness records it, inside the MCP content envelope.
+  const envelope = (value: unknown) => JSON.stringify({ content: [{ type: 'text', text: JSON.stringify(value) }] })
+  const refusal = 'MCP error -32602: the plan has 2 problems'
+  const panel = {
+    input: JSON.stringify({ title: 'Pull requests by author', plan: { views: [] } }),
+    output: envelope({ panelId: 'p1', shownAt: 5, description: ['Pull requests by author, last 30 days.'] }),
+  }
+  const app = {
+    input: JSON.stringify({ appId: 'app-0123456789ab', note: 'Added a due date column' }),
+    output: envelope({ appId: 'app-0123456789ab', name: 'Migration checklist', revision: 3 }),
+  }
+  // Each record's card, for the calls given as the records of one page.
+  const cards = (...tools: Omit<AgentToolCall, 'id' | 'title'>[]) =>
+    bridgeSessionRead(
+      'n1',
+      snapshot(tools.map((tool, at) => record(at + 1, { type: 'tool', tool: { id: 'call', title: '', ...tool } }))),
+      0,
+    ).records.map((row) => (row.event.type === 'tool' ? row.event.card : null))
+
+  it('names a panel from its input, and describes and identifies it from its result', () => {
+    expect(cards({ name: 'panel_show', status: 'completed', ...panel })).toEqual([
+      {
+        kind: 'panel',
+        title: 'Pull requests by author',
+        description: ['Pull requests by author, last 30 days.'],
+        panelId: 'p1',
+        shownAt: 5,
+      },
+    ])
+  })
+
+  it('reads a panel call split across two pages from what each record holds', () => {
+    expect(
+      cards(
+        { name: 'panel_show', status: 'running', input: panel.input },
+        { name: 'panel_show', status: 'completed', output: panel.output },
+      ),
+    ).toEqual([
+      { kind: 'panel', title: 'Pull requests by author' },
+      { kind: 'panel', description: ['Pull requests by author, last 30 days.'], panelId: 'p1', shownAt: 5 },
+    ])
+  })
+
+  it('marks a panel that failed, or finished with an error as its output, and not one still checking', () => {
+    expect(
+      cards(
+        { name: 'panel_show', status: 'pending', input: panel.input },
+        { name: 'panel_show', status: 'failed', input: panel.input, output: refusal },
+        { name: 'panel_show', status: 'completed', input: panel.input, output: refusal },
+      ),
+    ).toEqual([
+      { kind: 'panel', title: 'Pull requests by author' },
+      { kind: 'panel', title: 'Pull requests by author', failed: true },
+      { kind: 'panel', title: 'Pull requests by author', failed: true },
+    ])
+  })
+
+  it("caps a panel's description at eight lines of 300 characters", () => {
+    const output = envelope({
+      panelId: 'p1',
+      shownAt: 5,
+      description: Array.from({ length: 10 }, () => 'x'.repeat(400)),
+    })
+    const [card] = cards({ name: 'panel_show', status: 'completed', output })
+    expect(card).toEqual({
+      kind: 'panel',
+      description: Array.from({ length: 8 }, () => 'x'.repeat(300)),
+      panelId: 'p1',
+      shownAt: 5,
+    })
+  })
+
+  it('names an app and its revision from its result, and its note from its input', () => {
+    expect(cards({ name: 'app_show', status: 'completed', ...app })).toEqual([
+      {
+        kind: 'app',
+        appId: 'app-0123456789ab',
+        note: 'Added a due date column',
+        name: 'Migration checklist',
+        revision: 3,
+      },
+    ])
+  })
+
+  it('reads an app call split across two pages from what each record holds', () => {
+    expect(
+      cards(
+        { name: 'app_show', status: 'running', input: app.input },
+        { name: 'app_show', status: 'completed', output: app.output },
+      ),
+    ).toEqual([
+      { kind: 'app', appId: 'app-0123456789ab', note: 'Added a due date column' },
+      { kind: 'app', name: 'Migration checklist', revision: 3 },
+    ])
+  })
+
+  it('marks an app that failed, or finished with an error as its output', () => {
+    expect(
+      cards(
+        { name: 'app_show', status: 'failed', input: app.input, output: refusal },
+        { name: 'app_show', status: 'completed', input: app.input, output: refusal },
+      ),
+    ).toEqual([
+      { kind: 'app', appId: 'app-0123456789ab', note: 'Added a due date column', failed: true },
+      { kind: 'app', appId: 'app-0123456789ab', note: 'Added a due date column', failed: true },
+    ])
+  })
+
+  it('caps an app name at 200 characters', () => {
+    const output = envelope({ appId: 'app-0123456789ab', name: 'x'.repeat(300), revision: 1 })
+    const [card] = cards({ name: 'app_show', status: 'completed', output })
+    expect(card).toEqual({ kind: 'app', name: 'x'.repeat(200), revision: 1 })
+  })
+
+  it('gives no card to any other call, even one whose output reads as a panel', () => {
+    expect(cards({ name: 'git_log', status: 'completed', ...panel }, { status: 'completed', ...panel })).toEqual([
+      undefined,
+      undefined,
+    ])
   })
 })
 

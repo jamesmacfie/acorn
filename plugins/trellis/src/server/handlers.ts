@@ -1,13 +1,7 @@
 import { mergeStatements } from '@openuidev/lang-core'
 import { ToolError, type ToolContext } from '@acorn/plugin-api/node'
-import {
-  appCreateInput,
-  appPatchInput,
-  appReadInput,
-  appShowInput,
-  appWriteInput,
-  type AppShowResult,
-} from '../shared/api'
+import { appShowInput, type AppShowResult } from '../contract/appShowCall'
+import { appCreateInput, appPatchInput, appReadInput, appWriteInput } from '../shared/api'
 import { LIBRARY_ID, LIBRARY_VERSION } from '../shared/library'
 import { appGuide } from './guide'
 import { AppConflict, type AppMeta, type AppStore } from './store'

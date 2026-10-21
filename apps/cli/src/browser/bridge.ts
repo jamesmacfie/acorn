@@ -6,6 +6,7 @@ import type { NodeFetchBody, NodeFetchResponse, NodeStatus } from '@acorn/protoc
 import type { ArchiveResult, DeleteResult } from '@acorn/protocol/task.ts'
 import {
   ATTACHMENT_MAX_BYTES,
+  NATIVE_REPLY_MAX_CHARS,
   type BridgeAgentHint,
   type BridgeAttachment,
   type BridgeErrorCode,
@@ -28,6 +29,8 @@ import {
   type Task,
   type Workspace,
 } from '@acorn/protocol/api.ts'
+import { panelPlanSchema, type PanelPlan } from '@acorn/protocol/dashboards.ts'
+import { readPanelShowCall } from '@acorn/protocol/panelShowCall.ts'
 import {
   SITE_ASSOCIATIONS_MAX,
   associationMatches,
@@ -64,6 +67,7 @@ import type {
   AgentSession,
   AgentSessionList,
   AgentSessionSnapshot,
+  AgentToolCallRead,
   AgentTurn,
 } from '@acorn/plugin-agents/contract/wire.ts'
 import type { CustomAgent } from '@acorn/plugin-agents/contract/newSessionChoices.ts'
@@ -77,7 +81,18 @@ import {
   bridgeSession,
   bridgeSessionRead,
   sessionRoute,
+  toolCallRoute,
 } from './agents'
+import {
+  appRestoreRoute,
+  appRevisionRoute,
+  appRoute,
+  appStateRoute,
+  bridgeAppSummary,
+  revisionFiles,
+  type AppRevisionBody,
+  type AppSummaryBody,
+} from './apps'
 import type { WorkflowDefSummary, WorkflowRunRow, WorkflowStepRow } from '@acorn/plugin-workflows/contract/wire.ts'
 import {
   bridgeRuns,
@@ -112,6 +127,9 @@ type Probe = Awaited<ReturnType<typeof probeNode>>
 // How long `nodes.list` waits to learn whether an offline Node changed its certificate. A refused
 // connection answers at once; a Node that accepts and then hangs costs at most this.
 const LIST_PROBE_TIMEOUT_MS = 2_000
+
+const dashboardRunRoute = '/v1/core/dashboards/run'
+const dataSourceActRoute = '/v1/core/data-sources/act'
 
 // The native host's operations, over this browser's own custody. The certificate, the token, and the
 // broker stay in this process; replies carry node records, probe results, and project rows only.
@@ -548,6 +566,146 @@ export function createBridge(options: {
     return parsed.data
   }
 
+  // A task, with its workspace, while it's active. Null once it's archived.
+  async function activeTask(
+    nodeId: string,
+    taskId: string | undefined,
+  ): Promise<{ task: Task; workspaceId: string } | null> {
+    const [tasks, projects] = await Promise.all([
+      readList<Task>(nodeId, tasksRoute, (body) => body),
+      listProjectRows(nodeId),
+    ])
+    const task = tasks.find((candidate) => candidate.id === taskId)
+    const workspaceId = projects.find((project) => project.id === task?.projectId)?.workspaceId
+    return task && workspaceId ? { task, workspaceId } : null
+  }
+
+  // A plan run as a draft, as the desktop runs an agent's panel and an app's plans, with the plan beside
+  // it in the reply.
+  async function runDraftPlan(
+    nodeId: string,
+    workspaceId: string,
+    plan: PanelPlan,
+    request: { viewerZone: string; inputs?: Record<string, unknown> },
+  ): Promise<unknown> {
+    const run = (await nodeRequest(nodeId, {
+      method: 'POST',
+      path: dashboardRunRoute,
+      body: {
+        operation: 'run',
+        scope: { workspaceId },
+        target: { kind: 'draft', content: plan },
+        mode: 'execution',
+        viewerZone: request.viewerZone,
+        ...(request.inputs ? { inputs: request.inputs } : {}),
+      },
+      read: true,
+      // The reply carries the plan beside the run, and the whole reply must fit the extension's limit.
+      maxResponseBytes: NATIVE_REPLY_MAX_CHARS - JSON.stringify(plan).length,
+    })) as { rows?: unknown } | null
+    if (!Array.isArray(run?.rows)) throw new BridgeFailure('node_error', 'The Node returned an unreadable panel run.')
+    return run
+  }
+
+  // An agent's panel, as the desktop's card runs it: the plan from the call's input, as a draft, in the
+  // workspace of the session's task. The browser names the call, so it can only run a plan an agent
+  // showed in a session this device can read.
+  async function shownPanel(
+    nodeId: string,
+    sessionId: string,
+    toolId: string,
+  ): Promise<{ plan: PanelPlan; workspaceId: string }> {
+    const read = (await nodeRequest(nodeId, {
+      method: 'GET',
+      path: toolCallRoute(sessionId, toolId),
+      maxResponseBytes: NATIVE_REPLY_MAX_CHARS,
+    })) as AgentToolCallRead | null
+    const tool = read?.tool
+    const { input, result } = tool ? readPanelShowCall(tool) : {}
+    if (tool?.name !== 'panel_show' || tool.status !== 'completed' || !input || !result)
+      throw new BridgeFailure('not_found', "That call didn't draw a panel.")
+    const parsed = panelPlanSchema.safeParse(input.plan)
+    if (!parsed.success)
+      throw new BridgeFailure('not_found', `${input.title} no longer passes its checks, so it can't be drawn.`)
+    const active = await activeTask(nodeId, read?.taskId)
+    if (!active) throw new BridgeFailure('not_found', "This conversation's task is no longer active.")
+    // The agent's title is what the card says, as on the desktop's card.
+    return { plan: { ...parsed.data, title: input.title }, workspaceId: active.workspaceId }
+  }
+
+  // An app of the named task. The trellis routes don't confine a device to a task, so the host checks
+  // the owner itself, as it does for an attachment. Another task's app reads as missing.
+  async function taskApp(nodeId: string, taskId: string, appId: string): Promise<AppSummaryBody> {
+    const summary = (await nodeRequest(nodeId, { method: 'GET', path: appRoute(appId) })) as AppSummaryBody | null
+    if (!summary || summary.taskId !== taskId)
+      throw new BridgeFailure('not_found', 'That app is not part of this task.')
+    return summary
+  }
+
+  const appRevision = revisionFiles(async (nodeId, appId, revision) => {
+    const files = (await nodeRequest(nodeId, {
+      method: 'GET',
+      path: appRevisionRoute(appId, revision),
+      maxResponseBytes: NATIVE_REPLY_MAX_CHARS,
+    })) as AppRevisionBody | null
+    if (typeof files?.program !== 'string' || !files.plans || typeof files.plans !== 'object')
+      throw new BridgeFailure('node_error', 'The Node returned an unreadable app revision.')
+    return files
+  })
+
+  // One of an app's plans, as the desktop's app runs it. The browser names the plan, and the host takes
+  // it from the revision's own files, so the browser can't run a plan of its own. `head` asks that the
+  // revision be the app's head, because an older one is read only.
+  async function appPlan(
+    nodeId: string,
+    target: { taskId: string; appId: string; revision: number; plan: string },
+    head = false,
+  ): Promise<{ plan: PanelPlan; workspaceId: string }> {
+    const { taskId, appId, revision } = target
+    const summary = await taskApp(nodeId, taskId, appId)
+    if (head && summary.head !== revision)
+      throw new BridgeFailure(
+        'not_found',
+        `v${revision} of this app is read only, because v${summary.head} replaced it.`,
+      )
+    const [files, active] = await Promise.all([appRevision(nodeId, appId, revision), activeTask(nodeId, taskId)])
+    if (!Object.hasOwn(files.plans, target.plan))
+      throw new BridgeFailure('not_found', `This app has no plan called ${target.plan}.`)
+    const parsed = panelPlanSchema.safeParse(files.plans[target.plan])
+    if (!parsed.success)
+      throw new BridgeFailure('not_found', `The plan ${target.plan} no longer passes its checks, so it can't run.`)
+    if (!active) throw new BridgeFailure('not_found', "This conversation's task is no longer active.")
+    return { plan: parsed.data, workspaceId: active.workspaceId }
+  }
+
+  // A data source action on a row of a card. The row and action come from a fresh run of the card's
+  // plan, never from the browser, as the desktop's app takes them from its own last run. A row that's
+  // gone, or no longer offers the action, is refused rather than matched to another.
+  async function actOnRow(request: Extract<BridgeRequest, { op: 'row.act' }>): Promise<BridgeResults['row.act']> {
+    const { nodeId, target } = request
+    const { plan, workspaceId } =
+      target.kind === 'panel'
+        ? await shownPanel(nodeId, target.sessionId, target.toolId)
+        : await appPlan(nodeId, target, true)
+    const run = (await runDraftPlan(nodeId, workspaceId, plan, {
+      viewerZone: request.viewerZone,
+      ...(target.kind === 'app' ? { inputs: target.inputs } : {}),
+    })) as { rows: { id?: unknown; records?: unknown[]; actions?: { id?: unknown }[] }[] }
+    const row = run.rows.find((candidate) => candidate.id === request.rowId)
+    const record = row?.records?.[0]
+    if (!record || !row?.actions?.some((action) => action.id === request.actionId))
+      throw new BridgeFailure('not_found', 'That row changed. Refresh and try again.')
+    const answer = (await nodeRequest(nodeId, {
+      method: 'POST',
+      path: dataSourceActRoute,
+      body: { ref: record, actionId: request.actionId, confirmedRisk: request.confirmedRisk },
+      key: request.key,
+    })) as BridgeResults['row.act'] | null
+    if (typeof answer?.outcome !== 'string')
+      throw new BridgeFailure('node_error', 'The Node returned an unreadable action outcome.')
+    return { nodeId, outcome: answer.outcome, ...(answer.action ? { action: answer.action } : {}) }
+  }
+
   async function handle(request: BridgeRequest): Promise<BridgeResults[BridgeRequest['op']]> {
     switch (request.op) {
       case 'nodes.list': {
@@ -916,6 +1074,60 @@ export function createBridge(options: {
           await Promise.all([...taskIds].map((taskId) => listSessions(request.nodeId, { taskId })))
         ).flat()
         return { nodeId: request.nodeId, runId: request.runId, steps: bridgeSteps(steps, sessions, bridgeSession) }
+      }
+      case 'panel.run': {
+        const { nodeId, sessionId, toolId } = request
+        const { plan, workspaceId } = await shownPanel(nodeId, sessionId, toolId)
+        const run = await runDraftPlan(nodeId, workspaceId, plan, request)
+        return { nodeId, sessionId, toolId, plan, run }
+      }
+      case 'app.view': {
+        const { nodeId, taskId, appId, revision } = request
+        const summary = await taskApp(nodeId, taskId, appId)
+        const [files, active] = await Promise.all([appRevision(nodeId, appId, revision), activeTask(nodeId, taskId)])
+        const task = active && { id: active.task.id, title: active.task.title, branch: active.task.branch }
+        return {
+          nodeId,
+          appId,
+          revision,
+          summary: bridgeAppSummary(summary),
+          program: files.program,
+          plans: Object.keys(files.plans),
+          task,
+        }
+      }
+      case 'app.run': {
+        const { nodeId, appId, revision } = request
+        const { plan, workspaceId } = await appPlan(nodeId, request)
+        const run = await runDraftPlan(nodeId, workspaceId, plan, request)
+        return { nodeId, appId, revision, plan, run }
+      }
+      case 'row.act':
+        return actOnRow(request)
+      case 'app.state': {
+        const { nodeId, taskId, appId, state, key } = request
+        await taskApp(nodeId, taskId, appId)
+        if (state === undefined) {
+          const body = (await nodeRequest(nodeId, { method: 'GET', path: appStateRoute(appId) })) as {
+            state?: Record<string, unknown>
+          } | null
+          return { nodeId, appId, state: body?.state ?? {} }
+        }
+        await nodeRequest(nodeId, { method: 'PUT', path: appStateRoute(appId), body: { state }, key })
+        return { nodeId, appId, state: null }
+      }
+      case 'app.restore': {
+        const { nodeId, taskId, appId, revision, key } = request
+        await taskApp(nodeId, taskId, appId)
+        const body = (await nodeRequest(nodeId, {
+          method: 'POST',
+          path: appRestoreRoute(appId),
+          body: { revision },
+          key,
+        })) as { revision?: unknown } | null
+        if (typeof body?.revision !== 'number')
+          throw new BridgeFailure('node_error', 'The Node returned an unreadable restore.')
+        return { nodeId, appId, revision: body.revision }
       }
       case 'plugin.panel': {
         const view = await pluginPanel(request.nodeId, request)

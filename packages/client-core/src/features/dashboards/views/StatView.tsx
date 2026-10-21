@@ -1,4 +1,4 @@
-import { createMemo, For, Show } from 'solid-js'
+import { createMemo, For, Show, useContext } from 'solid-js'
 import {
   activityPoints,
   COMPARE_LABELS,
@@ -8,9 +8,9 @@ import {
   trendDelta,
 } from '@acorn/dashboards-core/render'
 import { cellText, formatCell } from '../format'
-import { createMeasureHistory } from '../history'
 import { aggregateRows } from '../shaping'
 import { Button } from '../../../kit/components/primitives'
+import { PanelViewHostContext } from './host'
 import type { PanelViewProps } from './props'
 
 // The stat view: one number over the shaped rows. Count by default, because "how many of these are
@@ -49,11 +49,13 @@ export default function StatView(props: PanelViewProps) {
   }
 
   // Only the history tier costs a read; activity is bucketed from rows already on screen
-  // (docs/dashboards/views.md § Trends).
-  const samples = createMeasureHistory(
-    () => props.panelId,
-    () => props.view.trend === 'history',
-  )
+  // (docs/dashboards/views.md § Trends). A client with no history reader draws no history trend.
+  const readHistory = useContext(PanelViewHostContext).measureHistory
+  const samples =
+    readHistory?.(
+      () => props.panelId,
+      () => props.view.trend === 'history',
+    ) ?? (() => [])
 
   const points = createMemo(() => {
     const now = Date.now()
@@ -123,7 +125,7 @@ export default function StatView(props: PanelViewProps) {
       {/* A history trend accrues from when the panel first asked for it, so a panel switched on
           today has an empty series and says so rather than drawing a flat line through a fortnight
           it was not watching. */}
-      <Show when={props.view.trend === 'history' && !mark()}>
+      <Show when={readHistory && props.view.trend === 'history' && !mark()}>
         <span class="dash-stat-label">Recording once an hour from today.</span>
       </Show>
     </div>

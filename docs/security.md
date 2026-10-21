@@ -54,6 +54,22 @@ Deleting a workspace removes its datasets. Row and byte caps plus retention boun
   with the session's own task token, and the route answers only for the session that token names.
   Acorn adds the bridge to the flag settings of the session it starts and writes nothing to the
   person's harness settings files ([harness bridges](./managed-agents/loop-hooks.md)).
+- **A paired browser** reaches its Node through the native host, under a device credential of its
+  own, and only through the bridge's typed operations, never a general route proxy
+  ([browser extension](./browser-extension.md#what-runs-where)). It can run any panel an agent showed
+  with `panel_show` in a session that device can read, because the host reads the plan from the call
+  and the browser only names it ([panel cards](./browser-extension/native-messaging.md#panel-cards)).
+  The desktop's card does the same under its own device, so this changes where the device can run a
+  panel from, not what it can run. It can also read an agent-built app and its saved state, run the
+  app's plans, save its state, and restore one of its revisions, for an app in a task that device can
+  read, as the desktop's app card can ([app cards](./browser-extension/native-messaging.md#app-cards)).
+  The host checks that the app belongs to the conversation's task, because the Node doesn't confine a
+  device to a task. It can run a data source's action on a row of either card, the bridge's only
+  write to a source's records ([row actions](./browser-extension/native-messaging.md#row-actions)).
+  The sidebar confirms with the action and the row first. The host runs the card's plan again and
+  takes the row and action from that run, never from the browser, so the browser can't name a record
+  or an action the source didn't offer, and an older app revision acts on nothing. The Node checks
+  the confirmed risk against the action's own.
 - **The terminal client** collapses the shell and helper into one process. UI code and the broker share
   a realm, so what the desktop holds as a process boundary this holds as a module boundary. The device
   token lives in the broker's module, the plugin cache and acknowledgements in one custody module, and
@@ -124,7 +140,9 @@ conversation and isn't the security boundary. An agent can write into the data r
 a revision that skipped the checks. The boundary is the card: it hands a program only the tools above,
 looks up a row action in its own last run rather than trusting the program, and copies every value a
 program hands it into plain data before it uses it. A planted revision reaches nothing more than one
-that passed.
+that passed. Those checks live in the trellis plugin's `AppRuntime`, which the desktop, the terminal,
+and the browser extension all run, and not in a client's `AppHost`, so no client calls a value a
+program handed it.
 
 ## Instruction file checks and review
 

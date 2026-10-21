@@ -1,9 +1,10 @@
 import { z } from 'zod'
+import { appIdSchema } from '../contract/appShowCall'
 
-// The app tools' inputs and results, and the routes the card and the Apps pane read, shared by the
-// Node and both clients. No lang-core here: the client's tool-card registration imports this eagerly.
+// The app tools' inputs, and the routes the card and the Apps pane read, shared by the Node and both
+// clients. `app_show`'s input and result are in the contract. No lang-core here: the client's
+// tool-card registration imports this eagerly.
 
-export const appIdSchema = z.string().regex(/^app-[0-9a-f]{12}$/, 'An app id looks like app-0123456789ab.')
 /** A plan name is the file name under plans/, and the name a program's Query and Panel use. */
 const planNameSchema = z
   .string()
@@ -30,20 +31,13 @@ export const appWriteInput = z.strictObject({
   hash: z.string().optional(),
 })
 export const appPatchInput = z.strictObject({ appId: appIdSchema, statements: fileText.min(1), hash: z.string() })
-export const appShowInput = z.strictObject({ appId: appIdSchema, note: z.string().trim().min(1).max(200) })
-
-/** What `app_show` returns, and what the card reads back from the transcript. */
-export const appShowResultSchema = z.object({
-  appId: appIdSchema,
-  name: z.string(),
-  revision: z.number().int().positive(),
-})
-export type AppShowResult = z.infer<typeof appShowResultSchema>
 
 export type AppRevisionSummary = { revision: number; note: string; restoredFrom?: number }
 /** An app's name, head, and revisions, as the card's route returns them. */
 export type AppSummary = { appId: string; taskId?: string; name: string; head: number; revisions: AppRevisionSummary[] }
 export type AppRevisionFiles = { program: string; plans: Record<string, unknown> }
+/** The most an app's saved state document may hold, as a working file may. */
+export const APP_STATE_MAX_BYTES = 256 * 1024
 /** One shown app, as the Apps pane and the Apps source list it. A task app or draft has `taskId`, and
  *  a project app has `projectId`. `sessionId` is the session its drawer draws. A draft's `draftOf`
  *  names its project app, the project revision it's at, and its own head when it got there. */

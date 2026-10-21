@@ -120,6 +120,13 @@
       "when": 1792472110812,
       "tag": "0020_agent_tool_call_facts",
       "breakpoints": true
+    },
+    {
+      "idx": 21,
+      "version": "6",
+      "when": 1792531823562,
+      "tag": "0021_agent_events_tool_index",
+      "breakpoints": true
     }
   ]
 }

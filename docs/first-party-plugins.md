@@ -93,8 +93,8 @@ used to be gaps and aren't: loaded plugins declare `commands` and `keybindings`,
 ## What the apps import from plugins
 
 An app may import any plugin's `node/index.ts` and `client/index.ts`, because composition roots exist
-to register plugins. An import from a plugin's `contract/` folder is different: it means an app depends
-on that one plugin. Each one is listed here and in `tools/arch/boundaries.test.ts`, which fails on an
+to register plugins. An import from a plugin's `contract/` or `embed/` folder is different: it means an
+app depends on that one plugin. Each one is listed here and in `tools/arch/boundaries.test.ts`, which fails on an
 import missing from its list and on a listed import that's gone. Add the reason in both places.
 
 - **CLI and agents.** The built-in `agent` commands and `projection.ts` read the session, turn, event,
@@ -103,6 +103,8 @@ import missing from its list and on a listed import that's gone. Add the reason 
   (`browser/agents.ts` and `browser/bridge.ts`) relays managed sessions, and also reads `appApproval`,
   `lifecycle`, `sessionModel`, and `newSessionChoices`. `browser/workflows.ts` reads a run's agent
   sessions from `wire.ts`.
+- **CLI and trellis.** The native bridge (`browser/agents.ts`) reads an `app_show` call with
+  `appShowCall`, so the sidebar names an agent's app as the desktop's app card does.
 - **CLI and workflows.** The built-in `workflow` commands read the run, step, and definition shapes from
   `wire.ts`. The native bridge (`browser/bridge.ts` and `browser/workflows.ts`) relays the same shapes.
 - **Desktop and terminal.** `TaskView.tsx` opens a terminal profile through `sessionsClient`, the create
@@ -110,6 +112,8 @@ import missing from its list and on a listed import that's gone. Add the reason 
 - **Extension and agents.** The sidebar draws a session's state with `runtimeState`, marks the Agents
   tab, each task row, and a conversation's state line with it, and registers the harness marks from
   `providerMarks`.
+- **Extension and trellis.** The sidebar runs an agent's app with `AppRuntime` from trellis's `embed/`,
+  the runtime the desktop's app card runs, so a program is bounded the same way in both.
 - **Extension and workflows.** The sidebar prefills a workflow's inputs from the page's item, and
   parses and checks the inputs of a start in a task, with `itemInputs`. It draws runs and steps with
   `statusDisplay`.

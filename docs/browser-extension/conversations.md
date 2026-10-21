@@ -19,7 +19,8 @@ carries none of its code. It narrows each answer to what the sidebar draws:
 - `session.read` asks the session route for `afterSeq`, `limit`, and `fold=1`, so each tool call
   arrives as one record. Each record keeps its ID, seq, turn, and `foldedThroughSeq`. Only the
   session's own user and agent messages, tool calls, and errors are kept, and a tool call keeps only
-  its title and status. A person's message lists the attachments its turn sent
+  its title and status. A panel or app call also keeps a few short fields that name what it made
+  ([panel and app calls](./native-messaging.md#panel-and-app-calls)). A person's message lists the attachments its turn sent
   ([page capture](./page-capture.md#sent-screenshots-in-the-conversation)). Its input and output can be megabytes, and a summary never shows them.
   A workflow step's prompt carries `workflow: true`, so the sidebar can say the workflow sent it. The
   nudge a step sends after a turn ends without its result doesn't.

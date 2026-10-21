@@ -99,5 +99,6 @@ export default function ListView(props: PanelViewProps) {
       )}
     </For>
   )
-  return props.groups?.length ? sections(props.groups) : list(props.rows)
+  // Inside JSX, so a later run's rows draw. A component's own body runs only once.
+  return <>{props.groups?.length ? sections(props.groups) : list(props.rows)}</>
 }

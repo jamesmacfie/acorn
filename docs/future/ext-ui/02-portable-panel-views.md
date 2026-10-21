@@ -1,6 +1,97 @@
 # Phase 2: make the panel views portable
 
-Date: October 21, 2026. Status: proposed. Needs nothing. Can be built beside phase 1.
+Date: October 21, 2026. Status: done. Needs nothing. Can be built beside phase 1.
+
+## Completion note
+
+Landed on October 21, 2026, on the `phase-2-portable-panel-views` branch.
+
+What landed:
+
+- `views/host.ts` holds the `PanelViewHost` type and its context, `PanelViewHostContext`. Both
+  members, `openLink` and `measureHistory`, are optional. `Cell` and `StatView` read them, and no
+  longer import the router, the tasks feature, or the history module.
+- `DesktopPanelViewHost` provides today's behavior: `openInAppUrl` with the router's `navigate` and
+  the active task, and `createMeasureHistory`. The desktop's `apps/desktop/src/client/index.tsx`
+  mounts it once, as the router's root, around `App`.
+- `RunPanel.tsx` draws one run from props: the supplied-rows line, "Couldn't refresh", the client's
+  problems, the as-of line, the coverage and partial notes, the client's notices, the description,
+  and `PanelBody`, with the loading and failed states. It works out the groups, `groupBy`,
+  provenance, buttons, the press flag, and the board's choices from the run. It imports the kit,
+  dashboards-core, protocol types, `SuppliedOrigin`, `shaping`, and the views, and nothing from
+  `host/`, `infra/`, the router, or TanStack Query.
+- `PublishedDashboardPanel` draws its body through `RunPanel`. Its queries, the kept-dataset line,
+  drill-downs, board writes, row actions, and confirms stay where they were.
+- client-core exports `RunPanel.tsx`, `views/host.ts`, and `DesktopPanelViewHost.tsx`. The count in
+  `tools/arch/boundaries.test.ts` went from 204 to 207.
+- Tests: `views/host.test.tsx` draws a link cell and a history stat with and without the context.
+  `DesktopPanelViewHost.test.tsx` pins the desktop's wiring. `RunPanel.test.tsx` draws a fixture run
+  as each of the six views with no providers, and the loading, failed, and stale states.
+  `apps/extension/src/sidebar/panelViews.test.tsx` draws a run with a link column and a history
+  stat.
+- Docs: "Drawing a run in any client" in [views](../../dashboards/views.md).
+
+Decisions and deviations:
+
+- The context follows client-core's naming, as `UnsavedChangesContext` does: the type is
+  `PanelViewHost` and the context is `PanelViewHostContext`.
+- `openLink` takes the URL only, not `(url, field)`. No client needs the field.
+- Both members are optional, so phase 3 can provide `openLink` alone. Without `measureHistory`, a
+  history stat also leaves out "Recording once an hour from today.", because nothing records for
+  that client.
+- A link cell is a link only for `https`, because `formatCell` already turns anything else into
+  text. The fallback needed no new check.
+- The desktop mounts the provider in `index.tsx`, as the router's root, and not inside `App.tsx`.
+  It's the same tree, and it's one line.
+- Source failures. `RunPanel` takes a `problems` slot holding the latest answer's problems, drawn by
+  the client, and not text for each failure. The desktop passes its list, with `SourceFailureAlert`
+  for failures and plain warnings for the rest. The shown run and the latest answer differ while a
+  stale run is on screen, and the problems must come from the latest one.
+- `RunPanel` takes the answer to draw, `stale`, and `error`, and the client picks the answer. The
+  desktop's rule, which keeps the last good answer while a source can't answer, stays in
+  `PublishedDashboardPanel`, because its handlers act on the shown run.
+- A board move's optimistic value goes onto the run's rows before `RunPanel`, not onto the display
+  rows. `displayPlanRun` copies a value through unchanged, so the result on screen is the same.
+- The import list. `views/PanelBody.tsx` and `dashboards.css` weren't exported. The sidebar reaches
+  `PanelBody` through `RunPanel`, and `RunPanel` imports `dashboards.css` itself, as `CardFrame`
+  does. `CardFrame.tsx` was already exported. `DesktopPanelViewHost.tsx` was exported instead, for
+  the desktop.
+- The kept-dataset line stays in `PublishedDashboardPanel`, before `RunPanel`. A plan's first source
+  is supplied or kept, never both, so the order on screen is unchanged.
+- The failed state still says "Edit the panel to repair its source or column." The sidebar can't
+  edit, so phase 3 may want other words there.
+
+Checks:
+
+- Every dashboards test passed unchanged: 31 files and 197 tests, before the new ones.
+- The extension test fails with the old `Cell.tsx`, which can't load the router's JSX build, and
+  passes with the new one.
+- The sidebar build is byte for byte the same: `sidebar-C-4Lo6jJ.js` at 263.37 kB (82.46 kB
+  gzipped), and `sidebar-CDc4f5Yh.css` at 108.10 kB, with the same content hashes before and after.
+- The Node service measured 1,915,111 B, under the 1,917,500 B ceiling, the same as after phase 1.
+- In `pnpm dev:agent`, a Tasks panel set to a stat with **Saved history**, placed on Home, draws
+  "0 items" and "Recording once an hour from today." That note draws only when a history reader is
+  provided, so the desktop provider is mounted on a placed panel. No account-free source in that
+  session has an `https` link field, and the studio's JSON tab is read only, so a link cell wasn't
+  clicked in the real app. `DesktopPanelViewHost.test.tsx` covers the link, and the same provider
+  supplies both members.
+- client-core (2,910 tests), the extension (264), trellis (49), and agents (209 files) pass. The
+  first agents run failed "bounds the complete catalogue read" while the machine was under load,
+  and passed on the rerun.
+- The public site's dashboards page cites `views.md`. The new section describes code, not what a
+  person sees, so the page needs no change.
+
+For later phases:
+
+- Import `@acorn/client-core/features/dashboards/RunPanel.tsx` and draw it inside `CardFrame`. To
+  open links through the `tabs` API, provide `PanelViewHostContext` from
+  `@acorn/client-core/features/dashboards/views/host.ts` with `openLink`.
+- Pass `describe` for an agent's panel, so the run's description shows. A press handler left out is
+  off. Without `onButton` and `onCorrect`, a table draws no row controls. Without `onDrilldown`,
+  group headers aren't pressable.
+- `describeSourceFailure` in `sourceErrors.ts` imports `ApiError` from `infra/`, so the sidebar
+  can't describe a failure with it as it stands. The host can send the text, or the import can be
+  split out.
 
 ## Goal
 

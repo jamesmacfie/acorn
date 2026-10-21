@@ -51,7 +51,9 @@ Three pieces carry a request from the sidebar to a Node:
 3. The contract, `packages/protocol/src/transport/extensionBridge.ts`. Both apps import it, because
    apps may not import each other.
 
-Data flows sidebar → background → native host → pinned Node connection → Node. The website and the
+Data flows sidebar → background → native host → pinned Node connection → Node. The background
+answers a port named `sidebar` only when the sidebar page opened it, because a content script the
+background injected into a page can open a port too. The website and the
 extension never hold a token or certificate. The desktop app takes no part: the bridge pairs and
 connects on its own, so the desktop can stay closed.
 
@@ -159,7 +161,9 @@ connection until it is paired again.
 - In Firefox 151, the first native host the extension starts after Firefox starts can get no process
   and no close. The 10-second deadline above ends that port. The selection restore retries once on a
   fresh port, and **Retry** opens one, and either answers at once.
-- The sidebar draws no tool details or subagent streams. It draws the screenshots a turn sent and names any other attachment.
+- The sidebar draws no tool details or subagent streams. It draws panel and app calls as lines that
+  name what the agent made, and links to the desktop for the panel or app itself. It draws the
+  screenshots a turn sent and names any other attachment.
 - Drafts are never expired.
 
 ## Why

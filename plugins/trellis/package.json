@@ -7,6 +7,8 @@
   "exports": {
     "./node/index.ts": "./src/node/index.ts",
     "./client/index.ts": "./src/client/index.ts",
+    "./contract/*": "./src/contract/*",
+    "./embed/AppRuntime.tsx": "./src/embed/AppRuntime.tsx",
     "./testkit/client": "./src/testkit/client.ts"
   },
   "scripts": {

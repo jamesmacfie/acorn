@@ -3,6 +3,7 @@ import type {
   BridgeAttachmentRef,
   BridgeConversationRecord,
   BridgeSessionRead,
+  BridgeToolCard,
 } from '@acorn/protocol/extensionBridge.ts'
 
 // One conversation as the sidebar holds it: a window of the session's events, from `from` (exclusive)
@@ -12,6 +13,8 @@ import type {
 export const CONVERSATION_PAGE = 200
 
 export type ToolLine = { key: string; kind: 'tool'; title: string; status: string | null }
+// A panel or app the agent made, named on a line of its own. `toolId` names the call to the host.
+export type CardLine = { key: string; kind: 'card'; toolId: string; card: BridgeToolCard; status: string | null }
 
 // A run this long or longer folds into one line. Two lines read as quickly as a folded one would.
 const TOOL_FOLD_AT = 3
@@ -23,19 +26,29 @@ export type ConversationItem =
   | { key: string; kind: 'agent'; text: string; at: number }
   | { key: string; kind: 'error'; text: string }
   | ToolLine
+  | CardLine
   // A run of tool lines with nothing between them. Its key is its first line's, so it stays the same
   // run as later lines join it.
   | { key: string; kind: 'tools'; lines: ToolLine[] }
 
+// A call's card fields merge as its title and status do: a field a record leaves out is unchanged.
+const mergeCard = (card: BridgeToolCard | undefined, update: BridgeToolCard | undefined) =>
+  card && update?.kind === card.kind ? ({ ...card, ...update } as BridgeToolCard) : (update ?? card)
+
+// A card line needs something to name, so an opener whose input didn't parse reads as the tool line it
+// would have been. A call that failed its checks always gets its line, so a failure never reads as done.
+const named = (card: BridgeToolCard) =>
+  card.failed || (card.kind === 'panel' ? !!card.title : !!(card.name || card.appId))
+
 // Messages, tool summaries, and errors in seq order. A streamed message arrives as appends on one
 // message id and reads as one message. A tool call arrives as an opener and later updates on one id,
-// and reads as one line whose title and status keep the last value reported; a field an update leaves
-// out is unchanged. An update at or below the seq a folded record already covers is skipped, so a
-// record read twice can't apply twice. Runs of TOOL_FOLD_AT or more tool lines come back as one
-// `tools` item.
+// and reads as one line whose title, status, and card keep the last value reported; a field an update
+// leaves out is unchanged. An update at or below the seq a folded record already covers is skipped, so
+// a record read twice can't apply twice. A named card is a `card` item, which no run folds. Runs of
+// TOOL_FOLD_AT or more tool lines come back as one `tools` item.
 export function conversationItems(records: readonly BridgeConversationRecord[]): ConversationItem[] {
   const items: ConversationItem[] = []
-  const tools = new Map<string, { at: number; through: number }>()
+  const tools = new Map<string, { at: number; toolId: string; through: number; card: BridgeToolCard | undefined }>()
   let message: { at: number; turnId: string | null; messageId: string | undefined } | null = null
   for (const record of records) {
     const event = record.event
@@ -69,16 +82,23 @@ export function conversationItems(records: readonly BridgeConversationRecord[]):
       const toolKey = `${record.turnId ?? 'session'}:${event.toolId}`
       const through = record.foldedThroughSeq ?? record.seq
       const open = tools.get(toolKey)
-      const card = open && items[open.at]
-      if (open && card?.kind === 'tool') {
+      const line = open && items[open.at]
+      if (open && line?.kind === 'tool') {
         if (record.seq <= open.through) continue
-        items[open.at] = { ...card, title: event.title || card.title, status: event.status ?? card.status }
+        items[open.at] = { ...line, title: event.title || line.title, status: event.status ?? line.status }
         open.through = through
+        open.card = mergeCard(open.card, event.card)
         continue
       }
-      tools.set(toolKey, { at: items.length, through })
+      tools.set(toolKey, { at: items.length, toolId: event.toolId, through, card: event.card })
       items.push({ key: record.id, kind: 'tool', title: event.title || 'Tool call', status: event.status ?? null })
     }
+  }
+  // After every record, because a call's card fields can arrive in any of them.
+  for (const { at, toolId, card } of tools.values()) {
+    const line = items[at]
+    if (card && named(card) && line?.kind === 'tool')
+      items[at] = { key: line.key, kind: 'card', toolId, card, status: line.status }
   }
   return groupToolRuns(items)
 }

@@ -13,6 +13,8 @@ import {
   type SiteAddress,
   type SiteAssociation,
 } from '../projects/siteAssociations.ts'
+import type { PanelPlan } from '../dashboards/panels.ts'
+import type { DataRecordAction } from '../data/dataActions.ts'
 import type { DataSchema } from '../data/values/dataSchemas.ts'
 import type { DataValue } from '../data/values/dataValues.ts'
 import type { NodeProbeResult, NodeRecord, NodeStatus } from './broker.ts'
@@ -75,11 +77,19 @@ export const TURN_TEXT_MAX_CHARS = 60_000
 // The Node refuses more than MAX_AGENT_CONTEXT_BYTES of context content in one turn.
 export const TURN_MAX_CONTEXTS = 8
 
+// The trellis plugin's limit on an app's saved state, and a bound on the inputs a program runs a plan
+// with, both counted as UTF-8 JSON.
+const APP_STATE_MAX_BYTES = 256 * 1024
+const APP_RUN_INPUTS_MAX_BYTES = 64 * 1024
+const jsonBytes = (value: unknown) => new TextEncoder().encode(JSON.stringify(value)).length
+
 const requestId = z.string().min(1).max(64)
 const nodeId = z.string().min(1).max(128)
 const rowId = z.string().min(1).max(128)
 // The agents routes' own bounds on an idempotency key.
 const operationKey = z.string().min(8).max(200)
+const revision = z.number().int().positive()
+const appRunInputs = z.record(z.string(), z.json()).refine((inputs) => jsonBytes(inputs) <= APP_RUN_INPUTS_MAX_BYTES)
 const envelope = { v: z.literal(BROWSER_BRIDGE_PROTOCOL_VERSION), id: requestId }
 
 // The parts of an agents plugin turn the sidebar sends, in that plugin's shape (`AgentInputPart`), so
@@ -314,6 +324,82 @@ export const bridgeRequestSchema = z.discriminatedUnion('op', [
     taskId: rowId,
     source: browserPanelSourceId.optional(),
   }),
+  // An agent's `panel_show` call, run as the desktop's card runs it (docs/browser-extension/native-messaging.md
+  // § Panel cards). The browser names the call, never a plan: the host reads the plan from the Node.
+  // `viewerZone` is the sidebar's time zone, because the host's clock may not be the browser's.
+  z.strictObject({
+    ...envelope,
+    op: z.literal('panel.run'),
+    nodeId,
+    sessionId: rowId,
+    toolId: z.string().min(1).max(256),
+    viewerZone: z.string().min(1).max(100),
+  }),
+  // An agent's app, as the desktop's app card draws it (docs/browser-extension/native-messaging.md § App
+  // cards). Each operation names the conversation's task, and the host refuses an app whose summary
+  // names another, because the Node doesn't confine this browser's device to a task. The browser names
+  // a revision and a plan, never a program or a plan's content: the host reads both from the Node.
+  z.strictObject({ ...envelope, op: z.literal('app.view'), nodeId, taskId: rowId, appId: rowId, revision }),
+  z.strictObject({
+    ...envelope,
+    op: z.literal('app.run'),
+    nodeId,
+    taskId: rowId,
+    appId: rowId,
+    revision,
+    plan: z.string().min(1).max(64),
+    inputs: appRunInputs,
+    viewerZone: z.string().min(1).max(100),
+  }),
+  // Reads the app's saved state, or saves `state` with `key`.
+  z
+    .strictObject({
+      ...envelope,
+      op: z.literal('app.state'),
+      nodeId,
+      taskId: rowId,
+      appId: rowId,
+      state: z
+        .record(z.string().regex(/^\$/), z.json())
+        .refine((state) => jsonBytes(state) <= APP_STATE_MAX_BYTES, 'The state is over 256 KiB.')
+        .optional(),
+      key: operationKey.optional(),
+    })
+    .refine((request) => (request.state === undefined) === (request.key === undefined), 'A save needs a key.'),
+  z.strictObject({
+    ...envelope,
+    op: z.literal('app.restore'),
+    nodeId,
+    taskId: rowId,
+    appId: rowId,
+    revision,
+    key: operationKey,
+  }),
+  // Runs a data source's action on one row of a panel card or an app card (docs/browser-extension/native-messaging.md
+  // § Row actions). The browser names the card's plan as `panel.run` or `app.run` would, and the row and
+  // action by ID. The host runs the plan again and takes both from that run, so the browser can't name a
+  // record or an action the source didn't offer. The key is the act route's, which takes only a UUID.
+  z.strictObject({
+    ...envelope,
+    op: z.literal('row.act'),
+    nodeId,
+    target: z.discriminatedUnion('kind', [
+      z.strictObject({ kind: z.literal('panel'), sessionId: rowId, toolId: z.string().min(1).max(256) }),
+      z.strictObject({
+        kind: z.literal('app'),
+        taskId: rowId,
+        appId: rowId,
+        revision,
+        plan: z.string().min(1).max(64),
+        inputs: appRunInputs,
+      }),
+    ]),
+    rowId: z.string().min(1).max(1_000),
+    actionId: z.string().min(1).max(64),
+    confirmedRisk: z.enum(['read', 'write', 'execute']),
+    viewerZone: z.string().min(1).max(100),
+    key: z.string().uuid(),
+  }),
 ])
 export type BridgeRequest = z.infer<typeof bridgeRequestSchema>
 export type BridgeOperation = BridgeRequest['op']
@@ -376,19 +462,29 @@ export type BridgeAgentSession = {
   updatedAt: number
 }
 
-// What the sidebar draws of one agent event: the session's own messages, its tool calls, and its
-// errors. The host keeps the agents plugin's record identity and drops everything else, including a
-// tool's input and output, which a summary never shows and which can be megabytes.
 // An attachment a turn sent: a screenshot is an `image`, anything else a plain attachment.
 export type BridgeAttachmentRef = { id: string; image: boolean; name: string | null }
 
+// What a `panel_show` or `app_show` call drew, named for the sidebar's line. Each field is absent when
+// this record doesn't say it, because a call's input and its result can arrive in different records;
+// the sidebar merges a call's fields by tool ID, as it merges `title` and `status`. `failed` marks a
+// call that didn't pass its checks, so nothing was drawn.
+export type BridgeToolCard =
+  // `panelId` and `shownAt` come with the result. A newer `shownAt` for the same `panelId` replaces a card.
+  | { kind: 'panel'; title?: string; description?: string[]; panelId?: string; shownAt?: number; failed?: true }
+  | { kind: 'app'; appId?: string; name?: string; revision?: number; note?: string; failed?: true }
+
+// What the sidebar draws of one agent event: the session's own messages, its tool calls, and its
+// errors. The host keeps the agents plugin's record identity and drops everything else, including a
+// tool's input and output, which a summary never shows and which can be megabytes. The one exception
+// is a panel or app call's `card`: a few short, capped fields read from them.
 export type BridgeConversationEvent =
   // `attachments` lists what the person's turn sent. When it's present, the text no longer carries the
   // `[Attachment: <id>]` lines that name them for the agent. `workflow` marks a workflow step's prompt.
   | { type: 'user_message'; text: string; attachments?: BridgeAttachmentRef[]; workflow?: true }
   | { type: 'assistant_message'; text: string; messageId?: string; append?: boolean }
   // `title` and `status` absent mean unchanged, as on the agents plugin's tool call.
-  | { type: 'tool'; toolId: string; title?: string; status?: string }
+  | { type: 'tool'; toolId: string; title?: string; status?: string; card?: BridgeToolCard }
   | { type: 'error'; message: string }
 
 export type BridgeConversationRecord = {
@@ -554,6 +650,36 @@ export type BridgeResults = {
   'workflow.steps': { nodeId: string; runId: string; steps: BridgeWorkflowStep[] }
   // Null when the plugin declares no panel, or has none for this task.
   'plugin.panel': { nodeId: string; pluginId: string; taskId: string; view: BrowserPanelView | null }
+  // `plan` is the call's plan, titled as the call is. `run` is the dashboards run route's answer,
+  // unchanged: a `DashboardRun` from dashboards-core, which this package can't import.
+  'panel.run': { nodeId: string; sessionId: string; toolId: string; plan: PanelPlan; run: unknown }
+  // `task` is null when the app's task is no longer active, so the card draws no app.
+  'app.view': {
+    nodeId: string
+    appId: string
+    revision: number
+    summary: BridgeAppSummary
+    program: string
+    plans: string[]
+    task: BridgeTask | null
+  }
+  // `run` is the dashboards run route's answer, as in `panel.run`.
+  'app.run': { nodeId: string; appId: string; revision: number; plan: PanelPlan; run: unknown }
+  // The saved state, or null after a save.
+  'app.state': { nodeId: string; appId: string; state: Record<string, unknown> | null }
+  // `revision` is the new head, holding the restored files.
+  'app.restore': { nodeId: string; appId: string; revision: number }
+  // The act route's answer, unchanged: `outcome`, and with `ready`, the action to take next.
+  'row.act': { nodeId: string; outcome: string; action?: DataRecordAction }
+}
+
+// An app's name, head, and revisions, in the trellis plugin's `AppSummary` shape. A restored revision
+// names the one it copied in `restoredFrom`.
+export type BridgeAppSummary = {
+  appId: string
+  name: string
+  head: number
+  revisions: { revision: number; note: string; restoredFrom?: number }[]
 }
 
 // Which sessions and tasks changed on the selected Node since the last hint. Nothing more: the

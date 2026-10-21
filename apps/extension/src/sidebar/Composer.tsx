@@ -44,6 +44,8 @@ export function Composer(props: {
   settled(): void
   // What the agent is doing, drawn above the message box.
   activity?: JSX.Element
+  // Hands the conversation a way to add text to this draft, for an app's Ask the agent button.
+  insertRef?(insert: (text: string) => Promise<{ ok: boolean; reason?: string }>): void
 }) {
   const target = props.target
   const [draft, setDraft] = createSignal<Draft>({ text: '' })
@@ -107,6 +109,21 @@ export function Composer(props: {
     setDraft(next)
     await saveDraft(props.storage.local, target, next, previous)
   }
+
+  // Added on a line of its own after any text already there, as the desktop's composer adds it. It
+  // never sends.
+  props.insertRef?.(async (value) => {
+    typed = true
+    try {
+      await apply((current) => {
+        const before = current.text && !current.text.endsWith('\n') ? `${current.text}\n` : current.text
+        return { ...current, text: `${before}${value}` }
+      })
+      return { ok: true }
+    } catch {
+      return { ok: false, reason: 'Browser storage is full, so the text may not survive closing the sidebar.' }
+    }
+  })
 
   const text = () => draft().text
   const captures = () => draft().captures ?? []

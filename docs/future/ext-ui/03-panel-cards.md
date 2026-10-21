@@ -1,6 +1,95 @@
 # Phase 3: panel cards in the sidebar
 
-Date: October 21, 2026. Status: proposed. Needs phases 1 and 2.
+Date: October 21, 2026. Status: done. Needs phases 1 and 2.
+
+## Completion note
+
+Landed on October 21, 2026, on the `phase-3-panel-cards` branch.
+
+What landed:
+
+- The route. `GET /sessions/:sessionId/tools/:toolId` in the agents plugin answers
+  `{ tool, turnId, taskId }`, behind `ownsSessionUnlessSearch`, and 404 for a call the session
+  doesn't have. `readToolCall` in `server/sessions/toolCallRead.ts` reads the call's rows by ID and
+  folds every one of them with `mergeToolCall`, then projects the status with `commandStatus`, as the
+  client reads do. The store loads the module lazily. Migration 0021 adds
+  `agent_events_session_tool_idx`, a partial index on the session and the tool ID over tool rows.
+- The bridge. `panel.run` in `extensionBridge.ts` takes `nodeId`, `sessionId`, `toolId`, and
+  `viewerZone`. `runShownPanel` in the host's `bridge.ts` reads the call, refuses with `not_found`,
+  finds the workspace from the task and project lists, and runs the plan as a draft in `execution`
+  mode with `read: true`.
+- The card's line carries `panelId` and `shownAt` from the result, so the sidebar can collapse an
+  older version before either card runs. `CardLine` carries `toolId`.
+- The sidebar. `PanelCard.tsx` loads with `lazy` from `Conversation.tsx`. It draws `RunPanel` in
+  `CardFrame`, provides `PanelViewHostContext` with `openLink` only, and runs on visibility,
+  **Refresh**, hints, and reconnects. `CardLineItem` keeps the phase 1 line as the loading state and
+  the older-host fallback, and owns the collapse with **Show** and **Hide this version**.
+- The background answers a port named `sidebar` only when its sender's address is the sidebar page.
+- Docs: native messaging, the conversation view, dashboards, the plugin route reference, the
+  transcript store, the extension's overview, and security. The site page "Talk to an agent from the
+  browser" too, marked checked.
+- Tests: checkpoints 1 to 3 as written, plus the index's query plan, the background's sender check,
+  row presses, a failed refresh, and the hint coalescing.
+
+Decisions and deviations:
+
+- drizzle-kit splits an index expression at its commas, so the index and its query use
+  `event_json ->> '$.tool.id'` rather than `json_extract`. SQLite uses the index only when the
+  query repeats the expression exactly. A test checks the query plan.
+- The protocol package can't import dashboards-core, so `panel.run`'s `run` is typed `unknown`.
+  The sidebar casts it to `DashboardRun` in one place. The host checks only that it has a `rows`
+  array.
+- A plan that no longer validates is `not_found` too, with its own message. `bad_request` means an
+  older host, so the card would wrongly ask for a CLI update.
+- The run's reply cap is `NATIVE_REPLY_MAX_CHARS` less the plan's length, because the reply carries
+  both.
+- Requirement 10's row menu. Phase 3 passes no `onButton`, so the views draw no row menu. A row whose
+  press opens something in Acorn says "That row opens in Acorn." with **Open in Acorn** above the
+  panel instead. `rowDestination` in `PanelCard.tsx` follows the desktop's press rules, where an
+  address always opens in a tab. A risky `openUrl` row action goes to Acorn, because the desktop
+  confirms it. `runNodeAction`, `surfaceAction`, and `createTask` leave the row unpressable.
+- Rows the agent supplied never change, so a hint doesn't rerun them and the card has no **Refresh**,
+  as on the desktop. A source that couldn't answer keeps the last good run on screen, greyed out, as
+  `PublishedDashboardPanel` does. The run's problems show as warnings with `planPartLabel`, because
+  `describeSourceFailure` imports `infra/`.
+- With a failed first run, the card draws only the reason. `RunPanel`'s failed state says "Edit the
+  panel to repair…", which the sidebar can't do.
+- The card stacks `RunPanel`'s parts in a `Stack`, because the origin line and the description
+  otherwise run together. The composer gets `z-index: var(--z-sticky)`, because a table's sticky
+  head cells painted over it.
+- Verify before building. The desktop sends no `evaluationTime` for a plan, so neither does the host.
+  The ledger keeps a call as its opener and its latest state (`ledgerFold.ts`), but the read folds
+  every row, which also covers an uncompacted ledger. The background checked the port's name only.
+  It checks the sender now, because content scripts it injects can open a port too.
+
+Checks:
+
+- Supplied rows. A plan with 256 KiB of supplied rows (3,474 rows) runs in 27 ms. The reply is
+  2,131,835 characters: 262,444 for `plan` and 1,869,375 for `run`. That's 9 chunks, far under the
+  16 Mi character limit. Dropping rows from `plan` would save 12%, so `plan` keeps them.
+- Checkpoint 4 ran without a live agent. A seed script wrote four `panel_show` calls over supplied
+  forecast rows into a `pnpm dev:extension` session's Node: a bar chart, a table, a stat, and a
+  changed bar chart with the first chart's panel ID. All three drew, and the first chart collapsed to
+  "Warmest hour by day. Replaced by a newer version." with **Show**. A link cell opened its address
+  in a new tab. The host logs no operations, so a counter in the sidebar page wrapped
+  `chrome.runtime.connect` instead. At 400 pixels high, a reload ran only the two cards in view.
+  Scrolling to the top ran the table once, and holding there 10 seconds sent nothing. Scrolling to
+  the bottom ran the chart once, and holding there sent nothing. Supplied rows don't rerun on a hint,
+  so a hint-driven rerun was checked in `PanelCard.test.tsx` only.
+- Sizes. The sidebar's first load went from 368,488 B to 373,320 B of JavaScript, 113,161 B to
+  116,082 B gzipped. `PanelCard`'s chunk is 48,571 B, 15,736 B gzipped, with 15.9 kB of CSS, and loads
+  with the first card. The Node service measured 1,915,624 B, under the 1,917,500 B ceiling, from
+  1,915,111 B after phase 2.
+
+For later phases:
+
+- Phase 5 turns actions on in `PanelCard`. It can pass `onButton` and its row menu's handler to
+  `RunPanel`, and replace the "That row opens in Acorn." notice for actions that become runnable.
+  `rowDestination` is the place a press is decided.
+- `panel.run` names the call. `row.act` can read the plan through the same route, with
+  `readToolCall`'s fold.
+- The site pages that cite `browser-extension.md`, `security.md`, and `dashboards.md` make no claim
+  this phase changed, so only the conversation page was updated.
 
 ## Goal
 

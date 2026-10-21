@@ -1,4 +1,4 @@
-import { afterEach, describe, expect, it } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 import { render } from 'solid-js/web'
 import type {
   BridgeAgentRequest,
@@ -468,6 +468,202 @@ describe('conversation', () => {
       await openSession(subject)
       expect(fold(subject.root)).toBeNull()
       expect(transcript(subject.root)).toEqual(['Step 1', 'Step 2'])
+    })
+  })
+
+  describe('panel and app lines', () => {
+    const call = (
+      subject: ReturnType<typeof mount>,
+      seq: number,
+      event: Partial<Extract<BridgeConversationRecord['event'], { type: 'tool' }>>,
+    ) => {
+      subject.state.events.get('s1')!.push({
+        id: `s1-t${seq}`,
+        seq,
+        turnId: 'turn',
+        createdAt: seq,
+        event: { type: 'tool', toolId: `tool-${seq}`, title: `Step ${seq}`, status: 'completed', ...event },
+      })
+      subject.state.sessions[0]!.lastEventSeq = seq
+    }
+
+    // The fake Node answers an operation it doesn't know with `bad_request`, as an older host does.
+    it('names a panel and links to the conversation, on a host too old to run it', async () => {
+      const subject = mount()
+      call(subject, 1, {
+        title: 'mcp__acorn__panel_show',
+        card: { kind: 'panel', title: 'Commits by day', description: ['Your commits this week,', 'by day.'] },
+      })
+      await openSession(subject)
+      await vi.waitFor(() =>
+        expect(transcript(subject.root)).toEqual([
+          'Commits by dayYour commits this week, by day.Copy Acorn linkUpdate the Acorn CLI to see this panel here.',
+        ]),
+      )
+      expect(button(subject.root, 'Copy Acorn link')!.getAttribute('data-tip')).toBe(
+        'acorn://n1/t/t1?pane=agents&item=s1',
+      )
+    })
+
+    const panelRun = (request: Record<string, unknown>) => {
+      const plan = {
+        version: 2,
+        title: 'Commits',
+        time: { zone: 'UTC', mode: 'fixed', weekStart: 'monday' },
+        sources: [],
+        columns: [{ id: 'title', label: 'Title', type: 'text', bind: {} }],
+        stages: [],
+        view: { kind: 'list' },
+      }
+      const run = {
+        plan,
+        rows: [{ id: 'r1', values: { title: `Drawn by ${request.toolId}` }, records: [] }],
+        groups: [],
+        description: [],
+        diagnostics: { problems: [], sources: [], stages: [], plugins: [], accounts: [], complete: true },
+      }
+      return { result: { nodeId: 'n1', sessionId: 's1', toolId: request.toolId, plan, run } }
+    }
+    const panelRuns = (subject: ReturnType<typeof mount>) =>
+      subject.state.requests.filter((request) => request.op === 'panel.run').map((request) => request.toolId)
+
+    it('draws a finished panel live, and collapses an older version of it until Show', async () => {
+      const subject = mount()
+      subject.state.answers.set('panel.run', panelRun)
+      call(subject, 1, { card: { kind: 'panel', title: 'Commits by day', panelId: 'commits', shownAt: 1 } })
+      call(subject, 2, { card: { kind: 'panel', title: 'Commits by day', panelId: 'commits', shownAt: 2 } })
+      await openSession(subject)
+      await vi.waitFor(() => expect(subject.root.textContent).toContain('Drawn by tool-2'))
+      expect(subject.root.querySelector('.transcript > li')!.textContent).toBe(
+        'Commits by day. Replaced by a newer version.Show',
+      )
+      // A collapsed card doesn't run.
+      expect(panelRuns(subject)).toEqual(['tool-2'])
+
+      button(subject.root, 'Show')!.click()
+      await vi.waitFor(() => expect(subject.root.textContent).toContain('Drawn by tool-1'))
+      expect(panelRuns(subject)).toEqual(['tool-2', 'tool-1'])
+      button(subject.root, 'Hide this version')!.click()
+      await settle()
+      expect(subject.root.textContent).not.toContain('Drawn by tool-1')
+    })
+
+    it('names an app at its revision and links to it on the Apps pane', async () => {
+      const subject = mount()
+      call(subject, 1, {
+        title: 'app_show',
+        card: { kind: 'app', appId: 'app-0123456789ab', note: 'Added due dates', name: 'Checklist', revision: 3 },
+      })
+      await openSession(subject)
+      // This host doesn't know `app.view`, so the line stays, with a word about the CLI.
+      await vi.waitFor(() =>
+        expect(transcript(subject.root)).toEqual([
+          'Checklist · v3Added due datesCopy Acorn linkUpdate the Acorn CLI to see this app here.',
+        ]),
+      )
+      expect(button(subject.root, 'Copy Acorn link')!.getAttribute('data-tip')).toBe(
+        'acorn://n1/t/t1?pane=apps&item=app-0123456789ab',
+      )
+    })
+
+    it("collapses the head's card when another card restores its revision", async () => {
+      const subject = mount()
+      const summary = {
+        appId: 'app-0123456789ab',
+        name: 'Checklist',
+        head: 2,
+        revisions: [
+          { revision: 1, note: 'First' },
+          { revision: 2, note: 'Second' },
+        ] as { revision: number; note: string; restoredFrom?: number }[],
+      }
+      subject.state.answers.set('app.view', (request) => ({
+        result: {
+          nodeId: 'n1',
+          appId: summary.appId,
+          revision: request.revision,
+          summary: structuredClone(summary),
+          program: 'root = Text("Steps")',
+          plans: [],
+          task: { id: request.taskId, title: 'Fix it', branch: null },
+        },
+      }))
+      subject.state.answers.set('app.state', () => ({ result: { nodeId: 'n1', appId: summary.appId, state: {} } }))
+      subject.state.answers.set('app.restore', () => {
+        summary.head = 3
+        summary.revisions.push({ revision: 3, note: 'Restored v1.', restoredFrom: 1 })
+        return { result: { nodeId: 'n1', appId: summary.appId, revision: 3 } }
+      })
+      call(subject, 1, { card: { kind: 'app', appId: summary.appId, note: 'First', name: 'Checklist', revision: 1 } })
+      call(subject, 2, { card: { kind: 'app', appId: summary.appId, note: 'Second', name: 'Checklist', revision: 2 } })
+      await openSession(subject)
+      await vi.waitFor(() => expect(button(subject.root, 'Restore v1')).toBeTruthy())
+      expect(subject.root.textContent).toContain('Checklist · v2')
+      button(subject.root, 'Restore v1')!.click()
+      await vi.waitFor(() => expect(subject.root.textContent).toContain('v2: Second. Replaced by v3.'))
+      expect(subject.root.textContent).toContain('Checklist · v3, restored from v1')
+    })
+
+    it("puts an app's Ask the agent text in this conversation's message box, after what's typed", async () => {
+      const subject = mount()
+      subject.state.answers.set('app.view', (request) => ({
+        result: {
+          nodeId: 'n1',
+          appId: 'app-0123456789ab',
+          revision: 1,
+          summary: {
+            appId: 'app-0123456789ab',
+            name: 'Checklist',
+            head: 1,
+            revisions: [{ revision: 1, note: 'First' }],
+          },
+          program: 'root = Button("Ask", @ToAssistant("Which step failed?"))',
+          plans: [],
+          task: { id: request.taskId, title: 'Fix it', branch: null },
+        },
+      }))
+      subject.state.answers.set('app.state', () => ({ result: { nodeId: 'n1', appId: 'app-0123456789ab', state: {} } }))
+      call(subject, 1, {
+        card: { kind: 'app', appId: 'app-0123456789ab', note: 'First', name: 'Checklist', revision: 1 },
+      })
+      await openSession(subject)
+      await vi.waitFor(() => expect(button(subject.root, 'Ask')).toBeTruthy())
+      type(subject.root, 'Hello')
+      button(subject.root, 'Ask')!.click()
+      await vi.waitFor(() => expect(draft(subject.root)).toBe('Hello\nWhich step failed?'))
+      expect(subject.state.requests.some((request) => request.op === 'turn.submit')).toBe(false)
+    })
+
+    it('says while a call checks, and warns when it failed its checks', async () => {
+      const subject = mount()
+      call(subject, 1, { status: 'running', card: { kind: 'panel', title: 'Commits by day' } })
+      call(subject, 2, { status: 'running', card: { kind: 'app', appId: 'app-0123456789ab', note: 'First' } })
+      call(subject, 3, { card: { kind: 'panel', title: 'Commits by day', failed: true } })
+      call(subject, 4, { card: { kind: 'app', failed: true } })
+      await openSession(subject)
+      expect(transcript(subject.root)).toEqual([
+        'Checking the plan for Commits by day…',
+        'Checking the app…',
+        "Commits by day didn't pass its checks, so nothing was drawn.",
+        "This app didn't pass its checks, so nothing was drawn.",
+      ])
+      const warnings = [...subject.root.querySelectorAll('.transcript .ui-alert')]
+      expect(warnings.map((alert) => alert.getAttribute('data-tone'))).toEqual(['warn', 'warn'])
+    })
+
+    it('folds the tool lines on each side of a card as two runs, and never the card', async () => {
+      const subject = mount()
+      for (const seq of [1, 2, 3]) call(subject, seq, {})
+      call(subject, 4, { card: { kind: 'panel', title: 'Commits by day' } })
+      for (const seq of [5, 6, 7]) call(subject, seq, {})
+      await openSession(subject)
+      await vi.waitFor(() =>
+        expect(transcript(subject.root)).toEqual([
+          '3 tool calls',
+          'Commits by dayCopy Acorn linkUpdate the Acorn CLI to see this panel here.',
+          '3 tool calls',
+        ]),
+      )
     })
   })
 

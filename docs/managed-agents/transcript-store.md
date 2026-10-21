@@ -83,6 +83,10 @@ Each reader stays correct:
 - **The walk.** Sequences have gaps, and the deleted row is never the newest.
 - **Export, waits, workflows, and delegation.** They read rows as stored. The markdown export folds
   tool rows to one line per call.
+- **One call by ID.** `GET /sessions/:id/tools/:toolId` reads a call's rows through
+  `agent_events_session_tool_idx`, an index on the session and the tool ID over tool rows, and folds
+  all of them in sequence order, so a call whose opener and latest state are pages apart reads whole
+  (`toolCallRead.ts`).
 
 Rows stored before the fold were compacted once in the background (`ledgerCompaction.ts`), marked per
 session in `ledger_compacted_at`. On a 1.3 GB database it removed 118,500 rows in 34 seconds, with a

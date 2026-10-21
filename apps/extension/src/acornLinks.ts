@@ -10,6 +10,8 @@ import { buildLink, type Place } from '@acorn/client-core/host/registries/comman
 const ITEM_PANES: Record<string, string> = { github: 'pr', runn: 'runn' }
 // The agents plugin's pane, which selects the conversation a link names as its item.
 const AGENT_PANE = 'agents'
+// The trellis plugin's Apps pane, which selects the app a link names as its item.
+const APPS_PANE = 'apps'
 
 // The link, or null when the address can't be one, such as an item address over the length limit.
 function link(nodeId: string, place: Parameters<typeof buildLink>[1]): string | null {
@@ -34,6 +36,7 @@ export const taskPaneLink = (nodeId: string, taskId: string, pane?: string) => l
 export const taskLink = (nodeId: string, taskId: string) => taskPaneLink(nodeId, taskId)
 export const conversationLink = (nodeId: string, taskId: string, sessionId: string) =>
   link(nodeId, task(taskId, AGENT_PANE, sessionId))
+export const appLink = (nodeId: string, taskId: string, appId: string) => link(nodeId, task(taskId, APPS_PANE, appId))
 // The project's place in the desktop app, where a task is made with the desktop's own choices.
 export const projectLink = (nodeId: string, projectId: string) => link(nodeId, { kind: 'project', projectId, rest: [] })
 // An outside item with no task: the desktop finds what claims the address.

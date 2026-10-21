@@ -8,6 +8,7 @@ import { createEffect, createRoot, Show } from 'solid-js'
 import { QueryCacheProvider } from '@acorn/client-core/infra/persistence/QueryCacheProvider.tsx'
 import { Route, Router } from '@solidjs/router'
 import App from './App'
+import DesktopPanelViewHost from '@acorn/client-core/features/dashboards/DesktopPanelViewHost.tsx'
 import '@acorn/client-core/infra/styles/styles.css'
 import { activeCacheId, activeNodeId, nodeReady, selectActiveNode } from '@acorn/client-core/infra/node/activeNode.ts'
 import { clientFor, nodes, nodeState } from '@acorn/client-core/infra/node/fleet.ts'
@@ -128,7 +129,13 @@ render(
         return (
           <QueryCacheProvider cache={cache}>
             <PaneModelHost nodeId={activeNodeId()}>
-              <Router root={App}>
+              <Router
+                root={() => (
+                  <DesktopPanelViewHost>
+                    <App />
+                  </DesktopPanelViewHost>
+                )}
+              >
                 <Route path="/" component={noop} />
                 <Route path="/t/:taskId" component={noop} />
                 <Route path="/settings/projects" component={noop} />

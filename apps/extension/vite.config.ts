@@ -14,6 +14,13 @@ import { extensionManifest } from './src/manifest'
 // ACORN_EXTENSION_OUT_DIR moves the output. `pnpm dev:extension` sets both for its session.
 const CONTENT_SCRIPTS = ['content', 'picker']
 
+// An agent-built app's runtime draws with `@acorn/plugin-api/ui`, which here is the few kit components
+// it uses rather than the facade's whole barrel (src/sidebar/appKit.ts). Exported for vitest.config.ts.
+export const APP_KIT = {
+  find: /^@acorn\/plugin-api\/ui$/,
+  replacement: resolve(import.meta.dirname, 'src/sidebar/appKit.ts'),
+}
+
 export default defineConfig(({ mode }) => {
   const browser = mode === 'firefox' ? 'firefox' : 'chrome'
   const development = process.env.ACORN_EXTENSION_HOST === 'development'
@@ -23,6 +30,7 @@ export default defineConfig(({ mode }) => {
   return {
     root: import.meta.dirname,
     base: './',
+    resolve: { alias: [APP_KIT] },
     plugins: [
       solid(),
       {

@@ -53,6 +53,7 @@ const METHODS = [
   'openRequests',
   'snapshot',
   'events',
+  'toolCall',
   'enqueueTurn',
   'patchQueuedTurn',
   'cancelTurn',
@@ -338,6 +339,7 @@ describe('a task-scoped credential is confined to its own agent sessions', () =>
       // A read is the transcript of another task's agent; the writes are worse.
       expect((await app.fetch(req(`/api/sessions/${sessionId}`), {} as Env)).status).toBe(404)
       expect((await app.fetch(req(`/api/sessions/${sessionId}/events`), {} as Env)).status).toBe(404)
+      expect((await app.fetch(req(`/api/sessions/${sessionId}/tools/call-1`), {} as Env)).status).toBe(404)
       expect((await app.fetch(req(`/api/sessions/${sessionId}/export`), {} as Env)).status).toBe(404)
       expect((await app.fetch(req(`/api/sessions/${sessionId}/artifacts`), {} as Env)).status).toBe(404)
       expect((await app.fetch(req(`/api/sessions/${sessionId}/cancel`, 'POST', {}), {} as Env)).status).toBe(404)

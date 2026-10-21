@@ -1,6 +1,67 @@
 # Phase 1: name the cards
 
-Date: October 21, 2026. Status: proposed. Needs nothing.
+Date: October 21, 2026. Status: done. Needs nothing.
+
+## Completion note
+
+Landed on October 21, 2026, on the `phase-1-name-the-cards` branch.
+
+What landed:
+
+- `BridgeToolCard` and the tool event's optional `card`, in
+  `packages/protocol/src/transport/extensionBridge.ts`, as requirement 1 gives them.
+- `toolCard` in `apps/cli/src/browser/agents.ts` adds `card` to a call named `panel_show` or
+  `app_show`, with the caps from requirement 2.
+- The shared readers. `readPanelShowCall` and its result schema are in
+  `packages/protocol/src/dashboards/panelShowCall.ts`. The MCP envelope unwrapping is `toolCallJson` in
+  `packages/protocol/src/agents/toolCallJson.ts`, which both readers use, so trellis lost its own copy.
+  Trellis has `plugins/trellis/src/contract/appShowCall.ts`, with `appIdSchema`, `appShowInput`, the
+  result schema, `AppShowResult`, and `readAppShowCall`. Its `shared/api.ts` imports `appIdSchema` from
+  there. The desktop's panel card, the terminal's panel line, the app card, and the host import them.
+- The sidebar. `conversationItems` gives a named call a `card` item, with its fields merged by tool ID,
+  and `CardLineItem` in `Conversation.tsx` draws it. `appLink` in `apps/extension/src/acornLinks.ts`
+  builds the Apps pane link.
+- Docs: native messaging, the conversation view, agent conversations, the extension's limits,
+  dashboards, agent-built apps, and first-party plugins. The site page "Talk to an agent from the
+  browser" too, marked checked.
+- Tests: checkpoints 1 and 2 as written, plus the caps, the app link, and the fallbacks below.
+
+Decisions and deviations:
+
+- `failed` is set for every settled status except completed with a result. A cancelled or interrupted
+  call reads as failed, as the desktop's and the terminal's cards already read it.
+- Requirement 9 reads "neither a title nor a name". An app's name arrives only with its result, so an
+  app that's still checking would never say "Checking the app…". The sidebar counts an app ID as a
+  name. A card with `failed` always gets its line, so a refused call whose input didn't parse can't
+  read as a finished tool line with a green mark.
+- A failed app reads "This app didn't pass its checks", because a refused call has no name.
+- `toolCallJson` is its own protocol entry point, so the app reader doesn't import a panel module.
+  The protocol's entry point cap in `tools/arch/boundaries.test.ts` went from 90 to 92, and
+  client-core's from 205 to 204.
+- Checkpoint 3 ran without a live agent. A seed script wrote a finished `panel_show`, a finished
+  `app_show`, and a refused `panel_show` into a `pnpm dev:extension` session's Node through
+  `AgentStore`. The sidebar, through this checkout's native host, drew all three lines. Their links
+  were `acorn://<node>/t/<task>?pane=agents&item=<session>` and `?pane=apps&item=<app>`. A development
+  build copies the link instead of opening it, so following it into the desktop wasn't checked. The
+  desktop's task deep link calls `openPane(taskId, pane, { kind: 'plugin:select', item })`, the call
+  the app card's **Open** makes.
+- Verify before building: Claude's ACP normalizer sets `name` from `mcp__<server>__<tool>`, and
+  Codex's from the item's tool. The ledger's latest row is the merged call, so it keeps `name`,
+  `input`, and `output`. OpenCode isn't a harness: [opencode.md](../opencode.md) is postponed.
+- Sizes. The Node service measured 1,915,121 B before and 1,915,111 B after, under the 1,917,500 B
+  ceiling. The CLI's `dist/native-host.js` went from 54.78 kB to 99.71 kB, because
+  `panelShowInputSchema` brings `panels.ts` and the data schemas it imports. `cli.js` shrank by 4.4 kB
+  and the shared chunk grew by 7 kB.
+
+For later phases:
+
+- The trellis contract folder exists, exported as `./contract/*`. An app imports from it only through
+  an edge listed in `tools/arch/boundaries.test.ts`. Keep lang-core out of `appShowCall.ts`, because
+  the CLI bundles it.
+- A `card` item keeps its call's merged status and the key of the call's first record, as a tool line
+  does. Phase 3 can draw a panel card in place of the line by switching on `card.kind`.
+- `card` carries no plan and no panel ID. Phase 3's `panel.run` names the session and tool call, as
+  the programme's README decides.
 
 ## Goal
 
@@ -33,8 +94,8 @@ card draws in full.
   call's records by tool ID, keeping the last title and status reported.
 - A harness records a refused MCP call as completed, with the error as its output. Both desktop cards
   treat "completed with no result" as "failed its checks."
-- The desktop reads a `panel_show` call with `readPanelShowCall` in
-  `packages/client-core/src/features/dashboards/panelShowCall.ts`, which unwraps the MCP content
+- The desktop reads a `panel_show` call with `readPanelShowCall`, in client-core before this phase
+  and in `packages/protocol/src/dashboards/panelShowCall.ts` after it, which unwraps the MCP content
   envelope. The trellis plugin reads an `app_show` call with its own `json` helper in
   `plugins/trellis/src/client/AppToolCard.tsx`, and its schemas are in
   `plugins/trellis/src/shared/api.ts`.

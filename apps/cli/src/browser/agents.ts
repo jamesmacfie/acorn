@@ -6,6 +6,7 @@ import type {
   AgentRequestKind,
   AgentSession,
   AgentSessionSnapshot,
+  AgentToolCall,
   AgentTurn,
 } from '@acorn/plugin-agents/contract/wire.ts'
 import {
@@ -27,6 +28,8 @@ import {
   newSessionChoices,
   type CustomAgent,
 } from '@acorn/plugin-agents/contract/newSessionChoices.ts'
+import { readAppShowCall } from '@acorn/plugin-trellis/contract/appShowCall.ts'
+import { readPanelShowCall } from '@acorn/protocol/panelShowCall.ts'
 import type {
   BridgeAgentHint,
   BridgeAgentChoice,
@@ -37,15 +40,19 @@ import type {
   BridgeConversationEvent,
   BridgeConversationRecord,
   BridgeSessionRead,
+  BridgeToolCard,
 } from '@acorn/protocol/extensionBridge.ts'
 
 // The agents plugin's route bodies, narrowed to what the sidebar draws. The types are that plugin's
 // contract. The only code the CLI bundle takes from it is the app-access wording, the model line, and
 // the New picker's rows in its contract, so the sidebar describes a grant, a session, and an agent to
-// start in the same words as the desktop.
+// start in the same words as the desktop. A panel or app call is read with the readers the desktop's
+// cards use, so the sidebar names it as they do.
 
 export const agentsRoute = '/v1/p/agents'
 export const sessionRoute = (sessionId: string) => `${agentsRoute}/sessions/${encodeURIComponent(sessionId)}`
+export const toolCallRoute = (sessionId: string, toolId: string) =>
+  `${sessionRoute(sessionId)}/tools/${encodeURIComponent(toolId)}`
 export const attachmentRoute = (attachmentId: string) =>
   `${agentsRoute}/attachments/${encodeURIComponent(attachmentId)}`
 
@@ -107,6 +114,49 @@ export const bridgeSession = (session: AgentSession): BridgeAgentSession => ({
   updatedAt: session.updatedAt,
 })
 
+// The most a card line carries, so a call's input and output can't fill a page: a title, name, or note,
+// and a description's lines.
+const CARD_TEXT_LIMIT = 200
+const DESCRIPTION_LINE_LIMIT = 300
+const DESCRIPTION_LINES = 8
+
+// A harness records a refused call as completed, with the error as its output, so a call that finished
+// without a result didn't pass its checks, as the desktop's cards read it.
+const failedChecks = (status: AgentToolCall['status'], result: unknown): boolean =>
+  status !== undefined && status !== 'pending' && status !== 'running' && (status !== 'completed' || !result)
+
+// What a `panel_show` or `app_show` call drew, from what this record holds of its input and output.
+// The tool's MCP name says which, never its title, which each harness writes its own way.
+function toolCard(tool: AgentToolCall): BridgeToolCard | undefined {
+  if (tool.name === 'panel_show') {
+    const { input, result } = readPanelShowCall(tool)
+    return {
+      kind: 'panel',
+      ...(input ? { title: input.title.slice(0, CARD_TEXT_LIMIT) } : {}),
+      ...(result
+        ? {
+            description: result.description
+              .slice(0, DESCRIPTION_LINES)
+              .map((line) => line.slice(0, DESCRIPTION_LINE_LIMIT)),
+            panelId: result.panelId.slice(0, CARD_TEXT_LIMIT),
+            shownAt: result.shownAt,
+          }
+        : {}),
+      ...(failedChecks(tool.status, result) ? { failed: true } : {}),
+    }
+  }
+  if (tool.name === 'app_show') {
+    const { input, result } = readAppShowCall(tool)
+    return {
+      kind: 'app',
+      ...(input ? { appId: input.appId, note: input.note.slice(0, CARD_TEXT_LIMIT) } : {}),
+      ...(result ? { name: result.name.slice(0, CARD_TEXT_LIMIT), revision: result.revision } : {}),
+      ...(failedChecks(tool.status, result) ? { failed: true } : {}),
+    }
+  }
+  return undefined
+}
+
 // A subagent's messages and tools belong to its own stream, which the sidebar doesn't draw. An
 // automatic message isn't the person's, so the turn's attachments aren't drawn under it.
 function conversationEvent(record: AgentEventRecord, turn: AgentTurn | undefined): BridgeConversationEvent | null {
@@ -133,14 +183,17 @@ function conversationEvent(record: AgentEventRecord, turn: AgentTurn | undefined
         ...(event.messageId ? { messageId: event.messageId } : {}),
         ...(event.append ? { append: true } : {}),
       }
-    case 'tool':
+    case 'tool': {
       if (event.tool.subagentId) return null
+      const card = toolCard(event.tool)
       return {
         type: 'tool',
         toolId: event.tool.id,
         ...(event.tool.title ? { title: event.tool.title } : {}),
         ...(event.tool.status ? { status: event.tool.status } : {}),
+        ...(card ? { card } : {}),
       }
+    }
     case 'error':
       return { type: 'error', message: event.message }
     default:

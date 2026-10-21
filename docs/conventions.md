@@ -104,11 +104,12 @@ read.** The arch test enforces the first half and the file headers say it. A tes
 `contract/`, and the arch test refuses one: `./contract/*` is a directory wildcard, so anything under it
 is importable from another package, tests included.
 
-**A plugin's `src/` children are drawn from seven names**: `node`, `server`, `client`, `tree`,
+**A plugin's `src/` children are drawn from eight names**: `node`, `server`, `client`, `embed`, `tree`,
 `contract`, `shared`, `testkit`. No loose files, and `node/` holds `index.ts` and `schema.ts` and
 nothing else. The arch test enforces both, because every rule that keys off the first path segment
-reads it as one of these seven. An eighth name would be refused by none of them and stop being
-governed.
+reads it as one of these eight. A ninth name would be refused by none of them and stop being
+governed. `embed/` is client code another client draws with, such as the trellis plugin's app runtime,
+which the browser extension runs. The arch tests hold it to the client tier's rules.
 
 **No folder is named `main`, `service`, or `wiring`**, at any depth. `main/` meant "the Electron main
 process", and once Electron went it was arbitrary which of `main/` or `server/` a module landed in. The
@@ -148,7 +149,7 @@ to "what is this". The arch test refuses a package without one.
 `tools/arch/boundaries.test.ts` checks five of the rules above, and `.github/workflows/ci.yml` runs
 it on every pull request:
 
-- The seven folder names.
+- The eight folder names.
 - The contents of `node/`.
 - No test under a `contract/`.
 - No folder named `main`, `service`, or `wiring`.

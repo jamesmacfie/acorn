@@ -11,15 +11,13 @@ import {
   writeJson,
 } from '@acorn/plugin-api/client'
 import type { AgentToolCardProps } from '@acorn/protocol/extensionPoints.ts'
+import { readAppShowCall, type AppShowResult } from '../contract/appShowCall'
 import {
   APPS_PANE_ID,
   appRestoreRoute,
   appRevisionRoute,
   appRoute,
-  appShowInput,
-  appShowResultSchema,
   type AppRevisionFiles,
-  type AppShowResult,
   type AppSummary,
 } from '../shared/api'
 import { appById } from './appsStore'
@@ -31,26 +29,13 @@ import { PublishButton } from './PublishButton'
 // line that can draw their own revision, read only, or restore it. A card in an archived task's
 // transcript draws nothing, because the task's data may not resolve.
 
-/** A call's JSON as a transcript recorded it, unwrapping the MCP content envelope. */
-function json(text: string | undefined): unknown {
-  try {
-    const value: unknown = text ? JSON.parse(text) : undefined
-    const content = (value as { content?: { text?: unknown }[] } | undefined)?.content
-    return Array.isArray(content) ? json(content.find((part) => typeof part?.text === 'string')?.text as string) : value
-  } catch {
-    return undefined
-  }
-}
-
 export default function AppToolCard(props: AgentToolCardProps) {
-  const input = createMemo(() => appShowInput.safeParse(json(props.tool.input)).data)
+  const call = createMemo(() => readAppShowCall(props.tool))
   // A harness records a refused call as completed, with the error as its output, so a finished call
   // with no result is an app that didn't pass its checks.
-  const result = createMemo(
-    () => (props.tool.status === 'completed' ? appShowResultSchema.safeParse(json(props.tool.output)).data : undefined),
-    undefined,
-    { equals: (a, b) => a?.appId === b?.appId && a?.revision === b?.revision },
-  )
+  const result = createMemo(() => (props.tool.status === 'completed' ? call().result : undefined), undefined, {
+    equals: (a, b) => a?.appId === b?.appId && a?.revision === b?.revision,
+  })
   const checking = () => props.tool.status === 'pending' || props.tool.status === 'running'
   return (
     <Show
@@ -71,7 +56,7 @@ export default function AppToolCard(props: AgentToolCardProps) {
         </Show>
       }
     >
-      {(shown) => <AppCard taskId={props.taskId} shown={shown} note={input()?.note ?? ''} />}
+      {(shown) => <AppCard taskId={props.taskId} shown={shown} note={call().input?.note ?? ''} />}
     </Show>
   )
 }

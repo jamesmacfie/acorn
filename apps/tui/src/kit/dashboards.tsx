@@ -2,7 +2,7 @@
 import { onMount, type JSX } from 'solid-js'
 import type { PanelPlan } from '@acorn/protocol/dashboards.ts'
 import type { AgentToolCardProps } from '@acorn/protocol/extensionPoints.ts'
-import { readPanelShowCall } from '@acorn/client-core/features/dashboards/panelShowCall.ts'
+import { readPanelShowCall } from '@acorn/protocol/panelShowCall.ts'
 import { Text } from './showing'
 
 // The terminal's `@acorn/plugin-api/ui/dashboards`. This host draws no dashboard views
