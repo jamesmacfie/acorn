@@ -65,6 +65,10 @@ also becomes a span named for the seam, such as `git.rev_parse`, with the histog
 every call. The Node sends one only inside an ambient trace and hangs it under the request, so a slow
 request names the Git command, process, or statement that held it.
 
+A seam can add facts that only its slow span carries, read when the call settles, such as
+`broker.request`'s `queue.ms` or a `ws.inbound` frame's `bytes`. They're never histogram labels,
+because a value that differs on every call would make a series per call.
+
 Each emitter admits at most 200 histogram series per flush window, across all names, owners, label
 sets, and units. Node durations are milliseconds, and client workload samples keep their own units.
 Samples share a series only when those dimensions and the typed label values match. Label order

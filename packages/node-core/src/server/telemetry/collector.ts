@@ -433,8 +433,18 @@ export function recordDuration(owner: string, seam: string, ms: number, attrs?: 
  * A caller with nothing better to say than `'core'` gets
  * the ambient owner, so `git.ts` and `sqlite.ts` name the plugin whose request they are serving
  * without either file learning anything about its callers (docs/telemetry/runtimes.md § Ambient attribution).
+ *
+ * `slowAttrs` are facts only a slow call's span carries, read once the call settles. They aren't
+ * histogram labels, so a per-call number such as a wait or a size can go there without minting a
+ * series per call.
  */
-export function measure<T>(owner: string, seam: string, run: () => T, attrs?: TelemetryAttrs): T {
+export function measure<T>(
+  owner: string,
+  seam: string,
+  run: () => T,
+  attrs?: TelemetryAttrs,
+  slowAttrs?: () => TelemetryAttrs,
+): T {
   if (!telemetryEnabled()) return run()
   const started = process.hrtime.bigint()
   const startedAt = Date.now()
@@ -450,16 +460,19 @@ export function measure<T>(owner: string, seam: string, run: () => T, attrs?: Te
     // because a sample with no parent explains nothing the histogram doesn't.
     if (ms < SLOW_SAMPLE_MS || !ambient || state.slowSamples >= SLOW_SAMPLES_MAX) return
     state.slowSamples += 1
-    emitSpan(resolved, {
-      traceId: ambient.traceId,
-      spanId: newSpanId(),
-      parentSpanId: ambient.spanId,
-      name: seam,
-      start: startedAt,
-      durationMs: ms,
-      status,
-      attrs: { ...attrs, slow: true },
-    })
+    // Wrapped, because `slowAttrs` is the caller's code and must not fail the call it describes.
+    safely(() =>
+      emitSpan(resolved, {
+        traceId: ambient.traceId,
+        spanId: newSpanId(),
+        parentSpanId: ambient.spanId,
+        name: seam,
+        start: startedAt,
+        durationMs: ms,
+        status,
+        attrs: { ...attrs, ...slowAttrs?.(), slow: true },
+      }),
+    )
   }
   let result: T
   try {

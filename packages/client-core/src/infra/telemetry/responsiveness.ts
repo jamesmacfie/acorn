@@ -1,3 +1,5 @@
+import type { QueryClient } from '@tanstack/solid-query'
+import type { TelemetryAttrs } from '@acorn/protocol/telemetry.ts'
 import {
   currentActivity,
   emitEvent,
@@ -20,13 +22,38 @@ const FRAME_SAMPLE_MS = 2_000
 const INPUT_EVENTS = ['pointerdown', 'pointermove', 'keydown', 'wheel', 'scroll'] as const
 
 const screenWorkListeners = new Set<() => void>()
+// The socket channels that delivered a frame since the last one-second tick, named on a `ui.stall`.
+const recentChannels = new Set<string>()
 
 /**
  * Something that can change the screen arrived without input, such as a socket frame while an agent
- * streams. Frame gaps are sampled for a short while after it.
+ * streams. Frame gaps are sampled for a short while after it. `channel` is the frame's channel
+ * prefix, or `binary` for terminal bytes.
  */
-export function noteScreenWork(): void {
+export function noteScreenWork(channel?: string): void {
+  if (channel) recentChannels.add(channel)
   for (const listener of screenWorkListeners) listener()
+}
+
+/** The active Node's query cache, as much of it as a stall report reads. */
+type ActiveCache = { client: QueryClient; persistence: { saving(): boolean } }
+
+/**
+ * What else was running when the window stalled, since most stalls come with no interaction open.
+ * Names and counts only, never a query key or frame content.
+ */
+function stallContext(activeCache: (() => ActiveCache) | undefined): TelemetryAttrs {
+  const context: TelemetryAttrs = { inbound: [...recentChannels].sort().join(',') }
+  try {
+    const cache = activeCache?.()
+    if (cache) {
+      context['cache.saving'] = cache.persistence.saving()
+      context['queries.fetching'] = cache.client.isFetching()
+    }
+  } catch {
+    // A diagnostic must not fail the page it describes.
+  }
+  return context
 }
 
 /**
@@ -36,7 +63,10 @@ export function noteScreenWork(): void {
  * wake an idle window at the display's refresh rate to measure nothing. The event-loop check stays on
  * its one-second timer, so a stall in an idle window is still reported.
  */
-export function startResponsivenessMonitor(send: (pulse: ResponsivenessPulse) => void): () => void {
+export function startResponsivenessMonitor(
+  send: (pulse: ResponsivenessPulse) => void,
+  activeCache?: () => ActiveCache,
+): () => void {
   let last = performance.now()
   let active = false
   let frame: number | null = null
@@ -94,8 +124,10 @@ export function startResponsivenessMonitor(send: (pulse: ResponsivenessPulse) =>
     // Very large gaps may be suspend/resume. The independent helper applies the same exclusion.
     if (active && isActive() && delay < 30_000) {
       recordDuration('core', 'ui.event_loop.delay', delay)
-      if (delay >= 250) emitEvent('core', 'ui.stall', { durationMs: delay, ...currentActivity() })
+      if (delay >= 250)
+        emitEvent('core', 'ui.stall', { durationMs: delay, ...currentActivity(), ...stallContext(activeCache) })
     }
+    recentChannels.clear()
     last = now
     pulse()
   }, 1000)

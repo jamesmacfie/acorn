@@ -441,6 +441,24 @@ it('summarizes repeated work per interaction without treating the frame monitor 
   expect(summary[0]).toMatchObject({ attrs: { traceId: span.traceId, operation: 'agents.snapshot.load', calls: 10 } })
 })
 
+it('puts the top three operations on the interaction span, where they can be grouped', async () => {
+  start()
+  setTelemetryEnabled(true)
+  const span = startInteraction('agents', { name: 'agents.session.open' })
+  const work = { 'agents.snapshot.load': 4, 'markdown.parse': 3, 'rows.reconcile': 2, 'pane.region.mount': 1 }
+  for (const [operation, calls] of Object.entries(work))
+    for (let i = 0; i < calls; i++) recordSample('agents', operation, 1)
+  span.end()
+  await flushTelemetry()
+  const ended = posted.flat().find((r) => r.kind === 'span' && r.spanId === span.spanId)
+  expect(ended?.attrs).toMatchObject({
+    'work.top1': 'agents.snapshot.load:4',
+    'work.top2': 'markdown.parse:3',
+    'work.top3': 'rows.reconcile:2',
+  })
+  expect(ended?.attrs).not.toHaveProperty('work.top4')
+})
+
 describe('rendered-surface checkpoints', () => {
   afterEach(() => _resetSurfaceHealth())
 

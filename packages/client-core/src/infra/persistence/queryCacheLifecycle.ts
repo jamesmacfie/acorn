@@ -14,6 +14,8 @@ export type QueryCacheLifecycle = {
   persister: Persister
   acquire(): QueryCacheLease
   flush(): Promise<void>
+  /** A save is under way: the capture, the serialization, or the write. */
+  saving(): boolean
   clearInactive(): Promise<void>
   retire(): Promise<void>
   retired(): boolean
@@ -135,6 +137,7 @@ export function queryCacheLifecycle(options: {
     persister,
     retired: () => retired,
     flush,
+    saving: () => capturing !== undefined,
     clearInactive: async () => {
       // Restore must finish before removal, and a capture must finish before deletion. Later
       // captures read only the remaining active queries and follow deletion on the same queue.

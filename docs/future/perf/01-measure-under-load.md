@@ -1,5 +1,72 @@
 # Phase 1: measure the window under load
 
+## Completion note
+
+Landed October 21, 2026, on branch `phase-1-measure-under-load`. The code and its tests are done. The
+replay numbers and the day of Sentry aren't taken, and need the owner at the machine.
+
+What landed:
+
+- The replay harness takes `--load [N]` on `replay` and `replay-ab`, in
+  `apps/desktop/scripts/agent/replay-load.mjs`. The report records `replay.load`, and each phase's
+  one-minute `loadAverage`. A busy process exits on its own if the harness dies.
+- The `agents` fixture streams `prose` into three sessions, with the flow in
+  `flows/streaming-replay-agents.json`. `waitTurn` takes `sessions`, and checks each digest.
+- The helper records a `broker.queue` histogram, the wait for a socket, with the same labels as
+  `broker.request`. A `broker.request` of 100 ms or more in a renderer trace is also a span, with
+  `route`, `queue.ms`, `pool.active`, and `pool.queued`.
+- A slow `ws.inbound.<prefix>` span carries `bytes`. The agents store times its event write as
+  `agents.frame.apply`.
+- An interaction span carries `work.top1` to `work.top3`, and the `ui.interaction.work` events stay.
+- `ui.stall` carries `inbound`, `cache.saving`, and `queries.fetching`.
+- The replay page, the helper's seam table, the telemetry model, renderer, runtimes, and diagnosis
+  pages, and [the dated baseline page](../../testing/window-under-load-2026-10-21.md).
+
+Decisions and deviations:
+
+1. `queue.ms` isn't a label on the `broker.request` histogram. A value that differs per request would
+   make a series per request. The p95 that phases 2 and 10 ask for is the `broker.queue` histogram.
+   The per-request numbers sit on the slow span. Both `measure` functions take an optional
+   `slowAttrs`, which only the slow span carries.
+2. The helper enters the trace named by the request's `traceparent` header, so its slow span hangs in
+   the renderer's trace beside the Node's `http.request`. Before this, the helper never sent a slow
+   span, because it had no ambient trace. The span carries `route`, the namespace from
+   `apiRouteNamespace`, because the Sentry exporter keeps an `api.request` only past one second, and
+   a per-route query can't lean on the parent. A request that never got a socket counts its whole
+   time as queue time.
+3. No `frames` attribute. Every dispatch applies exactly one frame until phase 7 queues them, so the
+   count would always be 1. The doc's test of a two-frame dispatch can't exist against this code. The
+   `wsClient` test checks `bytes` instead.
+4. `bytes` is the UTF-8 size of the frame encoded again as JSON, computed only for a slow dispatch, at
+   most 20 a flush. It isn't the wire size.
+5. `agents.frame.apply` uses the store's `agentTelemetry.measure`, the file's own convention, not the
+   kit's `measureWork`, which would file it under `core`. It isn't a child span of `ws.inbound.agent`,
+   because renderer spans hang under the interaction, not under an enclosing measure. Compare the two
+   histograms' sums.
+6. "In the last second" on `ui.stall` means since the previous one-second tick, which includes the
+   stall. The desktop entry hands the monitor the active cache, the way it hands `startPageFacts` the
+   client. The cache lifecycle gained `saving()`.
+7. The `agents` flow starts the first two sessions in the `open` stage, so the `streaming` phase
+   doesn't count opening them. `startSession` waits until the Stop button is disabled, because a
+   streaming session's composer stays on screen until the new one opens.
+
+Not done:
+
+- The replay runs. An agent-launched window is always hidden, and the replay refuses it. The `agents`
+  flow and `--load` pass their unit tests but haven't run against a real window, so the wait for a
+  new idle session is unverified. The baseline page has the commands and empty tables.
+- The day of Sentry with the new attributes.
+- The programme README still lists this phase. Trim it when the programme closes.
+
+For later phases:
+
+- Phase 2: read the queue from `broker.queue`. Add `timeout.kind` to the slow `broker.request` span
+  through `slowAttrs`, the way `queue.ms` goes.
+- Phase 7: add `frames` to the drain's `ws.inbound` span through `slowAttrs`. The gap between
+  `ws.inbound.agent` and `agents.frame.apply` sums is the cascade to remove.
+- The helper can send up to 20 `broker.request` spans every five seconds to Sentry. Watch the volume.
+- The Node service bundle is 1,930,648 bytes against a ceiling of 1,931,900.
+
 Date: October 21, 2026. Status: proposed. Comes first.
 
 The window is worst when the machine is busy, and nothing reproduces that on demand. This phase adds a

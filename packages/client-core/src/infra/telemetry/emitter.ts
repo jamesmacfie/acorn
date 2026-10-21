@@ -286,10 +286,15 @@ export function startInteraction(owner: string, input: SpanInput): SpanHandle {
     traceId: span.traceId,
     spanId: span.spanId,
     end: (status, attrs, at) => {
-      for (const [operation, calls] of takeInteractionWork(span.spanId)) {
+      const work = takeInteractionWork(span.spanId)
+      for (const [operation, calls] of work) {
         emitEvent(owner, 'ui.interaction.work', { traceId: span.traceId, spanId: span.spanId, operation, calls })
       }
-      span.end(status, attrs, at)
+      // The top three on the span too, where they can be grouped. Operation names are a closed list.
+      const top = Object.fromEntries(
+        work.slice(0, 3).map(([operation, calls], index) => [`work.top${index + 1}`, `${operation}:${calls}`]),
+      )
+      span.end(status, { ...attrs, ...top }, at)
       // Only if it is still ours. A second interaction that opened over this one owns the trace now,
       // and clearing it here would orphan every request the newer one is about to make.
       if (state.trace?.spanId === span.spanId) {
@@ -645,8 +650,18 @@ export function recordSample(owner: string, seam: string, ms: number, unit = '1'
   })
 }
 
-/** Time one call and hand back its own result untouched. Promise-aware, and timed to settlement. */
-export function measure<T>(owner: string, seam: string, run: () => T, attrs?: TelemetryAttrs): T {
+/**
+ * Time one call and hand back its own result untouched. Promise-aware, and timed to settlement.
+ * `slowAttrs` are facts only a slow call's span carries, read once the call settles, so a size can go
+ * there without minting a histogram series per call.
+ */
+export function measure<T>(
+  owner: string,
+  seam: string,
+  run: () => T,
+  attrs?: TelemetryAttrs,
+  slowAttrs?: () => TelemetryAttrs,
+): T {
   if (!telemetryEnabled()) return run()
   const from = performance.now()
   const started = Date.now()
@@ -659,16 +674,19 @@ export function measure<T>(owner: string, seam: string, run: () => T, attrs?: Te
     // Detailed exemplars are bounded; the histogram still counts every call, including fast ones.
     if (durationMs >= 100 && slowSamples < 20) {
       slowSamples++
-      emitSpan(owner, {
-        traceId: trace?.traceId ?? newTraceId(),
-        spanId: newSpanId(),
-        ...(trace ? { parentSpanId: trace.spanId } : {}),
-        name: seam,
-        start: started,
-        durationMs,
-        status,
-        attrs: { ...attrs, slow: true },
-      })
+      // Wrapped, because `slowAttrs` is the caller's code and must not fail the call it describes.
+      safely(() =>
+        emitSpan(owner, {
+          traceId: trace?.traceId ?? newTraceId(),
+          spanId: newSpanId(),
+          ...(trace ? { parentSpanId: trace.spanId } : {}),
+          name: seam,
+          start: started,
+          durationMs,
+          status,
+          attrs: { ...attrs, ...slowAttrs?.(), slow: true },
+        }),
+      )
     }
   }
   let result: T

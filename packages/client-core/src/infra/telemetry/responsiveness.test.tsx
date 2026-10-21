@@ -100,7 +100,7 @@ async function postedHistogram(posted: TelemetryRecord[][], name: string) {
   return total
 }
 
-function armedMonitor() {
+function armedMonitor(activeCache?: Parameters<typeof startResponsivenessMonitor>[1]) {
   vi.useFakeTimers({ toFake: ['setInterval', 'clearInterval', 'setTimeout', 'clearTimeout', 'performance', 'Date'] })
   vi.spyOn(document, 'visibilityState', 'get').mockReturnValue('visible')
   vi.spyOn(document, 'hasFocus').mockReturnValue(true)
@@ -108,9 +108,31 @@ function armedMonitor() {
   startClientTelemetry({ runtime: 'renderer', post: async (records) => void posted.push([...records]) })
   setTelemetryEnabled(true)
   const clock = frameClock()
-  dispose = startResponsivenessMonitor(() => {})
+  dispose = startResponsivenessMonitor(() => {}, activeCache)
   return { clock, posted }
 }
+
+it('names what else was running when the window stalled', async () => {
+  const { posted } = armedMonitor(() => ({
+    client: { isFetching: () => 2 } as never,
+    persistence: { saving: () => true },
+  }))
+  noteScreenWork('agent')
+  noteScreenWork('binary')
+  noteScreenWork('agent')
+  // The next one-second tick runs 400 ms late.
+  vi.spyOn(performance, 'now').mockReturnValue(performance.now() + 1_400)
+  vi.advanceTimersByTime(1_000)
+  await vi.advanceTimersByTimeAsync(0)
+  await flushTelemetry()
+  const stall = posted.flat().find((record) => record.kind === 'event' && record.name === 'ui.stall')
+  expect(stall?.attrs).toMatchObject({
+    durationMs: 400,
+    inbound: 'agent,binary',
+    'cache.saving': true,
+    'queries.fetching': 2,
+  })
+})
 
 it('stops requesting frames in an idle window and keeps checking the event loop', async () => {
   const { clock, posted } = armedMonitor()

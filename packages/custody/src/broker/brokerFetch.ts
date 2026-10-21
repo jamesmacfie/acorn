@@ -1,12 +1,16 @@
 import type { Agent as HttpAgent } from 'node:http'
 import type { Agent as HttpsAgent } from 'node:https'
 import type { NodeFetchRequest, NodeFetchResponse } from '@acorn/protocol/broker.ts'
-import { measure } from '@acorn/node-core/server/telemetry'
+import { apiRouteNamespace, parseTraceparent } from '@acorn/protocol/telemetry.ts'
+import { measure, recordDuration, runWithTelemetry } from '@acorn/node-core/server/telemetry'
 import { nodeRequest, NodeResponseTooLargeError } from './nodeRequest'
 
 const DEFAULT_TIMEOUT_MS = 30_000
 type Target = { node: { endpoint: string; token: string }; agent: HttpAgent | HttpsAgent }
 type Health = { result(response: NodeFetchResponse): void; failure(error: unknown): void }
+
+const countAll = (lists: NodeJS.ReadOnlyDict<readonly unknown[]>): number =>
+  Object.values(lists).reduce((sum, list) => sum + (list?.length ?? 0), 0)
 
 /** Request handles and deadlines, independent of WebSocket health and viewer identity. */
 export class BrokerFetch {
@@ -28,8 +32,15 @@ export class BrokerFetch {
       timedOut = true
       controller.abort()
     }, timeoutMs)
-    try {
-      const response = await measure(
+    const labels = { 'node.id': nodeId, method: request.method ?? 'GET' }
+    // Sockets in use and requests waiting, read before this request joins the pool.
+    const pool = { 'pool.active': countAll(target.agent.sockets), 'pool.queued': countAll(target.agent.requests) }
+    const started = performance.now()
+    let socketAt: number | undefined
+    // The wait for a socket, which a full pool makes long. A request that never got one waited throughout.
+    const queueMs = () => (socketAt ?? performance.now()) - started
+    const send = () =>
+      measure(
         'core',
         'broker.request',
         () =>
@@ -41,9 +52,18 @@ export class BrokerFetch {
             agent: target.agent,
             signal: controller.signal,
             maxResponseBytes: limits.maxResponseBytes ?? request.maxResponseBytes,
+            onSocket: () => (socketAt = performance.now()),
           }),
-        { 'node.id': nodeId, method: request.method ?? 'GET' },
+        labels,
+        () => ({ route: apiRouteNamespace(request.path), 'queue.ms': queueMs(), ...pool }),
       )
+    // Inside the renderer's trace, a slow request becomes a span beside the Node's own `http.request`,
+    // so the trace shows how much of the wait was the queue.
+    const parent = parseTraceparent(request.headers?.traceparent)
+    try {
+      const response = await (parent
+        ? runWithTelemetry({ traceId: parent.traceId, spanId: parent.parentSpanId, owner: 'core' }, send)
+        : send())
       health.result(response)
       return response
     } catch (error) {
@@ -56,6 +76,7 @@ export class BrokerFetch {
       health.failure(error)
       throw error
     } finally {
+      recordDuration('core', 'broker.queue', queueMs(), labels)
       clearTimeout(timeout)
       if (this.inFlight.get(request.requestId) === controller) this.inFlight.delete(request.requestId)
     }

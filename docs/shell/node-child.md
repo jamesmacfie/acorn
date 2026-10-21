@@ -71,7 +71,7 @@ other runtime ([telemetry](../telemetry.md)). The helper uses the Node's collect
 | Seam | Where | What it emits |
 | --- | --- | --- |
 | The boot account | `packages/custody/src/bootMarks.ts` | Span `helper.boot` with a `helper.boot.mark` child per mark |
-| Every request to a Node | `packages/custody/src/broker/nodeBroker.ts` | Histogram `broker.request` with the Node ID and the method |
+| Every request to a Node | `packages/custody/src/broker/brokerFetch.ts` | Histogram `broker.request` with the Node ID and the method, and histogram `broker.queue` with the same labels for its wait for a socket. A request of 100 ms or more in a renderer trace is also a `broker.request` span, with `route`, `queue.ms`, `pool.active`, and `pool.queued` |
 | The socket's health | The same file | Events `broker.reconnect`, `broker.degraded`, `broker.shed`, and `broker.missed-pong`, each with the Node ID |
 | A Node that died | `packages/custody/src/supervision/crashBudget.ts` | Event `node.crash` with the count in the window, and a fatal error when the budget is spent |
 | Memory, every 30 seconds on macOS | `packages/custody/src/telemetry.ts`, answered by the shell | Gauge `runtime.memory.footprint` in bytes, for the helper and, in its own batch, the renderer |

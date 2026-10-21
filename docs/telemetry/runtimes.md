@@ -63,7 +63,7 @@ nanoseconds, measured on September 11, 2026.
 | Every Git spawn | `server/core/git.ts` | Histogram `git.<subcommand>` |
 | Every SQL statement | `server/storage/sqlite.ts` | Histogram `sql.<verb>` |
 | Every process spawn | `server/core/proc.ts` | Histogram `proc.spawn` with the binary's base name. Events `proc.timeout` and `proc.truncated` |
-| Every measured call of 100 ms or more | `server/telemetry/collector.ts` `measure()` | A span named for the seam with `slow: true`, under the ambient trace, up to 20 per flush window ([hot seams](./model.md#hot-seams-are-metrics)) |
+| Every measured call of 100 ms or more | `server/telemetry/collector.ts` `measure()` | A span named for the seam with `slow: true` and any facts the seam adds for the span alone, under the ambient trace, up to 20 per flush window ([hot seams](./model.md#hot-seams-are-metrics)) |
 | Every wait of 10 ms or more for a repository | `server/core/checkoutAdmission.ts` | Span `checkout.admission.wait` under the waiting request, owner from the ambient store |
 | Every serve-then-revalidate decision | `server/sync/engine.ts` | Count `sync.fresh`, `sync.stale`, or `sync.cold` with the resource |
 | Every outbound WebSocket frame | `server/transport/wsHub.ts` | Histogram `ws.frame` with the channel prefix. Event `ws.shed` when a socket falls behind |

@@ -1,6 +1,6 @@
 import { execFile } from 'node:child_process'
 import { mkdtemp, rm } from 'node:fs/promises'
-import { tmpdir } from 'node:os'
+import { loadavg, tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { promisify } from 'node:util'
 
@@ -86,7 +86,7 @@ export async function createResourceSampler(client, shellPid) {
             wakeups: start && end ? end.wakeups - start.wakeups : null,
           }]
         }))
-        return { phase, elapsedMs, samples: samples.length, processes, telemetry }
+        return { phase, elapsedMs, samples: samples.length, loadAverage: loadavg()[0], processes, telemetry }
       }
     },
     close: async () => {

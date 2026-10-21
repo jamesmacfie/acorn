@@ -9,6 +9,8 @@ import type { NodeStatus, NodeTransportError } from '@acorn/protocol/broker.ts'
 import { activeToasts, dismissToast } from '../../features/notifications/toast'
 import { setActiveNode } from './activeNode'
 import { registerWsChannel } from './wsChannels'
+import type { TelemetryRecord } from '@acorn/protocol/telemetry.ts'
+import { flushTelemetry, setTelemetryEnabled, startClientTelemetry } from '../telemetry/emitter'
 
 // The renderer does not own a socket, so this fakes the broker rather than a WebSocket: the
 // thing under test is the subscription bookkeeping and the reconnect behaviour, not a transport.
@@ -256,6 +258,29 @@ describe('wsClient', () => {
     expect(bytes).toEqual([new Uint8Array([2])])
     binary.dispose()
     channel.dispose()
+  })
+
+  it('names the size of a frame whose dispatch was slow', async () => {
+    const posted: TelemetryRecord[] = []
+    startClientTelemetry({ runtime: 'tui', post: async (records) => void posted.push(...records) })
+    setTelemetryEnabled(true)
+    let now = 0
+    const clock = vi.spyOn(performance, 'now').mockImplementation(() => now)
+    const channel = registerWsChannel('probe', () => {
+      now += 150
+    })
+    try {
+      client.wsConnect()
+      bridge.emitFrame({ channel: 'probe:thing', text: 'é' })
+      await flushTelemetry()
+    } finally {
+      channel.dispose()
+      clock.mockRestore()
+      setTelemetryEnabled(false)
+    }
+    const span = posted.find((record) => record.kind === 'span' && record.name === 'ws.inbound.probe')
+    // Bytes, not characters: the accented letter takes two.
+    expect(span?.attrs).toMatchObject({ bytes: 37, slow: true })
   })
 
   it('delivers inactive-node plugin changes only to the fleet lifecycle subscriber', () => {

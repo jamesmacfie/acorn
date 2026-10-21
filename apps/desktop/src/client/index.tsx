@@ -30,7 +30,7 @@ const noop = () => null
 // somewhere to put its record (docs/telemetry/renderer.md § The emitter). Nothing here waits on it, and
 // it lives as long as the window does.
 void startClientRuntime({ runtime: 'renderer', app: 'desktop', client: () => clientFor(activeCacheId()).client })
-const stopResponsiveness = startResponsivenessMonitor(reportResponsiveness)
+const stopResponsiveness = startResponsivenessMonitor(reportResponsiveness, () => clientFor(activeCacheId()))
 window.addEventListener('pagehide', stopResponsiveness, { once: true })
 // Counts about the page every thirty seconds while collecting, read against the memory the shell
 // measures from outside (docs/shell/node-child.md § What the shell reports).

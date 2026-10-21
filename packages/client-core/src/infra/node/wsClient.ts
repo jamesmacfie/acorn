@@ -148,14 +148,12 @@ function connect(): void {
       for (const cb of fleetWorkspacesModeSubs) cb(nodeId, { mode })
     }
     if (nodeId !== activeNodeId()) return
-    // A frame is how a streaming reply or a busy terminal reaches the screen without any input.
-    noteScreenWork()
     dispatch(raw)
   })
   // Binary stream output has the same node filter. Its owner decodes the payload.
   transport.onBytes((nodeId, frame) => {
     if (nodeId !== activeNodeId()) return
-    noteScreenWork()
+    noteScreenWork('binary')
     binaryHandler?.(frame)
   })
   transport.onStatus((status) => {
@@ -182,18 +180,28 @@ function connect(): void {
 function dispatch(raw: unknown): void {
   if (!raw || typeof raw !== 'object' || typeof (raw as { channel?: unknown }).channel !== 'string') return
   const frame = raw as WsServerFrame
+  const prefix = frame.channel.split(':')[0]
+  // A frame is how a streaming reply or a busy terminal reaches the screen without any input.
+  noteScreenWork(prefix)
   // A histogram and never a span. Terminal output alone is hundreds of frames a second while an
   // agent is writing, so this is one record every five seconds however hot the socket is
   // (docs/telemetry/model.md § Hot seams are metrics). Keyed on the prefix, because `term:out` and
   // `plugin:machine-stats:sample` are different questions and one channel per session is not.
-  measure('core', `ws.inbound.${frame.channel.split(':')[0]}`, () => {
-    // The broker's gap detection strips `seq` before this point. Core reads `channel` and the owner
-    // narrows the rest.
-    if (frame.channel === 'term:status') {
-      const { pluginId } = frame as { pluginId?: unknown }
-      statusSubs.forEach((cb) => cb(typeof pluginId === 'string' ? pluginId : undefined))
-    } else routeWsFrame(frame)
-  })
+  measure(
+    'core',
+    `ws.inbound.${prefix}`,
+    () => {
+      // The broker's gap detection strips `seq` before this point. Core reads `channel` and the owner
+      // narrows the rest.
+      if (frame.channel === 'term:status') {
+        const { pluginId } = frame as { pluginId?: unknown }
+        statusSubs.forEach((cb) => cb(typeof pluginId === 'string' ? pluginId : undefined))
+      } else routeWsFrame(frame)
+    },
+    undefined,
+    // Encoded again only for a slow dispatch, which is at most twenty a flush.
+    () => ({ bytes: new TextEncoder().encode(JSON.stringify(frame)).byteLength }),
+  )
 }
 
 // Workflow notices for the bell, and step events and status changes for run views.

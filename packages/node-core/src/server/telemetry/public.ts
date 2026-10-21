@@ -9,6 +9,8 @@ export {
   newSpanId,
   newTraceId,
   onTelemetryBatch,
+  recordDuration,
+  runWithTelemetry,
   setTelemetryPref,
   startTelemetry,
   stopTelemetry,

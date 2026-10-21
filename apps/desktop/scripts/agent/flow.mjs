@@ -90,8 +90,9 @@ const ACTIONS = {
     if (value !== 'replay') fail(path, 'must be replay')
   },
   waitTurn: (value, path) => {
-    onlyKeys(value, ['timeoutMs'], path)
+    onlyKeys(value, ['timeoutMs', 'sessions'], path)
     needNumber(value.timeoutMs, `${path}.timeoutMs`, 1, MAX_TIMEOUT_MS)
+    if (value.sessions !== undefined) needNumber(value.sessions, `${path}.sessions`, 1, 10)
   },
   measure: (value, path) => {
     onlyKeys(value, ['phase', 'state'], path)
@@ -311,17 +312,21 @@ export async function runFlow(client, flow, { fixture = null, log = () => {}, re
         }
         if (!provider) throw new Error('The replay harness is not available in the Agent pane.')
         await client.click(provider)
+        // A session still streaming keeps its composer on screen until the new one opens, so wait until
+        // the Stop button beside the composer is disabled. Only the new session is idle.
+        const idleSessionShown = async () => (await client.snapshot({ role: 'textbox', name: 'Message agent' })).elements.length > 0
+          && (await client.snapshot({ role: 'button', name: 'Stop' })).elements[0]?.disabled === true
         const deadline = Date.now() + 30_000
-        while (!(await client.find({ role: 'textbox', name: 'Message agent' }))) {
+        while (!(await idleSessionShown())) {
           if (Date.now() > deadline) throw new Error('The replay session did not open its composer within 30 seconds.')
           await new Promise((resolve) => setTimeout(resolve, 200))
         }
         lastAction = Date.now()
       } else if (action === 'waitTurn') {
         if (!replay) throw new Error('A waitTurn step needs a replay fixture.')
-        const result = await replay.state.waitTurn(replay.name, replay.seed, value.timeoutMs)
-        stage.checkpoints.push({ name: 'turn-completed', atMs: Date.now() - started, ...result })
-        report.asserts.push({ stage: stage.name, surface: 'replay', invariant: 'digest', pass: true, detail: result })
+        const turns = await replay.state.waitTurns(replay.name, replay.seed, value.timeoutMs, value.sessions)
+        stage.checkpoints.push({ name: 'turn-completed', atMs: Date.now() - started, turns })
+        report.asserts.push({ stage: stage.name, surface: 'replay', invariant: 'digest', pass: true, detail: turns })
       } else if (action === 'measure') {
         if (!sampler) throw new Error('A measure step needs a resource sampler.')
         if (value.state === 'start') {

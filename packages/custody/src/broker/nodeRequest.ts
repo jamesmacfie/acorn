@@ -20,6 +20,8 @@ export type NodeRequestOptions = {
   signal: AbortSignal
   // Internal caller limit. A renderer cannot raise the transport ceiling.
   maxResponseBytes?: number
+  // Called when the agent hands the request a socket, which a full pool makes it wait for.
+  onSocket?: () => void
 }
 
 // Normal JSON, document, and diff reads fit below this. The broker currently returns a whole body
@@ -134,6 +136,7 @@ export function nodeRequest(options: NodeRequestOptions): Promise<NodeFetchRespo
       req.destroy(abortError())
     }
     signal.addEventListener('abort', onAbort, { once: true })
+    if (options.onSocket) req.once('socket', options.onSocket)
     req.on('close', () => signal.removeEventListener('abort', onAbort))
     req.on('error', reject)
     if (encoded) req.write(encoded.body)

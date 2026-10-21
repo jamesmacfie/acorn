@@ -497,11 +497,15 @@ function isAgentFrame(value: unknown): value is AgentWsFrame {
 
 function onFrame(value: unknown): void {
   if (!isAgentFrame(value)) return
+  // Timed inside the batch, so the reactive work Solid runs when the batch ends stays outside it.
+  // `ws.inbound.agent` minus this is what the frame's readers cost.
   if (value.channel === 'agent:event')
-    batch(() => {
-      appendEvent(value.event)
-      advanceSeq(value.event)
-    })
+    batch(() =>
+      agentTelemetry.measure('agents.frame.apply', () => {
+        appendEvent(value.event)
+        advanceSeq(value.event)
+      }),
+    )
   else if (value.channel === 'agent:session') {
     upsertSession(value.session)
     // The session row is published independently of its spawn projection. A fresh delegated row

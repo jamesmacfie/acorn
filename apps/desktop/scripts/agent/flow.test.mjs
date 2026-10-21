@@ -23,6 +23,13 @@ describe('parsing a flow', () => {
     expect(() => parseFlow(stage([{ measure: { phase: 'streaming', state: 'eval()' } }, assertion]))).toThrow(/state/)
   })
 
+  it('accepts the three-session replay flow, which waits for all three turns', async () => {
+    const flow = parseFlow(await readFile(join(import.meta.dirname, 'flows', 'streaming-replay-agents.json'), 'utf8'))
+    expect(flow.stages.map((stage) => stage.name)).toEqual(['open', 'streaming', 'settled', 'idle-focused', 'idle-blurred', 'hidden'])
+    expect(flow.stages[1].steps).toContainEqual({ waitTurn: { timeoutMs: 180000, sessions: 3 } })
+    expect(() => parseFlow(stage([{ waitTurn: { timeoutMs: 100, sessions: 0 } }]))).toThrow(/sessions/)
+  })
+
   it('accepts the session revisit flow', async () => {
     const flow = parseFlow(await readFile(join(import.meta.dirname, 'flows', 'session-revisit.json'), 'utf8'))
     expect(flow.stages.map((stage) => stage.name)).toEqual(['open', 'revisit'])

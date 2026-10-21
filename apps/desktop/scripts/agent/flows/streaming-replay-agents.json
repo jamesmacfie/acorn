@@ -1,0 +1,61 @@
+{
+  "name": "streaming-replay-agents",
+  "description": "Play the prose reply into three sessions at once, with the last one on screen, and measure streaming, settled, and focused idle work. The first two start streaming before the measured phase, so it doesn't count opening them.",
+  "stages": [
+    {
+      "name": "open",
+      "steps": [
+        { "click": { "target": { "role": "button", "name": "Streaming replay" } } },
+        { "click": { "target": { "role": "button", "name": "Agent" } } },
+        { "startSession": "replay" },
+        { "send": { "fixture": true } },
+        { "startSession": "replay" },
+        { "send": { "fixture": true } },
+        { "startSession": "replay" }
+      ]
+    },
+    {
+      "name": "streaming",
+      "steps": [
+        { "measure": { "phase": "streaming", "state": "start" } },
+        { "send": { "fixture": true } },
+        { "waitTurn": { "timeoutMs": 180000, "sessions": 3 } },
+        { "measure": { "phase": "streaming", "state": "stop" } }
+      ]
+    },
+    {
+      "name": "settled",
+      "steps": [
+        { "measure": { "phase": "settled", "state": "start" } },
+        { "pause": 3000 },
+        { "measure": { "phase": "settled", "state": "stop" } }
+      ]
+    },
+    {
+      "name": "idle-focused",
+      "steps": [
+        { "measure": { "phase": "idle-focused", "state": "start" } },
+        { "pause": 10000 },
+        { "measure": { "phase": "idle-focused", "state": "stop" } }
+      ]
+    },
+    {
+      "name": "idle-blurred",
+      "steps": [
+        { "windowState": "blurred" },
+        { "measure": { "phase": "idle-blurred", "state": "start" } },
+        { "pause": 10000 },
+        { "measure": { "phase": "idle-blurred", "state": "stop" } }
+      ]
+    },
+    {
+      "name": "hidden",
+      "steps": [
+        { "windowState": "hidden" },
+        { "measure": { "phase": "hidden", "state": "start" } },
+        { "pause": 10000 },
+        { "measure": { "phase": "hidden", "state": "stop" } }
+      ]
+    }
+  ]
+}

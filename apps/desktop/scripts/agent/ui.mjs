@@ -6,6 +6,16 @@ import { activeManifests, desktopRoot, readJson, refsPath, resolveManifest, writ
 import { nativeTarget, requireSessionApp } from './nativeApp.mjs'
 import { createReplayState } from './replay-state.mjs'
 import { createResourceSampler, setReplayWindowState } from './replay-resources.mjs'
+import { startLoad, takeLoadFlag } from './replay-load.mjs'
+
+// Each replay fixture: the generated reply it streams, and the flow in ./flows that plays it.
+const REPLAYS = {
+  prose: { reply: 'prose', flow: 'streaming-replay' },
+  code: { reply: 'code', flow: 'streaming-replay' },
+  tools: { reply: 'tools', flow: 'streaming-replay' },
+  agents: { reply: 'prose', flow: 'streaming-replay-agents' },
+}
+const REPLAY_NAMES = Object.keys(REPLAYS).join('|')
 
 function parseArgs(argv) {
   let session = null
@@ -29,27 +39,31 @@ async function refFor(manifest, ref) {
   return ref
 }
 
-async function replayReport(client, manifest, name) {
-  const flow = parseFlow(await readFile(join(import.meta.dirname, 'flows', 'streaming-replay.json'), 'utf8'))
+async function replayReport(client, manifest, name, load) {
+  const flow = parseFlow(await readFile(join(import.meta.dirname, 'flows', `${REPLAYS[name].flow}.json`), 'utf8'))
   const sampler = await createResourceSampler(client, manifest.appPid)
+  const described = { name, seed: manifest.fixture.seed, telemetry: manifest.fixture.telemetry ?? 'off', load }
   let state = null
   let originalSize = null
+  let busy = null
   try {
     state = createReplayState(manifest.dataDir)
     originalSize = await client.environment()
+    busy = startLoad(load)
     const report = await runFlow(client, flow, {
       fixture: manifest.fixture,
-      replay: { name, seed: manifest.fixture.seed, state },
+      replay: { name: REPLAYS[name].reply, seed: manifest.fixture.seed, state },
       sampler,
       windowState: (state) => setReplayWindowState(client, manifest.nativeApp.appPath, state),
       log: (line) => console.log(line),
     })
-    report.replay = { name, seed: manifest.fixture.seed, telemetry: manifest.fixture.telemetry ?? 'off' }
+    report.replay = described
     return report
   } catch (error) {
-    if (error.flowReport) error.flowReport.replay = { name, seed: manifest.fixture.seed, telemetry: manifest.fixture.telemetry ?? 'off' }
+    if (error.flowReport) error.flowReport.replay = described
     throw error
   } finally {
+    await busy?.stop()
     if (originalSize) {
       await setReplayWindowState(client, manifest.nativeApp.appPath, 'focused').catch(() => {})
       await client.setWindowSize(originalSize.width, originalSize.height).catch(() => {})
@@ -174,9 +188,10 @@ async function main() {
   }
   if (command === 'replay') {
     if (manifest.fixture?.name !== 'streaming-replay') throw new Error('Start the session with --fixture streaming-replay.')
-    if (args.length !== 1 || !['prose', 'code', 'tools'].includes(args[0])) throw new Error('Usage: replay prose|code|tools')
+    const { args: names, load } = takeLoadFlag(args)
+    if (names.length !== 1 || !Object.hasOwn(REPLAYS, names[0])) throw new Error(`Usage: replay ${REPLAY_NAMES} [--load [N]]`)
     try {
-      await saveReplayReport(manifest, await replayReport(client, manifest, args[0]))
+      await saveReplayReport(manifest, await replayReport(client, manifest, names[0], load))
     } catch (error) {
       if (error.flowReport) await saveReplayReport(manifest, error.flowReport)
       throw error
@@ -185,12 +200,13 @@ async function main() {
   }
   if (command === 'replay-ab') {
     if (manifest.fixture?.name !== 'streaming-replay') throw new Error('Start the session with --fixture streaming-replay.')
-    const flags = Object.fromEntries(args.reduce((pairs, value, index) => {
-      if (index % 2 === 0) pairs.push([value, args[index + 1]])
-      return pairs
+    const { args: pairs, load } = takeLoadFlag(args)
+    const flags = Object.fromEntries(pairs.reduce((entries, value, index) => {
+      if (index % 2 === 0) entries.push([value, pairs[index + 1]])
+      return entries
     }, []))
-    if (args.length !== 6 || !['prose', 'code', 'tools'].includes(flags['--fixture'])) {
-      throw new Error('Usage: replay-ab --base ABSOLUTE_DIR --candidate ABSOLUTE_DIR --fixture prose|code|tools')
+    if (pairs.length !== 6 || !Object.hasOwn(REPLAYS, flags['--fixture'] ?? '')) {
+      throw new Error(`Usage: replay-ab --base ABSOLUTE_DIR --candidate ABSOLUTE_DIR --fixture ${REPLAY_NAMES} [--load [N]]`)
     }
     const destination = join(desktopRoot, 'dist', 'client')
     const backup = join(manifest.directory, 'renderer-before-replay-ab')
@@ -200,7 +216,7 @@ async function main() {
       for (const [index, label] of ['base', 'candidate', 'candidate', 'base'].entries()) {
         await stageRenderer(flags[`--${label}`], destination)
         await client.refresh()
-        const report = await replayReport(client, manifest, flags['--fixture'])
+        const report = await replayReport(client, manifest, flags['--fixture'], load)
         report.build = label
         runs.push(report)
         await saveReplayReport(manifest, report, `-${label}-${index + 1}`)
