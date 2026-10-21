@@ -207,6 +207,7 @@ export const tasks = sqliteTable('tasks', {
   pullNumber: integer('pull_number'),
   status: text('status').notNull(), // 'active' | 'archived' | 'cancelled' (workflow child task)
   parentId: text('parent_id'), // task tree (docs/workflows.md): set on dispatched children; null = root
+  createdByTaskId: text('created_by_task_id'), // the task whose agent made this one; null = a person or the Node did
   sort: integer('sort').notNull().default(0), // rail ordering
   createdAt: integer('created_at').notNull(),
   updatedAt: integer('updated_at').notNull(),

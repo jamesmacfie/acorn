@@ -58,6 +58,10 @@ capability. The agents plugin resolves `gated` to supervised attendance and `aut
 attendance when it accepts a turn. Workflow continuations and plugin follow-ups inherit the saved
 value. Under autonomous attendance, a harness question or form is cancelled and a permission is
 rejected once, with a recorded reason and no attention row. The Node does not approve permissions.
+The runner also tells the agents plugin whether a run's agent steps may run with the harness's checks off
+(`allowUnguardedAgents`). A record trigger's run may only when its approval said so, and every other run
+may. The plugin refuses an autonomous step in a mode with no sandbox and no approval otherwise
+([triggers](./triggers.md#record-triggers)).
 A final message starting with `BLOCKED:` fails the agent step without another turn. Headless profiles have no managed
 session or request channel and keep their existing headless execution behavior.
 

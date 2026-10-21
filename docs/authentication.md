@@ -130,6 +130,11 @@ let a managed session read other sessions in its task's project
 ([cross-session reads](./managed-agents/cross-session-reads.md#who-can-read-what)). That doesn't widen
 the task token's session HTTP routes.
 
+A task token can create a task only in its own task's project, with the origin `agent`
+([task creation](./workspaces-and-tasks/task-creation.md)). The `acorn` CLI refuses `task create`
+under a task launch credential, so a command that creates a task in another project runs outside the
+session with a device token.
+
 HTTP root workflow starts need a device principal for repository, user, and database definitions, and
 refuse task and service tokens before parsing the body. A task token keeps its own workflow file
 listings, run reads, cancel, and kill. Trusted schedules and child workflows start through admission

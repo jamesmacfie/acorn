@@ -57,7 +57,22 @@ mounts checks resource scope from the principal before doing work. Database CLI 
 enforce supplied task IDs, and Memory resolves the caller's project before reading files.
 Device-only administration is gated on its own.
 
-There's no blanket task-token denial and no per-route opt-in metadata. A default-deny policy with
+A path the host calls itself answers only the host and devices. These are a loaded plugin's agent tool
+handlers, context section reads, CLI command routes, schedule runs, task check and cleanup routes, hook
+handler routes, harness probes, data source and discovery handlers, run list routes, node action routes,
+and everything under a code host's change request `api`. The host runs its own checks, such as the tool
+tiers and ceiling or the CLI command's device check, and then calls the handler in process. Over HTTP
+the handler would see the same principal and couldn't tell the two calls apart, so the Node answers
+`404 not_found` to an internal caller there: a task token, the service, or a workflow step. A device
+keeps them, because the owner's client and a plugin's own frames call some of them on purpose. Each
+registration that names one of these paths reserves it, and a reload or disable replaces the set
+(`reserveHostDispatchedPath`). The rule covers fetch handlers, which every loaded plugin uses. A
+compiled plugin's router routes are gated per route instead
+([the gates](./transport-and-auth.md#the-gates)). A path a source names in an
+answer, such as a row action's or a writable field's, isn't known ahead, so its handler checks the
+caller.
+
+Apart from those paths, there's no blanket task-token denial and no per-route opt-in metadata. A default-deny policy with
 opt-in metadata and trust-prompt disclosure is a design, not a control.
 
 Keep every broadcast a third party can hear content-free or scoped to the plugin itself.

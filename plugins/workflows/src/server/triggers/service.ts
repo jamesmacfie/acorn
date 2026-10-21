@@ -88,6 +88,8 @@ export class WorkflowTriggerService {
       stillApproved: (row, payload) => stillApproved(this.#resolver, row, configuredLoops(row), payload),
       moveToReview: review,
       settled: async (occurrence, run) => {
+        if (run.status === 'failed' && run.errorCause === 'unguarded-agent')
+          review(occurrence.triggerId, run.error ?? 'An agent step would run without asking.', 'unguarded-agent')
         if (settleClockRun(db, occurrence, run, review)) await this.enable(occurrence.triggerId)
       },
     })
@@ -167,14 +169,20 @@ export class WorkflowTriggerService {
     const inputs = input.inputs ?? {}
     const loops = input.loops ?? (row ? configuredLoops(row) : [])
     const resolved = await resolveTriggerGraph(this.#resolver, input, inputs, loops, await deferred(input.when, inputs))
-    if (input.when.kind === 'records')
-      await (await recordsKind()).reviewRecords(await this.#reader(), input, input.when, resolved.graph)
+    const source =
+      input.when.kind === 'records'
+        ? await (await recordsKind()).reviewRecords(await this.#reader(), input, input.when, resolved.graph)
+        : undefined
     const approved = row?.approvedGraphJson ? (JSON.parse(row.approvedGraphJson) as ResolvedWorkflowGraph) : null
     return {
       workflowName: resolved.graph.root.name,
       limits: effectiveTriggerLimits(resolved.graph, input.limits),
       loops: resolved.loops,
       changes: triggerChanges(approved, resolved.graph),
+      agentTasks:
+        input.when.kind === 'records' &&
+        (await (await recordsKind()).matchesAgentTasks(await this.#reader(), input.projectId, input.when)),
+      ...(source ? (await recordsKind()).recordAgents(source, resolved.graph) : {}),
     }
   }
 

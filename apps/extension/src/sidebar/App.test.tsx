@@ -22,7 +22,7 @@ function mount(
     refuseLateReads?: boolean
     local?: { nodeId: string; endpoint: string }
     // A Node that takes an ask. Without one, the ask fails and only the code works.
-    approval?: { allowed: boolean }
+    approval?: { allowed: boolean; busy?: boolean }
   } = {},
 ) {
   const fake = fakeBrowser()
@@ -64,9 +64,11 @@ function mount(
           : null,
       )
     if (request.op === 'node.ask')
-      return options.approval
-        ? reply({ phrase: 'maple river stone' })
-        : host.send({ v: 1, id: request.id, ok: false, error: { code: 'pairing_failed', message: 'no ask' } })
+      return options.approval?.busy
+        ? host.send({ v: 1, id: request.id, ok: false, error: { code: 'pairing_busy', message: 'busy' } })
+        : options.approval
+          ? reply({ phrase: 'maple river stone' })
+          : host.send({ v: 1, id: request.id, ok: false, error: { code: 'pairing_failed', message: 'no ask' } })
     if (request.op === 'node.collect') {
       if (!options.approval?.allowed) return reply(null)
       known.push('new')
@@ -261,6 +263,22 @@ describe('sidebar', () => {
     await settle()
     expect(sent(fake, 'node.collect').at(-1)).toMatchObject({ label: 'This computer' })
     expect(screenTitles(root)[0]).toBe('Connected to This computer')
+  })
+
+  it('offers Try again when another client asked at the same moment', async () => {
+    const approval = { allowed: false, busy: true }
+    const { root } = mount([], { local: { nodeId: 'new', endpoint: 'https://127.0.0.1:4317' }, approval })
+    await settle()
+    button(localCard(root), 'Connect')!.click()
+    await settle()
+    expect(screenTitles(root)).toEqual(['Enter the pairing code'])
+    expect(root.textContent).toContain('Another client asked at the same moment.')
+
+    approval.busy = false
+    button(root, 'Try again')!.click()
+    await settle()
+    expect(screenTitles(root)).toEqual(['Approve in Acorn'])
+    expect(root.textContent).not.toContain('Another client asked')
   })
 
   it('Use a pairing code instead pairs with a code while Acorn waits', async () => {

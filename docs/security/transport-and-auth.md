@@ -72,7 +72,9 @@ compiled plugins register with `ctx.routes.register`. A route passes when a core
 its handler, either as a mount or on the route itself, or when a named plugin ownership mount does.
 An ownership mount resolves the task behind a session, run, or attachment ID. Any other route needs an
 entry in the test's open list with its reason. Fetch handlers, which every loaded plugin uses, and
-`lazyRouter` mounts are opaque to the route table, so each checks its caller inside the handler.
+`lazyRouter` mounts are opaque to the route table, so each checks its caller inside the handler. The
+exception is a fetch handler path the host calls itself, which the Node closes to internal callers
+([plugin secrets and routes](./plugin-secrets-and-routes.md#routes-and-task-tokens)).
 
 ## Task scope
 
@@ -94,6 +96,13 @@ right. It resolves the owning task before any handler runs, and answers an unkno
 same 404 as a foreign one, so a caller can't learn which session ids exist. When no PTY engine is
 wired, it still answers the bridge's 503 rather than its own 404, because the client's degraded mode
 keys on the 503.
+
+A task token may create a task, because a record trigger on core's Tasks source can start a workflow
+for a new one. The route holds it to its own task's project, refuses `baseCommit`, `worktreePath`, and
+`skipSetup: true`, and stamps the origin `agent` whatever the body says
+([task creation](../workspaces-and-tasks/task-creation.md)). The `acorn` CLI in a task's terminal
+can't create a task. A command that needs another project's task runs outside the session, as a
+paired device.
 
 Some lists are filtered rather than gated: `GET /v1/core/tasks`, `GET /v1/core/task-statuses`,
 `GET /v1/core/runs`, and terminal's session roster. A task token has a reason to ask about its own task

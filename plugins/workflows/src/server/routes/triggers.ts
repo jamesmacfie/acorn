@@ -85,6 +85,7 @@ const draftBody = z
       .object({
         maxDescendants: z.number().int().min(1).max(500).optional(),
         maxConcurrency: z.number().int().min(1).max(4).optional(),
+        allowUnguardedAgents: z.boolean().optional(),
         budget: z
           .object({
             maxWallTimeMs: z.number().positive().finite().optional(),

@@ -16,6 +16,7 @@ vi.mock('../../infra/node/fleet', () => ({
     { nodeId: 'node-2', label: 'Build box', local: false },
   ],
 }))
+vi.mock('../../features/notifications/toast', () => ({ toast: vi.fn() }))
 vi.mock('../../infra/node/fleetActions', () => ({
   readPairingRequest: vi.fn(async (): Promise<{ request: unknown }> => ({
     request: {
@@ -28,6 +29,7 @@ vi.mock('../../infra/node/fleetActions', () => ({
   answerPairingRequest: vi.fn(async () => {}),
 }))
 
+const { toast } = await import('../../features/notifications/toast')
 const { answerPairingRequest, readPairingRequest } = await import('../../infra/node/fleetActions')
 const { default: PairingRequestDialog } = await import('./PairingRequestDialog')
 
@@ -38,8 +40,11 @@ afterEach(() => {
 })
 
 const dialog = () => document.querySelector<HTMLElement>('[role="alertdialog"]')
-const press = (text: string) =>
-  [...dialog()!.querySelectorAll<HTMLButtonElement>('button')].find((button) => button.textContent === text)!.click()
+const button = (text: string) =>
+  [...dialog()!.querySelectorAll<HTMLButtonElement>('button')].find((candidate) => candidate.textContent === text)!
+const press = (text: string) => button(text).click()
+// Allow waits a second after the dialog opens.
+const allowEnabled = () => vi.waitFor(() => expect(button('Allow').disabled).toBe(false), { timeout: 2_000 })
 
 it('shows the request a Node announces, and allows that request on that Node', async () => {
   vi.mocked(readPairingRequest).mockResolvedValueOnce({ request: null })
@@ -55,9 +60,42 @@ it('shows the request a Node announces, and allows that request on that Node', a
   expect(text).toContain('This computer')
   expect(text).toContain('maple river stone')
 
+  expect(button('Allow').disabled).toBe(true)
+  await allowEnabled()
   press('Allow')
   await vi.waitFor(() => expect(dialog()).toBeNull())
   expect(answerPairingRequest).toHaveBeenCalledWith('node-1', 'req-1', 'allow')
+})
+
+// Another ask landing while the owner reads cancels the request on the Node, so the read comes back
+// empty or with a request that started after.
+it.each([
+  ['nothing', null],
+  [
+    'a different request',
+    { id: 'req-2', deviceName: 'Chrome', phrase: 'oak ridge cloud', expiresAt: Date.now() + 60_000 },
+  ],
+])('closes the dialog and tells the owner when a frame brings %s', async (_name, next) => {
+  dispose = render(() => <PairingRequestDialog />, document.body.appendChild(document.createElement('div')))
+  await vi.waitFor(() => expect(dialog()).not.toBeNull())
+  await allowEnabled()
+
+  vi.mocked(readPairingRequest).mockResolvedValueOnce({ request: next })
+  ping('node-1')
+  await vi.waitFor(() => expect(dialog()).toBeNull())
+  expect(toast).toHaveBeenCalledWith('Another pairing request arrived, so this one was cancelled.')
+  expect(answerPairingRequest).not.toHaveBeenCalledWith('node-1', 'req-2', expect.anything())
+})
+
+it('leaves the dialog alone when a frame brings the request it already shows', async () => {
+  vi.mocked(toast).mockClear()
+  dispose = render(() => <PairingRequestDialog />, document.body.appendChild(document.createElement('div')))
+  await vi.waitFor(() => expect(dialog()).not.toBeNull())
+  const reads = vi.mocked(readPairingRequest).mock.calls.length
+  ping('node-1')
+  await vi.waitFor(() => expect(readPairingRequest).toHaveBeenCalledTimes(reads + 1))
+  expect(dialog()!.textContent).toContain('maple river stone')
+  expect(toast).not.toHaveBeenCalled()
 })
 
 // In tray mode the request opens the window, so it arrives before the dialog exists to hear the ping.

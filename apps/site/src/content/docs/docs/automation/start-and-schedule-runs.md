@@ -9,7 +9,7 @@ sources:
   - plugins/workflows/src/client/triggers/TriggerDialog.tsx
   - plugins/workflows/src/client/triggers/triggerModel.ts
   - plugins/git/src/client/launchWorkflow.ts
-checked: '2e987580a'
+checked: '5773c873c'
 ---
 
 A run always belongs to a task. This page covers each way to start one, and how to run a workflow on a
@@ -114,6 +114,11 @@ A trigger starts at most 10 runs a check, and the rest wait for the next one. Af
 it stops and shows **Needs review**. A trigger never starts a run for its own runs, or for the tasks it made for them.
 Its dialog lists the last 50 records it started, and says when the last check read only part of the
 results.
+
+Records can be written by other people, and your agent steps read them. If a step's agent would run
+commands with no sandbox and no approval, the run stops and the trigger shows **Needs review**. To let
+those steps run anyway, tick **Let agent steps run commands without asking** when you activate the
+trigger.
 
 ## In the terminal
 

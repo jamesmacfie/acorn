@@ -56,6 +56,13 @@ task branch. `baseBranch` names a local branch. `baseCommit` is a full SHA-1 or 
 in the target repository. The Node creates the branch from that commit before saving the task and
 removes it if the insert fails. Worktree creation stays lazy. A bad base returns 400.
 
+A task token can create a task only in the project of its own task, and the Node ignores the body's
+`origin`, stores `agent`, and records the caller's task in `created_by_task_id`. A task token that names
+another project, `baseCommit`, `worktreePath`, or `skipSetup: true` gets 403. A device's request is
+unchanged. A record trigger can start a workflow for a new task, so core's Tasks source serves
+`createdByTask` on a task an agent made and leaves it out of every other task
+([triggers](../workflows/triggers.md#record-triggers)).
+
 For `baseCommit`, first call `GET /v1/core/projects/:id/worktree-availability` with `branch` and
 `baseCommit`. The response includes opaque `targetIdentity`, even when the requested branch is
 unavailable. Keep it with the draft and submit it unchanged. The Node checks the checkout and Git

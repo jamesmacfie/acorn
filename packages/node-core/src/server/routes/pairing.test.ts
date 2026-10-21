@@ -116,3 +116,24 @@ it('pairs a client on this computer once the owner allows it, and refuses one fr
   // Spent: a second claim gets the same refusal as a wrong secret.
   expect((await open.request('/pair/requests/claim', post({ secret: ask.secret }), local)).status).toBe(401)
 })
+
+it('cancels both overlapping asks, and keeps asks from spending the ceiling for codes', async () => {
+  const { env, consume } = fixture()
+  const { open, core } = pairingRoutes()
+  const local = { ...env, incoming: { socket: { remoteAddress: '127.0.0.1' } } } as unknown as Env
+  const post = (body: unknown) => ({ method: 'POST', body: JSON.stringify(body) })
+  const ask = () => open.request('/pair/requests', post({ deviceName: 'acorn' }), local)
+
+  expect((await ask()).status).toBe(200)
+  const busy = await ask()
+  expect(busy.status).toBe(409)
+  expect(await busy.json()).toMatchObject({ error: { code: 'pairing_busy' } })
+  expect(((await (await core.request('/pair/requests', {}, local)).json()) as { request: unknown }).request).toBeNull()
+
+  // Asks three to six alternate between starting clean and cancelling, then the seventh is over the ceiling.
+  for (const status of [200, 409, 200, 409]) expect((await ask()).status).toBe(status)
+  expect((await ask()).status).toBe(429)
+  const code = await open.request('/pair', post({ code: 'ABC', deviceName: 'phone' }), env)
+  expect(code.status).toBe(200)
+  expect(consume).toHaveBeenCalledWith('ABC')
+})

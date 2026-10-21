@@ -129,7 +129,11 @@ export function useTriggerHarness() {
         harness.starts as unknown as WorkflowStartService,
         { tasks: harness.tasks, projects: {} } as unknown as Pick<CompiledCoreServices, 'tasks' | 'projects'>,
         Promise.resolve(),
-        { ...(scheduler ? { scheduler } : {}), records: async () => harness.reader },
+        {
+          ...(scheduler ? { scheduler } : {}),
+          records: async () => harness.reader,
+          describeSource: () => harness.reader.describe(),
+        },
       ),
     approved: async (firstCheck: WorkflowTriggerFirstCheck = 'process-current') => {
       const saved = harness.service.save({

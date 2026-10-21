@@ -1,4 +1,4 @@
-import type { AgentConfigOption } from '../../contract/wire.ts'
+import type { AgentConfigOption } from '../contract/wire.ts'
 
 /** Why the composer warns, as its warning mark's two tooltip lines. */
 export type UnguardedCommandsWarning = { tip: string; detail: string }
@@ -28,13 +28,19 @@ const UNGUARDED: Record<string, UnguardedCommandsWarning> = {
   'danger-full-access': CODEX_FULL_ACCESS,
 }
 
-/** The warning for a session whose current settings leave commands unguarded, or undefined. Reads
- *  only what the harness reported, so a harness that reports neither setting never warns. */
-export function unguardedCommandsWarning(options: readonly AgentConfigOption[]): UnguardedCommandsWarning | undefined {
+/** The setting that leaves a session's commands unguarded, with why it does, or undefined. Reads only
+ *  what the harness reported, so a harness that reports neither setting never matches. */
+export function unguardedSetting(
+  options: readonly AgentConfigOption[],
+): { value: string; warning: UnguardedCommandsWarning } | undefined {
   for (const option of options) {
     if (option.category !== 'mode' && option.category !== 'permission') continue
     const warning = option.currentValue ? UNGUARDED[option.currentValue] : undefined
-    if (warning) return warning
+    if (warning) return { value: option.currentValue!, warning }
   }
   return undefined
 }
+
+/** The warning for a session whose current settings leave commands unguarded, or undefined. */
+export const unguardedCommandsWarning = (options: readonly AgentConfigOption[]): UnguardedCommandsWarning | undefined =>
+  unguardedSetting(options)?.warning

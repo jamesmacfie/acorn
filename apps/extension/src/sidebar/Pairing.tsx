@@ -298,6 +298,8 @@ function Code(props: { client: BridgeClient; probe: NodeProbeResult; local: bool
   const [asked, setAsked] = createSignal(!props.local)
   const [phrase, setPhrase] = createSignal<string | null>(null)
   const [refused, setRefused] = createSignal(false)
+  // Another client asked at the same moment and the Node cancelled both.
+  const [overlapped, setOverlapped] = createSignal(false)
   const [usingCode, setUsingCode] = createSignal(false)
   const work = action()
 
@@ -318,16 +320,20 @@ function Code(props: { client: BridgeClient; probe: NodeProbeResult; local: bool
       if (!stopped) setRefused(true)
     }
   }
-  onMount(async () => {
-    if (!props.local) return
+  const ask = async () => {
+    setOverlapped(false)
     try {
       setPhrase((await props.client.call({ op: 'node.ask' })).phrase)
       void collect()
-    } catch {
-      // A Node that can't take an ask still takes a code.
+    } catch (error) {
+      // Any other failure is a Node that can't take an ask, which still takes a code.
+      if (error instanceof CallFailure && error.code === 'pairing_busy') setOverlapped(true)
     } finally {
       setAsked(true)
     }
+  }
+  onMount(() => {
+    if (props.local) void ask()
   })
 
   const pair = (event: SubmitEvent) => {
@@ -362,7 +368,25 @@ function Code(props: { client: BridgeClient; probe: NodeProbeResult; local: bool
 
   return (
     <Show when={asked()}>
-      <Show when={phrase()} fallback={<EmptyState title="Enter the pairing code" action={codeForm()} />}>
+      <Show
+        when={phrase()}
+        fallback={
+          <EmptyState
+            title="Enter the pairing code"
+            action={
+              <Stack>
+                <Show when={overlapped()}>
+                  <Alert>Another client asked at the same moment.</Alert>
+                  <Button variant="bare" onPress={() => void ask()}>
+                    Try again
+                  </Button>
+                </Show>
+                {codeForm()}
+              </Stack>
+            }
+          />
+        }
+      >
         {(words) => (
           <EmptyState
             title="Approve in Acorn"

@@ -1,7 +1,7 @@
 import { hostname } from 'node:os'
 import { createInterface } from 'node:readline/promises'
 import { setTimeout as sleep } from 'node:timers/promises'
-import { askToPair, collectPairing, probeNode, pairWithNode } from '../broker/nodePairing'
+import { askToPair, collectPairing, PairingBusyError, probeNode, pairWithNode } from '../broker/nodePairing'
 import type { FleetNode, FleetStore } from '../broker/fleetStore'
 import { fingerprintPhrase } from '@acorn/protocol/fingerprintWords.ts'
 import type { PairResult } from '@acorn/protocol/node.ts'
@@ -28,7 +28,13 @@ export async function pairInteractively(
   // The Node on this computer can ask a paired client to allow this one, so nobody has to copy a
   // code across (docs/api-reference/transport.md § Pairing by approval). The code prompt stays open
   // beside the wait, for a Node no paired client is watching.
-  const ask = node.local ? await askToPair(probe, deviceName).catch(() => null) : null
+  const ask = node.local
+    ? await askToPair(probe, deviceName).catch((error: unknown) => {
+        if (error instanceof PairingBusyError)
+          process.stderr.write(`\n  ${error.message} Run acorn again, or type a pairing code.\n`)
+        return null
+      })
+    : null
   if (ask)
     process.stderr.write(
       `\n  Allow this in Acorn on this computer. It shows: ${ask.phrase}\n  Or type a pairing code.\n`,

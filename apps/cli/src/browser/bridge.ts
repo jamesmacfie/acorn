@@ -1,6 +1,12 @@
 import { randomUUID } from 'node:crypto'
 import { NodeBroker, toNodeRecord, type FleetStore } from '@acorn/custody/broker'
-import { askToPair, collectPairing, pairWithNode, probeNode } from '@acorn/custody/broker/nodePairing.ts'
+import {
+  askToPair,
+  collectPairing,
+  PairingBusyError,
+  pairWithNode,
+  probeNode,
+} from '@acorn/custody/broker/nodePairing.ts'
 import { dataRootDir, runningNode } from '@acorn/custody/local'
 import type { NodeFetchBody, NodeFetchResponse, NodeStatus } from '@acorn/protocol/broker.ts'
 import type { ArchiveResult, DeleteResult } from '@acorn/protocol/task.ts'
@@ -748,7 +754,10 @@ export function createBridge(options: {
         if (!local || !pendingLocal)
           throw new BridgeFailure('no_probe', 'Find the Node on this computer before asking it to pair.')
         if (!local.compatible) throw new BridgeFailure('incompatible', 'That Node speaks a different protocol version.')
-        const asked = await ask(local, options.deviceName).catch(() => null)
+        const asked = await ask(local, options.deviceName).catch((error: unknown) => {
+          if (error instanceof PairingBusyError) throw new BridgeFailure('pairing_busy', error.message)
+          return null
+        })
         if (!asked)
           throw new BridgeFailure(
             'pairing_failed',

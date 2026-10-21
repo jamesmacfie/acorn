@@ -91,7 +91,8 @@ The shell's Rust dependency patch and remaining upstream advisories are in
 [Rust dependency security](./shell/packaging.md#rust-dependency-security). The dated review of October 1, 2026
 is [review-2026-10-01.md](./security/review-2026-10-01.md), and its follow-up on October 11, 2026 is
 [review-2026-10-11.md](./security/review-2026-10-11.md). The review of agent-built apps on October 19, 2026 is
-[review-2026-10-19.md](./security/review-2026-10-19.md).
+[review-2026-10-19.md](./security/review-2026-10-19.md). The review of the work since October 11, with the
+fixes for it, is [review-2026-10-21.md](./security/review-2026-10-21.md).
 
 ## What task scope does and doesn't protect against
 

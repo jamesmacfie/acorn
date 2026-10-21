@@ -52,7 +52,8 @@ Dispatch rechecks the published graph, repository trust, source metadata, connec
 destination scope before it creates the task, and again before it starts the run. A refusal only the
 owner can fix arrives as a `WorkflowAuthorityError` with a reason (see
 [refusals](./refusals.md#unattended-starts)). That moves the trigger to **Needs review** and blocks the
-occurrence. A trigger whose reason is `connection-required`, `input-required`, or `missing` shows as
+occurrence. A record trigger's run that stops on an agent step with checks off moves it there too, with
+the reason `unguarded-agent`. A trigger whose reason is `connection-required`, `input-required`, or `missing` shows as
 **Unavailable**, with a way to reconnect. Any other failure keeps the claimed occurrence for the
 scheduler to retry. A failed child is a workflow outcome and gets no automatic retry.
 
@@ -118,6 +119,30 @@ starting nothing, and the trigger becomes active when that commits.
 through the Workflow runs source, or the task it made for a run, through core's Tasks source. At the
 daily cap the trigger moves to **Needs review** with "Started 50 runs today. Review the trigger before
 it starts more.", after starting what fit in that check. Re-approval starts a new day's count.
+
+**Tasks an agent made.** An agent can create a task in its own project, and the Node stamps it with
+`createdByTask`. A person's task has no such field. A trigger on core's Tasks source that doesn't hold
+`createdByTask` to **is missing** could start a workflow on text an agent wrote, so the approval sheet
+warns "Agents can create tasks this trigger would match" until the query excludes them.
+
+**Agent steps.** A record's fields reach the workflow's agent steps as inputs, and the people who
+write those records may not be you. Under an autonomous posture, the agents plugin refuses a step whose
+session runs commands with no sandbox and no approval, such as Claude Code's `bypassPermissions` or
+Codex's `:danger-full-access` (`unguardedSetting` in `plugins/agents/src/shared/unguardedCommands.ts`).
+For a record trigger's run, the refusal fails the step with the reason `unguarded-agent`. The step's
+name and the mode are in the message, and the trigger moves to **Needs review**. Approving it with
+**Let agent steps run commands without asking** ticked (`allowUnguardedAgents` in the trigger's limits,
+frozen with the rest of the approval) lets those runs go ahead. Clock triggers and **Run now** have no
+outside records and are never refused. The approval sheet shows the box for a record trigger whose
+workflow has an agent step, with a line saying where the records come from when the source can say.
+
+Nothing in Acorn's own session defaults decides the mode of a step. A workflow session skips the
+owner's saved and last-used values, so the mode is the one the step asks for in `config_options`, and
+failing that the one the harness starts in: Claude Code's `permissions.defaultMode` in the account's
+settings, or Codex's active permission profile. The check reads the mode after the step's
+`config_options` are applied and before the first turn is queued. A child workflow's agent steps follow
+the root run's trigger, but the run that records `unguarded-agent` is the child's, so the trigger moves
+to **Needs review** only when the refused step is in the root workflow. The runs still fail either way.
 
 **Inputs.** Each record's inputs are the item rule from **Start workflow…**
 ([starting runs](./starting-runs.md#starting-a-run)) for the names the workflow declares, then the

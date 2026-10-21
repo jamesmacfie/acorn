@@ -64,6 +64,8 @@ async function fakeNode(nodeId: string, options: { protocolVersion?: number } = 
     revoked: false,
     // Whether the owner has allowed the pairing ask.
     allowed: false,
+    // Whether another ask is waiting, so the Node cancels both.
+    busy: false,
     projectsDelay: null as Promise<void> | null,
     // Accept the next turn, then drop the connection before answering.
     dropTurnReply: false,
@@ -175,6 +177,8 @@ async function fakeNode(nodeId: string, options: { protocolVersion?: number } = 
         device: { id: 'device-1', name: 'browser', createdAt: 1, lastSeenAt: null, revokedAt: null },
       })
     }
+    if (req.url === '/v1/pair/requests' && state.busy)
+      return reply(409, { error: { code: 'pairing_busy', message: 'Another client asked at the same moment.' } })
     if (req.url === '/v1/pair/requests')
       return reply(200, { secret: 'ask-secret', phrase: 'maple river stone', expiresInMs: 1 })
     if (req.url === '/v1/pair/requests/claim') {
@@ -686,6 +690,17 @@ describe('browser bridge local discovery', () => {
     expect(await call({ op: 'node.collect', label: 'This computer' })).toMatchObject({ nodeId, label: 'This computer' })
     await call({ op: 'node.select', nodeId })
     expect(await call({ op: 'projects.list', nodeId })).toMatchObject({ nodeId })
+  })
+
+  it('tells the sidebar to try again when another ask overlapped', async () => {
+    const node = await fakeNode(nodeId)
+    vi.stubEnv('ACORN_DATA_DIR', dataRoot({ nodeId, port: portOf(node.endpoint) }))
+    const { call } = bridge()
+    await call({ op: 'node.local' })
+    node.state.busy = true
+    await expect(call({ op: 'node.ask' })).rejects.toMatchObject({ code: 'pairing_busy' })
+    node.state.busy = false
+    expect(await call({ op: 'node.ask' })).toEqual({ phrase: 'maple river stone' })
   })
 
   it('asks only the Node on this computer, never one typed in', async () => {

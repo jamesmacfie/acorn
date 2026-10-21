@@ -35,6 +35,8 @@ export type WorkflowTriggerLimits = {
   maxDescendants: number
   maxConcurrency: number
   budget: WorkflowBudget & { maxWallTimeMs: number }
+  /** The owner chose to let this trigger's agent steps run commands without asking. Off when absent. */
+  allowUnguardedAgents?: boolean
 }
 
 export type WorkflowTriggerLoopSetting = {
@@ -59,6 +61,11 @@ export type WorkflowTriggerPreparation = {
   limits: WorkflowTriggerLimits
   loops: WorkflowTriggerLoop[]
   changes: Array<{ kind: 'workflow' | 'query' | 'field' | 'source'; label: string }>
+  /** The trigger reads core's Tasks source without excluding tasks an agent made. */
+  agentTasks: boolean
+  /** Set for a record trigger whose workflow has an agent step, which reads text strangers wrote.
+   *  `from` is where the records come from, such as "issues in acme/billing-api", when the source can say. */
+  recordAgents?: { from?: string }
 }
 
 /** A record trigger's last check: when it ran, how many runs it started, and whether it read every
@@ -139,5 +146,10 @@ export type WorkflowTriggerDraftInput = {
   when: WorkflowTriggerWhen
   cadence?: Cadence
   loops?: WorkflowTriggerLoopSetting[]
-  limits?: { maxDescendants?: number; maxConcurrency?: number; budget?: WorkflowBudget }
+  limits?: {
+    maxDescendants?: number
+    maxConcurrency?: number
+    budget?: WorkflowBudget
+    allowUnguardedAgents?: boolean
+  }
 }

@@ -252,6 +252,53 @@ describe('the active-task list route', () => {
     expect(rows).toContainEqual({ id: ordinaryId, skipSetup: false })
     expect((await create({ skipSetup: 'yes' })).status).toBe(400)
   })
+
+  describe('when an agent creates the task', () => {
+    const asTask = (taskId: string | undefined) =>
+      new Hono<AppEnv>()
+        .use('/api/*', async (c, next) => {
+          c.set('principal', { kind: 'internal', userId: 'james', scope: 'task', taskId })
+          await next()
+        })
+        .route('/api/tasks', tasks)
+    const create = (caller: Hono<AppEnv>, body: Record<string, unknown>) =>
+      caller.request('http://acorn.test/api/tasks', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ origin: 'manual', projectId: 'project-0', branch: 'feature', ...body }),
+      })
+
+    it('stamps its own origin and the task that made it, in the caller’s own project', async () => {
+      await seed(2, 1)
+      const response = await create(asTask('task-0-0'), { title: 'Follow up' })
+      expect(response.status).toBe(200)
+      const [row] = await t.db
+        .select()
+        .from(schema.tasks)
+        .where(eq(schema.tasks.id, ((await response.json()) as Task).id))
+      expect(row).toMatchObject({ origin: 'agent', createdByTaskId: 'task-0-0', projectId: 'project-0' })
+    })
+
+    it('refuses another project, a chosen start commit, skipped setup, and a caller with no task', async () => {
+      await seed(2, 1)
+      expect((await create(asTask('task-0-0'), { projectId: 'project-1' })).status).toBe(403)
+      expect((await create(asTask('task-0-0'), { baseCommit: 'abc123' })).status).toBe(403)
+      expect((await create(asTask('task-0-0'), { skipSetup: true })).status).toBe(403)
+      expect((await create(asTask(undefined), {})).status).toBe(403)
+      expect(await t.db.select().from(schema.tasks)).toHaveLength(2)
+    })
+
+    it('leaves a device’s request as it sent it', async () => {
+      await seed(2, 1)
+      const response = await create(app, { projectId: 'project-1', title: 'Mine', skipSetup: true })
+      expect(response.status).toBe(200)
+      const [row] = await t.db
+        .select()
+        .from(schema.tasks)
+        .where(eq(schema.tasks.id, ((await response.json()) as Task).id))
+      expect(row).toMatchObject({ origin: 'manual', createdByTaskId: null, projectId: 'project-1', skipSetup: true })
+    })
+  })
 })
 
 describe('creating a task on an existing worktree', () => {

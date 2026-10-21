@@ -8,7 +8,7 @@ sources:
   - packages/protocol/src/plugin/runtimeContributions.ts
   - examples/plugins/acme-agent/acorn-plugin.json
   - examples/plugins/acme-agent/node.js
-checked: '266ec702a'
+checked: 'cd6645657'
 ---
 
 import { Steps } from '@astrojs/starlight/components'
@@ -58,7 +58,8 @@ A tool needs no client bundle.
      text, so set `maxOutputBytes` for what your route can produce, not to protect the agent.
 
 2. **Answer it.** acorn posts `{ arguments, origin }` to the `handler` route. Read the task from the
-   request's credential, not from `origin`: the credential is signed, and `origin` is only a hint.
+   request's credential, not from `origin`: the credential is signed, and `origin` is only a hint. An
+   agent that posts to the route directly gets a 404, so your tool's tier always applies.
 
    <ExampleCode file="acme-agent/node.js" region="tools" />
 

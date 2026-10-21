@@ -49,7 +49,7 @@
     "@hono/node-server": ">=2.0.11",
     "dompurify": ">=3.4.12",
     "fast-uri": "4.1.5",
-    "hono": "4.13.7",
+    "hono": "4.13.11",
     "ip-address": "10.7.1",
     "katex": "^0.18.2",
     "proxy-addr": "^2.0.8",

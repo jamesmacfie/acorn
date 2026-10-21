@@ -99,6 +99,13 @@
       "when": 1792533416911,
       "tag": "0013_data_feed_events",
       "breakpoints": true
+    },
+    {
+      "idx": 14,
+      "version": "6",
+      "when": 1792578361752,
+      "tag": "0014_hard_wild_pack",
+      "breakpoints": true
     }
   ]
 }

@@ -82,8 +82,12 @@ throws `WorkflowAuthorityError` with one of these reasons:
 | `not-published` | The workflow or a saved query it uses has no published revision |
 | `missing` | The project, the task, a configured record loop, or a field a record trigger watches no longer exists. A record trigger's expired checkpoint, or a query that changed since its checkpoint, says this too |
 | `untrusted` | The project's repository configuration hasn't been reviewed and trusted |
+| `unguarded-agent` | A record trigger's agent step would run commands with no sandbox and no approval, and the trigger wasn't approved to allow that. It arrives from a failed run, not from the start |
 
-Any other failure is treated as passing, and the scheduler tries again.
+Any other failure is treated as passing, and the scheduler tries again. Every reason except
+`unguarded-agent` is thrown by the start service. That one is recorded on the failed run as its error
+cause, and the trigger moves to **Needs review** when the run settles
+([agent steps](./triggers.md#record-triggers)).
 
 A record trigger also stops and asks for review when it starts its daily number of runs, 50 by
 default: "Started 50 runs today. Review the trigger before it starts more." A record whose values

@@ -228,11 +228,12 @@ it('reloads an edited route module in a fresh isolated worker', async () => {
     mkdirSync(dirname(join(dir, path)), { recursive: true })
     writeFileSync(join(dir, path), contents)
   }
-  const greeting = async () => {
+  type Principal = { kind: 'device' | 'internal'; userId: string; scope?: 'task'; taskId?: string }
+  const greeting = async (path = '/greeting', principal: Principal = { kind: 'device', userId: 'owner' }) => {
     const { loaded, failures } = await loadExternalPlugins(dataRoot, { builtins: [] })
     expect(failures).toEqual([])
     const plugin = loaded[0]!.plugin
-    let handle: ((request: Request, context: { userId: string }) => Promise<Response>) | undefined
+    let handle: ((request: Request, context: { userId: string; principal: Principal }) => Promise<Response>) | undefined
     try {
       await plugin.init({
         log: { info: () => {} },
@@ -246,14 +247,19 @@ it('reloads an edited route module in a fresh isolated worker', async () => {
         events: {},
         core: { tasks: { load: async () => null } },
       } as never)
-      const response = await handle!(new Request('https://node.invalid/greeting'), { userId: 'owner' })
-      return (await response.json()) as { text: string }
+      const response = await handle!(new Request(`https://node.invalid${path}`), { userId: 'owner', principal })
+      const body = response.ok ? ((await response.json()) as { text: string }) : null
+      return { status: response.status, text: body?.text }
     } finally {
       await plugin.dispose?.()
     }
   }
   try {
     expect((await greeting()).text).toBe('Hello from the node')
+    // An agent's credential names one task, so the starter route won't load another one for it.
+    const agent: Principal = { kind: 'internal', userId: 'owner', scope: 'task', taskId: 'task-1' }
+    expect((await greeting('/greeting?taskId=task-2', agent)).status).toBe(404)
+    expect((await greeting('/greeting?taskId=task-1', agent)).text).toBe('Hello from the node')
     writeFileSync(
       join(dir, 'server/routes.js'),
       files['server/routes.js']!.replace('Hello from the node', 'Hello after reload'),

@@ -1,0 +1,1 @@
+ALTER TABLE `tasks` ADD `created_by_task_id` text;

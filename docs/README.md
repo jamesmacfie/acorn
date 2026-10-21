@@ -70,6 +70,7 @@ the whole plugin system in one page.
 | [security/plugin-storage-and-supply-chain.md](./security/plugin-storage-and-supply-chain.md) | Plugin SQLite policy, install integrity, and the boundary design rules. |
 | [security/review-2026-10-01.md](./security/review-2026-10-01.md) | Ten-area security review, completed remediation ledger, verification evidence, and remaining limits. |
 | [security/review-2026-10-19.md](./security/review-2026-10-19.md) | Review of agent-built apps: each way a program could reach beyond its plans and host tools, what stops it, and the one open finding. |
+| [security/review-2026-10-21.md](./security/review-2026-10-21.md) | Review of the work since October 11: loaded plugin paths the host dispatches, raced pairing asks, agent-created tasks, unguarded agent steps behind record triggers, and the audit. Each finding, its change, the checks, and what stays open. |
 | [security/review-2026-10-11.md](./security/review-2026-10-11.md) | Follow-up review: the TOML parser cap, release-build renderer origin, idempotency query strings, plugin route gates, and the dependency audit. |
 
 ## The renderer
@@ -488,16 +489,6 @@ Each plugin landing page above has topic pages in a folder of the same name:
   reads](./future/perf/06-checkout-admission-reads.md), [agent frames](./future/perf/07-agent-frames.md),
   [main-thread work](./future/perf/08-main-thread-work.md), [faster
   opens](./future/perf/09-faster-opens.md), and [acceptance](./future/perf/10-acceptance.md).
-
-## October 21 security findings proposal
-
-- [Close the October 21 security findings](./future/security/README.md), with phases for [the paths
-  the host dispatches](./future/security/01-plugin-handler-routes.md), [pairing by
-  approval](./future/security/02-pairing-approval.md), [agent-created
-  tasks](./future/security/03-agent-created-tasks.md), [unattended agent
-  steps](./future/security/04-unattended-agent-steps.md),
-  [dependencies](./future/security/05-dependencies.md), and [recording the
-  review](./future/security/06-record-the-review.md).
 
 ## OpenCode harness proposal
 

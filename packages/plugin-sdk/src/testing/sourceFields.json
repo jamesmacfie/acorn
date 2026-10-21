@@ -2885,6 +2885,9 @@
         "origin": {
           "type": "string"
         },
+        "createdByTask": {
+          "type": "string"
+        },
         "branch": {
           "type": [
             "string",
@@ -2992,6 +2995,19 @@
           "operators": [
             "eq",
             "ne"
+          ],
+          "sortable": false
+        }
+      },
+      {
+        "pointer": "/createdByTask",
+        "label": "Created by task",
+        "description": "The task whose agent made this one. Absent on a task a person made.",
+        "origin": "declared",
+        "query": {
+          "operators": [
+            "missing",
+            "present"
           ],
           "sortable": false
         }
