@@ -7,7 +7,7 @@ The replay under load and the week of Sentry aren't taken, and need the owner at
 
 What landed:
 
-- `lowerPriority(pid, 'agent' | 'background')` in `core/proc.ts` sets nice 5 or 10 with `os.setPriority`.
+- `lowerPriority(pid, 'agent' | 'background')` in `core/priority.ts` sets nice 5 or 10 with `os.setPriority`.
   A refusal is logged once, and a child that already exited is ignored. Plugins reach it through
   `@acorn/plugin-api/node`.
 - `spawnOwnedProcess` lowers every agent pipe child to 5, so ACP and Codex agents and their builds
