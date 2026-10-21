@@ -1,8 +1,9 @@
-import { createMemo, createSignal } from 'solid-js'
+import { createMemo, createSignal, onCleanup } from 'solid-js'
 import type { NodeRecord } from '@acorn/protocol/broker.ts'
 import { createFleetQuery, type FleetUnavailable } from '../../infra/node/fanout'
 import { attentionSources, compareAttention, type AttentionItem } from '../../host/registries/rail/attention'
 import { onScopeEvicted } from '../../host/registries/shell/scopeEviction'
+import { onAttentionStateChange } from './deliver'
 
 // The fleet-wide attention list, merged across every source and every node.
 //
@@ -61,12 +62,19 @@ export function createAttentionInbox(): () => AttentionInbox {
   // Read once, at creation: the registry is stable for the lifetime of an activation, and re-reading it
   // reactively would recreate every resource on any unrelated registration.
   const sources = attentionSources().map((source) => {
-    const [result] = createFleetQuery(
+    const [result, { refetch }] = createFleetQuery(
       () => ['attention', source.id] as const,
       (nodeId, _dep, signal) => source.fetch(nodeId, signal),
     )
-    return { source, result }
+    return { source, result, refetch }
   })
+  // Nothing else asks again once the first answer is in, so a request raised or answered later would
+  // not show until the inbox was remade.
+  onCleanup(
+    onAttentionStateChange(() => {
+      for (const { refetch } of sources) void refetch()
+    }),
+  )
 
   return createMemo<AttentionInbox>(() => {
     const rows: AttentionRow[] = []

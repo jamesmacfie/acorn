@@ -57,7 +57,7 @@ components and diff code into the closure.
 `apps/mobile/scripts/check-startup-budget.mjs` runs from `@acorn/mobile`'s `build`. It reads Vite's
 manifest in `apps/mobile/dist/.vite` and sums the entry's static closure, plus `src/client/start.tsx`,
 which `main.tsx` awaits before it draws. The ceilings are 507,000 B of scripts and 128,000 B of styles,
-about 5% above the 482,910 B and 121,692 B measured on October 21, 2026. It fails under 100,000 B of
+about 3% above the 492,518 B and 124,054 B measured on October 21, 2026, after the Needs you list. The draft form behind **New task** loads when the button is pressed. It fails under 100,000 B of
 scripts, on a chunk named in the renderer's denylist, and when the built-in plugins in
 `src/client/plugins.ts` load with the first screen.
 

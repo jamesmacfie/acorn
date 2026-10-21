@@ -178,6 +178,15 @@ Plugins are managed per Node. With more than one Node, the shell adds Fleet home
 aggregate Agent Center, attention, and search, Node-aware palette rows, and partial and offline
 states. [Client state and fleet behavior](./architecture/fleet.md) covers the rules.
 
+## Phone
+
+A phone's browser opens a [mobile web app](./mobile.md) through a gateway on the Node's computer. It
+lists what agents are waiting on in **Needs you** and answers a permission request or a question with
+a tap. It shows each task's conversation and sends a message, stops a turn, and starts a task with the
+same draft form the desktop uses. Every built-in pane except Preview draws, one at a time. These parts
+draw but aren't promised on a phone: typing in a terminal, because the keyboard can't send the control
+keys a shell needs; editing files, which nobody has checked at phone width; and the dashboard editor.
+
 ## Command-line client
 
 `acorn` with no arguments opens the terminal client. Headless commands use the same paired-Node

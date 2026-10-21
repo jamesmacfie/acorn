@@ -255,7 +255,14 @@ export type { ReferenceTargetContribution } from '@acorn/client-core/features/ag
 // the loopback listener a sign-in returns to. The folder dialog comes only as `pickNodeFolder`,
 // because every plugin folder so far is a Node's. Transport, fleet and plugin custody stay core's
 // business.
-export { canPickFolder, oauthCallback, pickFiles, previewViews, saveFile } from '@acorn/client-core/infra/platform'
+export {
+  canPickFolder,
+  formFactor,
+  oauthCallback,
+  pickFiles,
+  previewViews,
+  saveFile,
+} from '@acorn/client-core/infra/platform'
 // Native child webviews do not inherit DOM overflow clipping. Compiled surfaces that position one
 // use the host's shared visible box rather than duplicating the clipping walk.
 export { elementRectKey, visibleElementRect, observeNativePage } from '@acorn/client-core/infra/platform'

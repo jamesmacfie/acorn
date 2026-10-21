@@ -16,7 +16,9 @@ draws the same plugin panes the desktop draws, one at a time, with its own chrom
 | `apps/mobile/src/client/start.tsx` | The client runtime, the Node selection, and the first render |
 | `apps/mobile/src/client/roster.ts` | Registers the built-in plugins in `plugins.ts` after the first frame |
 | `apps/mobile/src/client/Shell.tsx` | Sign-in, the wait for the gateway, and the routes |
-| `apps/mobile/src/client/Home.tsx` | The task list |
+| `apps/mobile/src/client/Home.tsx` | **Needs you**, **New task**, and the task list |
+| `apps/mobile/src/client/NeedsYou.tsx` | The list of what agents are waiting on |
+| `apps/mobile/src/client/keyboardInset.ts` | Measures the on-screen keyboard |
 | `apps/mobile/src/client/TaskScreen.tsx` | One pane of a task, and the bar of its panes |
 
 ### The platform seam
@@ -44,9 +46,21 @@ The shell has three routes:
 
 | Route | What it shows |
 | --- | --- |
-| `/` | Tasks grouped by workspace. Each row has the task's state: the words of the desktop rail's markers for it. |
+| `/` | **Needs you**, then tasks grouped by workspace. Each task row has the task's state: the words of the desktop rail's markers for it. |
 | `/t/:taskId` | The first pane the task offers, once the built-in plugins have registered and the Node has said which of them it runs |
 | `/t/:taskId/:paneId` | That pane, under a bar with **Back**, the title, and the state, over a bar of the task's panes |
+
+**Needs you** is the desktop bell's inbox (`createAttentionInbox`), drawn as a list above the tasks. It
+hides while nothing waits, and the title reads "Tasks · 2 waiting". A row names the agent and what it
+asks, then the task and the session's state. A tap runs the source's own target handler, which selects
+the session and shows its pane in the task's layout, and then opens that pane. The phone reads the pane
+the handler showed from the layout, so a workflow gate opens Workflows the same way. The phone never
+persists that layout. The inbox is made after the built-in plugins register, because it reads the
+registered sources once.
+
+**New task** is in the top bar. It opens the desktop's `TaskDraftDialog` with every visible project, as a
+full-screen sheet ([dialogs](./ui-design/overlays.md#dialogs)), and opens the task it makes.
+The desktop offers the active workspace's projects, and the phone has no active workspace.
 
 The pane is the contribution's own component inside a `ContributionBoundary`, the way the terminal
 client draws one. The phone doesn't use `TaskPaneHost`, which draws a row of panes from the task's
@@ -118,6 +132,30 @@ paint. Client-core does the rest, and no plugin changes
 
 The phone's own bars are sized in `mobile.css`.
 
+### The keyboard
+
+A phone's browser keeps the page the same size when the on-screen keyboard opens and shrinks only the
+visual viewport. `trackKeyboardInset` measures the difference and keeps `--keyboard-inset` and
+`data-keyboard` on `<html>`. The shell's height subtracts the inset, a dialog sheet ends above it, and
+the bar of panes is hidden while it's up, so the pane gets every line. A pane reads no window and is
+only given less room. To check it in Playwright, replace `window.visualViewport` with an event target in
+an init script, set its `height`, and dispatch `resize`.
+
+## The conversation
+
+The Agents pane is the shared one, and the phone adds no code to it. These parts were checked at 390
+pixels:
+
+- Each permission button takes a whole row. A lone single-choice question draws a button for each
+  option, and the tap on one is the answer, with no dropdown to open and no **Submit answers** to find.
+  A question that takes several answers, or a typed one, draws as on the desktop. `AgentRequestCard`
+  reads `formFactor()` from `@acorn/plugin-api/client` for both
+  ([request cards](./managed-agents/transcript.md#request-cards)).
+- **Stop** is in the pane's header while a turn runs.
+- A long tool call is folded, and the transcript scrolls without moving the composer.
+- **Attach** opens the page's own file chooser, because the phone has no `files` group.
+- With the keyboard up, the composer and **Send** stay in view.
+
 ## Narrow layouts
 
 Each host layout draws a phone projection from the same component it draws the desktop with, choosing
@@ -135,6 +173,9 @@ by `formFactor()` once per mount ([pane layouts](./panes/layout.md#named-layouts
 
 ## Limits
 
+- Typing in a terminal, editing files, and the dashboard editor draw but aren't promised on a phone
+  ([features](./features.md#phone)). The app has no help screen to say so.
+- With the keyboard up the composer is tall and the transcript nearly disappears.
 - Loaded plugins don't run, because the browser has no plugin custody.
 - Telemetry stays off, because nothing on the phone switches it on.
 - The phone tells the plugin distribution it's the desktop app, because it draws the desktop's DOM

@@ -5,8 +5,9 @@
 .mobile-shell {
   display: flex;
   flex-direction: column;
-  /* The visible height, which changes as a phone's browser shows and hides its own toolbars. */
-  height: 100dvh;
+  /* The visible height, which changes as a phone's browser shows and hides its own toolbars. The
+     keyboard's inset comes from keyboardInset.ts: the browser doesn't shrink the page for it. */
+  height: calc(100dvh - var(--keyboard-inset, 0px));
   background: var(--bg);
 }
 
@@ -69,6 +70,11 @@
   width: auto;
   min-width: var(--tabrail-w);
   padding: 0 var(--space-3);
+}
+
+/* With the keyboard up the pane needs every line, and the bar's panes are out of reach under it. */
+:root[data-keyboard] .mobile-panes {
+  display: none;
 }
 
 .mobile-sign-in {

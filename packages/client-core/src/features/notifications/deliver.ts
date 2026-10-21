@@ -73,12 +73,24 @@ const EVENT_OF: Record<Edge['kind'], keyof NotificationSettings['events']> = {
 // drawer, a managed one opens the Agent pane; each plugin registers its own handler.
 const targetFor = (edge: Edge): Notice['target'] => latest.get(snapshotKey(edge))?.target
 
+const stateChangeListeners = new Set<() => void>()
+
+/** Runs when a session's state differs from the last one seen, or a session is new: the moments the
+ *  attention inbox's rows can have changed. The inbox fetches its rows, so this is what tells it to ask
+ *  again. */
+export function onAttentionStateChange(listener: () => void): () => void {
+  stateChangeListeners.add(listener)
+  return () => void stateChangeListeners.delete(listener)
+}
+
 /** Fold a fresh set of snapshots in, raise whatever edges they make, and keep the map the hold
  *  re-checks against. One call per adapter, per refresh. */
 export function observeAttention(next: Snapshot[], context: DeliveryContext = defaultDeliveryContext): void {
   const edges = edgesBetween(latest, next)
+  const moved = next.some((snapshot) => latest.get(snapshotKey(snapshot))?.state !== snapshot.state)
   for (const snapshot of next) latest.set(snapshotKey(snapshot), snapshot)
   for (const edge of edges) deliver(edge, context)
+  if (moved) for (const listener of stateChangeListeners) listener()
 }
 
 /** Replace one producer's roster, including sessions that disappeared since its last read. */

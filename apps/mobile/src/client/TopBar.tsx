@@ -7,8 +7,8 @@ import { Text } from '@acorn/client-core/kit/components/content'
 import { IconButton } from '@acorn/client-core/kit/components/inputs'
 
 /** The bar at the top of every screen: Back when there is somewhere to go back to, the screen's title
- *  and a line under it, and the Node's state whenever it isn't online. */
-export function TopBar(props: { title: string; detail?: JSX.Element; back?: boolean }) {
+ *  a line under it, the Node's state whenever it isn't online, and the screen's one action. */
+export function TopBar(props: { title: string; detail?: JSX.Element; back?: boolean; action?: JSX.Element }) {
   const navigate = useNavigate()
   const nodeId = () => activeNodeId() ?? ''
   return (
@@ -25,6 +25,7 @@ export function TopBar(props: { title: string; detail?: JSX.Element; back?: bool
       <Show when={nodeState(nodeId()) !== 'online'}>
         <NodeChip nodeId={nodeId()} />
       </Show>
+      {props.action}
     </header>
   )
 }

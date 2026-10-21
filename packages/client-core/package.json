@@ -71,6 +71,7 @@
     "./features/tabs/taskLaunch.ts": "./src/features/tabs/taskLaunch.ts",
     "./features/tabs/taskDraftStore.ts": "./src/features/tabs/taskDraftStore.ts",
     "./features/tabs/RailTab.tsx": "./src/features/tabs/RailTab.tsx",
+    "./features/tabs/TaskDraftDialog.tsx": "./src/features/tabs/TaskDraftDialog.tsx",
     "./features/tabs/TabRail.tsx": "./src/features/tabs/TabRail.tsx",
     "./features/tasks": "./src/features/tasks/public.ts",
     "./features/tasks/TaskPaneHost.tsx": "./src/features/tasks/TaskPaneHost.tsx",

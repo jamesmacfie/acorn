@@ -19,6 +19,7 @@ import { prefsOptions, projectsKey, tasksKey, type Project, type Task } from '@a
 import { Button, EmptyState } from '@acorn/client-core/kit/components/primitives.tsx'
 import { signedOut } from './platform'
 import { Home } from './Home'
+import { trackKeyboardInset } from './keyboardInset'
 import { SignIn } from './SignIn'
 import { TaskScreen } from './TaskScreen'
 
@@ -68,6 +69,7 @@ export function Shell() {
 // What every screen needs from the query client: the lookups client-core asks the host for, and the
 // person's theme and style from their preferences.
 function Frame(props: ParentProps) {
+  trackKeyboardInset()
   const client = useQueryClient()
   setTaskLookup((taskId) => client.getQueryData<Task[]>(tasksKey)?.find((task) => task.id === taskId))
   setProjectsLookup(() => client.getQueryData<Project[]>(projectsKey) ?? [])

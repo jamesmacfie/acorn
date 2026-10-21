@@ -176,5 +176,19 @@
   padding: env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left);
 }
 
+/* A dialog is a sheet over the whole screen too, down to the keyboard when one is up (--keyboard-inset,
+   which the phone's shell keeps). An alertdialog stays a box: its question is short. */
+:root[data-form-factor='narrow'] .overlay[role='dialog'] {
+  position: fixed;
+  inset: 0 0 var(--keyboard-inset, 0px);
+  width: auto;
+  max-height: none;
+  border: 0;
+  border-radius: var(--radius-0);
+  padding: env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left);
+}
+/* The actions sit at the foot of the sheet, not under a short form. */
+:root[data-form-factor='narrow'] .overlay[role='dialog'] .overlay-body { flex: 1; }
+
 /* The palette's hints line (PaletteSurface footer). */
 .palette-foot { padding: var(--space-3) var(--space-6); font-size: var(--fs-2xs); border-top: var(--chrome-divider); }
