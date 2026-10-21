@@ -13,11 +13,13 @@ export const alerts = defineEventFeed({
     load: field.number({ label: 'Load' }),
   },
   // #region starter
-  // The trigger dialog offers this first. The person still picks the workflow and its inputs.
+  // The trigger dialog offers this first. The person still picks the workflow and its inputs. Each
+  // alert is a new record, so "is new" starts one run per alert. The Host load source in hosts.ts is
+  // the one for "a host's load goes above 4".
   starterTriggers: [
     {
-      id: 'high-load',
-      label: 'A host’s load goes above 4',
+      id: 'high-load-alert',
+      label: 'A high-load alert arrives',
       description: 'Starts a run for each load alert above 4.',
       predicate: {
         kind: 'comparison',

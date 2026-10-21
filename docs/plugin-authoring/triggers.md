@@ -59,6 +59,10 @@ turns a threshold into a trigger: "load above 4" starts a run when a host crosse
 when it drops below and climbs back. Only a complete read can say a record stopped matching, so a
 read cut short never lets a record start matching again.
 
+`examples/plugins/acme-alerts` has one, **Host load**, which it builds from its own alert feed on each
+read: one record per host, holding its newest alert's load. Its suggestion is **A host's load goes
+above 4** with **Starts matching**.
+
 ## You hear about things that happen
 
 Declare an event feed and call `append`. Acorn stores the events and serves them as a source, so a
@@ -79,6 +83,11 @@ export const alerts = defineEventFeed({
 await alerts.append(ctx, [{ id: 'web-1:1729400000', time: Date.now(), data: { host: 'web-1', load: 6.2 } }])
 ```
 
+Every event is a record of its own, so a feed's suggestion pairs with **Is new**, such as **A
+high-load alert arrives**. **Starts matching** on a feed starts a run for every matching event too,
+because no event ever stops matching. A threshold that fires once until it clears needs a source of
+current state, like the one in the section above.
+
 `alerts.manifest` is the `contributions.dataSources` entry, and an event's `data` type follows from
 the fields. A feed with no other job can also declare a [CLI command](./cli-commands.md) that appends,
 so a script, a git hook, or a CI job on the same machine can fire a trigger:
@@ -89,7 +98,8 @@ jq -n --arg nodeId "$NODE_ID" '{nodeId: $nodeId, host: "web-1", load: 6.2}' |
 ```
 
 `npm create acorn-plugin <name> -- --trigger` writes this shape: a feed, a `raise` command, one
-suggested trigger, and a test. `examples/plugins/acme-alerts` is the same shape, finished.
+suggested trigger, and a test. `examples/plugins/acme-alerts` is the same shape, finished, with a
+**Host load** source beside the feed.
 
 ## Test your triggers
 
@@ -104,12 +114,13 @@ test and the Node agree.
   as the source would.
 
 ```ts
-const result = testTrigger(alerts.description, { on: 'enters' }, [
-  [alert('web-1', 6.2)],
-  [alert('web-1', 6.4)],
-  [],
-  [alert('web-1', 5.1)],
-])
+const [highLoad] = hostsDescription.starterTriggers!
+const result = testTrigger(
+  hostsDescription,
+  highLoad.change,
+  [[host('web-1', 6.2)], [host('web-1', 6.4)], [host('web-1', 2.1)], [host('web-1', 5.1)]],
+  { predicate: highLoad.predicate },
+)
 expect(result.map((read) => read.starts.length)).toEqual([1, 0, 0, 1])
 ```
 

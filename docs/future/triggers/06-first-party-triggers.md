@@ -7,7 +7,8 @@ phase 5.
 
 Built October 21, 2026. Every shipped source the phase names suggests its triggers, GitLab and
 Bitbucket call `changed()`, and the walks are recorded in
-[the October 21 walk](../../testing/triggers-2026-10-21.md). None of the four real-account walks ran.
+[the October 21 walk](../../testing/triggers-2026-10-21.md). The threshold walk passes through
+`acme-alerts`. None of the four real-account walks ran.
 
 ### What landed
 
@@ -28,6 +29,12 @@ Bitbucket call `changed()`, and the walks are recorded in
   `changed('pull-requests')` beside `pulls-changed` and `pr-synced`, as `githubEmitter` does, with a
   test each.
 - **Run titles.** Each Workflow runs record carries the workflow's name as its display title.
+- **Two shapes in `acme-alerts`.** Beside the **Load alerts** feed, the example serves **Host load**,
+  one record per host with its newest alert's load, which `src/hosts.ts` builds from the feed on each
+  read through `ctx.dataSources.invoke`. It suggests **A host's load goes above 4** with **Starts
+  matching**. The feed's suggestion is **A high-load alert arrives**, with **Is new**. The raise route
+  calls `changed('hosts')`, so a host trigger checks within a second. Plugin triggers' `testTrigger`
+  example runs over **Host load**, because a feed can't reuse a host's ID across reads.
 - **Revisions.** GitHub pull requests go to 7, Linear issues to 3, and Rollbar error groups to 2.
   Rollbar's pages read the description's revision instead of a literal.
 - **Docs.** Say when records changed and plugin triggers name Linear and Rollbar as sources with
@@ -52,6 +59,14 @@ Bitbucket call `changed()`, and the walks are recorded in
   because run records had no title. That's a field a useful trigger needs, so it's fixed here.
 - **The 5-minute default was already there.** The dialog sets every suggestion to check every 5
   minutes, so nothing changed for Linear and Rollbar.
+- **Host load is hand-written, not derived.** `defineDerivedSource` gives its fields no query
+  operators, so the Node would drop a "load above 4" suggestion on it. A hand-written source that
+  reads the feed and applies `gt`, `gte`, `lt`, and `lte` itself is about 130 lines. Letting a
+  derived source declare operators would be an SDK change of its own.
+- **Host records need a title too.** The first host walk started runs whose `issue` input was empty,
+  the same gap the run records had. Neither source set a display title. The Node could fill one from
+  a registration's `titlePointer` for every source, which would close the gap for third-party
+  sources as well. That's broader than this phase, so each source sets its own.
 - **The phase files stay.** The phase asks to remove them, but this note has to land in this file.
   Removing the folder, moving the future index row to **Completed plans removed**, and fixing the
   links into the folder are the last step after the phases merge.
@@ -64,9 +79,8 @@ The row for **Completed plans removed**: owners are [triggers](../../workflows/t
 `wake`. Still open:
 
 - The four real-account walks, each needing a change on a real service.
-- The threshold walk fails its second step by design: `acme-alerts` is an event feed, so every raise
-  above 4 is a new record and starts a run. "Starts once until the load drops" needs a source with one
-  record per host. Either add that shape to the examples or reword the walk.
+- A source that omits `display.title` leaves a trigger's `issue` input empty. The Node could fill the
+  title from `titlePointer`.
 - **A session needs you** wasn't walked. It needs a live agent session asking for attention.
 - `docs/workflows/triggers.md` and `docs/plugin-authoring/triggers.md` hold the trigger behavior, so
   nothing needed moving out of the phase files.

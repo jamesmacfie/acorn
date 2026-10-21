@@ -2,14 +2,20 @@
 
 An acorn plugin whose only job is to notice things. It declares an event feed, **Load alerts**, and a
 command that appends to it, so a script, a git hook, or a CI job on the same machine can fire a
-trigger. Its source suggests one trigger: **A host’s load goes above 4**.
+trigger. Beside the feed it serves **Host load**, one record per host with its newest alert's load.
+
+The two sources suggest different triggers. The feed suggests **A high-load alert arrives**, which
+starts a run for every alert above 4. **Host load** suggests **A host’s load goes above 4**, which
+starts a run when a host crosses 4, stays quiet while it's high, and starts again after it drops and
+climbs back.
 
 ```text
-acorn-plugin.json      the manifest: the feed, the raise command, and the suggested trigger
+acorn-plugin.json      the manifest: both sources, their suggested triggers, and the raise command
 src/feed.ts            the feed's fields and its suggested trigger
-src/index.ts           the node half: the raise command's route appends to the feed
-src/feed.test.ts       testTrigger over three reads, and checkStarterTriggers
-scripts/manifest.mjs   rewrites the manifest's feed entry from src/feed.ts on each build
+src/hosts.ts           the Host load source: each host's newest alert, read from the feed
+src/index.ts           the node half: the raise route appends to the feed, the hosts route reads it
+src/feed.test.ts       testTrigger over both sources, checkStarterTriggers, and the hosts read
+scripts/manifest.mjs   rewrites the manifest's source entries from the build
 ```
 
 ## Build and test

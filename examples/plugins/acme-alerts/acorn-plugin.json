@@ -64,8 +64,8 @@
           ],
           "starterTriggers": [
             {
-              "id": "high-load",
-              "label": "A host’s load goes above 4",
+              "id": "high-load-alert",
+              "label": "A high-load alert arrives",
               "description": "Starts a run for each load alert above 4.",
               "predicate": {
                 "kind": "comparison",
@@ -89,6 +89,15 @@
             }
           ]
         }
+      },
+      {
+        "sourceId": "hosts",
+        "name": "Host load",
+        "singular": "Host",
+        "plural": "Hosts",
+        "identityScope": "A host name.",
+        "handler": "/v1/p/acme-alerts/sources/hosts",
+        "titlePointer": "/host"
       }
     ],
     "cliCommands": [

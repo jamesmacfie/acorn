@@ -516,7 +516,7 @@ describe('acme-alerts', () => {
       copyNodeTypes(modules)
       for (const tool of ['vite', 'vitest']) linkTool(tool, modules)
       const node_ = (...args: string[]) => run(process.execPath, args, dir)
-      expect(node_('node_modules/vitest/vitest.mjs', 'run')).toMatch(/2 passed/)
+      expect(node_('node_modules/vitest/vitest.mjs', 'run')).toMatch(/4 passed/)
       node_(TSC, '--noEmit')
       node_('node_modules/vite/bin/vite.js', 'build', '--logLevel', 'error')
       // The build writes the manifest's feed entry from the code, and the committed one already matches.
