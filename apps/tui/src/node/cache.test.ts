@@ -4,6 +4,7 @@ import { join } from 'node:path'
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 import { fileCacheStorage } from './cache'
 import { _resetFleet, cacheKeyFor, clientFor, dropNode, setCacheStorage } from '@acorn/client-core/infra/node/fleet.ts'
+import { tasksKey } from '@acorn/protocol/api.ts'
 
 // The query cache's file store (./cache.ts): where a persisted partition lands, and what a reader sees
 // while one is being written. The persister calls this while the renderer owns the terminal, so a
@@ -68,15 +69,15 @@ describe('fileCacheStorage', () => {
     const cache = clientFor('tui-disposable')
     const lease = cache.persistence.acquire()
     await lease.restored
-    cache.client.setQueryData(['tasks'], [{ id: 'offline-task' }])
+    cache.client.setQueryData(tasksKey, [{ id: 'offline-task' }])
     await cache.persistence.flush()
     lease.release()
     await Promise.resolve()
     cache.client.clear()
     const remount = cache.persistence.acquire()
     await remount.restored
-    expect(cache.client.getQueryData(['tasks'])).toEqual([{ id: 'offline-task' }])
-    cache.client.setQueryData(['tasks'], [{ id: 'final-task' }])
+    expect(cache.client.getQueryData(tasksKey)).toEqual([{ id: 'offline-task' }])
+    cache.client.setQueryData(tasksKey, [{ id: 'final-task' }])
     remount.release()
     await Promise.resolve()
     await cache.persistence.flush()
@@ -87,8 +88,8 @@ describe('fileCacheStorage', () => {
     const replacement = clientFor('tui-disposable')
     const next = replacement.persistence.acquire()
     await next.restored
-    expect(replacement.client.getQueryData(['tasks'])).toBeUndefined()
-    replacement.client.setQueryData(['tasks'], [{ id: 'new-owner' }])
+    expect(replacement.client.getQueryData(tasksKey)).toBeUndefined()
+    replacement.client.setQueryData(tasksKey, [{ id: 'new-owner' }])
     await replacement.persistence.flush()
     expect(await storage.getItem(cacheKeyFor('tui-disposable'))).toContain('new-owner')
     next.release()

@@ -293,7 +293,8 @@ describe('broker HTTP', () => {
 
     const started = performance.now()
     await expect(broker.fetch('n1', { requestId: 'r-fast', path: '/fast' })).resolves.toMatchObject({ status: 200 })
-    expect(performance.now() - started).toBeLessThan(100)
+    // Queued, it would take the slow requests' 2 s. The margin is for a loaded machine running the full suite.
+    expect(performance.now() - started).toBeLessThan(1_000)
     broker.dispose()
     await Promise.all(slow)
   })

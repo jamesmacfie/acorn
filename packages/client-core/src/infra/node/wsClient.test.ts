@@ -327,16 +327,30 @@ describe('wsClient', () => {
     })
 
     it('yields to input once a drain runs past its slice, and keeps the frames in order', async () => {
-      const applied: unknown[] = []
-      const agent = registerWsChannel('agent', (frame) => applied.push(frame.n))
+      // Each frame is filed under the task that applied it. A microtask runs only once a task ends, so a
+      // new group means the drain gave the thread back in between.
+      const groups: unknown[][] = []
+      let open = false
+      const agent = registerWsChannel('agent', (frame) => {
+        if (!open) {
+          open = true
+          groups.push([])
+          queueMicrotask(() => (open = false))
+        }
+        groups.at(-1)!.push(frame.n)
+      })
       // Each read of the clock costs 3 ms, so a slice takes two frames.
       let now = 0
       const clock = vi.spyOn(performance, 'now').mockImplementation(() => (now += 3))
       try {
         client.wsConnect()
         for (let n = 1; n <= 6; n++) bridge.emitFrame(agentFrame(n))
-        await vi.waitFor(() => expect(applied).toEqual([1, 2]))
-        await vi.waitFor(() => expect(applied).toEqual([1, 2, 3, 4, 5, 6]))
+        await vi.waitFor(() => expect(groups.flat()).toHaveLength(6))
+        expect(groups).toEqual([
+          [1, 2],
+          [3, 4],
+          [5, 6],
+        ])
       } finally {
         clock.mockRestore()
         agent.dispose()
