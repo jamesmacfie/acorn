@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest'
 import { panelPlanSchema } from '@acorn/protocol/dashboards.ts'
 import { validatePanelPlan } from '@acorn/dashboards-core/plan.ts'
 import { panelGuideExamples } from '@acorn/dashboards-core/panelGuide.ts'
+import { starterTriggerCheck } from '@acorn/protocol/starterTriggers.ts'
 import { pullSourceDescription } from './pullSourceDescription'
 
 describe('GitHub pull request starter plans', () => {
@@ -20,6 +21,18 @@ describe('GitHub pull request starter plans', () => {
       })
       expect(validatePanelPlan(plan, sources), plan.title).toEqual([])
     }
+  })
+})
+
+describe('GitHub pull request suggested triggers', () => {
+  it("pass the Node's check against the source's own description", () => {
+    const { kept, dropped } = starterTriggerCheck(pullSourceDescription, pullSourceDescription.starterTriggers)
+    expect(dropped).toEqual([])
+    expect(kept.map((starter) => starter.label)).toEqual([
+      'A pull request asks for your review',
+      'A new pull request',
+      'Checks fail on a pull request',
+    ])
   })
 })
 

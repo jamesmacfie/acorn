@@ -7,6 +7,7 @@ import {
 } from '@acorn/protocol/dataSources.ts'
 import { createLinearSourceHandler } from './sourceHandler'
 import { readIssueOptions, readIssues } from './issueRead'
+import { starterTriggerCheck } from '@acorn/protocol/starterTriggers.ts'
 import { issueSourceDescription } from '../../shared/issueSource'
 import { linearFetch } from '../index'
 
@@ -60,8 +61,10 @@ const issue = (id: string, state = 'review') => ({
   description: 'Full description',
   project: { id: 'p1' },
   state: { id: state, name: state, type: 'started' },
+  team: { id: 'team1', name: 'Engineering' },
+  labels: { nodes: [{ name: 'Bug' }] },
   cycle: { id: 'c1', number: 12, name: null },
-  assignee: { name: 'Ada' },
+  assignee: { name: 'Ada', isMe: false },
   priority: 2,
   estimate: 3,
   createdAt: '2026-09-01T00:00:00Z',
@@ -153,9 +156,12 @@ describe('Linear typed issue source', () => {
       recordId: 'a',
       data: {
         state: { id: 'review', category: 'started' },
+        team: { id: 'team1', name: 'Engineering' },
+        labels: ['Bug'],
         cycleId: 'c1',
         cycle: 'Cycle 12',
         assignee: 'Ada',
+        assignedToViewer: false,
         priority: 'high',
         estimate: 3,
         completedAt: null,
@@ -175,6 +181,100 @@ describe('Linear typed issue source', () => {
       ).status,
     ).toBe(403)
     expect(linearFetch).toHaveBeenCalledTimes(4)
+  })
+  it('narrows by team, label, and assignment to the viewer, and checks each exactly after the read', async () => {
+    vi.mocked(linearFetch)
+      .mockResolvedValueOnce(teams())
+      .mockResolvedValueOnce(
+        response({
+          issues: page([
+            { ...issue('mine'), assignee: { name: 'Me', isMe: true } },
+            { ...issue('unlabeled'), labels: { nodes: [] }, assignee: { name: 'Me', isMe: true } },
+          ]),
+        }),
+      )
+    const request = input()
+    const where = (pointer: string, operator: 'eq' | 'contains', value: string | boolean) => ({
+      kind: 'comparison' as const,
+      left: { address: { from: 'item' as const, pointer } },
+      operator,
+      right: { address: { from: 'literal' as const, value } },
+    })
+    request.query.predicate = {
+      kind: 'all',
+      predicates: [
+        where('/team/id', 'eq', 'team1'),
+        where('/labels', 'contains', 'Bug'),
+        where('/assignedToViewer', 'eq', true),
+      ],
+    }
+    const result = dataSourcePageSchema.parse(await (await call(createIssueSourceHandler(), request)).json())
+    expect(result.records.map((record) => record.recordId)).toEqual(['mine'])
+    expect(vi.mocked(linearFetch).mock.calls[1]?.[2]).toMatchObject({
+      filter: {
+        and: [
+          { project: { id: { eq: 'p1' } } },
+          { team: { id: { eq: 'team1' } } },
+          { labels: { some: { name: { eq: 'Bug' } } } },
+          { assignee: { isMe: { eq: true } } },
+        ],
+      },
+    })
+    vi.mocked(linearFetch)
+      .mockResolvedValueOnce(teams())
+      .mockResolvedValueOnce(response({ issues: page([issue('a')]) }))
+    request.query.predicate = where('/assignedToViewer', 'eq', false)
+    expect((await (await call(createIssueSourceHandler(), request)).json()).records).toHaveLength(1)
+    expect(vi.mocked(linearFetch).mock.calls[3]?.[2]).toMatchObject({
+      filter: { and: [{ project: { id: { eq: 'p1' } } }] },
+    })
+    vi.mocked(linearFetch).mockResolvedValueOnce(teams())
+    request.query.predicate = where('/team/id', 'eq', 'another-team')
+    expect((await call(createIssueSourceHandler(), request)).status).toBe(502)
+  })
+  it("lists the project's teams, and labels by name once each", async () => {
+    vi.mocked(linearFetch)
+      .mockResolvedValueOnce(teams())
+      .mockResolvedValueOnce(response({ teams: page([{ id: 'team1', name: 'Engineering' }]) }))
+    const options: DataSourceRequest = {
+      operation: 'options',
+      source,
+      scope,
+      target: 'field',
+      pointer: '/team/id',
+      search: 'eng',
+      pageSize: 10,
+    }
+    expect(await (await call(createIssueSourceHandler(), options)).json()).toEqual({
+      options: [{ id: 'team1', label: 'Engineering' }],
+      exhausted: true,
+    })
+    expect(vi.mocked(linearFetch).mock.calls[1]?.[2]).toMatchObject({
+      filter: { id: { in: ['team1'] }, name: { containsIgnoreCase: 'eng' } },
+    })
+    vi.mocked(linearFetch).mockResolvedValueOnce(
+      response({
+        issueLabels: page([
+          { id: 'l1', name: 'Bug' },
+          { id: 'l2', name: 'Bug' },
+          { id: 'l3', name: 'Feature' },
+        ]),
+      }),
+    )
+    expect(
+      await (await call(createIssueSourceHandler(), { ...options, pointer: '/labels', search: '' })).json(),
+    ).toEqual({
+      options: [
+        { id: 'Bug', label: 'Bug' },
+        { id: 'Feature', label: 'Feature' },
+      ],
+      exhausted: true,
+    })
+  })
+  it("suggests triggers that pass the Node's check", () => {
+    const { kept, dropped } = starterTriggerCheck(issueSourceDescription, issueSourceDescription.starterTriggers)
+    expect(dropped).toEqual([])
+    expect(kept.map((starter) => starter.label)).toEqual(['A new issue with a label', 'An issue is assigned to you'])
   })
   it('rejects a selected state after a project change instead of reporting an empty selection', async () => {
     vi.mocked(linearFetch)

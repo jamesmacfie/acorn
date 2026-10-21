@@ -27,8 +27,10 @@ type Issue = {
   description: string | null
   project: { id: string }
   state: { id: string; name: string; type: string }
+  team: Choice
+  labels: { nodes: { name: string }[] }
   cycle: { id: string; number: number; name: string | null } | null
-  assignee: { name: string } | null
+  assignee: { name: string; isMe: boolean } | null
   priority: number
   estimate: number | null
   createdAt: string
@@ -36,7 +38,7 @@ type Issue = {
   completedAt: string | null
 }
 const issueFields =
-  'id identifier title url description project { id } state { id name type } cycle { id number name } assignee { name } priority estimate createdAt updatedAt completedAt'
+  'id identifier title url description project { id } state { id name type } team { id name } labels(first: 25) { nodes { name } } cycle { id number name } assignee { name isMe } priority estimate createdAt updatedAt completedAt'
 const projectId = (query: { parameters: Record<string, unknown> }) => {
   const id = query.parameters.project
   if (typeof id !== 'string' || !id || id.length > 200) throw new Error('project_required')
@@ -92,6 +94,30 @@ export async function readIssueOptions(
         signal,
       )
     ).workflowStates
+  } else if (input.target === 'field' && input.pointer === '/team/id') {
+    const teams = await projectTeams(token, projectId(input.scope), signal)
+    variables.filter = { id: { in: teams }, name: { containsIgnoreCase: input.search } }
+    page = (
+      await graph<{ teams: Page<Choice> }>(
+        token,
+        `query($first: Int!, $after: String, $filter: TeamFilter) { teams(first: $first, after: $after, filter: $filter) { nodes { id name } ${pageFields} } }`,
+        variables,
+        signal,
+      )
+    ).teams
+  } else if (input.target === 'field' && input.pointer === '/labels') {
+    // An issue's labels are names, so each choice is one. Two teams can each have a label of one name.
+    variables.filter = { name: { containsIgnoreCase: input.search } }
+    const labels = (
+      await graph<{ issueLabels: Page<Choice> }>(
+        token,
+        `query($first: Int!, $after: String, $filter: IssueLabelFilter) { issueLabels(first: $first, after: $after, filter: $filter) { nodes { id name } ${pageFields} } }`,
+        variables,
+        signal,
+      )
+    ).issueLabels
+    const names = [...new Set(labels.nodes.map((label) => label.name))]
+    page = { ...labels, nodes: names.map((name) => ({ id: name, name })) }
   } else throw new Error('unsupported_options')
   return optionsPage(page, input.cursor)
 }
@@ -111,6 +137,18 @@ export async function readIssues(token: string, query: DataSourceQuery, signal: 
       )
       if (!workflowState || !teams.includes(workflowState.team.id)) throw new Error('state_not_in_project')
       and.push({ state: { id: { eq: filter.value } } })
+    } else if (filter.pointer === '/team/id') {
+      if (typeof filter.value !== 'string') throw new Error('invalid_team')
+      if (!teams.includes(filter.value)) throw new Error('team_not_in_project')
+      and.push({ team: { id: { eq: filter.value } } })
+    } else if (filter.pointer === '/labels') {
+      if (typeof filter.value !== 'string') throw new Error('invalid_label')
+      and.push({ labels: { some: { name: { eq: filter.value } } } })
+    } else if (filter.pointer === '/assignedToViewer') {
+      if (typeof filter.value !== 'boolean') throw new Error('invalid_assignee_filter')
+      // Only true narrows Linear's read. An unassigned issue has no assignee to compare, so the exact
+      // check after the read decides false.
+      if (filter.value) and.push({ assignee: { isMe: { eq: true } } })
     } else and.push(dateFilter(filter))
   }
   return readAllRecords(
@@ -137,9 +175,12 @@ export async function readIssues(token: string, query: DataSourceQuery, signal: 
           description: issue.description,
           projectId: issue.project.id,
           state: { id: issue.state.id, name: issue.state.name, category: issue.state.type },
+          team: { id: issue.team.id, name: issue.team.name },
+          labels: issue.labels.nodes.map((label) => label.name),
           cycleId: issue.cycle?.id ?? null,
           cycle: issue.cycle ? cycleTitle(issue.cycle) : null,
           assignee: issue.assignee?.name ?? null,
+          assignedToViewer: issue.assignee?.isMe ?? false,
           priority: PRIORITIES[issue.priority] ?? 'none',
           estimate: issue.estimate,
           createdAt: epoch(issue.createdAt),

@@ -93,7 +93,8 @@ A record carries the workflow's name, its status with a tone, what started it, i
 its parent run and nesting depth, and its start and last update times. It also carries the first
 line of its error or cancel reason, capped at 200 characters, and its duration once the run reaches
 a final status. A run retried after it settled measures to its latest final status. Selecting a row
-opens the run pane on that run.
+opens the run pane on that run. Its title is the workflow's name, which a record trigger shows for a
+match and fills into a workflow's `issue` input. The source suggests one trigger, **A run fails**.
 
 What started a run is in the `/trigger` field, labeled **Started by**: `manual`, `trigger`,
 `agent-tool`, `agent-map`, or `reprocess`. The run row stores it as `started_by`, and a run a trigger

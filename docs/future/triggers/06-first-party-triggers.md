@@ -1,6 +1,77 @@
 # Phase 6: first-party triggers and acceptance
 
-Date: October 20, 2026. Status: proposed. Needs phase 5.
+Date: October 20, 2026. Status: built on branch `phase-6-first-party-triggers`, not merged. Needs
+phase 5.
+
+## Completion note
+
+Built October 21, 2026. Every shipped source the phase names suggests its triggers, GitLab and
+Bitbucket call `changed()`, and the walks are recorded in
+[the October 21 walk](../../testing/triggers-2026-10-21.md). None of the four real-account walks ran.
+
+### What landed
+
+- **Suggested triggers.** GitHub pull requests: **A pull request asks for your review**, **A new pull
+  request**, and **Checks fail on a pull request**, each on open pull requests. GitLab and Bitbucket:
+  **A new merge request** and **A new pull request** only, because neither source has review
+  requests or checks. Linear issues: **A new issue with a label**, with "Bug" as the label, and **An
+  issue is assigned to you**. Rollbar error groups: **An error seen more than once**, at least 2 and
+  active, and **A new error**. Workflow runs: **A run fails**. Agent sessions: **A session needs
+  you**, as `attention` not equal to `none`. Each plugin's tests run `starterTriggerCheck` over the
+  real description and expect nothing dropped.
+- **Fields and operators.** Linear issues gain `team` (`/team/id` with `eq` and project-scoped
+  choices, `/team/name`), `labels` (`contains`, choices by name), and `assignedToViewer`. The issue
+  page reads `team`, `labels(first: 25)`, and `assignee { isMe }`, and `consistency` says what that
+  costs. Rollbar's `totalOccurrences` takes `gt`, `gte`, `lt`, and `lte`, applied after the read.
+  GitHub's `checks` takes `eq`.
+- **Change signals.** `gitlabEmitter` and `bitbucketEmitter` call `changed('merge-requests')` and
+  `changed('pull-requests')` beside `pulls-changed` and `pr-synced`, as `githubEmitter` does, with a
+  test each.
+- **Run titles.** Each Workflow runs record carries the workflow's name as its display title.
+- **Revisions.** GitHub pull requests go to 7, Linear issues to 3, and Rollbar error groups to 2.
+  Rollbar's pages read the description's revision instead of a literal.
+- **Docs.** Say when records changed and plugin triggers name Linear and Rollbar as sources with
+  nothing to signal. The Workflow runs source section, workflow gaps (the file-trigger item points
+  at [triggers](../../workflows/triggers.md)), the docs index, and the future index. On the site,
+  **Start and schedule runs** describes **Start from a suggestion**. `sourceFields.json` is
+  regenerated.
+
+### Decisions and deviations
+
+- **"Assigned to you" is its own field.** A suggestion's operands must be literals, so `assignee` is
+  you can't be written. Linear reports `isMe` on each assignee, so `assignedToViewer` is a boolean,
+  the way GitHub's `reviewRequestedFromViewer` is, and it costs no extra call. Only `true` narrows
+  Linear's read.
+- **`checks` isn't sent to search.** The phase said to add it to the search if `eq` was missing. A
+  read-only check on real pull requests showed search's `status:` misses some whose combined state
+  matches, so a qualifier would drop real matches. The exact check after the read decides, inside the
+  250-match cap.
+- **Label choices are workspace-wide.** The options list every label whose name matches, by name,
+  once each, rather than filtering to the project's teams.
+- **The run title was found live.** **A run fails** started a follow-up whose `issue` input was empty,
+  because run records had no title. That's a field a useful trigger needs, so it's fixed here.
+- **The 5-minute default was already there.** The dialog sets every suggestion to check every 5
+  minutes, so nothing changed for Linear and Rollbar.
+- **The phase files stay.** The phase asks to remove them, but this note has to land in this file.
+  Removing the folder, moving the future index row to **Completed plans removed**, and fixing the
+  links into the folder are the last step after the phases merge.
+
+### For whoever closes the programme
+
+The row for **Completed plans removed**: owners are [triggers](../../workflows/triggers.md),
+[say when records changed](../../data-sources/changes.md), [plugin triggers](../../plugin-authoring/triggers.md),
+[event feeds](../../data-sources/event-feeds.md), and [schedules](../../schedules.md#policies) for
+`wake`. Still open:
+
+- The four real-account walks, each needing a change on a real service.
+- The threshold walk fails its second step by design: `acme-alerts` is an event feed, so every raise
+  above 4 is a new record and starts a run. "Starts once until the load drops" needs a source with one
+  record per host. Either add that shape to the examples or reword the walk.
+- **A session needs you** wasn't walked. It needs a live agent session asking for attention.
+- `docs/workflows/triggers.md` and `docs/plugin-authoring/triggers.md` hold the trigger behavior, so
+  nothing needed moving out of the phase files.
+- Service size: the Node's static graph is 1,930,369 bytes on this branch, under the 1,931,900
+  ceiling. Phase 5 measured 1,929,849, so this phase adds about 520 bytes. The ceiling isn't raised.
 
 ## Goal
 

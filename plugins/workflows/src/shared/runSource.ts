@@ -223,6 +223,21 @@ export const runSourceDescription: DataSourceDescription = {
   operations: { query: true, options: true, details: false, incremental: false, groups: ['all'] },
   coverage: { kind: 'events', retention: 'Until the owning task is deleted', complete: true },
   starterPlans: runStarterPlans,
+  // A trigger never reads its own runs, so this can't start itself again.
+  starterTriggers: [
+    {
+      id: 'run-fails',
+      label: 'A run fails',
+      description: 'Starts a run when a workflow run fails, and again if it fails after a retry.',
+      predicate: {
+        kind: 'comparison',
+        left: { address: { from: 'item', pointer: '/status' } },
+        operator: 'eq',
+        right: { address: { from: 'literal', value: 'failed' } },
+      },
+      change: { on: 'enters' },
+    },
+  ],
   consistency:
     'One row per workflow run, child runs included. Duration is the time from start to the final status, so a run retried after it settled measures to its latest one.',
   targets: [{ kind: 'workflows.run' }],

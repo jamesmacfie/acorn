@@ -99,6 +99,21 @@ export const mergeRequestSourceDescription: DataSourceDescription = {
   ...projectsParameter,
   operations: { query: true, options: true, details: false, incremental: false, groups: ['all'] },
   coverage: { kind: 'snapshot' },
+  // The only suggested trigger the fields allow: the source has no review requests or checks.
+  starterTriggers: [
+    {
+      id: 'new-pull-request',
+      label: 'A new merge request',
+      description: 'Starts a run once for each merge request opened.',
+      predicate: {
+        kind: 'comparison',
+        left: { address: { from: 'item', pointer: '/state' } },
+        operator: 'eq',
+        right: { address: { from: 'literal', value: 'open' } },
+      },
+      change: { on: 'new' },
+    },
+  ],
   consistency:
     "GitLab's REST list of each selected project's merge requests, newest first, 100 at most per project. A read past that says it is incomplete.",
 }

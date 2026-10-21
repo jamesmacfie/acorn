@@ -1,6 +1,7 @@
 import type { PanelPlan } from '@acorn/protocol/dashboards.ts'
 import type { DataBindingAddress } from '@acorn/protocol/dataBindings.ts'
 import type { DataSourceDescription } from '@acorn/protocol/dataSources.ts'
+import type { StarterTrigger } from '@acorn/protocol/starterTriggers.ts'
 
 // Starter panels for the Add panel launcher (docs/data-sources.md). Their scope names no account: the
 // launcher moves each one onto the account and repositories the person picked. Each filter is a step
@@ -12,14 +13,15 @@ const pullColumn = (id: string, label: string, type: Column['type']): Column => 
   type,
   bind: { pulls: { field: `/${id}` } },
 })
+const fieldIs = (column: string, right: DataBindingAddress) => ({
+  kind: 'comparison' as const,
+  left: { address: { from: 'item' as const, pointer: `/${column}` } },
+  operator: 'eq' as const,
+  right: { address: right },
+})
 const keep = (column: string, right: DataBindingAddress): PanelPlan['stages'][number] => ({
   op: 'filter',
-  where: {
-    kind: 'comparison',
-    left: { address: { from: 'item', pointer: `/${column}` } },
-    operator: 'eq',
-    right: { address: right },
-  },
+  where: fieldIs(column, right),
 })
 const openPulls = keep('state', { from: 'literal', value: 'open' })
 const mine = keep('author', { from: 'context', name: 'viewer', pointer: '/login' })
@@ -71,9 +73,40 @@ const pullStarterPlans: PanelPlan[] = [
   ),
 ]
 
+// Suggested triggers for the trigger dialog (docs/plugin-authoring/triggers.md). Each one reads open
+// pull requests, so its search stays narrow.
+const isOpen = fieldIs('state', { from: 'literal', value: 'open' })
+const openAnd = (column: string, value: string | boolean) => ({
+  kind: 'all' as const,
+  predicates: [isOpen, fieldIs(column, { from: 'literal', value })],
+})
+const pullStarterTriggers: StarterTrigger[] = [
+  {
+    id: 'review-requested',
+    label: 'A pull request asks for your review',
+    description: 'Starts a run when you’re asked to review an open pull request, and again if you’re asked again.',
+    predicate: openAnd('reviewRequestedFromViewer', true),
+    change: { on: 'enters' },
+  },
+  {
+    id: 'new-pull-request',
+    label: 'A new pull request',
+    description: 'Starts a run once for each pull request opened.',
+    predicate: isOpen,
+    change: { on: 'new' },
+  },
+  {
+    id: 'checks-fail',
+    label: 'Checks fail on a pull request',
+    description: 'Starts a run when an open pull request’s head checks fail, and again if they fail after passing.',
+    predicate: openAnd('checks', 'FAILURE'),
+    change: { on: 'enters' },
+  },
+]
+
 export const pullSourceDescription: DataSourceDescription = {
   projectScope: { kind: 'repository', parameter: '/repositories', record: '/repository' },
-  revision: '6',
+  revision: '7',
   schema: {
     type: 'object',
     additionalProperties: false,
@@ -222,6 +255,7 @@ export const pullSourceDescription: DataSourceDescription = {
       label: 'Head checks',
       origin: 'declared',
       display: { kind: 'status' },
+      query: { operators: ['eq'], sortable: false },
       choices: {
         kind: 'static',
         values: [
@@ -313,6 +347,7 @@ export const pullSourceDescription: DataSourceDescription = {
   targets: [{ kind: 'github.pull-request' }],
   coverage: { kind: 'snapshot' },
   starterPlans: pullStarterPlans,
+  starterTriggers: pullStarterTriggers,
   reach: {
     parameter: '/repositories',
     itemPlural: 'repositories',
@@ -320,5 +355,5 @@ export const pullSourceDescription: DataSourceDescription = {
     empty: 'no linked repositories',
   },
   consistency:
-    'Reads are restricted to linked repositories. An explicit list selects a subset. Search is eventually consistent, with no snapshot isolation during pagination. Up to 250 matches are fully read. A larger search returns no rows and says it is incomplete, so narrow it with repositories or conditions.',
+    'Reads are restricted to linked repositories. An explicit list selects a subset. Search is eventually consistent, with no snapshot isolation during pagination. Head checks are compared after the read, never sent to search. Up to 250 matches are fully read. A larger search returns no rows and says it is incomplete, so narrow it with repositories or conditions.',
 }

@@ -93,6 +93,12 @@ A trigger can also start a run for each record that's new, starts matching, or c
 task whose title contains "triage". Each record gets its own task, named after the workflow and the
 record, and a slow run never holds up the next record.
 
+A new trigger opens on **Start from a suggestion**, which lists ideas from the sources your project
+can read, such as **A pull request asks for your review**, **A new issue with a label** from Linear,
+**An error seen more than once** from Rollbar, **A run fails**, and **A session needs you**. Picking
+one fills steps 1 to 4 below, checking every 5 minutes, and you still edit any of it, such as the
+label to look for. **Set it up yourself** starts from an empty form.
+
 1. Open the workflow, choose **Add trigger…**, and under **When** pick **When records change**.
 2. Under **Records from**, pick a source and add conditions, or pick a saved query.
 3. Under **Start a run when a record**, pick **Is new**, **Starts matching**, or **Changes**. For

@@ -133,6 +133,8 @@ export function createRunSourceHandler(db: PluginDatabase, core: Core): PluginFe
             error: shortError(error),
             durationMs: TERMINAL_WORKFLOW_STATUSES.has(row.status) ? row.updatedAt - row.createdAt : null,
           },
+          // A record trigger names its match, and fills a workflow's `issue` input, from this title.
+          display: { title: row.name },
           taskId: row.taskId,
           // The run pane's id, WORKFLOWS_PANE_ID, which lives in the client half.
           action: { verb: 'openPane' as const, pane: 'workflows' },

@@ -48,13 +48,15 @@ cancel runs. That stays deferred.
 
 ## Define file-owned trigger consent
 
-Published database workflows can have owner-approved Node schedules. Repository and user definition
-files do not activate triggers implicitly. Adding that behavior needs a separate approval contract
-for file identity, changed content, revocation, and offline/restart handling.
+Published database workflows can have owner-approved [triggers](../workflows/triggers.md), on a
+schedule or when records change. Repository and user definition files do not activate triggers
+implicitly. Adding that behavior needs a separate approval contract for file identity, changed
+content, revocation, and offline/restart handling.
 
 Acceptance: an unapproved file cannot schedule work. An approved unchanged definition runs under
 its stored budget and scope; a content or identity change requires the designed reapproval behavior.
-Preserve the implemented schedule owner and runtime rather than adding a second scheduler.
+Preserve the trigger service and the core scheduler that times it rather than adding a second
+scheduler.
 
 ## Verify and hand off
 

@@ -61,7 +61,7 @@ export async function readErrors(
     if (['/status', '/level', '/environment'].includes(left.pointer)) {
       if (typeof right.value !== 'string' || !right.value) throw new Error('invalid_filter')
       params.append(left.pointer.slice(1), right.value)
-    } else if (typeof right.value !== 'number' || !Number.isFinite(right.value)) throw new Error('invalid_date')
+    } else if (typeof right.value !== 'number' || !Number.isFinite(right.value)) throw new Error('invalid_number')
   }
   for (const sort of query.sort)
     if (!errorSourceDescription.fields.find((field) => field.pointer === sort.pointer)?.query?.sortable)
@@ -88,18 +88,19 @@ export async function readErrors(
       if (records.length >= DATA_LIMITS.selectionRecords || bytes > DATA_LIMITS.selectionBytes)
         return {
           records: [],
-          revision: '1',
+          revision: errorSourceDescription.revision,
           readTime: Date.now(),
           completeness: { kind: 'incomplete', cause: 'upstream-cap' },
         }
       records.push(record)
     }
     // The documented items endpoint returns 100 records per page, with no cursor or snapshot.
-    if (result.items.length < 100) return { ...selectDataRecords(records, query), revision: '1', readTime: Date.now() }
+    if (result.items.length < 100)
+      return { ...selectDataRecords(records, query), revision: errorSourceDescription.revision, readTime: Date.now() }
   }
   return {
     records: [],
-    revision: '1',
+    revision: errorSourceDescription.revision,
     readTime: Date.now(),
     completeness: { kind: 'incomplete', cause: 'upstream-cap' },
   }

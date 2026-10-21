@@ -21,8 +21,13 @@ code is in `packages/node-core/src/server/dataSources/changes.ts`.
 
 The event asks listeners to read again. It carries no records and has no delivery guarantee, so a
 listener still reads on its own schedule and treats the event as a reason to read sooner. These
-sources call it: `github:pull-requests`, `workflows:runs`, `agents:sessions`, and `core:tasks`. An
-[event feed](./event-feeds.md) calls it for you whenever `append` stores an event.
+sources call it: `github:pull-requests`, `gitlab:merge-requests`, `bitbucket:pull-requests`,
+`workflows:runs`, `agents:sessions`, and `core:tasks`. The three code hosts call it beside
+`pulls-changed` and `pr-synced`. An [event feed](./event-feeds.md) calls it for you whenever
+`append` stores an event.
+
+Linear's issues and Rollbar's errors don't call it. Acorn only reads them, so the plugin never sees
+the moment they change, and their triggers check on the cadence the person picks.
 
 The workflows plugin listens. Each approved record trigger whose query reads the changed source checks
 again within seconds, at most once every 15 seconds, through the scheduler's `wake`

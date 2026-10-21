@@ -191,6 +191,7 @@ it('shapes a record: duration once settled, a short error, and a child run', asy
       updatedAt: OCTOBER + 60_000,
       durationMs: 60_000,
     },
+    display: { title: 'Review' },
     target: { kind: 'workflows.run', item: root.id },
   })
   expect(records[0]?.data).toMatchObject({ parentRunId: root.id, depth: 1, durationMs: null, error: null })

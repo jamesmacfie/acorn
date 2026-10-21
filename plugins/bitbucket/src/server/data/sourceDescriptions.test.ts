@@ -1,7 +1,8 @@
 import { describe, expect, it } from 'vitest'
 import { panelPlanSchema } from '@acorn/protocol/dashboards.ts'
 import { validatePanelPlan } from '@acorn/dashboards-core/plan.ts'
-import { reviewCommentSourceDescription } from './sourceDescriptions'
+import { starterTriggerCheck } from '@acorn/protocol/starterTriggers.ts'
+import { pullRequestSourceDescription, reviewCommentSourceDescription } from './sourceDescriptions'
 
 describe('Bitbucket review comment starter plans', () => {
   it("fit the source's own description", () => {
@@ -19,5 +20,16 @@ describe('Bitbucket review comment starter plans', () => {
       })
       expect(validatePanelPlan(plan, sources), plan.title).toEqual([])
     }
+  })
+})
+
+describe('Bitbucket pull request suggested triggers', () => {
+  it("pass the Node's check against the source's own description", () => {
+    const { kept, dropped } = starterTriggerCheck(
+      pullRequestSourceDescription,
+      pullRequestSourceDescription.starterTriggers,
+    )
+    expect(dropped).toEqual([])
+    expect(kept.map((starter) => starter.label)).toEqual(['A new pull request'])
   })
 })

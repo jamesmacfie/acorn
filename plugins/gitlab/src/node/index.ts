@@ -70,7 +70,7 @@ export const gitlabPlugin = (): NodePlugin => ({
   ],
   init: async (ctx) => {
     const store = ctx.storage.open()
-    const emit = gitlabEmitter(ctx.events.send)
+    const emit = gitlabEmitter(ctx.events.send, ctx.dataSources.changed)
     const provider = createGitlabProvider({ clientId: gitlabClientId })
     ctx.providers.integration(provider)
     const maxPages = provider.budgets.maxPages

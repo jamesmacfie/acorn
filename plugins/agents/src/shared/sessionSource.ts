@@ -80,6 +80,21 @@ export const sessionSourceDescription: DataSourceDescription = {
   parameters: { type: 'object', additionalProperties: false, properties: {} },
   parameterFields: [],
   operations: { query: true, options: false, details: false, incremental: false, groups: ['all'] },
+  starterTriggers: [
+    {
+      id: 'needs-you',
+      label: 'A session needs you',
+      description:
+        'Starts a run when an agent session needs your attention, and again if it needs you after that’s cleared.',
+      predicate: {
+        kind: 'comparison',
+        left: { address: { from: 'item', pointer: '/attention' } },
+        operator: 'ne',
+        right: { address: { from: 'literal', value: 'none' } },
+      },
+      change: { on: 'enters' },
+    },
+  ],
   consistency:
     'A page reflects the managed-session ledger at read time. State may advance between pages; record identity and the explicit read time remain stable.',
   targets: [{ kind: 'agents.session' }],

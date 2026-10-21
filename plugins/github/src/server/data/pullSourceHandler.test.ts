@@ -333,6 +333,21 @@ describe('GitHub typed pull source', () => {
     })
   })
 
+  it('compares head checks after the read, with none of it sent to search', async () => {
+    vi.mocked(ghGraphQL).mockResolvedValueOnce(
+      upstream([
+        node('failing'),
+        node('closed', { state: 'CLOSED' }),
+        node('missing', { latestCommit: { nodes: [] } }),
+      ]),
+    )
+    const input = query()
+    input.query.predicate = { kind: 'all', predicates: [filter('/state', 'open'), filter('/checks', 'FAILURE')] }
+    const page = dataSourcePageSchema.parse(await (await call(createPullSourceHandler(), input)).json())
+    expect(page.records.map((row) => row.recordId)).toEqual(['failing'])
+    expect(vi.mocked(ghGraphQL).mock.calls[0]?.[2]).toMatchObject({ q: 'is:pr repo:org/repo is:open' })
+  })
+
   it.each(['org/repo is:closed', '', 'org'])(
     'rejects invalid repository %j before a network call',
     async (repository) => {

@@ -1,5 +1,6 @@
 import type { DataSourceDescription, DataSourceRegistration } from '@acorn/protocol/dataSources.ts'
 import type { DataSchema } from '@acorn/protocol/dataSchemas.ts'
+import type { StarterTrigger } from '@acorn/protocol/starterTriggers.ts'
 
 export const errorSource: DataSourceRegistration = {
   sourceId: 'error-groups',
@@ -87,8 +88,35 @@ export const errorDetailSchema: DataSchema = {
   required: ['group', 'latestOccurrence'],
 }
 
+// Suggested triggers (docs/plugin-authoring/triggers.md). Rollbar has no moment to say its errors
+// changed, so these check on the trigger's cadence. The 2 is a starting value the person edits.
+const fieldIs = (pointer: string, operator: 'eq' | 'gte', value: string | number) => ({
+  kind: 'comparison' as const,
+  left: { address: { from: 'item' as const, pointer } },
+  operator,
+  right: { address: { from: 'literal' as const, value } },
+})
+const active = fieldIs('/status', 'eq', 'active')
+const errorStarterTriggers: StarterTrigger[] = [
+  {
+    id: 'seen-again',
+    label: 'An error seen more than once',
+    description:
+      'Starts a run when an active error reaches two occurrences, and again if it comes back after it’s resolved.',
+    predicate: { kind: 'all', predicates: [fieldIs('/totalOccurrences', 'gte', 2), active] },
+    change: { on: 'enters' },
+  },
+  {
+    id: 'new-error',
+    label: 'A new error',
+    description: 'Starts a run once for each new active error.',
+    predicate: active,
+    change: { on: 'new' },
+  },
+]
+
 export const errorSourceDescription: DataSourceDescription = {
-  revision: '1',
+  revision: '2',
   schema: recordSchema,
   detailSchema: errorDetailSchema,
   fields: [
@@ -101,7 +129,13 @@ export const errorSourceDescription: DataSourceDescription = {
       origin: 'declared' as const,
       query: { operators: ['eq'] as 'eq'[], sortable: false },
     })),
-    { pointer: '/totalOccurrences', label: 'Occurrences', origin: 'declared', display: { kind: 'number' } },
+    {
+      pointer: '/totalOccurrences',
+      label: 'Occurrences',
+      origin: 'declared',
+      display: { kind: 'number' },
+      query: { operators: ['gt', 'gte', 'lt', 'lte'], sortable: false },
+    },
     ...(['firstOccurrenceAt', 'lastOccurrenceAt'] as const).map((key) => ({
       pointer: `/${key}`,
       label: key === 'firstOccurrenceAt' ? 'First seen' : 'Last seen',
@@ -113,6 +147,7 @@ export const errorSourceDescription: DataSourceDescription = {
   parameters: { type: 'object', properties: {}, additionalProperties: false },
   parameterFields: [],
   operations: { query: true, options: false, details: true, incremental: false, groups: ['all'] },
+  starterTriggers: errorStarterTriggers,
   consistency:
-    'One Rollbar project connection. REST status, level and environment filters narrow candidates; first/last seen predicates are applied after exhausting at most 5,000 items. Larger sets are incomplete, including sorted take. No upstream snapshot isolation or incremental checkpoint guarantee. Continuations retain selections for 60 seconds. Details use the existing safe occurrence projection; truncated projections fail explicitly.',
+    'One Rollbar project connection. REST status, level and environment filters narrow candidates; occurrence count and first/last seen predicates are applied after exhausting at most 5,000 items. Larger sets are incomplete, including sorted take. No upstream snapshot isolation or incremental checkpoint guarantee. Continuations retain selections for 60 seconds. Details use the existing safe occurrence projection; truncated projections fail explicitly.',
 }

@@ -62,7 +62,7 @@ export const bitbucketPlugin = (): NodePlugin => ({
   ],
   init: async (ctx) => {
     const store = ctx.storage.open()
-    const emit = bitbucketEmitter(ctx.events.send)
+    const emit = bitbucketEmitter(ctx.events.send, ctx.dataSources.changed)
     ctx.providers.integration(bitbucketProvider)
     const maxPages = bitbucketProvider.budgets.maxPages
 

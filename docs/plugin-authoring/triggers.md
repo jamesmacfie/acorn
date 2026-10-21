@@ -19,6 +19,10 @@ store.add(deploy)
 ctx.dataSources.changed('deploys')
 ```
 
+If your plugin only reads another service, as Linear's and Rollbar's do, it has no moment to signal.
+Skip the call. Their triggers check on the cadence the person picks, every 5 minutes for a
+suggestion.
+
 Add suggested triggers to the description, up to 10. The trigger dialog lists the suggestions of every
 source the project can read as its first screen, **Start from a suggestion**, and fills **When** from
 the one picked. The person still picks the workflow, the inputs, and the account.

@@ -2,6 +2,7 @@ import { expect, it } from 'vitest'
 import { panelPlanSchema } from '@acorn/protocol/dashboards.ts'
 import { dataSourceDescriptionSchema } from '@acorn/protocol/dataSources.ts'
 import { validatePanelPlan } from '@acorn/dashboards-core/plan.ts'
+import { starterTriggerCheck } from '@acorn/protocol/starterTriggers.ts'
 import { runSourceDescription } from './runSource'
 
 it("Workflow runs starter plans fit the source's own description", () => {
@@ -20,4 +21,10 @@ it("Workflow runs starter plans fit the source's own description", () => {
     })
     expect(validatePanelPlan(plan, sources), plan.title).toEqual([])
   }
+})
+
+it("Workflow runs suggested triggers pass the Node's check", () => {
+  const { kept, dropped } = starterTriggerCheck(runSourceDescription, runSourceDescription.starterTriggers)
+  expect(dropped).toEqual([])
+  expect(kept.map((starter) => starter.label)).toEqual(['A run fails'])
 })

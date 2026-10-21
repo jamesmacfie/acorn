@@ -1,4 +1,5 @@
 import type { DataSourceDescription, DataSourceRegistration } from '@acorn/protocol/dataSources.ts'
+import type { StarterTrigger } from '@acorn/protocol/starterTriggers.ts'
 
 export const issueSource: DataSourceRegistration = {
   sourceId: 'issues',
@@ -16,8 +17,34 @@ export const issueSource: DataSourceRegistration = {
 // Linear's priority numbers, 0 to 4, as the record's choice ids.
 export const PRIORITIES = ['none', 'urgent', 'high', 'medium', 'low'] as const
 
+// Suggested triggers (docs/plugin-authoring/triggers.md). Linear has no moment to say its issues
+// changed, so these check on the trigger's cadence. "Bug" is a label Linear gives a new workspace,
+// and a starting value the person edits.
+const fieldIs = (pointer: string, operator: 'eq' | 'contains', value: string | boolean) => ({
+  kind: 'comparison' as const,
+  left: { address: { from: 'item' as const, pointer } },
+  operator,
+  right: { address: { from: 'literal' as const, value } },
+})
+const issueStarterTriggers: StarterTrigger[] = [
+  {
+    id: 'new-labeled-issue',
+    label: 'A new issue with a label',
+    description: 'Starts a run once for each new issue that has the label you pick.',
+    predicate: fieldIs('/labels', 'contains', 'Bug'),
+    change: { on: 'new' },
+  },
+  {
+    id: 'assigned-to-you',
+    label: 'An issue is assigned to you',
+    description: 'Starts a run when an issue is assigned to you, and again if it’s assigned to you after someone else.',
+    predicate: fieldIs('/assignedToViewer', 'eq', true),
+    change: { on: 'enters' },
+  },
+]
+
 export const issueSourceDescription: DataSourceDescription = {
-  revision: '2',
+  revision: '3',
   projectScope: { kind: 'external-project', parameter: '/project', record: '/projectId' },
   schema: {
     type: 'object',
@@ -39,9 +66,17 @@ export const issueSourceDescription: DataSourceDescription = {
         },
         required: ['id', 'name', 'category'],
       },
+      team: {
+        type: 'object',
+        additionalProperties: false,
+        properties: { id: { type: 'string' }, name: { type: 'string' } },
+        required: ['id', 'name'],
+      },
+      labels: { type: 'array', items: { type: 'string' } },
       cycleId: { type: ['string', 'null'] },
       cycle: { type: ['string', 'null'] },
       assignee: { type: ['string', 'null'] },
+      assignedToViewer: { type: 'boolean' },
       priority: { type: 'string' },
       estimate: { type: ['number', 'null'] },
       createdAt: { type: 'number' },
@@ -56,9 +91,12 @@ export const issueSourceDescription: DataSourceDescription = {
       'description',
       'projectId',
       'state',
+      'team',
+      'labels',
       'cycleId',
       'cycle',
       'assignee',
+      'assignedToViewer',
       'priority',
       'estimate',
       'createdAt',
@@ -80,9 +118,32 @@ export const issueSourceDescription: DataSourceDescription = {
     },
     { pointer: '/state/name', label: 'State name', origin: 'declared', display: { kind: 'status', role: 'status' } },
     { pointer: '/state/category', label: 'State category', origin: 'declared' },
+    {
+      pointer: '/team/id',
+      label: 'Team',
+      origin: 'declared',
+      query: { operators: ['eq'], sortable: false },
+      choices: { kind: 'dynamic', dependsOn: ['/project'] },
+    },
+    { pointer: '/team/name', label: 'Team name', origin: 'declared' },
+    {
+      pointer: '/labels',
+      label: 'Labels',
+      origin: 'declared',
+      display: { kind: 'text', list: true },
+      query: { operators: ['contains'], sortable: false },
+      choices: { kind: 'dynamic', dependsOn: [] },
+    },
     { pointer: '/cycleId', label: 'Cycle ID', origin: 'declared' },
     { pointer: '/cycle', label: 'Cycle', origin: 'declared' },
     { pointer: '/assignee', label: 'Assignee', origin: 'declared', display: { kind: 'person', role: 'assignee' } },
+    {
+      pointer: '/assignedToViewer',
+      label: 'Assigned to you',
+      origin: 'declared',
+      display: { kind: 'boolean' },
+      query: { operators: ['eq'], sortable: false },
+    },
     {
       pointer: '/priority',
       label: 'Priority',
@@ -120,6 +181,7 @@ export const issueSourceDescription: DataSourceDescription = {
   ],
   operations: { query: true, options: true, details: false, incremental: false, groups: ['all'] },
   targets: [{ kind: 'linear.issue' }],
+  starterTriggers: issueStarterTriggers,
   consistency:
-    'Linear project issues, including archived issues, with exact state IDs. No snapshot isolation across upstream pages. At most 5,000 candidates are exhausted before stable sorting; a larger selection is incomplete. Continuations retain the selection for 60 seconds.',
+    'Linear project issues, including archived issues, with exact state IDs. No snapshot isolation across upstream pages. At most 5,000 candidates are exhausted before stable sorting; a larger selection is incomplete. Continuations retain the selection for 60 seconds. Each issue page also reads every issue’s team and its first 25 labels, which makes each page cost several times the Linear query complexity it would without them. Labels match by exact name.',
 }

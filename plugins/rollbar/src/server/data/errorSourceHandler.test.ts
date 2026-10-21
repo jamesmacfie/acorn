@@ -7,7 +7,8 @@ import {
 } from '@acorn/protocol/dataSources.ts'
 import { validateDataValue } from '@acorn/protocol/dataSchemas.ts'
 import { createErrorSourceHandler } from './errorSourceHandler'
-import { errorDetailSchema } from '../../shared/errorSource'
+import { starterTriggerCheck } from '@acorn/protocol/starterTriggers.ts'
+import { errorDetailSchema, errorSourceDescription } from '../../shared/errorSource'
 import { rollbarFetch } from '../index'
 
 vi.mock('../index', async (original) => ({ ...(await original<typeof import('../index')>()), rollbarFetch: vi.fn() }))
@@ -40,14 +41,14 @@ const context: PluginRequestContext = {
 }
 const call = (handler: ReturnType<typeof createErrorSourceHandler>, request: DataSourceRequest, ctx = context) =>
   handler(new Request('http://acorn.test/', { method: 'POST', body: JSON.stringify(request) }), ctx)
-const item = (id: number, first = 100, last = 200) => ({
+const item = (id: number, first = 100, last = 200, occurrences = 3) => ({
   id,
   counter: id,
   title: 'Error',
   environment: 'prod',
   status: 'active',
   level: 'error',
-  total_occurrences: 3,
+  total_occurrences: occurrences,
   first_occurrence_timestamp: first,
   last_occurrence_timestamp: last,
 })
@@ -118,6 +119,20 @@ describe('Rollbar error group source', () => {
       (await call(handler, next, { ...context, providers: { ...context.providers, connections: async () => [] } }))
         .status,
     ).toBe(502)
+  })
+  it('filters on occurrence count after the read, with status sent to Rollbar', async () => {
+    vi.mocked(rollbarFetch).mockResolvedValueOnce(response([item(1, 100, 200, 1), item(2, 100, 200, 2)]))
+    const request = input()
+    request.pageSize = 10
+    request.query.predicate = errorSourceDescription.starterTriggers![0]!.predicate
+    const page = dataSourcePageSchema.parse(await (await call(createErrorSourceHandler(), request)).json())
+    expect(page.records.map((record) => record.recordId)).toEqual(['2:2'])
+    expect(vi.mocked(rollbarFetch).mock.calls[0]?.[1]).toBe('/items?status=active&page=1')
+  })
+  it("suggests triggers that pass the Node's check", () => {
+    const { kept, dropped } = starterTriggerCheck(errorSourceDescription, errorSourceDescription.starterTriggers)
+    expect(dropped).toEqual([])
+    expect(kept.map((starter) => starter.label)).toEqual(['An error seen more than once', 'A new error'])
   })
   it('does not report a locally empty selection complete through the candidate cap', async () => {
     vi.mocked(rollbarFetch).mockImplementation(async (_token, path) => {

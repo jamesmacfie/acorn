@@ -4530,6 +4530,12 @@
         "display": {
           "kind": "status"
         },
+        "query": {
+          "operators": [
+            "eq"
+          ],
+          "sortable": false
+        },
         "choices": {
           "kind": "static",
           "values": [
@@ -5554,6 +5560,28 @@
             "category"
           ]
         },
+        "team": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "id": {
+              "type": "string"
+            },
+            "name": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "id",
+            "name"
+          ]
+        },
+        "labels": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
         "cycleId": {
           "type": [
             "string",
@@ -5571,6 +5599,9 @@
             "string",
             "null"
           ]
+        },
+        "assignedToViewer": {
+          "type": "boolean"
         },
         "priority": {
           "type": "string"
@@ -5602,9 +5633,12 @@
         "description",
         "projectId",
         "state",
+        "team",
+        "labels",
         "cycleId",
         "cycle",
         "assignee",
+        "assignedToViewer",
         "priority",
         "estimate",
         "createdAt",
@@ -5673,6 +5707,47 @@
         "origin": "declared"
       },
       {
+        "pointer": "/team/id",
+        "label": "Team",
+        "origin": "declared",
+        "query": {
+          "operators": [
+            "eq"
+          ],
+          "sortable": false
+        },
+        "choices": {
+          "kind": "dynamic",
+          "dependsOn": [
+            "/project"
+          ]
+        }
+      },
+      {
+        "pointer": "/team/name",
+        "label": "Team name",
+        "origin": "declared"
+      },
+      {
+        "pointer": "/labels",
+        "label": "Labels",
+        "origin": "declared",
+        "display": {
+          "kind": "text",
+          "list": true
+        },
+        "query": {
+          "operators": [
+            "contains"
+          ],
+          "sortable": false
+        },
+        "choices": {
+          "kind": "dynamic",
+          "dependsOn": []
+        }
+      },
+      {
         "pointer": "/cycleId",
         "label": "Cycle ID",
         "origin": "declared"
@@ -5689,6 +5764,20 @@
         "display": {
           "kind": "person",
           "role": "assignee"
+        }
+      },
+      {
+        "pointer": "/assignedToViewer",
+        "label": "Assigned to you",
+        "origin": "declared",
+        "display": {
+          "kind": "boolean"
+        },
+        "query": {
+          "operators": [
+            "eq"
+          ],
+          "sortable": false
         }
       },
       {
@@ -6415,6 +6504,15 @@
         "origin": "declared",
         "display": {
           "kind": "number"
+        },
+        "query": {
+          "operators": [
+            "gt",
+            "gte",
+            "lt",
+            "lte"
+          ],
+          "sortable": false
         }
       },
       {

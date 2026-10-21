@@ -92,6 +92,21 @@ export const pullRequestSourceDescription: DataSourceDescription = {
   ...repositoriesParameter,
   operations: { query: true, options: true, details: false, incremental: false, groups: ['all'] },
   coverage: { kind: 'snapshot' },
+  // The only suggested trigger the fields allow: the source has no review requests or checks.
+  starterTriggers: [
+    {
+      id: 'new-pull-request',
+      label: 'A new pull request',
+      description: 'Starts a run once for each pull request opened.',
+      predicate: {
+        kind: 'comparison',
+        left: { address: { from: 'item', pointer: '/state' } },
+        operator: 'eq',
+        right: { address: { from: 'literal', value: 'open' } },
+      },
+      change: { on: 'new' },
+    },
+  ],
   consistency:
     "Bitbucket's REST list of each selected repository's pull requests, newest first, 100 at most per repository. A read past that says it is incomplete.",
 }

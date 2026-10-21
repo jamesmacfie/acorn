@@ -7,10 +7,14 @@ import { projectAddress } from '../shared/mergeRequestRef'
 type GitlabVerb = 'pr-synced' | 'checks-changed' | 'pulls-changed' | 'repos-changed'
 export type GitlabEmit = (verb: GitlabVerb, payload?: Record<string, unknown>) => void
 
+// The two merge request verbs also say the `merge-requests` source changed, so every route that
+// announces a mirror write does both (docs/data-sources/changes.md).
 export const gitlabEmitter =
-  (send: PluginBroadcast['send']): GitlabEmit =>
-  (verb, payload = {}) =>
+  (send: PluginBroadcast['send'], changed: (sourceId: string) => void): GitlabEmit =>
+  (verb, payload = {}) => {
     send({ channel: pluginChannel('gitlab', verb), ...payload })
+    if (verb === 'pulls-changed' || verb === 'pr-synced') changed('merge-requests')
+  }
 
 /** A project's identity on the channel: its address on the server at `origin`. */
 export const projectPayload = (origin: string, path: string) => ({

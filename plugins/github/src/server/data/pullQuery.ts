@@ -60,6 +60,11 @@ export function pullSearch(query: DataSourceQuery): string {
         if (typeof value !== 'boolean') throw new Error('invalid_review_filter')
         parts.push(value ? 'review-requested:@me' : '-review-requested:@me')
         break
+      case '/checks':
+        // Search's `status:` disagrees with the rollup state on real pull requests, so it can't narrow
+        // the search. The exact check after the read decides.
+        if (typeof value !== 'string') throw new Error('invalid_checks')
+        break
       default:
         parts.push(dateQualifier(left.pointer === '/createdAt' ? 'created' : 'updated', filter.operator, value))
     }
