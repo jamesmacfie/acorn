@@ -30,6 +30,7 @@ import {
   worktreePorcelain,
 } from './worktrees'
 import { isTaskArchiving } from './archiveGate'
+import { checkoutAdmissionFor } from '../core/checkoutAdmission'
 import { broadcastTasksChanged } from '../notify'
 import {
   admitTaskHead,
@@ -394,7 +395,16 @@ export async function resolveTaskCwd(
         ...changeRequestFetch(changeRequest, branch),
         name: changeRequestName(changeRequest),
       }
-      const wt = await ensureWorktree(worktreesRoot, checkout, owner, repo, branch, head ?? null)
+      const admission = checkoutAdmissionFor(db)
+      const wt = await ensureWorktree(
+        worktreesRoot,
+        checkout,
+        owner,
+        repo,
+        branch,
+        head ?? null,
+        admission && ((action) => admission.admitWork(t.id, action)),
+      )
       // Falling back to the project root here would put the task in the main checkout, on whatever
       // branch the user last left it, silently, and typically alongside whatever other task lives there.
       // The failures that reach this line (git refusing a branch already checked out in another

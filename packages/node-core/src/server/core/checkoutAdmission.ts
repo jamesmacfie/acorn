@@ -16,11 +16,6 @@ export const registerCheckoutAdmission = (db: AppDatabase, admission: CheckoutAd
   byDatabase.set(db, admission)
 }
 export const checkoutAdmissionFor = (db: AppDatabase): CheckoutAdmission | undefined => byDatabase.get(db)
-export const admitCheckout = <T>(db: AppDatabase, taskId: string, action: () => Promise<T>): Promise<T> => {
-  const admission = byDatabase.get(db)
-  if (!admission) throw new BridgeError(503, 'checkout_admission_unavailable', 'Checkout admission is unavailable.')
-  return admission.admitWork(taskId, action)
-}
 
 // How long a mapped path's Git common directory stays in use as its queue key. Every admission reads
 // the key twice, the second time while holding the queue, so without this a repository's lookups wait

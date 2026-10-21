@@ -31,6 +31,20 @@ If another worktree or the project checkout has the task's branch checked out, G
 reports the occupied branch and path from Git's worktree roster and leaves that checkout alone.
 Release the branch there, then reopen the task to retry. Setup runs only after creation succeeds.
 
+Each repository has one admission queue, keyed by its shared Git folder
+([Admit work and writes](../git-client/stashes.md#admit-work-and-writes)). Creation enters it only
+around `git worktree add` and its branch check, the one step that changes the shared folder. The
+fetch, the file copy, and the `core:worktree-created` hooks run outside it, and a second caller for
+the same task joins the creation in flight. A read of a worktree that already exists doesn't enter
+the queue at all. `tasks.root`, `requireRoot`, `resolveCwd`, and `runConfig` read files and, when
+HEAD has moved, update `tasks.branch`. They don't change Git state. So the editor, the Git pane,
+and a prompt's tool list answer while another task creates a worktree. A read of a task with no
+worktree yet waits its turn at `git worktree add`.
+
+Archive sets a worktree aside by renaming it before it marks the task archived. A read that lands in
+between finds the task claimed by archive or the folder gone, and answers with no root. It doesn't
+build the worktree again, which is the answer it would get a moment later.
+
 ## Revalidate a worktree
 
 The directory is keyed by owner, repository, and branch, so revalidation checks the branch as well

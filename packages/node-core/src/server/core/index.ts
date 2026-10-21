@@ -134,23 +134,13 @@ export function createCoreServices(options: {
   // the bridge only exists once the plugins have started.
   capabilities: CapabilityRegistry
 }): CompiledCoreServices {
-  const rawTasks = createTaskService(options.db)
+  const tasks = createTaskService(options.db)
   const projects = createProjectService(options.db, options.activeIdentity)
-  const checkoutAdmission = createCheckoutAdmission(rawTasks, projects, git, async () =>
+  const checkoutAdmission = createCheckoutAdmission(tasks, projects, git, async () =>
     options.db.select(TASK_REF_COLUMNS).from(schema.tasks).all(),
   )
   checkoutAdmission.registerOwner('setup', async (taskIds) => setupCheckoutActivity(options.db, taskIds))
   registerCheckoutAdmission(options.db, checkoutAdmission)
-  const tasks: CompiledTaskService = {
-    ...rawTasks,
-    root: (taskId) => checkoutAdmission.admitWork(taskId, () => rawTasks.root(taskId)),
-    requireRoot: (taskId) => checkoutAdmission.admitWork(taskId, () => rawTasks.requireRoot(taskId)),
-    resolveCwd: (task, baseCheckout) =>
-      task
-        ? checkoutAdmission.admitWork(task.id, () => rawTasks.resolveCwd(task, baseCheckout))
-        : rawTasks.resolveCwd(task, baseCheckout),
-    runConfig: (taskId) => checkoutAdmission.admitWork(taskId, () => rawTasks.runConfig(taskId)),
-  }
   const identity = createIdentityService(options.activeIdentity)
   const models = createModelService(options.db, options.secrets)
   const prefs = createPrefService(options.db)

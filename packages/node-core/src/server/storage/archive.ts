@@ -28,7 +28,7 @@ import { projectRepository } from '../projects/projects'
 import { branchExists, discardWorktree, setWorktreeAside } from '../worktrees/worktrees'
 import { beginTaskArchive, finishTaskArchive } from '../worktrees/archiveGate'
 import { broadcastTasksChanged } from '../notify'
-import { admitCheckout, checkoutAdmissionFor } from '../core/checkoutAdmission'
+import { checkoutAdmissionFor } from '../core/checkoutAdmission'
 import { primaryChangeRequest } from '../core/changeRequests'
 import { runInSpan } from '../telemetry/collector'
 
@@ -374,7 +374,7 @@ export async function restoreTask(
   if (!checkout || !branch) taskScripts(db).newGeneration(id)
   if (checkout && branch) {
     try {
-      await admitCheckout(db, t.id, () => resolveTaskCwd(db, toTaskRef(t), checkout))
+      await resolveTaskCwd(db, toTaskRef(t), checkout)
     } catch (err) {
       await db
         .update(schema.tasks)

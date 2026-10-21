@@ -62,9 +62,11 @@ session with no work does not block it.
 
 Agents admits a queued turn or a Codex plan continuation under the guard. Workflows admits a new
 run or retry under it. The Workflow runner releases admission before ticking the graph, since a
-tick can enqueue an Agent turn. Core uses the same guard for lazy task-root preparation and archive
-claims. Manual setup admission enters this guard before Core persists its attempt. Automatic setup
-starts inside guarded lazy worktree preparation. An archive claim remains visible until teardown
+tick can enqueue an Agent turn. Core uses the same guard around `git worktree add` in lazy task-root
+preparation, and for archive claims. Reads of a worktree that exists skip it
+([Create a worktree](../workspaces-and-tasks/worktrees.md#create-a-worktree)). Manual setup admission
+enters this guard before Core persists its attempt. Automatic setup starts after the guarded add, in
+the same preparation. An archive claim remains visible until teardown
 settles. The guard releases in `finally`
 after a write, even when Git refuses or throws.
 

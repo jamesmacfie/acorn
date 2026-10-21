@@ -1,6 +1,6 @@
 import { execFileSync, spawn } from 'node:child_process'
-import { cpSync, mkdirSync, mkdtempSync, realpathSync, rmSync, writeFileSync } from 'node:fs'
-import { join } from 'node:path'
+import { cpSync, existsSync, mkdirSync, mkdtempSync, realpathSync, renameSync, rmSync, writeFileSync } from 'node:fs'
+import { join, resolve } from 'node:path'
 import { tmpdir } from 'node:os'
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest'
 import { schema } from '../db'
@@ -15,6 +15,10 @@ import {
   setWorktreesRoot,
   taskRoot,
 } from './taskWorktree'
+import { createCheckoutAdmission, registerCheckoutAdmission } from '../core/checkoutAdmission'
+import type { ProjectService } from '../core/projectRefs'
+import type { TaskService } from '../core/tasks'
+import { beginTaskArchive, finishTaskArchive } from './archiveGate'
 import { _resetWorktreeStatus, invalidateWorktreeStatus } from './worktreeStatus'
 import type { TelemetryRecord } from '@acorn/protocol/telemetry.ts'
 import {
@@ -41,6 +45,7 @@ vi.mock('node:child_process', async (importOriginal) => {
 vi.setConfig({ testTimeout: 20_000 })
 
 const TASK = '88888888-8888-4888-8888-888888888888'
+const OTHER_TASK = '99999999-9999-4999-8999-999999999999'
 const git = (cwd: string, ...args: string[]) => execFileSync('git', ['-C', cwd, ...args], { stdio: 'pipe' })
 
 // `core:worktree-created` is the single choke point that runs the workspace setup script: it must fire
@@ -143,6 +148,87 @@ describe('resolveTaskCwd core:worktree-created hook', () => {
     expect(fresh).toMatchObject({ cwd: a.cwd, created: false })
     expect(stale).toMatchObject({ cwd: a.cwd, created: false })
     expect(created).toHaveLength(1)
+  })
+
+  // One queue per repository, as the Node composes it, held by a second task of the same project.
+  const holdQueue = async () => {
+    const admission = createCheckoutAdmission(
+      { load: (id: string) => loadTask(t.db, id), active: async () => [] } as unknown as TaskService,
+      { byId: async () => ({ id: 'project-web', path: checkout }) } as unknown as ProjectService,
+    )
+    registerCheckoutAdmission(t.db, admission)
+    const now = Date.now()
+    await t.db.insert(schema.tasks).values({
+      id: OTHER_TASK,
+      title: 'Other',
+      origin: 'local',
+      projectId: 'project-web',
+      branch: 'feat-other',
+      status: 'active',
+      sort: 1,
+      createdAt: now,
+      updatedAt: now,
+    })
+    let release!: () => void
+    const held = new Promise<void>((resolve) => (release = resolve))
+    const running = admission.admitWork(OTHER_TASK, () => held)
+    return { admission, release, running }
+  }
+
+  it('reads a worktree that exists without waiting for the repository queue', async () => {
+    const { cwd } = await resolveTaskCwd(t.db, await loadTask(t.db, TASK), checkout)
+    const queue = await holdQueue()
+    try {
+      const start = performance.now()
+      expect(await taskRoot(t.db, TASK)).toBe(resolve(cwd))
+      expect(await requireTaskRoot(t.db, TASK)).toBe(resolve(cwd))
+      expect(performance.now() - start).toBeLessThan(50)
+    } finally {
+      queue.release()
+      await queue.running
+    }
+  })
+
+  it('makes a read of a task with no worktree wait for the queue, and frees the queue after the add', async () => {
+    const queue = await holdQueue()
+    const read = taskRoot(t.db, TASK)
+    await new Promise((resolve) => setTimeout(resolve, 200))
+    expect((await loadTask(t.db, TASK))?.worktreePath).toBeNull()
+
+    // The hook runs after `git worktree add`. A creation still holding the queue would never get past
+    // this read.
+    let hookAdmitted = false
+    clearHooks('setup')
+    registerHookHandler({
+      id: 'setup:queue-free',
+      pluginId: 'setup',
+      point: 'core:worktree-created',
+      mode: 'transform',
+      priority: 500,
+      call: async (payload) => {
+        await queue.admission.admitWork(OTHER_TASK, async () => void (hookAdmitted = true))
+        return { payload }
+      },
+    })
+    queue.release()
+    await queue.running
+    expect(await read).not.toBeNull()
+    expect(hookAdmitted).toBe(true)
+  })
+
+  // An archive renames the folder before it marks the task archived. A read in between gets no root, the
+  // answer it would get a moment later, and doesn't build the worktree again.
+  it('answers a task whose archive has set its worktree aside with no root, and builds nothing', async () => {
+    const { cwd } = await resolveTaskCwd(t.db, await loadTask(t.db, TASK), checkout)
+    expect(beginTaskArchive(TASK)).toBe(true)
+    try {
+      renameSync(cwd, `${cwd}-1-acorn-archive`)
+      expect(await taskRoot(t.db, TASK)).toBeNull()
+      await expect(requireTaskRoot(t.db, TASK)).rejects.toThrow('The task is not active.')
+      expect(existsSync(cwd)).toBe(false)
+    } finally {
+      finishTaskArchive(TASK)
+    }
   })
 
   it('correlates creation and shared waiting with their requesting surfaces without paths', async () => {

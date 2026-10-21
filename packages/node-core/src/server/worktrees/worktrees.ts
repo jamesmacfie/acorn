@@ -120,6 +120,16 @@ export function forkRemoteUrl(origin: string, base: string, fork: string): strin
   return `${prefix}${fork}${suffix}`
 }
 
+// An existing branch is checked out as it is. A new one starts at `startPoint`, or at the checkout's
+// HEAD when there is none. The branch check sits beside the add, so a lock around both keeps another
+// task from creating the branch between them.
+const addWorktree = async (checkout: string, path: string, branch: string, startPoint: string | null) => {
+  const args = (await branchExists(checkout, branch))
+    ? ['worktree', 'add', '--', path, branch]
+    : ['worktree', 'add', '-b', branch, '--', path, ...(startPoint ? [startPoint] : [])]
+  await gitOrThrow(args, { cwd: checkout, timeoutMs: 60_000 })
+}
+
 export async function ensureWorktree(
   worktreesRoot: string,
   checkout: string,
@@ -129,6 +139,9 @@ export async function ensureWorktree(
   // The task's primary change request: what to fetch, from a fork on origin's host when `fork` names
   // one and from origin otherwise, and how a person names it.
   changeRequest: { number: number; ref: string; name: string; fork?: { base: string; path: string } } | null,
+  // Runs `git worktree add`, the one step that changes the repository's shared Git folder. The caller
+  // passes the repository's admission queue, so the fetch before it and everything after stay outside.
+  exclusive: <T>(action: () => Promise<T>) => Promise<T> = (action) => action(),
 ): Promise<EnsureWorktreeResult> {
   if (!isValidBranch(branch)) return { ok: false, reason: 'Invalid branch name.' }
   const path = join(worktreesRoot, worktreeBranchDirName(owner, repo, branch))
@@ -186,10 +199,8 @@ export async function ensureWorktree(
     } catch (error) {
       return { ok: false, reason: gitFailure(failure, error) }
     }
-    const exists = await branchExists(checkout, branch)
-    const args = exists ? ['worktree', 'add', '--', path, branch] : ['worktree', 'add', '-b', branch, '--', path, head]
     try {
-      await prepareWorktreePhase('git.worktree.add', () => gitOrThrow(args, { cwd: checkout, timeoutMs: 60_000 }))
+      await exclusive(() => prepareWorktreePhase('git.worktree.add', () => addWorktree(checkout, path, branch, head)))
     } catch (error) {
       return {
         ok: false,
@@ -205,10 +216,8 @@ export async function ensureWorktree(
   // makes Git resolve HEAD in `checkout`, so the task inherits local commits even when origin's
   // remote-tracking ref is stale. `--` ends option parsing so a branch or path cannot be read as a
   // flag.
-  const exists = await branchExists(checkout, branch)
-  const args = exists ? ['worktree', 'add', '--', path, branch] : ['worktree', 'add', '-b', branch, '--', path]
   try {
-    await prepareWorktreePhase('git.worktree.add', () => gitOrThrow(args, { cwd: checkout, timeoutMs: 60_000 }))
+    await exclusive(() => prepareWorktreePhase('git.worktree.add', () => addWorktree(checkout, path, branch, null)))
   } catch (error) {
     return {
       ok: false,
