@@ -46,6 +46,7 @@ export type CoreProcService = {
   DEFAULT_TIMEOUT_MS: typeof proc.DEFAULT_TIMEOUT_MS
   KILL_GRACE_MS: typeof proc.KILL_GRACE_MS
   brokerEnv: typeof proc.brokerEnv
+  lowerPriority: typeof proc.lowerPriority
   runProcess: typeof proc.runProcess
   runProcessOrThrow: typeof proc.runProcessOrThrow
   ProcessError: typeof proc.ProcessError
