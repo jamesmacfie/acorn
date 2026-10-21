@@ -12,7 +12,7 @@ import { realpathSync } from 'node:fs'
 import { basename, dirname, isAbsolute, join, resolve, sep } from 'node:path'
 
 export type FileGuardPolicy = {
-  /** The data root, in every spelling the Node knows. */
+  /** The data root, in every spelling the Node knows, and the client folders (`clientCustodyDirs`). */
   dataDir: string[]
   /** What the file tools may read inside the data root. */
   read: string[]

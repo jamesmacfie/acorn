@@ -1,6 +1,48 @@
 # Phase 1: keep agents away from client device tokens
 
-Date: October 22, 2026. Status: proposed. Severity: high.
+## Completion note
+
+Done on October 22, 2026.
+
+What landed:
+
+- `appDataDir`, `configDir`, and `desktopDataRootDir` moved into
+  `packages/node-core/src/server/transport/listenerConfig.ts`. Custody re-exports `configDir` and
+  `desktopDataRootDir`, so no caller changed. A new `clientCustodyDirs(dataDir)` there lists the
+  folders to block, and `@acorn/plugin-api/node` exports it for the agents runtime.
+- `dataRootReadBlock` takes `clientDirs`. The block carries the ones it kept, and
+  `claudeReadBlockSettings` adds them to `denyRead` and to the file guard's protected roots. Their
+  entries join `hidden`, which feeds the `Read` and `Edit` deny rules, the same way the data root's do.
+- The CLI's environment check has a comment saying it isn't a boundary. The read block doc, the CLI
+  task doc, and the credentials doc say the same, and credentials names keychain sealing as the
+  follow-up. Four public site pages changed to match, and every page citing a touched file is marked.
+- Tests: a client folder case in `readBlock.test.ts`, and `packages/custody/src/local/paths.test.ts`
+  for `ACORN_TUI_CONFIG_DIR`.
+
+Decisions and deviations:
+
+- The desktop folder in the list is wrong for a development build. Its `data.key` lives in the
+  custody root beside the Node's root, `<data root>-shell` (`development_custody_root` in the desktop
+  crate), not in `com.acorn.desktop`. `clientCustodyDirs` lists both: the parent of
+  `desktopDataRootDir()` and `<data root>-shell`.
+- A client folder that holds the worktree or the data root is skipped, as the doc says. That always
+  skips the installed desktop's folder, because it holds the data root. Blocking it would stack a
+  second deny above paths the sandbox opens again, which I couldn't check on Linux. Its tokens are
+  sealed, so what stays open there is `fleet.json`, and `data.key` only where the keychain refused.
+  That's R21's case, which stays the owner's.
+- **Check this node** reports only the switch and the harnesses, not folder coverage, so the
+  diagnostics test didn't change.
+- The file guard's refusal still says "Acorn's data folder" for a client folder. That matches the
+  switch's name, so I left it.
+
+For later phases:
+
+- The `pnpm dev:agent` walk in Acceptance didn't run here. This session runs inside a sandbox, so a
+  nested Claude Code sandbox can't start. Phase 6 should walk it: `cat` of `device-token-local`, the
+  `env -u` CLI run, and `acorn task scripts status`, with the switch on and off.
+- The Node service bundle measured 1,937,689 bytes against the 1,939,000 ceiling after this change.
+
+Date: October 22, 2026. Status: done. Severity: high.
 
 Every client except the desktop keeps the owner's device token as a plain file. An agent runs as the
 same OS user, so one `cat` turns its task token into the owner's device token, which passes every

@@ -30,6 +30,13 @@ A blocked session's shell commands, and every process they start:
   its own skill folders, and its own attachment folder. The task CLI uses the token file and the
   certificate. A hard link from the data folder into the worktree fails too, because the sandbox
   checks the source path.
+- Can't read the client config folder, where the CLI, the terminal client, the phone gateway, and the
+  browser bridge keep their device tokens as plain files, or a development desktop's custody root,
+  which holds its plain `data.key` (`clientCustodyDirs` in
+  `packages/node-core/src/server/transport/listenerConfig.ts`). A client folder that holds the
+  session's worktree or the data folder isn't blocked, so a project kept in one still works. That
+  leaves out the installed desktop's own folder, which holds the data folder; its device tokens are
+  sealed with a key in the keychain.
 - Can write only in its worktree, a temporary folder, and the parts of the repository's `.git`
   folder a commit from a worktree writes. The files that make git run a program or read a different
   repository stay unwritable: `config`, `config.worktree`, `hooks`, `modules`, each worktree's
@@ -62,11 +69,11 @@ built as `file-guard.js` beside `mcp.js`). The guard resolves every link in the 
 file that doesn't exist yet through its folder, then checks that real path against the session's
 allowlist:
 
-- Inside the data folder, a read must fall within the session's worktree, its skill folders, its
-  attachment folder, its own token file, or the Node's certificate. A write must fall within the worktree or the git folders a
-  commit writes.
+- Inside the data folder or a client folder, a read must fall within the session's worktree, its
+  skill folders, its attachment folder, its own token file, or the Node's certificate. A write must
+  fall within the worktree or the git folders a commit writes.
 - The git files listed above can't be written, inside the data folder or not.
-- A search can't start from a folder that holds the data folder.
+- A search can't start from a folder that holds the data folder or a client folder.
 
 So a `.env` created in the data folder after the session started is refused, as is a write reached
 through a link in the worktree. The guard decides from the policy on its command line and never asks
@@ -94,7 +101,7 @@ outside contributors, and leave it off for work that needs those tools.
 ## What it doesn't cover
 
 - The agent's own token, which reaches only its own task.
-- Anything outside the data folder that your user can read.
+- Anything outside the data folder and the client folders that your user can read.
 
 For the rest of the model, see
 [what task scope does and doesn't protect against](../security.md#what-task-scope-does-and-doesnt-protect-against).

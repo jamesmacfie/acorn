@@ -94,6 +94,8 @@ export type AgentDriverLoopHooks = { command: string; args: string[]; beforeTool
  *  docs/managed-agents/read-block.md). Paths are absolute. */
 export type AgentDriverReadBlock = {
   dataDir: string
+  /** The client folders, blocked like the data root. Each one existed at the start. */
+  clientDirs: string[]
   /** The session's working folder, which its file tools may write. */
   worktree: string
   /** What the agent's commands still read inside the data root: its worktree, its own token file, the
@@ -105,8 +107,8 @@ export type AgentDriverReadBlock = {
   /** Git files it may never write, even inside `writable` or the worktree, because the Node's own
    *  unsandboxed git would act on them (`gitWrites`). Concrete paths, never globs. */
   writeDenied: string[]
-  /** Data root paths holding nothing the agent works in, for the harness's own file tools, which its
-   *  shell sandbox doesn't cover. */
+  /** Paths in the data root and the client folders holding nothing the agent works in, for the
+   *  harness's own file tools, which its shell sandbox doesn't cover. */
   hidden: string[]
   /** `host:port` of the Node's loopback API, for the task CLI. */
   loopback: string | null

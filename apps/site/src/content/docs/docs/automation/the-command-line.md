@@ -8,7 +8,7 @@ sources:
   - docs/cli/plugin-commands.md
   - docs/cli/local-service.md
   - apps/cli/src/args.ts
-checked: '1aaa5e5b6'
+checked: '9aaaaf7d3'
 ---
 
 `acorn` with a command is acorn's command-line interface (CLI): it talks to a Node and prints what it
@@ -146,6 +146,11 @@ acorn task scripts wait --phase setup --check
 It leaves out the task ID and reads it from the environment
 ([Environment variables](/docs/reference/environment-variables/#set-for-processes-in-a-task)). Other
 commands refuse, and say to run them outside the task's session.
+
+That refusal guards against running the wrong command by mistake. It doesn't stop an agent, which
+controls its own environment and can read the command line's device token like any of your files.
+**Keep agents out of Acorn's data folder** is what keeps a Claude Code agent away from that token
+([What acorn doesn't protect against](/docs/security/what-acorn-doesnt-protect-against/)).
 
 ## Run a Node in the background
 

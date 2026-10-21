@@ -16,6 +16,7 @@ import {
   acornFileGuard,
   acornLoopHook,
   agentProfileRegistry,
+  clientCustodyDirs,
   createLogger,
   deliverableSkills,
   describeError,
@@ -365,6 +366,7 @@ export class ManagedAgentEngine {
           await mkdir(attachments, { recursive: true })
           return (await import('../drivers/readBlock')).dataRootReadBlock({
             dataDir: options.dataDir,
+            clientDirs: clientCustodyDirs(options.dataDir),
             fileGuard,
             attachments,
             ...start,
