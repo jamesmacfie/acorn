@@ -484,6 +484,16 @@ Each plugin landing page above has topic pages in a folder of the same name:
   [main-thread work](./future/perf/08-main-thread-work.md), [faster
   opens](./future/perf/09-faster-opens.md), and [acceptance](./future/perf/10-acceptance.md).
 
+## October 21 security findings proposal
+
+- [Close the October 21 security findings](./future/security/README.md), with phases for [the paths
+  the host dispatches](./future/security/01-plugin-handler-routes.md), [pairing by
+  approval](./future/security/02-pairing-approval.md), [agent-created
+  tasks](./future/security/03-agent-created-tasks.md), [unattended agent
+  steps](./future/security/04-unattended-agent-steps.md),
+  [dependencies](./future/security/05-dependencies.md), and [recording the
+  review](./future/security/06-record-the-review.md).
+
 ## OpenCode harness proposal
 
 - [OpenCode as a contributed harness](./future/opencode.md), postponed.
