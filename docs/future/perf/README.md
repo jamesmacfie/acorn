@@ -1,34 +1,49 @@
 # Keep the window responsive under load
 
-Date: October 21, 2026. Status: phases 1 to 9 built on October 22, 2026. None of the targets below
-is measured yet, and phase 10 is open. Each phase's completion note says what it built, what it left,
-and what still needs the owner's machine.
+Date: October 21, 2026. Status: phases 1 to 9 built October 21 and 22, 2026, and their plans removed.
+Acceptance, in [phase 10](./10-acceptance.md), and the work listed under [still open](#still-open)
+remain.
 
 This programme makes the desktop window answer input and show data sooner, most of all while the
-machine is busy with agents and builds. It covers the helper's connection to the Node, background
-polling, process priority, blocking work on the Node, and long tasks in the renderer. Read this page
-before you pick up a phase.
+machine is busy with agents and builds. The reference pages below own what shipped. This page keeps
+the starting numbers that acceptance compares against, and the work that's left.
 
-## What the programme delivers
+## What shipped
 
-At the end, these hold on the owner's machine over a working week, measured in Sentry and with the
-load test from phase 1:
+| Phase | What changed | Owner |
+| --- | --- | --- |
+| 1 | `--load` and the `agents` fixture for the replay harness. Telemetry for the helper's queue wait (`broker.queue`), frame size, interaction work, and what ran during a stall. | [Streaming replay](../../local-development/streaming-replay.md), [diagnosis](../../telemetry/diagnosis.md), and [the baseline page](../../testing/window-under-load-2026-10-21.md), whose tables are still empty |
+| 2 | 16 sockets per loopback Node and 6 per remote one, a separate pool of four for long requests, a deadline that starts at the socket, one retry and never after a timeout, and no reads to an offline Node. | [Connection broker](../../shell/bridge-and-broker.md#connection-broker) |
+| 3 | One batched scripts read for the rail, status reads for the tasks on screen only, Docker's last list served at once, and no refetch on window focus by default. | [Renderer query cache](../../caching.md#renderer-query-cache), [task script snapshots](../../caching.md#task-script-snapshots), [schedules](../../schedules.md), and [Docker](../../docker.md) |
+| 4 | Agents at nice 5. Background Git, Docker polls, and setup and teardown scripts at nice 10. | [Process and paths](../../security/process-and-paths.md) and [agent operations](../../managed-agents/operations.md) |
+| 5 | The command settle, `#session` references, the usage source, record triggers, dataset pages, and the trigger list read through indexes or read less. | [Storage and memory](../../managed-agents/operations.md#storage-and-memory), [data layer](../../data-layer.md), and [triggers](../../workflows/triggers.md) |
+| 6 | Reads of an existing worktree skip checkout admission, and creation holds the queue only around `git worktree add`. | [Worktrees](../../workspaces-and-tasks/worktrees.md) |
+| 7 | Agent frames apply once per animation frame, and each session has its own signal. | [The transcript store](../../managed-agents/transcript-store.md) |
+| 8 | Markdown fences highlight in the worker, the cache persists an allowlist, and the composer, rail, dashboards, apps, and hidden terminals do less on the main thread. | [Persisted query cache](../../caching/persisted-query-cache.md), [Markdown renders block by block](../../ui-design/kit-internals.md#markdown-renders-block-by-block), [composer](../../managed-agents/composer.md), [rail and routing](../../frontend/rail-and-routing.md), [views](../../dashboards/views.md), [app runtime](../../agent-built-apps/runtime.md), and [the terminal client](../../terminal/client.md) |
+| 9 | Each dashboard panel draws on its own and reads its sources together. The editor draws kept text first. The composer reuses its context, and a reply's first chunk goes out at once. Cold starts prepare in parallel, and usage answers from its last snapshot. | [Placements](../../dashboards/placements.md), [the editor pane](../../editor/editor-pane.md), [the transcript store](../../managed-agents/transcript-store.md), and [plan usage](../../managed-agents/providers.md#plan-usage) |
 
-- A fast Node route reaches the renderer within 50 ms of the Node answering it, even while long
-  requests are in flight. No renderer read times out while it waits for a connection.
-- Background polling scales with what's on screen, not with the number of tasks.
-- Agents, builds, and polls run at a lower CPU priority than the window, the helper, and the Node.
-- No single synchronous SQLite statement on the Node runs longer than 250 ms on the owner's data.
-- An agent's socket frames are applied at most once per animation frame, and no code highlighting
-  runs on the main thread.
-- The persisted query cache holds what the first frame needs, under 1 million characters.
+## Still open
 
-These targets are proposed. The owner confirms or changes them once phase 1 has the loaded baseline:
-
-- `ui.frame.gap.max` p95 under 120 ms while the host load is above the CPU count, against 182 ms.
-- Windows with a frame gap over 250 ms under load at 0.5% or less, against 2.4%.
-- Node `runtime.event_loop.max.max` p95 under 150 ms under load, against 490 ms.
-- First Agent pane open p95 under 3 s, against 12.1 s.
+- **Measurements.** No replay under `--load` has run, because an agent-launched window is hidden and
+  the replay refuses it. No week of Sentry has been read. [Phase 10](./10-acceptance.md) owns both.
+- **The paged transcript.** The Agent pane still pages a whole transcript before it draws. Reading the
+  newest page first needs a design for a projection that doesn't start at the first event: tool cards
+  whose opening row is missing, card counts, and the scroll when older pages arrive. It's the change
+  most likely to move the 12.1 s first open.
+- **Cold starts in the shared queue pass.** `queueCoordinator.ts` still awaits each cold start inside a
+  pass shared by the whole Node. Moving it out needs a record of failed starts that outlives one scan,
+  or a failed start retries in a loop.
+- **Launch restore.** `App.tsx` still waits for this launch's prefs read, because restoring from the
+  cached copy opened the wrong place after a quick quit. Measure `renderer.startup.usable` first.
+- **Agent events only to viewers that hold the session.** The `agent:attach` and `agent:detach`
+  protocol change is built only if `ws.inbound.agent` stays above target. It would go in the Node's
+  `sessionFrames.ts`, with a reattach hook in `wsChannels.ts`.
+- **A pushed `task-scripts:changed` frame.** The rail polls its one batched read every 15 seconds. A
+  frame with a 60-second backstop needs a protocol change.
+- **The first boot after the upgrade.** Migration `0022` builds two partial indexes over every agent
+  event, about 830,000 on the owner's machine. Watch that boot's `migrate` mark.
+- **The read worker.** A second, read-only `DatabaseSync` in a worker for data sources, search,
+  export, and usage stays an option if a read still passes 250 ms.
 
 ## Starting point
 
@@ -73,64 +88,13 @@ the main thread for up to 1,051 ms, once inside a 1,471 ms navigation. The persi
 `renderer.startup.usable` had a p50 of 1.8 to 2.7 s over 29 visible launches, against 1.3 s on
 October 13. `/v1/p/agents/usage` took 8.4 s at the median.
 
-## The phases
-
-| Phase | What changes |
-| --- | --- |
-| [1](./01-measure-under-load.md) | A load test for the replay harness, and the telemetry that splits queue time from work. |
-| [2](./02-helper-connections.md) | The helper stops queuing fast reads behind slow ones, and stops polling a dead Node. |
-| [3](./03-fewer-background-reads.md) | Rail, status, and Docker polling scale with the screen, and focus stops refetching everything. |
-| [4](./04-process-priority.md) | Agents, task scripts, and background polls run at a lower CPU priority than the window. |
-| [5](./05-node-sqlite-stalls.md) | The SQLite reads that stall the Node's loop use their indexes, or read less. |
-| [6](./06-checkout-admission-reads.md) | Reads of an existing worktree stop waiting behind another task's Git writes. |
-| [7](./07-agent-frames.md) | Agent frames are applied once per animation frame, and each session wakes only its readers. |
-| [8](./08-main-thread-work.md) | Code highlighting, cache saves, typing, the rail, dashboards, and hidden terminals do less on the main thread. |
-| [9](./09-faster-opens.md) | The Agent pane, dashboards, the editor, the composer, and launch draw before every read finishes. |
-| [10](./10-acceptance.md) | The load test and a working week in Sentry, compared with phase 1. |
-
-## Order and dependencies
-
-Phase 1 comes first and is small. Every later phase compares against it.
-
-Phases 2 and 3 have the largest measured effect, and they help each other. Phase 2 lets fast reads
-through, and phase 3 sends fewer of them. Do 2 before 3, so the drop in queue time shows separately
-from the drop in requests.
-
-Phase 4 needs nothing else. It targets the busy-machine case directly, so ship it soon after phase 1.
-
-Phases 5 and 6 are on the Node and can run beside phases 7 and 8 in the renderer. Phase 9 comes after
-phase 2, because many of its waits are queue waits that phase 2 removes. Measure again before you
-build each part of it. Phase 10 comes last.
-
-## What holds across every phase
-
-- Measure before and after with the same method, and record both. A change with no measured gain gets
-  reverted.
-- Compare a visible window with a visible window. A `pnpm dev:agent` window is hidden unless the
-  replay harness shows it, so use a hidden one for counts, not for times.
-- A request that waits less must not answer differently. Freshness rules, write ordering, and the
-  data a reader sees stay as they are unless the phase says otherwise.
-- Persisted data keeps its shape, or gets a migration in the same change.
-- New spans and attributes follow
-  [the admission rule](../../telemetry/model.md#the-admission-rule-for-a-span), and each updates its
-  seams table in the same change.
-- When a phase ships, document the behavior in its owning page and trim the phase here.
-
 ## Out of scope
 
 - Agent processes' own memory. They peaked at 13 GB on October 21, against 8 GB on October 13, and
   swap explains part of the load. [Idle stop](../../managed-agents/operations.md#idle-stop) owns
   that. Revisit its 4 GB limit separately.
-- Shrinking `agents.sqlite`. Phase 5 adds reads that use indexes. It doesn't change storage.
+- Shrinking `agents.sqlite`. The programme's reads use indexes and don't change storage.
 - The remote preview proxy, which shares the broker's sockets.
   [The split programme](../split/10-remote-preview-proxy.md) owns it.
 - Cold launch work the October 19 perf plan finished. Phase 9 touches launch only where restore waits
   on a fresh prefs read.
-
-## Why
-
-Two earlier programmes cut payloads and Git calls, and the October 13 targets mostly held. The window
-still feels slow, because the remaining time sits in queues and on a shared CPU. The four-socket
-queue turns a 10 ms read into a 3 s one, and nothing in the repository sets a process priority, so a
-build at load 30 competes with the window as an equal. Fixing those two gains more than any single
-faster query. The rest of the programme removes the work that fills the queue and the main thread.

@@ -483,17 +483,10 @@ Each plugin landing page above has topic pages in a folder of the same name:
   [keeping the machine awake](./future/node-tray/07-keep-awake.md), and [acceptance on real
   machines](./future/node-tray/08-acceptance.md).
 
-## Responsiveness under load proposal
+## Responsiveness under load
 
-- [Keep the window responsive under load](./future/perf/README.md), with phases for [measuring under
-  load](./future/perf/01-measure-under-load.md), [the helper's
-  connections](./future/perf/02-helper-connections.md), [fewer background
-  reads](./future/perf/03-fewer-background-reads.md), [process
-  priority](./future/perf/04-process-priority.md), [Node SQLite
-  stalls](./future/perf/05-node-sqlite-stalls.md), [checkout admission
-  reads](./future/perf/06-checkout-admission-reads.md), [agent frames](./future/perf/07-agent-frames.md),
-  [main-thread work](./future/perf/08-main-thread-work.md), [faster
-  opens](./future/perf/09-faster-opens.md), and [acceptance](./future/perf/10-acceptance.md).
+- [Keep the window responsive under load](./future/perf/README.md): what shipped, what's still open,
+  and [acceptance](./future/perf/10-acceptance.md).
 
 ## October 22 security findings proposal
 
