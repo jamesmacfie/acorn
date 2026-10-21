@@ -84,6 +84,7 @@ async function serve(flags: { node?: string; port?: string; origin?: string }): 
   gateway = await startGateway({
     broker,
     nodeId: node.nodeId,
+    label: node.label,
     sessions,
     codes,
     origin,

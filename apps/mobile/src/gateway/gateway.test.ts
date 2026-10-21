@@ -98,6 +98,7 @@ beforeEach(async () => {
   gateway = await startGateway({
     broker: broker as unknown as GatewayBroker,
     nodeId: NODE_ID,
+    label: 'Studio Mac',
     sessions: sessionStore(join(dir, 'sessions')),
     codes,
     origin: ORIGIN,
@@ -177,6 +178,15 @@ describe('the checks on every request', () => {
     expect((await send('/node/v1/core/tasks')).status).toBe(401)
     expect((await send('/node/v1/core/tasks', { headers: { cookie: 'acorn_session=forged' } })).status).toBe(401)
     expect(broker.fetch).not.toHaveBeenCalled()
+  })
+
+  it('names its Node to a signed-in phone and says when a phone is signed out', async () => {
+    const reply = await send('/session', { headers: { cookie: await cookie() } })
+    expect(reply.status).toBe(200)
+    expect(JSON.parse(reply.body)).toEqual({ nodeId: NODE_ID, label: 'Studio Mac' })
+    const signedOut = await send('/session')
+    expect(signedOut.status).toBe(401)
+    expect(JSON.parse(signedOut.body).error.code).toBe('signed_out')
   })
 
   it('refuses a denied route and names the desktop', async () => {

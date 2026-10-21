@@ -209,6 +209,7 @@ Start with the plugin map, then follow the authoring guide or API reference.
 | [telemetry/diagnosis.md](./telemetry/diagnosis.md) | What Settings → Telemetry shows, diagnosing an unresponsive view, and memory over a day. |
 | [shell.md](./shell.md) | The Tauri shell: schemes, custody, webviews, the helper, and packaging. |
 | [tui.md](./tui.md) | The terminal client: `acorn` in a terminal, its process model, its host switch, how it draws a frame, and its chrome. |
+| [mobile.md](./mobile.md) | The mobile web app: its platform seam over the gateway, its screens, how to run it, and how to drive it at phone width. |
 | [cli.md](./cli.md) | Headless `acorn` commands, Node selection, read resources, output, and exit codes. |
 | [cli/workspaces-projects-tasks.md](./cli/workspaces-projects-tasks.md) | CLI core writes, retries, stdin piping, and task script reads. |
 | [cli/agents-and-workflows.md](./cli/agents-and-workflows.md) | CLI agent sessions, workflow runs, and the run list. |

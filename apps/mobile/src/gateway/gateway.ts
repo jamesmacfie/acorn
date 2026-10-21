@@ -133,6 +133,8 @@ const returnedHeaders = (headers: Record<string, string>): Record<string, string
 export function startGateway(options: {
   broker: GatewayBroker
   nodeId: string
+  /** The Node's name in the gateway's fleet, which a phone shows as its Node's name. */
+  label: string
   sessions: SessionStore
   codes: PairingCodes
   /** The address phones open, such as https://host.tailnet.ts.net. */
@@ -242,10 +244,17 @@ export function startGateway(options: {
     if (method !== 'GET' && method !== 'HEAD' && req.headers.origin !== served.origin)
       return answer(res, 403, 'wrong_origin', `Requests must come from ${served.origin}.`)
     if (url.pathname === '/session' && method === 'POST') return signIn(req, res)
-    if (url.pathname === '/node' || url.pathname.startsWith('/node/')) {
+    const isNode = url.pathname === '/node' || url.pathname.startsWith('/node/')
+    if (isNode || (url.pathname === '/session' && method === 'GET')) {
       const session = sessionOf(req)
       if (!session) return answer(res, 401, 'signed_out', 'Sign in to the gateway with a code.')
-      return forward(req, res, url, requestId, session)
+      if (isNode) return forward(req, res, url, requestId, session)
+      // Which Node this gateway serves, so the phone can list it before its socket opens, and tell
+      // a signed-out phone from a gateway it can't reach.
+      res
+        .writeHead(200, { 'content-type': 'application/json', 'cache-control': 'no-store' })
+        .end(JSON.stringify({ nodeId, label: options.label }))
+      return
     }
     if (method === 'GET') return serveApp(url, res)
     answer(res, 404, 'not_found', 'Nothing is served at that path.')

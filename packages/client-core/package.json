@@ -151,6 +151,7 @@
     "./infra/highlight": "./src/infra/highlight/public.ts",
     "./infra/node": "./src/infra/node/public.ts",
     "./infra/node/activeNode.ts": "./src/infra/node/activeNode.ts",
+    "./infra/node/fetchBody.ts": "./src/infra/node/fetchBody.ts",
     "./infra/node/fleet.ts": "./src/infra/node/fleet.ts",
     "./infra/node/wsClient.ts": "./src/infra/node/wsClient.ts",
     "./infra/persistence": "./src/infra/persistence/public.ts",

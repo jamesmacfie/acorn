@@ -1,4 +1,4 @@
-export { createAppStartupRestore } from './appStartup.ts'
+export { applyAppearance, createAppStartupRestore } from './appStartup.ts'
 export { parseJson, persistedStateRegistry, stringifyPersistedValue, utf8Bytes } from './persistedState.ts'
 export type { PersistedStateSlice } from './persistedState.ts'
 export { PersistedSliceKeys, PrefKeys } from './prefKeys.ts'

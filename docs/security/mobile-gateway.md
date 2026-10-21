@@ -69,6 +69,7 @@ The gateway answers these paths:
 | Path | What it does |
 | --- | --- |
 | `POST /session` | Spends a sign-in code and sets the cookie |
+| `GET /session` | Names the Node, as `{ nodeId, label }`, to a phone with a live session, and answers `401 signed_out` to one without |
 | `/node/*` | Forwards the rest of the path and the query to the Node through `broker.fetch`, and answers with the Node's status, headers, and body |
 | `GET /events` | The event socket |
 | Any other `GET` | A file from the built web app in `apps/mobile/dist`, or its `index.html` for a path without an extension, with `Content-Security-Policy: script-src 'self'` |
@@ -140,6 +141,9 @@ curl -H 'Cookie: acorn_session=SESSION' http://127.0.0.1:4320/node/v1/core/tasks
 
 Run `pnpm --filter @acorn/mobile gateway sessions` to list sessions and
 `pnpm --filter @acorn/mobile gateway revoke ID` to end one.
+
+To work on the web app the gateway serves, run `pnpm dev:mobile` instead. It starts the gateway behind
+a dev server ([mobile web app](../mobile.md#run-it)).
 
 ## Limits
 
