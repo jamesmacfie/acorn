@@ -655,7 +655,7 @@ export default function DockerBrowse() {
   )
 
   return (
-    <ListDetail listLabel="Docker objects" list={list}>
+    <ListDetail listLabel="Docker objects" list={list} selection={section() === 'containers' ? selected() : null}>
       {/* Only containers have a detail, so the other tabs leave the column empty. */}
       <Show
         when={section() === 'containers' && selected()}

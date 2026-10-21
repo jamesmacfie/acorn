@@ -32,6 +32,12 @@ A pane that collapses without doing that gets full-width rows clipped mid-word. 
 remote tree can't read a host signal from its worker, so it leaves the flag off and keeps a column
 that resizes but doesn't collapse. See [two-column panes](../ui-design/two-column-panes.md#two-column-panes).
 
+### Selection
+
+`selection`, on a `list-detail` pane, returns the key of what the list has selected, or null. A phone
+shows one region at a time and uses it to show the detail when someone picks a row
+([narrow `list-detail`](./layout.md#narrow-list-detail)). A desktop layout ignores it.
+
 ### Archived tasks
 
 `readsArchived` says a task pane can draw an archived task. The archive page previews one in the

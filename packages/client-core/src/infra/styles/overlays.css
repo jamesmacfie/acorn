@@ -167,5 +167,14 @@
    top plus a bottom, with no inline height, is what makes the flex column fill. */
 .ui-drawer[data-maximized] { top: var(--topbar-h); }
 
+/* Narrow: a phone has no rails or task footer to sit between, so a drawer is a sheet over the whole
+   screen, padded clear of the notch and the home indicator. It reads the root attribute the phone's
+   shell sets, as narrow.css does (formFactor() in infra/platform). */
+:root[data-form-factor='narrow'] .ui-drawer {
+  inset: 0;
+  height: auto;
+  padding: env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left);
+}
+
 /* The palette's hints line (PaletteSurface footer). */
 .palette-foot { padding: var(--space-3) var(--space-6); font-size: var(--fs-2xs); border-top: var(--chrome-divider); }

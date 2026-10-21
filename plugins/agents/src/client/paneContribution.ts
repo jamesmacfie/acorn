@@ -42,6 +42,7 @@ export const agentPaneContribution: PaneLayoutContribution<AgentPaneModel> = {
   prefetch: (task) => void managedAgentStore.loadTask(task.id).catch(() => {}),
   // The sidebar gives each row its run-state glyph back as a rail form.
   collapsible: true,
+  selection: (_task, model) => model.selectedSessionId() ?? null,
   regions: {
     'list-header': AgentSidebarHeader,
     list: AgentTaskSidebar,

@@ -412,6 +412,7 @@ export default function EditorPane(props: { task: Task }) {
           listLabel="Editor sidebar"
           collapseKey={sidebarKey}
           collapseContent="empty"
+          selection={active() ?? null}
           list={
             <>
               <Tabs

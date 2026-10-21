@@ -93,6 +93,10 @@ export default function WorkflowEditor(props: { projectId: string; item?: string
     workspaces.data?.find((entry) => entry.projects.some((project) => project.id === props.projectId))?.id ?? ''
 
   const draft = () => store.draft()
+  const selectionKey = () => {
+    const { selection } = draft()
+    return selection.kind === 'node' ? `node:${selection.name}` : selection.kind
+  }
   // What the graph's positions are filed under: the definition's key, or an empty string for a draft
   // that has no row yet, which reads and writes nothing.
   const layoutId = () => {
@@ -729,9 +733,9 @@ export default function WorkflowEditor(props: { projectId: string; item?: string
           when={tab() !== 'json'}
           fallback={<JsonTab json={store.json()} readOnly={store.readOnly()} onApply={store.applyText} />}
         >
-          {/* The list column stays beside the canvas and collapses under it on a narrow layout, which
-            is `list-detail`'s own rule rather than anything this pane decides. */}
-          <ListDetail split>
+          {/* The list column stays beside the canvas, and a narrow layout shows one at a time, which is
+            `list-detail`'s own rule rather than anything this pane decides. */}
+          <ListDetail split selection={selectionKey()}>
             <ListColumn>
               <Show when={workflowCatalogKey()} keyed>
                 {(_catalogKey) => (

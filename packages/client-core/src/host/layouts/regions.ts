@@ -33,6 +33,10 @@ export type LayoutProps = {
   /** `list-detail` only. What the list is showing, usually the task, so that each one keeps its own
    *  scroll position in the list column rather than every task sharing the pane's. */
   scrollScope?: string
+  /** `list-detail` only. What the list has selected, as a key, or null for nothing. A narrow layout
+   *  shows the detail when it changes to a new key. Absent for a pane with no selection to report,
+   *  which stays on the list until someone presses **Show detail**. */
+  selection?: string | null
   /** `tabs` only. The bar, in order; each entry has a `panel:<id>` region. */
   tabs?: readonly { id: string; label: string }[]
   /** `wizard` only. The host draws the indicator from these and the back and next controls. */

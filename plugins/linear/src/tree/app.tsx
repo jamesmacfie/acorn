@@ -228,7 +228,7 @@ export function LinearIssuePane(props: LinearPaneProps & { bridge: AcornBridge }
   // multi-ticket task gets its switcher here.
   return (
     <Show when={linked().length > 1} fallback={body()}>
-      <ListDetail split listWidth="narrow">
+      <ListDetail split listWidth="narrow" selection={target() ? targetKey(target()!) : null}>
         <ListColumn label="Linked Linear issues">
           <For each={linked()}>
             {(entry) => (

@@ -23,6 +23,10 @@ export const notesPaneContribution: PaneLayoutContribution<NotesModel> = {
   regions: { 'list-header': NotesHeader, list: NotesList, detail: NoteBody },
   collapsible: true,
   collapseContent: 'empty',
+  selection: (_task, model) => {
+    const note = model.selected()
+    return note ? `${note.scope}:${note.slug}` : null
+  },
   // Notes are files under the data root, not in the worktree, so they outlive an archive.
   readsArchived: true,
 }

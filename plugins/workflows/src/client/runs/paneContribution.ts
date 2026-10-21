@@ -27,5 +27,8 @@ export const workflowsPaneContribution: PaneLayoutContribution<RunPaneModel> = {
   layout: 'list-detail',
   // The runs, the selection, the live tail and the four verbs, built once per task by the host.
   model: (task, pane) => createRunPaneModel(task, pane.shown),
+  // The step is what the detail draws, and it belongs to a run, so picking either moves the key.
+  selection: (_task, model) =>
+    model.selectedRunId() && model.selectedStepId() ? `${model.selectedRunId()}:${model.selectedStepId()}` : null,
   regions: { 'list-header': RunPaneHeader, list: RunPaneList, 'list-footer': RunPaneFooter, detail: NodeDetail },
 }

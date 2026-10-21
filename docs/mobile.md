@@ -118,6 +118,21 @@ paint. Client-core does the rest, and no plugin changes
 
 The phone's own bars are sized in `mobile.css`.
 
+## Narrow layouts
+
+Each host layout draws a phone projection from the same component it draws the desktop with, choosing
+by `formFactor()` once per mount ([pane layouts](./panes/layout.md#named-layouts)):
+
+- `list-detail` and the kit's `ListDetail` show one column at a time. A pane's `selection` shows the
+  detail, **Back** returns to the list, and **Show detail** goes forward again
+  ([narrow `list-detail`](./panes/layout.md#narrow-list-detail)).
+- `document-over-frame`, `frame-beside-document`, and `stack-split` fill the pane with their first
+  region. **Show panel** opens the second in a full-screen `Drawer`.
+- On a phone every `Drawer` is a sheet over the whole screen, because there are no rails or task footer
+  to sit between.
+- `single`, `header-body-footer`, `wizard`, and `tabs` don't change. The tab strip already scrolls
+  sideways.
+
 ## Limits
 
 - Loaded plugins don't run, because the browser has no plugin custody.

@@ -137,6 +137,15 @@ export type PaneLayoutContribution<M = undefined> = PaneCommon & {
   collapsible?: boolean
   /** Use an empty rail when the list has no useful one-mark representation. */
   collapseContent?: 'rows' | 'empty'
+  /**
+   * `list-detail` only: what the list has selected, as a key, or null for nothing. A layout that shows
+   * one region at a time, which is the phone's, pushes the detail when this changes to a key
+   * (docs/panes/layout.md § Layout model). Read it from the selection the model already keeps.
+   *
+   * Without it the narrow layout stays on the list until someone presses **Show detail**, so a pane
+   * works on a phone before its author adds this.
+   */
+  selection?: (task: Task, model: M) => string | null
 }
 
 /** What the host tells a pane's model about the pane it belongs to. */
@@ -298,6 +307,10 @@ function drawLayout(entry: PaneLayoutContribution<any>, owner?: string): PaneCon
             },
             collapsible: entry.collapsible === true,
             collapseContent: entry.collapseContent ?? 'rows',
+            // A getter for the reason `hidden` is: the selection moves without the pane redrawing.
+            get selection() {
+              return entry.selection?.(props.task, model())
+            },
             get scrollScope() {
               return props.task.id
             },

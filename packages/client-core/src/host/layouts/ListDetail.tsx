@@ -1,6 +1,8 @@
 import { Show } from 'solid-js'
 import { paneCollapseKey, sidebarCollapse } from '../../kit/lib/layout/collapseState'
-import { CollapseEdge, SplitHandle } from '../../kit/components/primitives'
+import { CollapseEdge, SplitHandle, ViewSwitch } from '../../kit/components/primitives'
+import { formFactor } from '../../infra/platform'
+import { createNarrowView } from '../../kit/lib/layout/narrowView'
 import { createSplitDrag } from '../../kit/lib/layout/split'
 import { retainScroll } from '../../kit/lib/layout/retainScroll'
 import { layoutState } from './state'
@@ -29,8 +31,10 @@ import type { LayoutProps } from './regions'
 // becomes one icon or nothing at all is a question only the pane can answer, and it answers it by
 // reading the same signal this does (kit/lib/layout/collapseState.ts).
 //
-// Narrow: one region at a time, and selecting in the list pushes the detail. Terminal: the same below
-// 80 columns, two columns above it, with a key to switch groups.
+// Narrow: one region at a time, with no divider or collapse control. The pane's `selection` changing to
+// a key shows the detail, **Back** returns to the list and leaves the selection alone, and **Show detail**
+// goes forward again. Terminal: the same below 80 columns, two columns above it, with a key to switch
+// groups.
 
 // The list's width in pixels, once someone has dragged it. Zero means "whatever --listdetail-w says",
 // which is a clamp against the viewport rather than a number, so the default cannot be written here.
@@ -38,11 +42,18 @@ const MIN_LIST_WIDTH = 120
 const MAX_LIST_FRACTION = 0.6
 
 export function ListDetail(props: LayoutProps) {
+  // Fixed for a boot, so the branch never remounts a region.
+  const narrow = formFactor() === 'narrow'
   const [width, setWidth] = layoutState(props.stateKey, 'list-width', 0)
   const [stored, setCollapsed] = sidebarCollapse(paneCollapseKey(props.stateKey))
   // A pane that never offered the control must not come back collapsed because it once did, or a
   // stored flag from an earlier build leaves a rail nobody can widen.
-  const collapsed = () => props.collapsible === true && stored()
+  const collapsed = () => !narrow && props.collapsible === true && stored()
+  const [view, setView] = createNarrowView(() => props.selection)
+  const listHidden = () => props.hidden?.includes('list') === true
+  // A hidden list leaves the detail alone on screen, narrow or not, so there is nothing to go back to.
+  const showList = () => !listHidden() && (!narrow || view() === 'list')
+  const showDetail = () => !narrow || listHidden() || view() === 'detail'
   let root: HTMLDivElement | undefined
   let list: HTMLElement | undefined
   // Snapshotted at pointer-down, so a keyboard nudge measures from the width on screen rather than
@@ -75,9 +86,10 @@ export function ListDetail(props: LayoutProps) {
     <div
       ref={root}
       class="pane layout-list-detail"
+      data-view={narrow ? view() : undefined}
       style={width() && !collapsed() ? { '--listdetail-w': `${width()}px` } : undefined}
     >
-      <Show when={!props.hidden?.includes('list')}>
+      <Show when={showList()}>
         {/* <aside> rather than a div: the list is a complementary landmark, and naming it is how a
             screen reader tells two same-shaped columns apart. */}
         <aside
@@ -108,22 +120,32 @@ export function ListDetail(props: LayoutProps) {
               <div class="layout-list-footer">{props.regions['list-footer']?.()}</div>
             </Show>
           </Show>
+          <Show when={narrow && props.selection !== null}>
+            <ViewSwitch to="detail" onSwitch={() => setView('detail')} />
+          </Show>
         </aside>
         {/* The same edge the kit's split draws, from the same node, so the two collapse controls
             cannot drift apart again (kit/components/layout/ListDetail.tsx § CollapseEdge). A pane that
             cannot collapse gets the bare grip and no wrapper. */}
-        <Show when={props.collapsible} fallback={<SplitHandle axis="x" drag={drag} />}>
-          <CollapseEdge
-            collapsed={collapsed()}
-            onToggle={() => setCollapsed(!collapsed())}
-            drag={drag}
-            listLabel={props.label}
-          />
+        <Show when={!narrow}>
+          <Show when={props.collapsible} fallback={<SplitHandle axis="x" drag={drag} />}>
+            <CollapseEdge
+              collapsed={collapsed()}
+              onToggle={() => setCollapsed(!collapsed())}
+              drag={drag}
+              listLabel={props.label}
+            />
+          </Show>
         </Show>
       </Show>
-      <div class="layout-region-detail" use:regionFocus={{ paneId: props.stateKey, regionId: 'detail' }}>
-        {props.regions.detail?.()}
-      </div>
+      <Show when={showDetail()}>
+        <Show when={narrow && !listHidden()}>
+          <ViewSwitch to="list" onSwitch={() => setView('list')} />
+        </Show>
+        <div class="layout-region-detail" use:regionFocus={{ paneId: props.stateKey, regionId: 'detail' }}>
+          {props.regions.detail?.()}
+        </div>
+      </Show>
     </div>
   )
 }

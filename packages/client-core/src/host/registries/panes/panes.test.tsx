@@ -496,3 +496,24 @@ describe('the pane spans', () => {
     expect(spansNamed('pane.region')[0].attrs.owner).toBe('core')
   })
 })
+
+// A narrow `list-detail` pushes the detail when the pane's selection changes, and the pane reports
+// that selection from the model it already keeps (docs/panes/layout.md § Layout model).
+describe('a pane’s selection', () => {
+  afterEach(() => {
+    delete document.documentElement.dataset.formFactor
+  })
+
+  it('reaches a narrow list-detail layout, which shows the detail when it changes', async () => {
+    document.documentElement.dataset.formFactor = 'narrow'
+    const [key, setKey] = createSignal<string | null>(null)
+    register(pane({ model: () => ({ key }), selection: (_task, model) => model.key() }))
+    const Pane = paneRegistry.get('notes')!.component
+    dispose = render(() => <Pane task={task} />, host)
+    const shown = () => [...host.querySelectorAll('[data-region]')].map((node) => node.getAttribute('data-region'))
+    await until(() => shown().length > 0)
+    expect(shown()).toEqual(['list'])
+    setKey('one')
+    expect(shown()).toEqual(['detail'])
+  })
+})
