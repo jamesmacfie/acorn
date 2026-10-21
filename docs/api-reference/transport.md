@@ -90,14 +90,21 @@ These limits apply:
 
 - The ask answers only a loopback peer. Anything else gets `403 pairing_local_only` and pairs with a
   code, because a dialog anyone on the network could raise is one the owner learns to click through.
-- The ask shares the code route's ceiling of 20 requests a minute. The claim has no ceiling, because
-  its secret is 256 random bits.
-- The Node holds one request for two minutes, in memory. A new ask replaces the old one, so a person
-  who restarts `acorn` isn't locked out by their first attempt. A restart drops it.
+- The ask has its own ceiling of 6 a minute, apart from the code route's 20, so a loop of asks can't
+  block someone typing a code from another computer. The claim has no ceiling, because its secret is
+  256 random bits.
+- The Node holds one request for two minutes, in memory. An ask that lands while another is still
+  waiting for an answer cancels both and gets `409 pairing_busy`, so something racing the owner can
+  cancel their request but never take its place on their dialog. The next ask starts clean, and a
+  person who restarts `acorn` gets one refusal, then pairs. An ask after the held request was
+  answered or expired replaces it. A restart drops it.
 - The secret travels only in request bodies, never in a path a log could keep. Any process on the
   computer can ask, agents included. The phrase is how the owner tells their own request from one
   raced in by something else.
-- The desktop opens the dialog by itself. The terminal client draws no dialog, so it can ask but
+- The desktop opens the dialog by itself, and never changes the request it shows. A frame that brings
+  a different request, or none, closes the dialog with a toast. **Allow** stays disabled for the
+  first second.
+ The terminal client draws no dialog, so it can ask but
   can't allow.
 
 `DELETE /v1/core/devices/:id` closes that device's open WebSocket connections at once, because a live

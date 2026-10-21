@@ -6,10 +6,12 @@ import { fingerprintWords } from '@acorn/protocol/fingerprintWords.ts'
 // computer asks for a device token, the owner allows or denies it from a client that is already
 // paired, and the asker collects the token with the secret only it was given.
 //
-// One request at a time, like one code at a time (pairingCodes.ts). A new ask replaces the old one, so
-// a person who quits and reruns `acorn` isn't locked out by their own first attempt. The phrase is
-// what lets the owner tell their own request from one something else raced in: the asker prints it,
-// and the dialog shows it.
+// One request at a time. An ask that lands while another is still waiting for an answer cancels both,
+// so something racing the owner can cancel their request but never take its place on their dialog,
+// and the next ask starts clean. A person who quits and reruns `acorn` gets one refusal, then pairs.
+// An ask after the held request was answered or expired replaces it. The phrase is what lets the
+// owner tell their own request from one something else raced in: the asker prints it, and the dialog
+// shows it.
 //
 // In memory on purpose. A restart drops the request, and the asker gets the same refusal as a denial.
 
@@ -17,7 +19,8 @@ export const PAIRING_REQUEST_MS = 2 * 60_000
 const PHRASE_WORDS = 3
 
 export type PairingRequests = {
-  ask(deviceName: string): PairingAsk
+  // Null when another ask was still waiting for an answer: that one is cancelled too.
+  ask(deviceName: string): PairingAsk | null
   // The request waiting for an answer, or null once it is answered, expired, or replaced.
   pending(): PairingRequest | null
   // False when `id` isn't the request waiting for an answer.
@@ -43,6 +46,10 @@ export function pairingRequests(now: () => number = () => Date.now()): PairingRe
 
   return {
     ask(deviceName) {
+      if (live() && !held!.allowed) {
+        held = null
+        return null
+      }
       const secret = randomBytes(32)
       // Words from random bytes, through the same list the certificate words use.
       const phrase = fingerprintWords(randomBytes(32).toString('hex'), PHRASE_WORDS)!.join(' ')

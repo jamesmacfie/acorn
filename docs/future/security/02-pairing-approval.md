@@ -1,5 +1,41 @@
 # Phase 2: stop a raced pairing request landing under the owner's click
 
+## Completion note
+
+Done October 21, 2026, on branch `phase-2-pairing-approval`.
+
+An ask that lands while another is still waiting for an answer now cancels both and gets
+`409 pairing_busy` (`pairingRequests.ask` returns `null` for it). The next ask starts clean. An ask after
+the held request was answered or expired replaces it, as before. The route still broadcasts the
+`pairing:requested` frame on a refusal, because that frame is how the open dialog learns its request is
+gone.
+
+`PairingRequestDialog` never changes the request it shows. A frame that brings a different request ID, or
+none, closes the dialog and toasts "Another pairing request arrived, so this one was cancelled." A frame
+with the same ID is ignored. **Allow** is disabled for one second after the dialog opens.
+
+`POST /v1/pair/requests` has its own ceiling of 6 a minute. The code route keeps its 20. `attemptCeiling`
+now takes the limit as an argument.
+
+Decisions and deviations:
+
+- The three clients already treated any non-200 ask as "use a code", so none of them broke on a 409. Each
+  now says why. `askToPair` throws `PairingBusyError` on a 409. The terminal client prints the message and
+  "Run acorn again, or type a pairing code." The bridge answers `node.ask` with a new `pairing_busy`
+  error code. The extension sidebar shows the message above the code form with a **Try again** button
+  that asks again. The terminal client has no button, so its "try again" is rerunning `acorn`.
+- A client whose own ask was cancelled by someone else's overlap sees the ordinary denied-or-expired
+  refusal when it next polls, with no **Try again**. The spec asked for the button only on the 409.
+- Not checked live in `pnpm dev:agent`: the service budget is red, so I covered the acceptance with the
+  route test, the bridge test against a real TLS fake Node, and the dialog test. The terminal client's
+  new message (`packages/custody/src/local/pair.ts`) has no test of its own.
+
+What later phases need to know:
+
+- The Node service graph grew by 152 bytes, from 1,932,051 to 1,932,203. The ceiling is still
+  1,931,900, so `pnpm --filter @acorn/node build` stays red by 303 bytes until the coordinator raises it.
+- `BridgeErrorCode` gained `pairing_busy`. The native messaging table and the extension doc say so.
+
 Date: October 21, 2026. Status: proposed. Severity: medium.
 
 Pairing by approval lets a client on the Node's computer get a device token when the owner clicks

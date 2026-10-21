@@ -698,6 +698,8 @@ export type BridgeErrorCode =
   | 'bad_request'
   | 'no_probe'
   | 'pairing_failed'
+  // Another ask overlapped this one and the Node cancelled both. Asking again starts clean.
+  | 'pairing_busy'
   | 'pairing_required'
   | 'unknown_node'
   | 'not_selected'

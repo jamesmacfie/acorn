@@ -116,12 +116,20 @@ export async function pairWithNode(
   return pairResult(body)
 }
 
+// Another ask was waiting for an answer, so the Node cancelled both. Asking again starts clean.
+export class PairingBusyError extends Error {
+  constructor() {
+    super('Another client asked at the same moment. Try again.')
+  }
+}
+
 // Pairing by approval (docs/api-reference/transport.md § Pairing by approval), for the Node on this
 // computer: ask, and show the phrase so the owner can match it in their dialog. Null when the Node
 // can't take an ask, such as one that isn't on this computer or one that is answering too many,
-// which leaves the code as the way in.
+// which leaves the code as the way in. Throws `PairingBusyError` when asks overlapped.
 export async function askToPair(probe: PinnedProbe, deviceName: string): Promise<PairingAsk | null> {
   const { status, body } = await pinnedPost(probe, '/v1/pair/requests', { deviceName })
+  if (status === 409) throw new PairingBusyError()
   if (status !== 200) return null
   const ask = JSON.parse(body) as Partial<PairingAsk>
   return typeof ask.secret === 'string' && typeof ask.phrase === 'string' ? (ask as PairingAsk) : null
