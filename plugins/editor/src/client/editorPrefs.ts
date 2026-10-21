@@ -21,12 +21,6 @@ export const readEditorWordWrap = (prefs: Record<string, string> | undefined): b
 export const saveEditorWordWrap = (qc: QueryClient, enabled: boolean): Promise<boolean> =>
   savePref(qc, PrefKeys.editorWordWrap, enabled ? '1' : '0')
 
-export const readEditorShowIgnored = (prefs: Record<string, string> | undefined): boolean =>
-  prefs?.[PrefKeys.editorShowIgnored] !== '0'
-
-export const saveEditorShowIgnored = (qc: QueryClient, enabled: boolean): Promise<boolean> =>
-  savePref(qc, PrefKeys.editorShowIgnored, enabled ? '1' : '0')
-
 export const readEditorLineBlame = (prefs: Record<string, string> | undefined): boolean =>
   prefs?.[PrefKeys.editorLineBlame] !== '0'
 

@@ -7,17 +7,31 @@ import {
   clientEvents,
   integrationsOptions,
   pickNodeFolder,
+  readJson,
   type ProjectImporterProps,
   projectsKey,
   projectsOptions,
   workspacesKey,
   writeJson,
 } from '@acorn/plugin-api/client'
-import { Alert, Button, Card, EmptyState, Heading, Inline, SettingRow, Stack, Text } from '@acorn/plugin-api/ui'
+import {
+  Alert,
+  Button,
+  Card,
+  EmptyState,
+  Heading,
+  IconButton,
+  Inline,
+  Input,
+  SettingRow,
+  Stack,
+  Text,
+} from '@acorn/plugin-api/ui'
 import type { IntegrationsResponse } from '@acorn/protocol/api.ts'
 import {
   githubImportRoute,
   reposKey,
+  reposRoute,
   type GithubImportAction,
   type GithubImportItem,
   type GithubImportResponse,
@@ -50,6 +64,25 @@ export default function GithubImporter(props: ProjectImporterProps) {
   const [running, setRunning] = createSignal<{ repoId: number; action: GithubImportAction } | null>(null)
   const busy = (repo: Repo, action: GithubImportAction) => running()?.repoId === repo.id && running()?.action === action
   const [error, setError] = createSignal('')
+  const [filter, setFilter] = createSignal('')
+  // Forced, because the Node serves its own copy of the list until it goes stale, so a plain refetch
+  // would miss a repository made a minute ago.
+  const [refreshing, setRefreshing] = createSignal(false)
+  const refreshRepos = async () => {
+    setRefreshing(true)
+    setError('')
+    try {
+      queryClient.setQueryData(reposKey, await readJson<Repo[]>(`${reposRoute}?force=true`))
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : String(cause))
+    } finally {
+      setRefreshing(false)
+    }
+  }
+  const shown = () => {
+    const needle = filter().trim().toLowerCase()
+    return (repos.data ?? []).filter((repo) => `${repo.owner}/${repo.name}`.toLowerCase().includes(needle))
+  }
   // Which project already holds each repository, so a row says so. Owner and name compare without
   // case, because GitHub's do.
   const projects = createQuery(() => projectsOptions(true))
@@ -162,8 +195,20 @@ export default function GithubImporter(props: ProjectImporterProps) {
               <Text emphasis="muted" wrap>
                 Clone asks where to put the copy. Link folder asks where your copy already is.
               </Text>
+              <Input
+                kind="filter"
+                label="Filter repositories"
+                placeholder="Filter repositories…"
+                value={filter()}
+                onInput={setFilter}
+              />
+              <Show when={!shown().length}>
+                <EmptyState align="start" size="sm">
+                  Nothing matches that filter.
+                </EmptyState>
+              </Show>
               <Stack gap="none">
-                <For each={repos.data ?? []}>
+                <For each={shown()}>
                   {(repo) => (
                     // Adding the same repository twice is legal, since two clones of one repository
                     // are a supported shape, so a row that already has a project keeps its buttons.
@@ -211,9 +256,17 @@ export default function GithubImporter(props: ProjectImporterProps) {
         <Stack gap="stack">
           <Inline spread>
             <Heading level={3}>Import from GitHub</Heading>
-            <Button variant="ghost" size="sm" onPress={props.onClose}>
-              Close
-            </Button>
+            <Inline gap="row">
+              <Show when={githubReady()}>
+                <IconButton
+                  icon="refresh-cw"
+                  label="Refresh repositories"
+                  busy={refreshing()}
+                  onPress={() => void refreshRepos()}
+                />
+              </Show>
+              <IconButton icon="x" label="Close" onPress={props.onClose} />
+            </Inline>
           </Inline>
           {body()}
         </Stack>

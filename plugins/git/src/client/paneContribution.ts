@@ -33,7 +33,13 @@ export const gitPaneContribution: PaneLayoutContribution<GitTaskPaneModel> = {
   // while it is the one on screen (`createGitPaneModel`).
   model: (task, pane) => {
     const git = createGitPaneModel(task, pane.shown)
-    return { ...git, changes: createChangesModel(task, { shown: () => pane.shown() && git.section() === 'changes' }) }
+    return {
+      ...git,
+      changes: createChangesModel(task, {
+        shown: () => pane.shown() && git.section() === 'changes',
+        paneShown: pane.shown,
+      }),
+    }
   },
   collapsible: true,
   collapseContent: 'empty',

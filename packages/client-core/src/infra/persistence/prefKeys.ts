@@ -72,7 +72,6 @@ export const PrefKeys = {
   editorMode: 'editor_mode',
   // Device default for graphical text wrapping. Open tabs may override it for this session.
   editorWordWrap: 'editor_word_wrap',
-  editorShowIgnored: 'editor_show_ignored',
   // Show who last changed the cursor line, after its end. On unless explicitly disabled.
   editorLineBlame: 'editor_line_blame',
   // Fallback when a text file's indentation sample is ambiguous.

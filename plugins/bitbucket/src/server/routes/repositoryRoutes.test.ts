@@ -83,6 +83,13 @@ describe('the Bitbucket repository routes, against a fake bitbucket.org', () => 
     expect(body).toEqual([expect.objectContaining({ path: 'Acme/API', defaultBranch: 'main', private: true })])
   })
 
+  it('lists a repository made since the last read when forced', async () => {
+    await call('')
+    fake.repositories.push({ path: 'Acme/Web', defaultBranch: 'main', pullRequests: [] })
+    const { body } = await call<{ path: string }[]>('?force=true')
+    expect(body.map((entry) => entry.path).sort()).toEqual(['Acme/API', 'Acme/Web'])
+  })
+
   it('lists the open pull requests and adopts their branches, a fork with its own repository', async () => {
     repository.pullRequests.push(
       makePullRequest({

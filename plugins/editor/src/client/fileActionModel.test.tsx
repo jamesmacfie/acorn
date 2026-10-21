@@ -38,7 +38,6 @@ const api = (overrides: Partial<EditorApi> = {}): EditorApi => ({
   list: async () => [],
   files: async () => [],
   read: async () => ({ text: '', revision: 'rev0' }),
-  ignored: async () => ({ available: true, ignored: [] }),
   readImage: async () => ({ bytes: new Uint8Array(), type: 'image/png' }),
   lineMarkers: async () => null,
   fileStatus: async () => ({ kind: 'unavailable' }),

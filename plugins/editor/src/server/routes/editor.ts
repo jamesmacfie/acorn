@@ -25,7 +25,6 @@ import type {
   EditorWriteResult,
   FileActionResult,
   FileTarget,
-  IgnoreEntries,
   TrashAvailability,
 } from '../../contract/api'
 export type { EditorEntry } from '../../contract/api'
@@ -33,7 +32,6 @@ export type { EditorEntry } from '../../contract/api'
 export type EditorBridge = {
   root(taskId: string): Promise<string | null>
   list(taskId: string, relPath: string): Promise<EditorEntry[]>
-  ignored(taskId: string, relPath: string, names: string[]): Promise<IgnoreEntries>
   files(taskId: string): Promise<string[]>
   read(taskId: string, relPath: string): Promise<EditorReadResult> // throws BridgeError(403/404) on escape/missing
   readImage(taskId: string, relPath: string): Promise<Uint8Array>
@@ -72,7 +70,6 @@ const targetBody = z.object({
 const createBody = z.object({ parent: targetBody, name: z.string(), kind: z.enum(['file', 'folder']) })
 const renameBody = z.object({ source: targetBody, name: z.string() })
 const trashBody = z.object({ source: targetBody })
-const ignoredBody = z.object({ path: z.string().max(4096), names: z.array(z.string().min(1).max(255)).max(10000) })
 
 export const editor = new Hono<AppEnv>()
   .get('/:id/editor/root', (c) => viaBridge(c, EDITOR, async (b) => ({ root: await b.root(c.req.param('id')) })))
@@ -80,11 +77,6 @@ export const editor = new Hono<AppEnv>()
   .get('/:id/editor/file-status', (c) => viaBridge(c, EDITOR, (b) => b.fileStatus(c.req.param('id'))))
   // relPath rides a query param ('' = worktree root); the bridge validates it, so no schema here.
   .get('/:id/editor/list', (c) => viaBridge(c, EDITOR, (b) => b.list(c.req.param('id'), c.req.query('path') ?? '')))
-  .post('/:id/editor/ignored', async (c) => {
-    const parsed = ignoredBody.safeParse(await c.req.json().catch(() => null))
-    if (!parsed.success) return respondError(c, 400, 'bad_request')
-    return viaBridge(c, EDITOR, (b) => b.ignored(c.req.param('id'), parsed.data.path, parsed.data.names))
-  })
   .get('/:id/editor/read', (c) => {
     const path = c.req.query('path')
     if (!path) return respondError(c, 400, 'bad_request')

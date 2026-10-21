@@ -73,6 +73,7 @@ export const projectReads = (db: PluginDatabase, servers: GitlabServers, { core,
             resource: PROJECTS_RESOURCE,
             userId: scope,
             ttlMs: PROJECTS_STALE_AFTER_MS,
+            force: c.req.query('force') === 'true',
             read: async (): Promise<Cached<GitlabProject[]> | null> => {
               const [[sync], rows] = await Promise.all([
                 db

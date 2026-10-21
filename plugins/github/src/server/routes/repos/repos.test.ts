@@ -140,6 +140,24 @@ describe('repos list (serve-then-revalidate via the sync engine)', () => {
     expect(emit).not.toHaveBeenCalled()
   })
 
+  it('force: a fresh mirror still blocks on GitHub and serves the new list', async () => {
+    await plugin.db
+      .insert(reposTable)
+      .values({ userId: 'james', ...publicRepo, pushedAt: publicRepo.pushedAt, fetchedAt: Date.now() })
+    await plugin.db
+      .insert(syncState)
+      .values({ userId: 'james', resource: reposResource(), etag: '"repos-v1"', fetchedAt: Date.now() })
+    const added = { ...ghRepo, id: 20001, name: 'acorn' }
+    vi.mocked(gh).mockResolvedValueOnce(responseJson([ghRepo, added], { headers: { etag: '"repos-v2"' } }))
+
+    const res = await app.fetch(new Request('http://acorn.test/api/repos?force=true'), {
+      DB: core.db,
+      ...testSecretEnv(ENC_KEY),
+    } as Env)
+    expect(res.status).toBe(200)
+    expect(await res.json()).toHaveLength(2)
+  })
+
   it('POST /refresh zeroes freshness so the next read revalidates', async () => {
     await plugin.db
       .insert(reposTable)

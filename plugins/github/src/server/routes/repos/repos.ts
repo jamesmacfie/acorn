@@ -44,6 +44,7 @@ export const repos = (db: PluginDatabase, emit: GithubEmit = NO_EMIT) =>
         resource,
         userId,
         ttlMs: REPOS_STALE_AFTER_MS,
+        force: c.req.query('force') === 'true',
         read,
         refresh: () => refreshRepos(token, db, userId, { emit }),
       })

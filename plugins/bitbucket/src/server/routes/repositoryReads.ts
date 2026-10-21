@@ -77,6 +77,7 @@ export const repositoryReads = (
         resource: REPOSITORIES_RESOURCE,
         userId: connectionId,
         ttlMs: REPOSITORIES_STALE_AFTER_MS,
+        force: c.req.query('force') === 'true',
         read: async (): Promise<Cached<BitbucketRepository[]> | null> => {
           const [[sync], rows] = await Promise.all([
             db

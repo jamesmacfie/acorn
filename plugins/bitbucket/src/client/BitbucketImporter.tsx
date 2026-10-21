@@ -7,15 +7,29 @@ import {
   clientEvents,
   integrationsOptions,
   pickNodeFolder,
+  readJson,
   type ProjectImporterProps,
   projectsKey,
   projectsOptions as coreProjectsOptions,
   workspacesKey,
   writeJson,
 } from '@acorn/plugin-api/client'
-import { Alert, Button, Card, EmptyState, Heading, Inline, SettingRow, Stack, Text } from '@acorn/plugin-api/ui'
+import {
+  Alert,
+  Button,
+  Card,
+  EmptyState,
+  Heading,
+  IconButton,
+  Inline,
+  Input,
+  SettingRow,
+  Stack,
+  Text,
+} from '@acorn/plugin-api/ui'
 import {
   importRoute,
+  repositoriesRoute,
   repositoriesKey,
   type BitbucketImportItem,
   type BitbucketImportResult,
@@ -42,6 +56,28 @@ export default function BitbucketImporter(props: ProjectImporterProps) {
     )
   const [running, setRunning] = createSignal<{ repository: BitbucketRepository; action: 'map' | 'clone' } | null>(null)
   const [error, setError] = createSignal('')
+  const [filter, setFilter] = createSignal('')
+  // Forced, because the Node serves its own copy of the list until it goes stale, so a plain refetch
+  // would miss one made a minute ago.
+  const [refreshing, setRefreshing] = createSignal(false)
+  const refresh = async () => {
+    setRefreshing(true)
+    setError('')
+    try {
+      queryClient.setQueryData(
+        repositoriesKey,
+        await readJson<BitbucketRepository[]>(`${repositoriesRoute}?force=true`),
+      )
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : String(cause))
+    } finally {
+      setRefreshing(false)
+    }
+  }
+  const shown = () => {
+    const needle = filter().trim().toLowerCase()
+    return (repositories.data ?? []).filter((repository) => repository.path.toLowerCase().includes(needle))
+  }
 
   const importOne = async (repository: BitbucketRepository, action: 'map' | 'clone') => {
     if (running()) return
@@ -145,8 +181,20 @@ export default function BitbucketImporter(props: ProjectImporterProps) {
                 <Text emphasis="muted" wrap>
                   Clone asks where to put the copy. Link folder asks where your copy already is.
                 </Text>
+                <Input
+                  kind="filter"
+                  label="Filter repositories"
+                  placeholder="Filter repositories…"
+                  value={filter()}
+                  onInput={setFilter}
+                />
+                <Show when={!shown().length}>
+                  <EmptyState align="start" size="sm">
+                    Nothing matches that filter.
+                  </EmptyState>
+                </Show>
                 <Stack gap="none">
-                  <For each={repositories.data ?? []}>
+                  <For each={shown()}>
                     {(repository) => (
                       <SettingRow
                         label={repository.path}
@@ -188,9 +236,17 @@ export default function BitbucketImporter(props: ProjectImporterProps) {
         <Stack gap="stack">
           <Inline spread>
             <Heading level={3}>Import from Bitbucket</Heading>
-            <Button variant="ghost" size="sm" onPress={props.onClose}>
-              Close
-            </Button>
+            <Inline gap="row">
+              <Show when={connections().length > 0}>
+                <IconButton
+                  icon="refresh-cw"
+                  label="Refresh repositories"
+                  busy={refreshing()}
+                  onPress={() => void refresh()}
+                />
+              </Show>
+              <IconButton icon="x" label="Close" onPress={props.onClose} />
+            </Inline>
           </Inline>
           {body()}
         </Stack>
