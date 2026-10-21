@@ -87,6 +87,13 @@ describe('the GitLab project routes, against a fake gitlab.com', () => {
     expect(body).toEqual([expect.objectContaining({ id: 42, path: 'Group/Sub/API', defaultBranch: 'main' })])
   })
 
+  it('lists a project made since the last read when forced', async () => {
+    await call('')
+    fake.projects.push({ id: 43, path: 'Group/Web', defaultBranch: 'main', mergeRequests: [] })
+    const { body } = await call<{ path: string }[]>('?force=true')
+    expect(body.map((entry) => entry.path).sort()).toEqual(['Group/Sub/API', 'Group/Web'])
+  })
+
   it('lists the open merge requests of a nested project, whatever the case of its path, and adopts their branches', async () => {
     const { status, body } = await call<MergeRequestRow[]>(`${at('group/sub/api')}/merge-requests?state=open`)
     expect(status).toBe(200)
