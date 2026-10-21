@@ -28,7 +28,7 @@ vi.mock('@acorn/plugin-api/ui/dashboards', () => ({
   },
 }))
 import AppView from './AppView'
-import { library } from './bindings'
+import { library } from '../embed/bindings'
 
 let host: HTMLDivElement, dispose: () => void
 const settle = () => new Promise((resolve) => setTimeout(resolve, 0))

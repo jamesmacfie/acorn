@@ -93,8 +93,8 @@ used to be gaps and aren't: loaded plugins declare `commands` and `keybindings`,
 ## What the apps import from plugins
 
 An app may import any plugin's `node/index.ts` and `client/index.ts`, because composition roots exist
-to register plugins. An import from a plugin's `contract/` folder is different: it means an app depends
-on that one plugin. Each one is listed here and in `tools/arch/boundaries.test.ts`, which fails on an
+to register plugins. An import from a plugin's `contract/` or `embed/` folder is different: it means an
+app depends on that one plugin. Each one is listed here and in `tools/arch/boundaries.test.ts`, which fails on an
 import missing from its list and on a listed import that's gone. Add the reason in both places.
 
 - **CLI and agents.** The built-in `agent` commands and `projection.ts` read the session, turn, event,
@@ -112,6 +112,8 @@ import missing from its list and on a listed import that's gone. Add the reason 
 - **Extension and agents.** The sidebar draws a session's state with `runtimeState`, marks the Agents
   tab, each task row, and a conversation's state line with it, and registers the harness marks from
   `providerMarks`.
+- **Extension and trellis.** The sidebar runs an agent's app with `AppRuntime` from trellis's `embed/`,
+  the runtime the desktop's app card runs, so a program is bounded the same way in both.
 - **Extension and workflows.** The sidebar prefills a workflow's inputs from the page's item, and
   parses and checks the inputs of a start in a task, with `itemInputs`. It draws runs and steps with
   `statusDisplay`.

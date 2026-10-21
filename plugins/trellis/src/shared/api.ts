@@ -36,6 +36,8 @@ export type AppRevisionSummary = { revision: number; note: string; restoredFrom?
 /** An app's name, head, and revisions, as the card's route returns them. */
 export type AppSummary = { appId: string; taskId?: string; name: string; head: number; revisions: AppRevisionSummary[] }
 export type AppRevisionFiles = { program: string; plans: Record<string, unknown> }
+/** The most an app's saved state document may hold, as a working file may. */
+export const APP_STATE_MAX_BYTES = 256 * 1024
 /** One shown app, as the Apps pane and the Apps source list it. A task app or draft has `taskId`, and
  *  a project app has `projectId`. `sessionId` is the session its drawer draws. A draft's `draftOf`
  *  names its project app, the project revision it's at, and its own head when it got there. */

@@ -41,8 +41,10 @@ import { OpenInAcorn } from './OpenInAcorn'
 import { Requests } from './Requests'
 import { agentName, toolMark } from './state'
 
-// With the first panel a conversation draws, so a conversation without one never loads the views.
+// With the first panel or app a conversation draws, so a conversation without one never loads the views
+// or the app runtime.
 const PanelCard = lazy(() => import('./PanelCard'))
+const AppCard = lazy(() => import('./AppCard'))
 
 // How near the bottom of the page still counts as reading the newest message.
 const FOLLOW_SLACK_PX = 40
@@ -159,6 +161,12 @@ export function Conversation(props: {
     session().runtimeState === 'waiting' || (view()?.requests ?? []).some((request) => request.status === 'pending')
   const working = () => !waiting() && session().runtimeState === 'working'
   const foldKey = (runKey: string) => `${target.sessionId}:${runKey}`
+  // A restore moves an app's head, which no hint reports, so every app card reads its summary again.
+  const [appsRestored, setAppsRestored] = createSignal(0)
+  // An app's Ask the agent button fills this conversation's message box, once the composer is drawn.
+  let insertDraft: ((text: string) => Promise<{ ok: boolean; reason?: string }>) | undefined
+  const compose = async (text: string) =>
+    insertDraft ? insertDraft(text) : { ok: false, reason: "The message box isn't ready yet. Try again." }
 
   const [stopping, setStopping] = createSignal(false)
   const [stopProblem, setStopProblem] = createSignal<string | null>(null)
@@ -208,6 +216,9 @@ export function Conversation(props: {
                         reconnects={props.reconnects}
                         tabs={props.tabs}
                         replaced={replaced(item)}
+                        compose={compose}
+                        appsRestored={appsRestored()}
+                        restoredApp={() => setAppsRestored((count) => count + 1)}
                       />
                     )
                   if (item.kind === 'tools')
@@ -278,6 +289,7 @@ export function Conversation(props: {
         blocked={blocked()}
         focused={props.focused ?? false}
         settled={() => void reader.refresh()}
+        insertRef={(insert) => (insertDraft = insert)}
         activity={
           <>
             <Show when={working()}>
@@ -366,7 +378,7 @@ function ToolLineItem(props: { line: ToolLine }) {
 
 // A panel or app the agent made, in the desktop card's words, with a link to where it draws in full:
 // the conversation for a panel, and the task's Apps pane for an app. A finished panel draws live, unless
-// a newer version of it replaced it.
+// a newer version of it replaced it. A finished app runs, and collapses itself once it isn't the head.
 function CardLineItem(props: {
   line: CardLine
   target: DraftTarget
@@ -376,10 +388,20 @@ function CardLineItem(props: {
   reconnects: number
   tabs: BrowserApi['tabs']
   replaced: boolean
+  compose(text: string): Promise<{ ok: boolean; reason?: string }>
+  appsRestored: number
+  restoredApp(): void
 }) {
   const { nodeId, taskId, sessionId } = props.target
   const checking = () => props.line.status === 'pending' || props.line.status === 'running'
   const [showOld, setShowOld] = createSignal(false)
+  // A finished app call, with the app and revision its result named.
+  const appCall = () => {
+    const card = props.line.card
+    return card.kind === 'app' && props.line.status === 'completed' && card.appId && card.revision
+      ? { appId: card.appId, revision: card.revision, note: card.note ?? '' }
+      : undefined
+  }
   const words = () => {
     const card = props.line.card
     if (card.kind === 'panel')
@@ -460,6 +482,28 @@ function CardLineItem(props: {
               </Show>
             </Stack>
           </Show>
+        </Match>
+        <Match when={appCall()}>
+          {(app) => (
+            <Suspense fallback={line()}>
+              <AppCard
+                client={props.client}
+                target={props.target}
+                appId={app().appId}
+                revision={app().revision}
+                note={app().note}
+                href={words().href}
+                opensLinks={props.opensLinks}
+                hint={props.hint}
+                reconnects={props.reconnects}
+                tabs={props.tabs}
+                compose={props.compose}
+                restores={props.appsRestored}
+                restored={props.restoredApp}
+                line={line()}
+              />
+            </Suspense>
+          )}
         </Match>
       </Switch>
     </li>

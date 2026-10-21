@@ -4,10 +4,9 @@ import { z } from 'zod'
 import { type AppEnv, requireDevice, respondError } from '@acorn/plugin-api/node'
 import { pluginManifestShape } from '@acorn/protocol/plugin/contract.ts'
 import { appIdSchema } from '../contract/appShowCall'
-import { publishModeSchema, type AppListing } from '../shared/api'
+import { APP_STATE_MAX_BYTES, publishModeSchema, type AppListing } from '../shared/api'
 import { writePluginPackage } from './pluginPackage'
 import { publishToProject, startDraft, type ProjectAppDeps } from './projectApps'
-import { MAX_STATE_BYTES } from './store'
 
 // What the card, the Apps pane, and the Apps source read, Restore, an app's saved state, publishing to
 // the project, and turning an app into a plugin (docs/agent-built-apps.md). Device only: an agent works
@@ -82,7 +81,7 @@ export const appRoutes = (deps: AppRouteDeps) => {
         const appId = appIdSchema.safeParse(c.req.param('appId'))
         const body = stateBody.safeParse(await c.req.json().catch(() => null))
         if (!appId.success || !body.success) return respondError(c, 400, 'bad_request')
-        if (Buffer.byteLength(JSON.stringify(body.data.state)) > MAX_STATE_BYTES)
+        if (Buffer.byteLength(JSON.stringify(body.data.state)) > APP_STATE_MAX_BYTES)
           return respondError(c, 413, 'too_large')
         if (!(await store.meta(appId.data))) return respondError(c, 404, 'not_found')
         await store.saveState(appId.data, body.data.state)

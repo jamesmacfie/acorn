@@ -39,8 +39,10 @@ card, from the record's `card` ([panel and app calls](./native-messaging.md#pane
   reads as its title, then the run's description, such as "Pull requests by author, last 30 days.",
   and "Update the Acorn CLI to see this panel here." **Open in Acorn** opens the conversation in the
   desktop.
-- An app reads as its name and revision, such as "Migration checklist · v3", then the revision's
-  note. **Open in Acorn** opens the task's Apps pane on that app.
+- A finished app runs, as an [app card](#app-cards). While it loads, and on a host too old to draw
+  it, it reads as its name and revision, such as "Migration checklist · v3", then the revision's note,
+  and on an older host "Update the Acorn CLI to see this app here." **Open in Acorn** opens the task's
+  Apps pane on that app.
 - While the call checks, the line reads "Checking the plan for Commits by day…" or "Checking the
   app…".
 - A call that failed its checks reads "Commits by day didn't pass its checks, so nothing was drawn.",
@@ -76,6 +78,34 @@ loads them.
 - A newer card with the same panel ID collapses an older one to "Commits by day. Replaced by a newer
   version." with **Show**, among the cards the sidebar has loaded. A collapsed card doesn't run.
   **Hide this version** collapses it again.
+
+### App cards
+
+A finished `app_show` call runs the app, as the desktop's app card does
+([agent-built apps](../agent-built-apps.md#cards)). `AppCard` in `apps/extension/src/sidebar/` draws
+it, and the conversation loads it with a dynamic import, together with the trellis plugin's
+`AppRuntime`, lang-core, and the views, so a conversation with no apps never loads them.
+
+- The card reads the app with `app.view` ([app cards](./native-messaging.md#app-cards)) when it mounts,
+  on an `agent` hint for its session, and when the connection comes back. A hint or the connection
+  reads it at most once every five seconds.
+- The card that shows the app's head runs it: its name and revision, **Open in Acorn**, which opens
+  the task's Apps pane where **Publish to project** is, and the app, capped at 480 pixels with
+  **Expand**. Its queries and panels run through `app.run` once it's in view. A panel draws read only,
+  with the dashboard's views, and its links open in a new tab.
+- Ticks and typed values are saved with `app.state`, 400 milliseconds after the last change, as on
+  the desktop. The card reads them when it mounts.
+- A link in the app shows its full address in a confirm, then opens in a new tab. **Ask the agent**
+  puts the app's text in this conversation's message box, on a line after what's typed. It never
+  sends.
+- A row action says "This action runs in the Acorn app."
+- An older revision collapses to "v2: Added owners. Replaced by v3." with **Show v2**, which draws it
+  read only, and **Restore v2**, which sends `app.restore` and draws the new revision in its place. A
+  retried restore keeps its key, so a restore the Node already made isn't made twice. A restore moves
+  the head without a hint, so every app card in the conversation reads its summary again, and the card
+  that was the head collapses at once. A restore made in the desktop shows on the next hint or reload.
+- In a task that's no longer active, the card draws one line: "Migration checklist · v3. This task is
+  archived, so the app isn't drawn."
 
 A request the agent waits on follows the transcript as the desktop's request card
 ([answering the agent](./conversations.md#answering-the-agent)).

@@ -315,6 +315,9 @@ importers:
       '@acorn/plugin-agents':
         specifier: workspace:*
         version: link:../../plugins/agents
+      '@acorn/plugin-trellis':
+        specifier: workspace:*
+        version: link:../../plugins/trellis
       '@acorn/plugin-workflows':
         specifier: workspace:*
         version: link:../../plugins/workflows

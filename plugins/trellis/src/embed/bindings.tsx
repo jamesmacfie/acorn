@@ -1,4 +1,4 @@
-import { createContext, createMemo, Show, useContext, type JSX } from 'solid-js'
+import { createContext, createMemo, Show, useContext, type Component, type JSX } from 'solid-js'
 import {
   Alert,
   Badge,
@@ -15,30 +15,31 @@ import {
   Text,
   Textarea,
 } from '@acorn/plugin-api/ui'
-import { PlanPanel } from '@acorn/plugin-api/ui/dashboards'
 import { createStateField, FormScope, useFormName, useOpenUI, type ComponentRenderer } from '@acorn/openui-solid'
-import type { PanelPlan } from '@acorn/protocol/dashboards.ts'
 import { appLibrary } from '../shared/library'
 import { plainData, plainText } from './plainData'
 
 // The client half of the library: each component drawn with a kit component through
-// `@acorn/plugin-api/ui`, which the terminal build resolves to its own kit, so one binding draws in
-// both clients. `Panel` draws a plan with the dashboard's own panel. Bindings read props inside JSX or
+// `@acorn/plugin-api/ui`, which the terminal and the browser extension resolve to their own kits, so one
+// binding draws in every client. `Panel` draws with the client's own panel. Bindings read props inside JSX or
 // a memo, never at the top of the component, which Solid runs once; and read context at the top, never
 // in a prop getter, which the terminal can read from a key handler outside the component.
 
-/** What the card hands its program's components. */
-export type AppHost = {
-  appId: string
-  workspaceId: string
-  plans: Record<string, unknown>
+/** What a program's `Panel` draws with: one of the app's plans, named and already checked, with the
+ *  inputs copied to plain data. Each client draws it with its own dashboard views. */
+export type AppPanelProps = { plan: string; inputs: Record<string, unknown> | undefined; active: boolean }
+
+/** What the runtime hands its program's components. */
+export type AppScope = {
+  plans: readonly string[]
   /** An older revision drawn by Show: nothing in it acts. */
   readOnly: boolean
   /** Whether the card is on screen, so its panels pause when it isn't. */
   active: () => boolean
+  Panel: Component<AppPanelProps>
 }
-export const AppHostContext = createContext<AppHost>()
-const useHost = () => useContext(AppHostContext)!
+export const AppScopeContext = createContext<AppScope>()
+const useScope = () => useContext(AppScopeContext)!
 // A Card standing in a row is as wide as its content rather than the row.
 const InRow = createContext<() => boolean>(() => false)
 
@@ -48,9 +49,9 @@ const text = plainText
 const act = (label: () => string, action: () => unknown) => {
   const runtime = useOpenUI()
   const form = useFormName()
-  const host = useHost()
+  const scope = useScope()
   return () => {
-    if (!host.readOnly) void runtime.triggerAction(label(), form, action() as never)
+    if (!scope.readOnly) void runtime.triggerAction(label(), form, action() as never)
   }
 }
 
@@ -82,7 +83,7 @@ const CardBinding: ComponentRenderer<Props> = (p) => {
 }
 
 const ButtonBinding: ComponentRenderer<Props> = (p) => {
-  const { readOnly } = useHost()
+  const { readOnly } = useScope()
   const press = act(
     () => text(p.props.label),
     () => p.props.action,
@@ -99,7 +100,7 @@ const ButtonBinding: ComponentRenderer<Props> = (p) => {
 }
 
 const CheckboxBinding: ComponentRenderer<Props> = (p) => {
-  const { readOnly } = useHost()
+  const { readOnly } = useScope()
   const field = createStateField(
     () => text(p.props.name),
     () => p.props.checked,
@@ -120,7 +121,7 @@ const CheckboxBinding: ComponentRenderer<Props> = (p) => {
 }
 
 const InputBinding: ComponentRenderer<Props> = (p) => {
-  const { readOnly } = useHost()
+  const { readOnly } = useScope()
   const field = createStateField(
     () => text(p.props.name),
     () => p.props.value,
@@ -138,7 +139,7 @@ const InputBinding: ComponentRenderer<Props> = (p) => {
 }
 
 const TextareaBinding: ComponentRenderer<Props> = (p) => {
-  const { readOnly } = useHost()
+  const { readOnly } = useScope()
   const field = createStateField(
     () => text(p.props.name),
     () => p.props.value,
@@ -156,7 +157,7 @@ const TextareaBinding: ComponentRenderer<Props> = (p) => {
 }
 
 const SelectBinding: ComponentRenderer<Props> = (p) => {
-  const { readOnly } = useHost()
+  const { readOnly } = useScope()
   const field = createStateField(
     () => text(p.props.name),
     () => p.props.value,
@@ -218,21 +219,16 @@ const ListItemBinding: ComponentRenderer<Props> = (p) => (
 )
 
 const PanelBinding: ComponentRenderer<Props> = (p) => {
-  const host = useHost()
-  const plan = () => host.plans[text(p.props.plan)] as PanelPlan | undefined
+  const scope = useScope()
+  const plan = () => text(p.props.plan)
   // A copy, read whole, so a picked value reaches the run and nothing holds the program's store.
   const inputs = createMemo(() => plainData(p.props.inputs) as Props | undefined)
   return (
-    <Show when={plan()} fallback={<Alert tone="warn">{`This app has no plan called ${text(p.props.plan)}.`}</Alert>}>
-      {(plan) => (
-        <PlanPanel
-          id={`${host.appId}:${text(p.props.plan)}`}
-          plan={plan()}
-          workspaceId={host.workspaceId}
-          inputs={inputs()}
-          active={host.active()}
-        />
-      )}
+    <Show
+      when={scope.plans.includes(plan())}
+      fallback={<Alert tone="warn">{`This app has no plan called ${plan()}.`}</Alert>}
+    >
+      <scope.Panel plan={plan()} inputs={inputs()} active={scope.active()} />
     </Show>
   )
 }

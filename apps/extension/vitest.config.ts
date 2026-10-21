@@ -1,5 +1,6 @@
 import solid from 'vite-plugin-solid'
 import { defineConfig } from 'vitest/config'
+import { APP_KIT } from './vite.config'
 
 // A message's time reads the same on every machine, so the site's sidebar pictures don't depend on
 // where they were made. Set here, in the main process, so every worker starts with them; a worker
@@ -16,7 +17,7 @@ export default defineConfig({
       {
         plugins: [solid()],
         // Without the browser condition vitest picks Solid's server build, which renders once and never updates.
-        resolve: { conditions: ['browser', 'development'] },
+        resolve: { conditions: ['browser', 'development'], alias: [APP_KIT] },
         test: {
           name: 'sidebar',
           environment: 'jsdom',

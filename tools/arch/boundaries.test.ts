@@ -163,6 +163,11 @@ const segment = (pkg: Pkg, file: string): string => relative(pkg.src, file).spli
 // import another plugin's contract/; anything else is a coupling edge.
 const isContract = (pkg: Pkg | undefined, file: string | null): boolean =>
   !!pkg && !!file && pkg.kind === 'plugin' && segment(pkg, file) === 'contract'
+// embed/ is a client surface a plugin lends another client to draw with, such as trellis's app runtime
+// in the browser extension (docs/plugins/package-shape.md § Package shape). An app imports it only
+// through a listed edge, as it does contract/.
+const isEmbed = (pkg: Pkg | undefined, file: string | null): boolean =>
+  !!pkg && !!file && pkg.kind === 'plugin' && segment(pkg, file) === 'embed'
 
 // Test scaffolding by location, not filename: a `.test.ts` suffix, a package's test/ or e2e/ tree, or
 // its testkit/, whose helpers are test-only but deliberately unsuffixed.
@@ -213,7 +218,7 @@ function side(pkg: Pkg, file: string): 'client' | 'node' | 'shared' {
     return seg === 'node' ? 'node' : 'client'
   }
   const seg = relative(pkg.src, file).split('/')[0]
-  if (seg === 'client') return 'client'
+  if (seg === 'client' || seg === 'embed') return 'client'
   // `entries` and `composition` are apps/node's two folders (docs/local-development.md).
   if (['server', 'mcp', 'entries', 'composition'].includes(seg)) return 'node'
   return 'shared'
@@ -284,7 +289,7 @@ describe('architecture boundaries', () => {
     expect([...new Set(appToApp)].sort()).toEqual([])
   })
 
-  it("an app imports a plugin's contract/ only through a listed edge", () => {
+  it("an app imports a plugin's contract/ or embed/ only through a listed edge", () => {
     // Each entry is an app depending on one specific plugin, with the reason. The same list is in
     // docs/first-party-plugins.md § What the apps import from plugins. Activation entrypoints
     // (`node/index.ts`, `client/index.ts`) aren't listed, because composition roots exist to import them.
@@ -350,6 +355,11 @@ describe('architecture boundaries', () => {
       ],
       ['apps/extension/src/sidebar/main.tsx -> plugins/agents/src/contract/providerMarks.ts', 'harness brand marks'],
       ['apps/extension/src/sidebar/state.tsx -> plugins/agents/src/contract/toolTone.ts', "a tool call's tone"],
+      // The extension sidebar runs an agent's app with the desktop's runtime.
+      [
+        'apps/extension/src/sidebar/AppCard.tsx -> plugins/trellis/src/embed/AppRuntime.tsx',
+        "runs an app_show call's program, bounded as the desktop bounds it",
+      ],
       [
         'apps/extension/src/sidebar/TaskRow.tsx -> plugins/agents/src/contract/runtimeState.ts',
         "marks a task row with its agents' state",
@@ -407,7 +417,10 @@ describe('architecture boundaries', () => {
     const found = [
       ...new Set(
         EDGES.filter(
-          (e) => e.fromPkg.kind === 'app' && !isTestCode(e.fromFile) && isContract(e.target.pkg, e.target.file),
+          (e) =>
+            e.fromPkg.kind === 'app' &&
+            !isTestCode(e.fromFile) &&
+            (isContract(e.target.pkg, e.target.file) || isEmbed(e.target.pkg, e.target.file)),
         ).map((e) => `${rel(e.fromFile)} -> ${rel(e.target.file!)}`),
       ),
     ].sort()
@@ -691,9 +704,11 @@ describe('architecture boundaries', () => {
     let scanned = 0
     for (const plugin of readdirSync(join(ROOT, 'plugins'), { withFileTypes: true })) {
       if (!plugin.isDirectory()) continue
-      const pure = kitPurity(`plugins/${plugin.name}/src/client`, { skipTests: true })
-      offences.push(...pure.offences)
-      scanned += pure.scanned
+      for (const tier of ['client', 'embed']) {
+        const pure = kitPurity(`plugins/${plugin.name}/src/${tier}`, { skipTests: true })
+        offences.push(...pure.offences)
+        scanned += pure.scanned
+      }
     }
     expect(scanned).toBeGreaterThan(40) // anti-vacuity: the walker found the client directories
     expect(offences.sort()).toEqual([...CLIENT_DOM_BASELINE].sort())
@@ -781,7 +796,7 @@ describe('architecture boundaries', () => {
     // whoever imports it next.
     // An empty map is a declaration too: a plugin whose entry is a relative path in its plugin config
     // resolves no subpath from outside, and `{}` says so where a missing field says nothing at all.
-    const KINDS = /^\.\/(node\/index\.ts|client\/index\.ts|contract\/\*|testkit|testkit\/client)$/
+    const KINDS = /^\.\/(node\/index\.ts|client\/index\.ts|contract\/\*|embed\/\w+\.tsx?|testkit|testkit\/client)$/
     const problems: string[] = []
     for (const pkg of PACKAGES.filter((p) => p.kind === 'plugin')) {
       const manifest = JSON.parse(readFileSync(join(pkg.dir, 'package.json'), 'utf8')) as {
@@ -799,7 +814,7 @@ describe('architecture boundaries', () => {
         const extra =
           subpath === './server/index.ts' && ['@acorn/plugin-linear', '@acorn/plugin-rollbar'].includes(pkg.name)
         if (!KINDS.test(subpath) && !extra)
-          problems.push(`${pkg.name}: ${subpath} is not an entrypoint, contract/, or testkit`)
+          problems.push(`${pkg.name}: ${subpath} is not an entrypoint, contract/, an embed/ file, or testkit`)
         const resolved = target.replace('/*', '')
         if (!existsSync(join(pkg.dir, resolved))) problems.push(`${pkg.name}: ${subpath} -> ${target} does not exist`)
       }
@@ -1922,7 +1937,7 @@ describe('architecture boundaries', () => {
     expect(pluginFiles.length).toBeGreaterThan(100)
     expect({ stylesheets, roots }).toEqual({ stylesheets: [], roots: [] })
   })
-  it('a plugin src/ has only the seven folder names, and node/ holds only the entrypoint and the schema', () => {
+  it('a plugin src/ has only the eight folder names, and node/ holds only the entrypoint and the schema', () => {
     // docs/conventions.md § Folders. The point of a fixed set is that a reader can predict where a
     // file lives without opening the package, and every rule above that keys off the first path
     // segment — the client/node split, contract/, the testkit — reads that segment as if it were one
@@ -1932,7 +1947,7 @@ describe('architecture boundaries', () => {
     // `node/` is the activation entrypoint and its Drizzle schema, nothing else. It is the one folder
     // an app imports by path rather than through a barrel, so a module parked there becomes public
     // without anyone deciding it should be.
-    const NAMES = ['node', 'server', 'client', 'tree', 'contract', 'shared', 'testkit']
+    const NAMES = ['node', 'server', 'client', 'embed', 'tree', 'contract', 'shared', 'testkit']
     const NODE_FILES = /^(index|schema)(\.test)?\.tsx?$/
     const problems: string[] = []
     let scanned = 0

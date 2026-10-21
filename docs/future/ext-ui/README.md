@@ -1,6 +1,6 @@
 # Agent panels and apps in the browser extension
 
-Date: October 21, 2026. Status: phases 1 to 3 done, phases 4 and 5 proposed. Checked against `a6842f9b7`.
+Date: October 21, 2026. Status: phases 1 to 4 done, phase 5 proposed. Checked against `a6842f9b7`.
 
 This programme makes the browser extension's sidebar draw what an agent builds in a conversation: the
 dashboard panel from `panel_show` and the app from `app_show`. Today the sidebar draws both as one
@@ -114,8 +114,8 @@ client.
 - **Whether the extension should draw panels at all, or link.** Phase 1 alone answers most "what did
   the agent make" questions. Phases 2 to 5 are about two weeks of work. Decide after phase 1 ships and
   the sidebar has seen real use.
-- **Where the app runtime lives.** Phase 4 proposes `plugins/trellis/src/embed/`. A small package
-  of its own would also work, and would suit the terminal client too. Decide in phase 4.
+- **Where the app runtime lives.** Decided in phase 4: `plugins/trellis/src/embed/`, beside the
+  library it draws. Its completion note gives the reasons.
 - **Panel history.** A stat's history trend reads samples kept for a published panel. An agent's panel
   is never published, so it has no history. Phase 2 makes history optional, and the sidebar never
   supplies it.

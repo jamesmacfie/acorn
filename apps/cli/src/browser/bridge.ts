@@ -29,7 +29,7 @@ import {
   type Task,
   type Workspace,
 } from '@acorn/protocol/api.ts'
-import { panelPlanSchema } from '@acorn/protocol/dashboards.ts'
+import { panelPlanSchema, type PanelPlan } from '@acorn/protocol/dashboards.ts'
 import { readPanelShowCall } from '@acorn/protocol/panelShowCall.ts'
 import {
   SITE_ASSOCIATIONS_MAX,
@@ -83,6 +83,16 @@ import {
   sessionRoute,
   toolCallRoute,
 } from './agents'
+import {
+  appRestoreRoute,
+  appRevisionRoute,
+  appRoute,
+  appStateRoute,
+  bridgeAppSummary,
+  revisionFiles,
+  type AppRevisionBody,
+  type AppSummaryBody,
+} from './apps'
 import type { WorkflowDefSummary, WorkflowRunRow, WorkflowStepRow } from '@acorn/plugin-workflows/contract/wire.ts'
 import {
   bridgeRuns,
@@ -555,6 +565,47 @@ export function createBridge(options: {
     return parsed.data
   }
 
+  // A task, with its workspace, while it's active. Null once it's archived.
+  async function activeTask(
+    nodeId: string,
+    taskId: string | undefined,
+  ): Promise<{ task: Task; workspaceId: string } | null> {
+    const [tasks, projects] = await Promise.all([
+      readList<Task>(nodeId, tasksRoute, (body) => body),
+      listProjectRows(nodeId),
+    ])
+    const task = tasks.find((candidate) => candidate.id === taskId)
+    const workspaceId = projects.find((project) => project.id === task?.projectId)?.workspaceId
+    return task && workspaceId ? { task, workspaceId } : null
+  }
+
+  // A plan run as a draft, as the desktop runs an agent's panel and an app's plans, with the plan beside
+  // it in the reply.
+  async function runDraftPlan(
+    nodeId: string,
+    workspaceId: string,
+    plan: PanelPlan,
+    request: { viewerZone: string; inputs?: Record<string, unknown> },
+  ): Promise<unknown> {
+    const run = (await nodeRequest(nodeId, {
+      method: 'POST',
+      path: dashboardRunRoute,
+      body: {
+        operation: 'run',
+        scope: { workspaceId },
+        target: { kind: 'draft', content: plan },
+        mode: 'execution',
+        viewerZone: request.viewerZone,
+        ...(request.inputs ? { inputs: request.inputs } : {}),
+      },
+      read: true,
+      // The reply carries the plan beside the run, and the whole reply must fit the extension's limit.
+      maxResponseBytes: NATIVE_REPLY_MAX_CHARS - JSON.stringify(plan).length,
+    })) as { rows?: unknown } | null
+    if (!Array.isArray(run?.rows)) throw new BridgeFailure('node_error', 'The Node returned an unreadable panel run.')
+    return run
+  }
+
   // An agent's panel, run as the desktop's card runs it: the plan from the call's input, as a draft, in
   // the workspace of the session's task. The browser names the call, so it can only run a plan an agent
   // showed in a session this device can read.
@@ -576,29 +627,46 @@ export function createBridge(options: {
       throw new BridgeFailure('not_found', `${input.title} no longer passes its checks, so it can't be drawn.`)
     // The agent's title is what the card says, as on the desktop's card.
     const plan = { ...parsed.data, title: input.title }
-    const [tasks, projects] = await Promise.all([
-      readList<Task>(nodeId, tasksRoute, (body) => body),
-      listProjectRows(nodeId),
-    ])
-    const projectId = tasks.find((task) => task.id === read?.taskId)?.projectId
-    const workspaceId = projects.find((project) => project.id === projectId)?.workspaceId
-    if (!workspaceId) throw new BridgeFailure('not_found', "This conversation's task is no longer active.")
-    const run = (await nodeRequest(nodeId, {
-      method: 'POST',
-      path: dashboardRunRoute,
-      body: {
-        operation: 'run',
-        scope: { workspaceId },
-        target: { kind: 'draft', content: plan },
-        mode: 'execution',
-        viewerZone: request.viewerZone,
-      },
-      read: true,
-      // The reply carries the plan beside the run, and the whole reply must fit the extension's limit.
-      maxResponseBytes: NATIVE_REPLY_MAX_CHARS - JSON.stringify(plan).length,
-    })) as { rows?: unknown } | null
-    if (!Array.isArray(run?.rows)) throw new BridgeFailure('node_error', 'The Node returned an unreadable panel run.')
+    const active = await activeTask(nodeId, read?.taskId)
+    if (!active) throw new BridgeFailure('not_found', "This conversation's task is no longer active.")
+    const run = await runDraftPlan(nodeId, active.workspaceId, plan, request)
     return { nodeId, sessionId, toolId, plan, run }
+  }
+
+  // An app of the named task. The trellis routes don't confine a device to a task, so the host checks
+  // the owner itself, as it does for an attachment. Another task's app reads as missing.
+  async function taskApp(nodeId: string, taskId: string, appId: string): Promise<AppSummaryBody> {
+    const summary = (await nodeRequest(nodeId, { method: 'GET', path: appRoute(appId) })) as AppSummaryBody | null
+    if (!summary || summary.taskId !== taskId)
+      throw new BridgeFailure('not_found', 'That app is not part of this task.')
+    return summary
+  }
+
+  const appRevision = revisionFiles(async (nodeId, appId, revision) => {
+    const files = (await nodeRequest(nodeId, {
+      method: 'GET',
+      path: appRevisionRoute(appId, revision),
+      maxResponseBytes: NATIVE_REPLY_MAX_CHARS,
+    })) as AppRevisionBody | null
+    if (typeof files?.program !== 'string' || !files.plans || typeof files.plans !== 'object')
+      throw new BridgeFailure('node_error', 'The Node returned an unreadable app revision.')
+    return files
+  })
+
+  // One of an app's plans, run as the desktop's app runs it. The browser names the plan, and the host
+  // takes it from the revision's own files, so the browser can't run a plan of its own.
+  async function runAppPlan(request: Extract<BridgeRequest, { op: 'app.run' }>): Promise<BridgeResults['app.run']> {
+    const { nodeId, taskId, appId, revision } = request
+    await taskApp(nodeId, taskId, appId)
+    const [files, active] = await Promise.all([appRevision(nodeId, appId, revision), activeTask(nodeId, taskId)])
+    if (!Object.hasOwn(files.plans, request.plan))
+      throw new BridgeFailure('not_found', `This app has no plan called ${request.plan}.`)
+    const parsed = panelPlanSchema.safeParse(files.plans[request.plan])
+    if (!parsed.success)
+      throw new BridgeFailure('not_found', `The plan ${request.plan} no longer passes its checks, so it can't run.`)
+    if (!active) throw new BridgeFailure('not_found', "This conversation's task is no longer active.")
+    const run = await runDraftPlan(nodeId, active.workspaceId, parsed.data, request)
+    return { nodeId, appId, revision, plan: parsed.data, run }
   }
 
   async function handle(request: BridgeRequest): Promise<BridgeResults[BridgeRequest['op']]> {
@@ -972,6 +1040,48 @@ export function createBridge(options: {
       }
       case 'panel.run':
         return runShownPanel(request)
+      case 'app.view': {
+        const { nodeId, taskId, appId, revision } = request
+        const summary = await taskApp(nodeId, taskId, appId)
+        const [files, active] = await Promise.all([appRevision(nodeId, appId, revision), activeTask(nodeId, taskId)])
+        const task = active && { id: active.task.id, title: active.task.title, branch: active.task.branch }
+        return {
+          nodeId,
+          appId,
+          revision,
+          summary: bridgeAppSummary(summary),
+          program: files.program,
+          plans: Object.keys(files.plans),
+          task,
+        }
+      }
+      case 'app.run':
+        return runAppPlan(request)
+      case 'app.state': {
+        const { nodeId, taskId, appId, state, key } = request
+        await taskApp(nodeId, taskId, appId)
+        if (state === undefined) {
+          const body = (await nodeRequest(nodeId, { method: 'GET', path: appStateRoute(appId) })) as {
+            state?: Record<string, unknown>
+          } | null
+          return { nodeId, appId, state: body?.state ?? {} }
+        }
+        await nodeRequest(nodeId, { method: 'PUT', path: appStateRoute(appId), body: { state }, key })
+        return { nodeId, appId, state: null }
+      }
+      case 'app.restore': {
+        const { nodeId, taskId, appId, revision, key } = request
+        await taskApp(nodeId, taskId, appId)
+        const body = (await nodeRequest(nodeId, {
+          method: 'POST',
+          path: appRestoreRoute(appId),
+          body: { revision },
+          key,
+        })) as { revision?: unknown } | null
+        if (typeof body?.revision !== 'number')
+          throw new BridgeFailure('node_error', 'The Node returned an unreadable restore.')
+        return { nodeId, appId, revision: body.revision }
+      }
       case 'plugin.panel': {
         const view = await pluginPanel(request.nodeId, request)
         return { nodeId: request.nodeId, pluginId: request.pluginId, taskId: request.taskId, view }

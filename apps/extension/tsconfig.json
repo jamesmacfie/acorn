@@ -1,5 +1,9 @@
 {
   "extends": "../../tsconfig.base.json",
-  "compilerOptions": { "types": ["node", "vite/client"] },
+  "compilerOptions": {
+    "types": ["node", "vite/client"],
+    // The sidebar's `@acorn/plugin-api/ui`, as vite.config.ts aliases it.
+    "paths": { "@acorn/plugin-api/ui": ["./src/sidebar/appKit.ts"] }
+  },
   "include": ["src", "vite.config.ts", "vitest.config.ts"]
 }

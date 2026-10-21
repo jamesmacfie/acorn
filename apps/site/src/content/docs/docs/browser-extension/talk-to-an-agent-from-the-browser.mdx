@@ -7,11 +7,12 @@ sources:
   - docs/browser-extension/task-pages.md
   - docs/browser-extension/transcript.md
   - apps/extension/src/sidebar/Agents.tsx
+  - apps/extension/src/sidebar/AppCard.tsx
   - apps/extension/src/sidebar/Composer.tsx
   - apps/extension/src/sidebar/Conversation.tsx
   - apps/extension/src/sidebar/PanelCard.tsx
   - apps/extension/src/sidebar/Requests.tsx
-checked: '0ca51f7a5'
+checked: '64e4a064a'
 ---
 
 import Keys from '../../../../components/Keys.astro'
@@ -58,9 +59,15 @@ to one line with **Show**. To add the panel to a dashboard or edit it, use **Ope
 card's top. With an older Acorn command line, the panel reads as a line with its title and what it
 shows, and asks you to update it.
 
-An app the agent made gets a line of its own, which never folds: the app's name, version, and what
-changed. **Open in Acorn** shows it drawn in the desktop app. A panel or app that didn't pass its
-checks says so in amber.
+An app the agent made runs in the conversation, as it does in the desktop app: its name and version,
+and the app itself, with **Expand** for a tall one. Ticks and typed values are saved, and come back in
+the desktop app's card and Apps pane, and the other way round the next time the panel draws the app. A
+link in the app shows its full address and asks first, then opens in a new tab. **Ask the agent** puts
+the app's text in the message box, and never sends. When the agent changes the app, the older version
+folds to one line with **Show** to see it and **Restore** to bring it back as the newest version. To
+publish the app to the project, use **Open in Acorn**. With an older Acorn command line, the app reads
+as a line with its name and what changed, and asks you to update it. A panel or app that didn't pass
+its checks says so in amber.
 
 While the agent works, a line above the message box says **Working**, with **Stop** to end its turn.
 While it waits on you, the line says **Waiting for you**.
@@ -102,8 +109,8 @@ never guesses an answer.
 ## Limits
 
 - The panel shows messages, tool calls by title, and errors. It draws a dashboard panel the agent
-  made, read only: no row actions, board moves, or drill-downs. It names an app the agent made, but
-  doesn't draw it. It doesn't show a tool's details or subagents' work. Open the conversation in the
-  desktop app for those.
+  made, read only: no row actions, board moves, or drill-downs. It runs an app the agent made, but an
+  action on one of the app's rows runs only in the desktop app. It doesn't show a tool's details or
+  subagents' work. Open the conversation in the desktop app for those.
 - It shows the attachments a message sent as chips, each screenshot with its picture.
 - Drafts stay in the browser until sent or cleared. They don't expire.

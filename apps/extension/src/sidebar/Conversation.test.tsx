@@ -555,10 +555,83 @@ describe('conversation', () => {
         card: { kind: 'app', appId: 'app-0123456789ab', note: 'Added due dates', name: 'Checklist', revision: 3 },
       })
       await openSession(subject)
-      expect(transcript(subject.root)).toEqual(['Checklist · v3Added due datesCopy Acorn link'])
+      // This host doesn't know `app.view`, so the line stays, with a word about the CLI.
+      await vi.waitFor(() =>
+        expect(transcript(subject.root)).toEqual([
+          'Checklist · v3Added due datesCopy Acorn linkUpdate the Acorn CLI to see this app here.',
+        ]),
+      )
       expect(button(subject.root, 'Copy Acorn link')!.getAttribute('data-tip')).toBe(
         'acorn://n1/t/t1?pane=apps&item=app-0123456789ab',
       )
+    })
+
+    it("collapses the head's card when another card restores its revision", async () => {
+      const subject = mount()
+      const summary = {
+        appId: 'app-0123456789ab',
+        name: 'Checklist',
+        head: 2,
+        revisions: [
+          { revision: 1, note: 'First' },
+          { revision: 2, note: 'Second' },
+        ] as { revision: number; note: string; restoredFrom?: number }[],
+      }
+      subject.state.answers.set('app.view', (request) => ({
+        result: {
+          nodeId: 'n1',
+          appId: summary.appId,
+          revision: request.revision,
+          summary: structuredClone(summary),
+          program: 'root = Text("Steps")',
+          plans: [],
+          task: { id: request.taskId, title: 'Fix it', branch: null },
+        },
+      }))
+      subject.state.answers.set('app.state', () => ({ result: { nodeId: 'n1', appId: summary.appId, state: {} } }))
+      subject.state.answers.set('app.restore', () => {
+        summary.head = 3
+        summary.revisions.push({ revision: 3, note: 'Restored v1.', restoredFrom: 1 })
+        return { result: { nodeId: 'n1', appId: summary.appId, revision: 3 } }
+      })
+      call(subject, 1, { card: { kind: 'app', appId: summary.appId, note: 'First', name: 'Checklist', revision: 1 } })
+      call(subject, 2, { card: { kind: 'app', appId: summary.appId, note: 'Second', name: 'Checklist', revision: 2 } })
+      await openSession(subject)
+      await vi.waitFor(() => expect(button(subject.root, 'Restore v1')).toBeTruthy())
+      expect(subject.root.textContent).toContain('Checklist · v2')
+      button(subject.root, 'Restore v1')!.click()
+      await vi.waitFor(() => expect(subject.root.textContent).toContain('v2: Second. Replaced by v3.'))
+      expect(subject.root.textContent).toContain('Checklist · v3, restored from v1')
+    })
+
+    it("puts an app's Ask the agent text in this conversation's message box, after what's typed", async () => {
+      const subject = mount()
+      subject.state.answers.set('app.view', (request) => ({
+        result: {
+          nodeId: 'n1',
+          appId: 'app-0123456789ab',
+          revision: 1,
+          summary: {
+            appId: 'app-0123456789ab',
+            name: 'Checklist',
+            head: 1,
+            revisions: [{ revision: 1, note: 'First' }],
+          },
+          program: 'root = Button("Ask", @ToAssistant("Which step failed?"))',
+          plans: [],
+          task: { id: request.taskId, title: 'Fix it', branch: null },
+        },
+      }))
+      subject.state.answers.set('app.state', () => ({ result: { nodeId: 'n1', appId: 'app-0123456789ab', state: {} } }))
+      call(subject, 1, {
+        card: { kind: 'app', appId: 'app-0123456789ab', note: 'First', name: 'Checklist', revision: 1 },
+      })
+      await openSession(subject)
+      await vi.waitFor(() => expect(button(subject.root, 'Ask')).toBeTruthy())
+      type(subject.root, 'Hello')
+      button(subject.root, 'Ask')!.click()
+      await vi.waitFor(() => expect(draft(subject.root)).toBe('Hello\nWhich step failed?'))
+      expect(subject.state.requests.some((request) => request.op === 'turn.submit')).toBe(false)
     })
 
     it('says while a call checks, and warns when it failed its checks', async () => {

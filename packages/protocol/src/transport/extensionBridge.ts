@@ -76,11 +76,18 @@ export const TURN_TEXT_MAX_CHARS = 60_000
 // The Node refuses more than MAX_AGENT_CONTEXT_BYTES of context content in one turn.
 export const TURN_MAX_CONTEXTS = 8
 
+// The trellis plugin's limit on an app's saved state, and a bound on the inputs a program runs a plan
+// with, both counted as UTF-8 JSON.
+const APP_STATE_MAX_BYTES = 256 * 1024
+const APP_RUN_INPUTS_MAX_BYTES = 64 * 1024
+const jsonBytes = (value: unknown) => new TextEncoder().encode(JSON.stringify(value)).length
+
 const requestId = z.string().min(1).max(64)
 const nodeId = z.string().min(1).max(128)
 const rowId = z.string().min(1).max(128)
 // The agents routes' own bounds on an idempotency key.
 const operationKey = z.string().min(8).max(200)
+const revision = z.number().int().positive()
 const envelope = { v: z.literal(BROWSER_BRIDGE_PROTOCOL_VERSION), id: requestId }
 
 // The parts of an agents plugin turn the sidebar sends, in that plugin's shape (`AgentInputPart`), so
@@ -325,6 +332,46 @@ export const bridgeRequestSchema = z.discriminatedUnion('op', [
     sessionId: rowId,
     toolId: z.string().min(1).max(256),
     viewerZone: z.string().min(1).max(100),
+  }),
+  // An agent's app, as the desktop's app card draws it (docs/browser-extension/native-messaging.md § App
+  // cards). Each operation names the conversation's task, and the host refuses an app whose summary
+  // names another, because the Node doesn't confine this browser's device to a task. The browser names
+  // a revision and a plan, never a program or a plan's content: the host reads both from the Node.
+  z.strictObject({ ...envelope, op: z.literal('app.view'), nodeId, taskId: rowId, appId: rowId, revision }),
+  z.strictObject({
+    ...envelope,
+    op: z.literal('app.run'),
+    nodeId,
+    taskId: rowId,
+    appId: rowId,
+    revision,
+    plan: z.string().min(1).max(64),
+    inputs: z.record(z.string(), z.json()).refine((inputs) => jsonBytes(inputs) <= APP_RUN_INPUTS_MAX_BYTES),
+    viewerZone: z.string().min(1).max(100),
+  }),
+  // Reads the app's saved state, or saves `state` with `key`.
+  z
+    .strictObject({
+      ...envelope,
+      op: z.literal('app.state'),
+      nodeId,
+      taskId: rowId,
+      appId: rowId,
+      state: z
+        .record(z.string().regex(/^\$/), z.json())
+        .refine((state) => jsonBytes(state) <= APP_STATE_MAX_BYTES, 'The state is over 256 KiB.')
+        .optional(),
+      key: operationKey.optional(),
+    })
+    .refine((request) => (request.state === undefined) === (request.key === undefined), 'A save needs a key.'),
+  z.strictObject({
+    ...envelope,
+    op: z.literal('app.restore'),
+    nodeId,
+    taskId: rowId,
+    appId: rowId,
+    revision,
+    key: operationKey,
   }),
 ])
 export type BridgeRequest = z.infer<typeof bridgeRequestSchema>
@@ -579,6 +626,31 @@ export type BridgeResults = {
   // `plan` is the call's plan, titled as the call is. `run` is the dashboards run route's answer,
   // unchanged: a `DashboardRun` from dashboards-core, which this package can't import.
   'panel.run': { nodeId: string; sessionId: string; toolId: string; plan: PanelPlan; run: unknown }
+  // `task` is null when the app's task is no longer active, so the card draws no app.
+  'app.view': {
+    nodeId: string
+    appId: string
+    revision: number
+    summary: BridgeAppSummary
+    program: string
+    plans: string[]
+    task: BridgeTask | null
+  }
+  // `run` is the dashboards run route's answer, as in `panel.run`.
+  'app.run': { nodeId: string; appId: string; revision: number; plan: PanelPlan; run: unknown }
+  // The saved state, or null after a save.
+  'app.state': { nodeId: string; appId: string; state: Record<string, unknown> | null }
+  // `revision` is the new head, holding the restored files.
+  'app.restore': { nodeId: string; appId: string; revision: number }
+}
+
+// An app's name, head, and revisions, in the trellis plugin's `AppSummary` shape. A restored revision
+// names the one it copied in `restoredFrom`.
+export type BridgeAppSummary = {
+  appId: string
+  name: string
+  head: number
+  revisions: { revision: number; note: string; restoredFrom?: number }[]
 }
 
 // Which sessions and tasks changed on the selected Node since the last hint. Nothing more: the

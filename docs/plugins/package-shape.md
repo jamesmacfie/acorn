@@ -15,6 +15,7 @@ plugins/<name>/
     node/       index.ts, the NodePlugin factory, and schema.ts. Nothing else.
     server/     routes/*.ts Hono routers, engines, stores, drivers, the vendor client
     client/     index.ts, components, <plugin>Client.ts, *Store.ts, contributions
+    embed/      client code another client draws with, named one file at a time in the exports map
     tree/       loaded tier only: the remote component tree the host draws
     contract/   only what another package imports. No tests.
     shared/     wire types, api.ts route builders, anything both halves read
@@ -24,11 +25,15 @@ plugins/<name>/
   drizzle.config.ts export { default } from '../drizzle.shared'   (table-owning plugins only)
 ```
 
-The exports map has five kinds, and a plugin declares the ones it has:
+The exports map has six kinds, and a plugin declares the ones it has:
 
 - `./node/index.ts` for the Node activation entrypoint.
 - `./client/index.ts` for the client activation entrypoint.
 - `./contract/*` for the cross-plugin contract.
+- `./embed/<File>.tsx` for one embedded surface. Each file is named, not a wildcard, so `embed/` can
+  hold its own tests. An app imports one only through an edge listed in `tools/arch/boundaries.test.ts`.
+  The trellis plugin's `AppRuntime.tsx` is the one there is: the browser extension runs an agent's app
+  with it.
 - `./testkit` for node-side test helpers.
 - `./testkit/client` for client-side test helpers.
 

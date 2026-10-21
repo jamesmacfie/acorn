@@ -39,6 +39,10 @@ request carries `v: 1` and a request `id`, and the host answers with the same `i
 | `plugin.panel` | `nodeId`, `pluginId`, `taskId`, `source` (optional) | `{ nodeId, pluginId, taskId, view }`, where `view` is null when the task has no panel; see [plugin panels](./plugin-panels.md#native-operation) |
 | `requests.pending` | `nodeId` | `{ nodeId, requests }`; see [request notifications](./notifications.md#native-operation) |
 | `panel.run` | `nodeId`, `sessionId`, `toolId`, `viewerZone` | `{ nodeId, sessionId, toolId, plan, run }`; see [panel cards](#panel-cards) |
+| `app.view` | `nodeId`, `taskId`, `appId`, `revision` | `{ nodeId, appId, revision, summary, program, plans, task }`; see [app cards](#app-cards) |
+| `app.run` | `nodeId`, `taskId`, `appId`, `revision`, `plan`, `inputs`, `viewerZone` | `{ nodeId, appId, revision, plan, run }` |
+| `app.state` | `nodeId`, `taskId`, `appId`, and `state` with `key` to save | `{ nodeId, appId, state }`, where `state` is null after a save |
+| `app.restore` | `nodeId`, `taskId`, `appId`, `revision`, `key` | `{ nodeId, appId, revision }`, the new head |
 
 A reply is `{ v, id, ok: true, result }` or `{ v, id, ok: false, error: { code, message } }`. The host
 also sends `{ v, event: 'status', status }` when the selected Node's connection changes, and
@@ -91,6 +95,31 @@ The run is a read: an answer that arrives after the selection moved is refused w
 `plan` is the parsed plan, so the sidebar can lay out the view. `run` is the run route's answer,
 unchanged, capped so the whole reply fits the extension's 16 Mi character limit. A host from before
 `panel.run` answers `bad_request`, and the sidebar draws the call's line instead.
+
+## App cards
+
+Four operations draw an agent's app in the sidebar ([app cards](./transcript.md#app-cards)). The
+browser names an app, a revision, and a plan, never a program or a plan's content. Each names the
+conversation's task, and the host first reads the app's summary from the trellis plugin's
+`GET /v1/p/trellis/apps/<appId>` and refuses with `not_found` unless it names that task. The trellis
+routes don't confine a device to a task, so the host makes this check itself, as it does for an
+attachment.
+
+- `app.view` answers the summary, the revision's program, its plan names, and the task's ID, title,
+  and branch. `task` is null once the task isn't active, and the sidebar draws no app then.
+- `app.run` reads the revision's files, takes the named plan from them, and runs it as `panel.run`
+  runs a panel: a draft in the task's workspace, in `execution` mode, with the sidebar's `viewerZone`
+  and the program's `inputs`. A plan name the revision has no file for is `not_found`, and so is a
+  plan that no longer passes `panelPlanSchema`. `inputs` are at most 64 KiB of JSON.
+- `app.state` without `state` reads the app's saved state. With `state` and `key`, it saves it with
+  `PUT`. The schema refuses a state over 256 KiB, the trellis route's own limit, and a save without a
+  key.
+- `app.restore` posts the revision to the restore route with its key, so the Node makes one revision
+  for a retried restore.
+
+A revision never changes, so the host keeps the files of the last eight revisions it read, by Node,
+app, and revision, and a program's runs skip that read. It keeps nothing else between calls. A host
+from before `app.view` answers `bad_request`, and the sidebar draws the call's line instead.
 
 ## Limits
 

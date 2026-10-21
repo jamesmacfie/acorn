@@ -45,9 +45,6 @@ export type RevisionMeta = AppRevisionSummary & {
 
 export class AppConflict extends Error {}
 
-/** The most a saved state document may hold, as a working file may. */
-export const MAX_STATE_BYTES = 256 * 1024
-
 export const fileHash = (text: string) => createHash('sha256').update(text).digest('hex').slice(0, 16)
 
 const fileName = (file: AppFile) => (file === 'program' ? 'program.oui' : `${file}.json`)
