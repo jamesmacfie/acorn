@@ -35,7 +35,12 @@ Each repository has one admission queue, keyed by its shared Git folder
 ([Admit work and writes](../git-client/stashes.md#admit-work-and-writes)). Creation enters it only
 around `git worktree add` and its branch check, the one step that changes the shared folder. The
 fetch, the file copy, and the `core:worktree-created` hooks run outside it, and a second caller for
-the same task joins the creation in flight. A read of a worktree that already exists doesn't enter
+the same task joins the creation in flight. That includes a read that comes after the folder and
+`worktreePath` exist but before the copy and hooks finish, so nothing starts in a tree that setup
+hasn't claimed. The Node marks setup as starting before it writes `worktreePath`, so a checkout write
+admitted on the new worktree sees setup as activity. Archive's claim doesn't wait for a creation. It
+waits for the creation afterwards, as it did before, and removes the finished worktree.
+A read of a worktree that already exists doesn't enter
 the queue at all. `tasks.root`, `requireRoot`, `resolveCwd`, and `runConfig` read files and, when
 HEAD has moved, update `tasks.branch`. They don't change Git state. So the editor, the Git pane,
 and a prompt's tool list answer while another task creates a worktree. A read of a task with no

@@ -23,7 +23,15 @@ import { createTaskService } from '../core/tasks'
 import { registerCheckoutAdmission, type CheckoutAdmission } from '../core/checkoutAdmission'
 import { worktreeBranchDirName } from '../worktrees/pathGuards'
 import { archiveTask, restoreTask, runTeardownProcess, type ArchiveDeps } from './archive'
-import { computeTaskStatuses, reconcileWorktrees, setWorktreesRoot, taskRoot } from '../worktrees/taskWorktree'
+import { clearHooks, registerHookHandler } from '../pluginHost/hooks'
+import {
+  computeTaskStatuses,
+  loadTask,
+  reconcileWorktrees,
+  resolveTaskCwd,
+  setWorktreesRoot,
+  taskRoot,
+} from '../worktrees/taskWorktree'
 import type { TelemetryRecord, TelemetrySpan } from '@acorn/protocol/telemetry.ts'
 import {
   flushTelemetry,
@@ -356,6 +364,57 @@ describe('archiveTask teardown ordering', () => {
     // The retained historical row must not make a later pane or plugin call recreate the directory.
     await expect(taskRoot(t.db, 'task1')).resolves.toBeNull()
     expect(existsSync(worktree)).toBe(false)
+  })
+
+  // Creation no longer holds the repository queue through its copy and hooks, so archive's claim goes
+  // straight in. It waits for the creation afterwards, then removes the finished worktree.
+  it('waits for a creation still in its hooks, then removes the finished worktree', async () => {
+    setWorktreesRoot(join(dir, 'worktrees'))
+    const now = Date.now()
+    await t.db.insert(schema.tasks).values({
+      id: 'task2',
+      title: 'Fresh',
+      origin: 'local',
+      projectId: 'project-widget',
+      branch: 'feat/y',
+      status: 'active',
+      sort: 1,
+      createdAt: now,
+      updatedAt: now,
+    })
+    let release!: () => void
+    const held = new Promise<void>((resolve) => (release = resolve))
+    registerHookHandler({
+      id: 'setup:slow',
+      pluginId: 'setup',
+      point: 'core:worktree-created',
+      mode: 'transform',
+      priority: 500,
+      call: async (payload) => {
+        await held
+        return { payload }
+      },
+    })
+    try {
+      const creating = resolveTaskCwd(t.db, await loadTask(t.db, 'task2'), checkout)
+      await vi.waitFor(async () => expect((await loadTask(t.db, 'task2'))?.worktreePath).toBeTruthy())
+      const created = (await loadTask(t.db, 'task2'))!.worktreePath!
+
+      let settled = false
+      const archiving = archiveTask(t.db, 'task2', {}, deps()).then((res) => ((settled = true), res))
+      await new Promise((resolve) => setTimeout(resolve, 100))
+      expect(settled).toBe(false)
+      expect(existsSync(created)).toBe(true)
+
+      release()
+      await creating
+      expect(await archiving).toEqual({ ok: true })
+      expect(existsSync(created)).toBe(false)
+      expect(await loadTask(t.db, 'task2')).toMatchObject({ status: 'archived', worktreePath: null })
+      expect(git(checkout, 'worktree', 'list').toString()).not.toContain('feat/y')
+    } finally {
+      clearHooks('setup')
+    }
   })
 
   it('non-zero teardown pauses the archive and removes nothing', async () => {

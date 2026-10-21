@@ -373,6 +373,13 @@ export async function resolveTaskCwd(
   if (isTaskArchiving(t.id)) throw new BridgeError(409, 'task-archiving', 'Task archive is in progress.')
   // Branchless tasks never use a persisted worktree: they run in the project root.
   if (!t.branch || project?.vcs !== 'git') return { cwd: checkout, isWorktree: false, created: false }
+  // A creation is unfinished until its copy and hooks are, though its folder and `worktreePath` exist
+  // sooner. Reads join it rather than take the folder, so nothing starts in a tree setup hasn't claimed.
+  const inflight = inflightCreates.get(t.id)
+  if (inflight) {
+    const { prepareTask } = await import('./preparationTelemetry')
+    return prepareTask(t.id, true, () => inflight)
+  }
   if (t.worktreePath && isDir(t.worktreePath)) {
     const isProjectRoot = !!projectRoot && resolve(t.worktreePath) === resolve(projectRoot)
     // Verify rather than assume before handing a persisted path back (docs/workspaces-and-tasks/worktrees.md §
@@ -381,11 +388,6 @@ export async function resolveTaskCwd(
     return { cwd: t.worktreePath, isWorktree: !isProjectRoot, created: false }
   }
   const branch = t.branch
-  const inflight = inflightCreates.get(t.id)
-  if (inflight) {
-    const { prepareTask } = await import('./preparationTelemetry')
-    return prepareTask(t.id, true, () => inflight)
-  }
   const create = import('./preparationTelemetry').then(({ prepareTask, prepareWorktreePhase }) =>
     prepareTask(t.id, false, async () => {
       const { owner, repo } = projectWorktreeIdentity(project!)
@@ -411,16 +413,10 @@ export async function resolveTaskCwd(
       // worktree, a stale directory) are all ones the user has to act on, so say so instead.
       if (!wt.ok) throw new BridgeError(409, 'worktree-unavailable', wt.reason)
       await prepareWorktreePhase('worktree.validate', async () => assertOnBranch(wt.path, branch))
-      await db
-        .update(schema.tasks)
-        .set({ worktreePath: wt.path, updatedAt: Date.now() })
-        .where(eq(schema.tasks.id, t.id))
-      // The task row just gained a worktree, and archive already announces losing one, so "worktree
-      // created / removed" folds into `tasks:changed`: a consumer re-reads `worktreePath`
-      // (docs/plugins/events.md § Hearing a core event).
-      broadcastTasksChanged({ taskId: t.id })
+      // Setup is marked before the row names the worktree. A write admitted on the new checkout then
+      // sees setup starting, and never finds the checkout with nothing claiming it.
+      const scripts = taskScripts(db)
       if (wt.created) {
-        const scripts = taskScripts(db)
         scripts.newGeneration(t.id)
         const setup = await projectSetup(db, t.projectId)
         scripts.prepareSetup(
@@ -434,6 +430,16 @@ export async function resolveTaskCwd(
                 ? 'not_configured'
                 : undefined,
         )
+      }
+      await db
+        .update(schema.tasks)
+        .set({ worktreePath: wt.path, updatedAt: Date.now() })
+        .where(eq(schema.tasks.id, t.id))
+      // The task row just gained a worktree, and archive already announces losing one, so "worktree
+      // created / removed" folds into `tasks:changed`: a consumer re-reads `worktreePath`
+      // (docs/plugins/events.md § Hearing a core event).
+      broadcastTasksChanged({ taskId: t.id })
+      if (wt.created) {
         await prepareWorktreePhase('files.copy', () => copyConfiguredFiles(db, t, checkout, wt.path))
         // Awaited, not fired and forgotten: `core:worktree-created` admits the setup process before the
         // next terminal opens. This awaits spawning, not completion; callers read task scripts for

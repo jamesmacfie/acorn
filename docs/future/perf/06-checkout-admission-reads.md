@@ -25,9 +25,16 @@ Decisions and deviations:
    only where creation needs it covers the same reads with less code, and it can't fall through from
    the fast path into a creation outside the queue if the folder vanishes between the check and the
    read.
-2. A write on a task's new checkout can now be admitted between the task row gaining its
-   `worktreePath` and `prepareSetup` marking setup as starting. That's a few awaits, and before, the
-   queue closed it. Nothing writes to a checkout that nobody has opened yet, so I left it.
+2. Taking the queue out of creation opened two gaps, and I closed both. A read that came after
+   `git worktree add` wrote `worktreePath` took the folder at once, while the copy and the hooks were
+   still running, where before it waited in the queue. `resolveTaskCwd` now joins a creation in
+   flight before it looks at the folder. And setup is marked as starting before the row gets
+   `worktreePath`, so a write admitted on the new checkout sees setup as activity. Agent turns and
+   workflow steps resolve the root before they act, so they join the creation too. A workflow run's
+   admission only saves its row. Tests cover both.
+   The doc's second case, an archive claimed during the copy or the hooks, was already safe. The claim
+   goes through, then archive waits on the task's `inflightCreates` entry before it reads the row, so
+   it removes a finished worktree and nulls `worktreePath`. A test shows it.
 3. Two active tasks can't share a branch, so two creations can't race for the same path. Before, the
    second would have found the folder under the queue and reused it. Now its `git worktree add` fails
    with `worktree-unavailable`. A reservation already prevents the case.
@@ -36,6 +43,8 @@ Decisions and deviations:
 5. `tsc --noEmit` in node-core reports `lowerPriority` missing from `Methods<CoreProcService>` in
    `server/plugins/hostCallModes.ts`. It comes from phase 4 and isn't touched here. The service budget is
    1,933,025 B against a ceiling of 1,934,100 B.
+6. A hook that reads the root of the task it is creating for now waits on its own creation. It did
+   before too, because the queue was held.
 
 What later phases need to know:
 

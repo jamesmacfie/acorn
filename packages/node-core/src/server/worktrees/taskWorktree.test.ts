@@ -3,6 +3,7 @@ import { cpSync, existsSync, mkdirSync, mkdtempSync, realpathSync, renameSync, r
 import { join, resolve } from 'node:path'
 import { tmpdir } from 'node:os'
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest'
+import { eq } from 'drizzle-orm'
 import { schema } from '../db'
 import { clearHooks, registerHookHandler } from '../pluginHost/hooks'
 import { makeTestDb, type TestDb } from '../../testkit/db'
@@ -15,6 +16,7 @@ import {
   setWorktreesRoot,
   taskRoot,
 } from './taskWorktree'
+import { setupCheckoutActivity } from '../taskScripts/service'
 import { createCheckoutAdmission, registerCheckoutAdmission } from '../core/checkoutAdmission'
 import type { ProjectService } from '../core/projectRefs'
 import type { TaskService } from '../core/tasks'
@@ -31,9 +33,13 @@ import {
 } from '../telemetry/collector'
 
 const broadcasts: Record<string, unknown>[] = []
+let onBroadcast: ((frame: Record<string, unknown>) => void) | undefined
 vi.mock('../transport/wsHub', async (importOriginal) => ({
   ...(await importOriginal<typeof import('../transport/wsHub')>()),
-  wsBroadcast: (frame: Record<string, unknown>) => void broadcasts.push(frame),
+  wsBroadcast: (frame: Record<string, unknown>) => {
+    broadcasts.push(frame)
+    onBroadcast?.(frame)
+  },
 }))
 
 // Passes through, so the other cases still run real Git; the boot check counts the spawns.
@@ -130,6 +136,7 @@ describe('resolveTaskCwd core:worktree-created hook', () => {
     })
   })
   afterEach(() => {
+    onBroadcast = undefined
     clearHooks('setup')
     t.cleanup()
     rmSync(dir, { recursive: true, force: true })
@@ -229,6 +236,47 @@ describe('resolveTaskCwd core:worktree-created hook', () => {
     } finally {
       finishTaskArchive(TASK)
     }
+  })
+
+  // The folder and `worktreePath` exist as soon as `git worktree add` returns, well before the copy and
+  // the hooks finish. A read that took the folder then would start work in a half-prepared tree.
+  it('makes a read join a creation still in its hooks, not take the folder already on disk', async () => {
+    let release!: () => void
+    const held = new Promise<void>((resolve) => (release = resolve))
+    clearHooks('setup')
+    registerHookHandler({
+      id: 'setup:slow',
+      pluginId: 'setup',
+      point: 'core:worktree-created',
+      mode: 'transform',
+      priority: 500,
+      call: async (payload) => {
+        await held
+        return { payload }
+      },
+    })
+    const creating = resolveTaskCwd(t.db, await loadTask(t.db, TASK), checkout)
+    await vi.waitFor(async () => expect((await loadTask(t.db, TASK))?.worktreePath).toBeTruthy())
+
+    let settled = false
+    const read = taskRoot(t.db, TASK).then((root) => ((settled = true), root))
+    await new Promise((resolve) => setTimeout(resolve, 100))
+    expect(settled).toBe(false)
+
+    release()
+    await creating
+    expect(await read).toBe(resolve((await loadTask(t.db, TASK))!.worktreePath!))
+  })
+
+  it('marks setup as starting before the task row names the worktree', async () => {
+    await t.db.update(schema.projects).set({ setupScript: 'echo setup' })
+    let whenRowNamesWorktree: unknown
+    onBroadcast = () => {
+      const row = t.db.select().from(schema.tasks).where(eq(schema.tasks.id, TASK)).get()
+      if (row?.worktreePath) whenRowNamesWorktree ??= setupCheckoutActivity(t.db, [TASK])
+    }
+    await resolveTaskCwd(t.db, await loadTask(t.db, TASK), checkout)
+    expect(whenRowNamesWorktree).toEqual([{ taskId: TASK, description: 'setup starting' }])
   })
 
   it('correlates creation and shared waiting with their requesting surfaces without paths', async () => {
