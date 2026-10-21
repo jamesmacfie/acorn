@@ -24,6 +24,7 @@ const OPEN_TO_A_TASK_TOKEN: Record<string, string> = {
   // task; leaving them unfiltered would hand over every other task's title, branch and worktree path.
   'GET /v1/core/tasks': 'routes/tasks.ts filters the list by mayActOnTask',
   'GET /v1/core/task-statuses': 'routes/worktree.ts filters the roster by mayActOnTask',
+  'GET /v1/core/task-scripts': 'routes/projects/taskScripts.ts filters the ids by mayActOnTask',
 
   // A task row is inert. It records intent — a title, a project, a branch name — and nothing on it
   // runs until a person opens it, at which point the worktree and setup paths apply their own gates.

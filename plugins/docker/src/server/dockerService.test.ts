@@ -87,6 +87,51 @@ it('fences invalidated inventory and its finally against a replacement wave', as
   expect(await service.containers()).toEqual(await b)
 })
 
+it("answers the summary's list from memory while docker ps hangs, and remembers a failure for 30 s", async () => {
+  vi.useFakeTimers()
+  const service = getDockerService()
+  mocks.docker.mockResolvedValueOnce('{"ID":"first","Names":"first","Image":"fixture"}')
+  expect((await service.containerSnapshot()).list).toMatchObject([{ id: 'first' }])
+
+  // Older than ten seconds: the old list comes back at once, and one read starts behind it.
+  const hung = deferred<string>()
+  mocks.docker.mockReturnValueOnce(hung.promise)
+  await vi.advanceTimersByTimeAsync(10_000)
+  expect((await service.containerSnapshot()).list).toMatchObject([{ id: 'first' }])
+  expect((await service.containerSnapshot()).list).toMatchObject([{ id: 'first' }])
+  expect(mocks.docker).toHaveBeenCalledTimes(2)
+  hung.resolve('{"ID":"second","Names":"second","Image":"fixture"}')
+  await vi.advanceTimersByTimeAsync(0)
+  expect((await service.containerSnapshot()).list).toMatchObject([{ id: 'second' }])
+
+  // A docker event makes the next read wait for a fresh list.
+  mocks.docker.mockResolvedValueOnce('{"ID":"third","Names":"third","Image":"fixture"}')
+  service.invalidate('containers')
+  expect((await service.containerSnapshot()).list).toMatchObject([{ id: 'third' }])
+
+  // A failure serves the last list and asks Docker nothing more for thirty seconds.
+  mocks.docker.mockRejectedValueOnce(new Error('daemon down'))
+  service.invalidate('containers')
+  expect((await service.containerSnapshot()).list).toMatchObject([{ id: 'third' }])
+  const calls = mocks.docker.mock.calls.length
+  await vi.advanceTimersByTimeAsync(29_000)
+  await service.containerSnapshot()
+  expect(mocks.docker).toHaveBeenCalledTimes(calls)
+  mocks.docker.mockResolvedValueOnce('{"ID":"back","Names":"back","Image":"fixture"}')
+  await vi.advanceTimersByTimeAsync(1_000)
+  expect((await service.containerSnapshot()).list).toMatchObject([{ id: 'back' }])
+})
+
+it('fails fast for thirty seconds when Docker never answered', async () => {
+  vi.useFakeTimers()
+  const service = getDockerService()
+  mocks.docker.mockRejectedValueOnce(new Error('daemon down'))
+  await expect(service.containerSnapshot()).rejects.toThrow('daemon down')
+  await vi.advanceTimersByTimeAsync(29_000)
+  await expect(service.containerSnapshot()).rejects.toThrow('daemon down')
+  expect(mocks.docker).toHaveBeenCalledTimes(1)
+})
+
 it('drains output after exit and ends once at close; stop suppresses end', () => {
   const end = vi.fn(),
     output = vi.fn()

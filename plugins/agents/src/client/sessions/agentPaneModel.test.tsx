@@ -218,7 +218,7 @@ it('reads the providers from the cache on the next task, and refreshes them with
       () => (
         <QueryClientProvider client={client}>
           {(() => {
-            built = createAgentPaneModel({ id: taskId } as never, { shown: () => false })
+            built = createAgentPaneModel({ id: taskId } as never, { shown: () => true })
             return null
           })()}
         </QueryClientProvider>
@@ -244,6 +244,25 @@ it('reads the providers from the cache on the next task, and refreshes them with
   expect(providers).toHaveBeenLastCalledWith(true)
   expect(second.model.choices().map((choice) => choice.provider.id)).toEqual(['claude', 'codex'])
   second.dispose()
+})
+
+it("doesn't read the providers for a kept task whose pane isn't shown", async () => {
+  providers.mockImplementation(async () => [claude])
+  const client = new QueryClient({ defaultOptions: { queries: { retry: false } } })
+  const dispose = render(
+    () => (
+      <QueryClientProvider client={client}>
+        {(() => {
+          createAgentPaneModel({ id: 't1' } as never, { shown: () => false })
+          return null
+        })()}
+      </QueryClientProvider>
+    ),
+    document.createElement('div'),
+  )
+  await settle()
+  expect(providers).not.toHaveBeenCalled()
+  dispose()
 })
 
 it('retries a saved turn through fresh host admission without copying host policy fields', async () => {

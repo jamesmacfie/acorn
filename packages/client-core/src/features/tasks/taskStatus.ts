@@ -1,7 +1,8 @@
-import { createSignal } from 'solid-js'
+import { createEffect, createMemo, createRoot, createSignal, on } from 'solid-js'
 import { taskBridge } from './taskBridge'
+import { activeTaskId } from './tasks'
 import { wsOnNodeEvent } from '../../infra/node/wsClient'
-import type { TaskStatus } from '@acorn/protocol/task.ts'
+import { TASK_IDS_PER_READ, type TaskStatus } from '@acorn/protocol/task.ts'
 import type { ClientScheduleContribution } from '../../host/registries/shell/schedules'
 import { latestOnly } from '../../kit/lib/state/latestOnly'
 
@@ -46,7 +47,25 @@ export function publishTaskStatuses(list: readonly TaskStatus[]): void {
   setStatusRevision((revision) => revision + 1)
 }
 
-const refreshTaskStatuses = latestOnly(async () => taskBridge().task.statuses(), publishTaskStatuses)
+// The tasks the rail draws. Null until a rail says, and in a client without one, which asks about
+// every active task.
+const [railTaskIds, setRailTaskIds] = createSignal<readonly string[] | null>(null)
+export { setRailTaskIds }
+
+// The rail's rows and the open task, so a task nobody can see costs no `git status`. Undefined asks for
+// every active task: no rail has said, or the list is too long to name in one read.
+const statusTaskIds = (): readonly string[] | undefined => {
+  const rail = railTaskIds()
+  if (!rail) return undefined
+  const open = activeTaskId()
+  const ids = open && !rail.includes(open) ? [...rail, open] : rail
+  return ids.length <= TASK_IDS_PER_READ ? ids : undefined
+}
+
+const refreshTaskStatuses = latestOnly(async () => {
+  const ids = statusTaskIds()
+  return ids && !ids.length ? [] : taskBridge().task.statuses(ids)
+}, publishTaskStatuses)
 
 // Start polling; returns an unsubscribe.
 //
@@ -56,18 +75,29 @@ const refreshTaskStatuses = latestOnly(async () => taskBridge().task.statuses(),
 export const taskStatusScheduleContribution: ClientScheduleContribution = {
   id: 'tasks.worktree-status',
   intervalMs: 10_000,
-  // Each refresh shells out to `git status` for every active worktree. Status broadcasts keep
+  // The clock is a backstop to the events below, so it slows down while the window has no focus.
+  unfocusedIntervalMs: 30_000,
+  // Each refresh shells out to `git status` for every worktree it asks about. Status broadcasts keep
   // in-app mutations immediate; ten seconds bounds background process churn as task count grows.
   run: refreshTaskStatuses,
-  // Two narrow events, because what moves a dirty marker is a write under the worktree or an agent
-  // finishing a turn. A content-free terminal status ping would also fire on every idle-to-working
-  // edge and make a build's output spawn a `git status` per worktree per client. Core's own transport,
-  // so no feature accessor.
+  // One narrow event, because what moves a dirty marker is a write under the worktree, and an agent
+  // that writes files raises it too. Agent session frames and terminal status pings would fire on every
+  // turn and every idle-to-working edge, each a `git status` per worktree per client. Core's own
+  // transport, so no feature accessor.
   subscribe: (refresh) => {
-    const offs = [
-      wsOnNodeEvent('worktree:status-changed', () => refresh()),
-      wsOnNodeEvent('agent-session:changed', () => refresh()),
-    ]
-    return () => offs.forEach((off) => off())
+    const off = wsOnNodeEvent('worktree:status-changed', () => refresh())
+    // A task new to the rail, after a workspace switch, has no status until it's asked about.
+    const stopAsking = createRoot((dispose) => {
+      const asked = createMemo(() => {
+        const ids = statusTaskIds()
+        return ids && [...ids].sort().join(',')
+      })
+      createEffect(on(asked, () => refresh(), { defer: true }))
+      return dispose
+    })
+    return () => {
+      off()
+      stopAsking()
+    }
   },
 }

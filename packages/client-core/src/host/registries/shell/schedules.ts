@@ -1,7 +1,7 @@
 import { createEffect, createMemo, createRoot, onCleanup, untrack } from 'solid-js'
 import { activeNodeId } from '../../../infra/node/activeNode'
 import { hasHostCapability, type HostCapabilityRequirement } from '../../../infra/node/hostCapabilities'
-import { hostHidden, onHostVisibilityChange } from '../../../infra/platform'
+import { hostFocused, hostHidden, onHostVisibilityChange } from '../../../infra/platform'
 import { Registry } from '../../../kit/lib/state/registry'
 import { createLogger } from '../../../infra/telemetry/logger'
 
@@ -17,6 +17,9 @@ const log = createLogger('schedule')
 export type ClientScheduleContribution = {
   id: string
   intervalMs: number
+  /** A slower clock while the window has no focus, for an entry whose events keep it current and whose
+   *  clock is only a backstop. Events still refresh it at once. */
+  unfocusedIntervalMs?: number
   requires?: HostCapabilityRequirement
   run: () => void | Promise<void>
   subscribe?: (refresh: () => void) => () => void
@@ -83,7 +86,19 @@ export function startClientSchedules(): () => void {
             }
           })()
         }
-        const timer = setInterval(refresh, entry.intervalMs)
+        // Unfocused, a tick runs only once enough of them have passed to make the slower interval.
+        let skippedTicks = 0
+        const tick = () => {
+          if (
+            entry.unfocusedIntervalMs &&
+            !hostFocused() &&
+            ++skippedTicks * entry.intervalMs < entry.unfocusedIntervalMs
+          )
+            return
+          skippedTicks = 0
+          refresh()
+        }
+        const timer = setInterval(tick, entry.intervalMs)
         const off = entry.subscribe?.(refresh)
         untrack(refresh)
         const offVisibility = onHostVisibilityChange(refresh)

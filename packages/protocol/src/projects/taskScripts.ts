@@ -1,4 +1,5 @@
 import { z } from 'zod'
+import { taskIdsQuery } from './task.ts'
 
 export const TASK_SCRIPT_OUTPUT_BYTES = 64 * 1024
 const TASK_SCRIPT_QUERY_BYTES = 32 * 1024
@@ -92,6 +93,10 @@ export type TaskScriptsStatus = z.infer<typeof taskScriptsStatusSchema>
 export type TaskScriptWait = z.infer<typeof taskScriptWaitSchema>
 export type TaskScriptLogs = z.infer<typeof taskScriptLogsSchema>
 export const taskScriptsRoute = (id: string) => `/v1/core/tasks/${encodeURIComponent(id)}/scripts`
+// Many tasks' snapshots in one read, keyed by task id. A task the caller may not see, or that no longer
+// exists, is absent rather than an error.
+export const taskScriptsBatchRoute = (ids: readonly string[]) => `/v1/core/task-scripts?${taskIdsQuery(ids)}`
+export const taskScriptsBatchSchema = z.record(z.string(), taskScriptsStatusSchema)
 export const taskScriptsKey = ['task-scripts', 'v1'] as const
 export const taskScriptSettled = (state: TaskScriptState): boolean =>
   ['succeeded', 'failed', 'skipped', 'interrupted'].includes(state)

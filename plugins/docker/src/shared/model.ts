@@ -106,6 +106,10 @@ export type DockerTaskSummary = {
   running: number
   total: number
   projects: string[] // distinct compose projects among the matched containers
+  // When the `docker ps` list behind this was read. The Node answers from its last list while Docker is
+  // slow, so this can be older than the request. Absent from a Node before it. Mixed-version path until
+  // 2027-01-19.
+  observedAt?: number
 }
 
 // The `[docker]` matcher keys (server/dockerConfig.ts) as one project sees them: what its checkout's

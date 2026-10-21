@@ -115,6 +115,13 @@ or offline, cached answers stay visible with freshness badges, and a refetch fai
 A reconnect or sequence gap marks data stale and fetches again. There's no history cursor and no
 offline mutation queue.
 
+Coming back to the window refetches nothing by default (`refetchOnWindowFocus: false` in `clientFor`).
+The socket keeps data fresh while it's connected, and a reconnect marks the Node's queries stale. A
+query that reads something no frame announces sets `refetchOnWindowFocus` itself. A reconnect, or a
+`ws:shed` half a second after it arrives, refetches only active queries. A pane model kept for a task
+out of view reads only while `pane.shown()` is true, so its queries aren't active
+([pane models](./panes/models.md)).
+
 A failed read retries once by default (`clientFor` in `packages/client-core/src/infra/node/fleet.ts`).
 It doesn't retry a timeout, which already waited out the broker's deadline, a 4xx answer, or a read
 refused because the Node is offline. A query can set its own `retry`.
@@ -179,8 +186,15 @@ retention rules and must not share a blind deletion policy.
 
 ## Task script snapshots
 
-The client query key is `['task-scripts', 'v1', taskId]` in the selected Node's cache. A task-addressed
-`tasks:changed` notice invalidates that task's script query as well as its task rows, and a reconnect
-refreshes. Active views also refresh every 15 seconds. Core sends content-free invalidations after
-lifecycle writes and archive-gate changes, and log tails are fetched on demand. A stale or offline
-running snapshot doesn't assert that the process is alive.
+The client query key is `['task-scripts', 'v1', taskId]` in the selected Node's cache. The rail reads
+every row's scripts in one query, `['task-scripts', 'v1', { ids }]`, through
+`GET /v1/core/task-scripts?ids=` (`createTaskScriptsBatch` in
+`packages/client-core/src/features/tasks/taskScripts.ts`). It asks for at most 100 tasks a request,
+and writes each task's answer under its own key, so `cachedTaskScripts` answers for any task the rail
+has shown. The batch isn't persisted, because the per-task entries already are. A Node from before the
+batched route answers 404, and the rail then reads task by task.
+
+Any `tasks:changed` notice invalidates every script query, because the rail's one query is what moves
+a task's markers. A reconnect refreshes too. Active views also refresh every 15 seconds. Core sends
+content-free invalidations after lifecycle writes and archive-gate changes, and log tails are fetched
+on demand. A stale or offline running snapshot doesn't assert that the process is alive.

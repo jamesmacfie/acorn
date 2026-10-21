@@ -58,8 +58,10 @@ and a socket that dies holding a pause releases it.
 
 An invalidation ping has no producer to slow, so those are still shed. The hub replaces the first one
 in a congested window with a `ws:shed` marker that takes its sequence number, and later sheds in that
-window take none. The broker forwards the marker, and the renderer marks what's on screen stale and
-refetches, as after a reconnect. Viewer admission errors bypass shedding.
+window take none. The broker forwards the marker. Half a second later, the renderer marks what's on
+screen stale and refetches, as after a reconnect, so the refetches don't join a socket that is still
+draining. A second marker in that half second joins the first. Viewer admission errors bypass
+shedding.
 
 ## Sending text to an agent
 

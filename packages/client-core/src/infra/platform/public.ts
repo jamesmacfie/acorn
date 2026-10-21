@@ -13,6 +13,7 @@ export {
   saveFile,
   desktopLinks,
   oauthCallback,
+  setHostFocused,
 } from './index.ts'
 export type { CliInstallState, PickedFile, PluginCustody, SaveRequest } from './index.ts'
 export { elementRectKey, visibleElementRect } from './webviewGeometry.ts'

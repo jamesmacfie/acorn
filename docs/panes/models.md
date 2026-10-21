@@ -62,6 +62,12 @@ while hidden and fetches once when it's drawn again. The Git pane's History and 
 disabled while their tab is hidden, so Git events only mark them stale. The Workflows pane stops its
 elapsed clock and owes one re-read for whatever arrived while it was hidden.
 
+A query a model creates passes `enabled: … && pane.shown()`. A disabled observer keeps its cached data,
+but it doesn't count as active, so a reconnect, a `ws:shed`, or an invalidation only marks it stale
+instead of fetching for a task nobody sees. The agent pane's harness and custom agent lists, the
+Changes tab's projects and preferences, and Notes' workspaces read this way. Solid Query has no
+`subscribed` option, which is the React adapter's name for the same thing.
+
 A kept model can also hold older data than the Node. A model that reads once, rather than through a
 query or a live store, reads again when `shown` turns true. Notes re-reads its lists and the open note
 unless that note has unsaved edits, because a note save doesn't check for a newer copy. Context

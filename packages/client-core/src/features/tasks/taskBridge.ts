@@ -8,6 +8,7 @@ import type {
   TaskArchiveConcern,
   TaskStatus,
 } from '@acorn/protocol/task.ts'
+import { taskIdsQuery } from '@acorn/protocol/task.ts'
 import {
   projectConfigRoute,
   projectRunTargetsRoute,
@@ -43,7 +44,8 @@ export type TaskBridge = {
     // archived first with `opts`, which needs the terminal plugin; without it, archive the task first.
     delete(id: string, opts?: DeleteOpts): Promise<DeleteResult>
     onCreated(id: string, nodeId?: string | null): Promise<void>
-    statuses(): Promise<TaskStatus[]>
+    // Every active task's worktree status, or only these tasks'.
+    statuses(ids?: readonly string[]): Promise<TaskStatus[]>
   }
 }
 
@@ -84,7 +86,7 @@ export const taskBridge = (): TaskBridge => {
       delete: (id, opts) => post<DeleteResult>(taskDeleteRoute(id), opts ?? {}),
       onCreated: (id, nodeId) =>
         post<{ ok: boolean }>(taskOnCreatedRoute(id), undefined, { nodeId }).then(() => undefined),
-      statuses: () => readJson<TaskStatus[]>(taskStatusesRoute),
+      statuses: (ids) => readJson<TaskStatus[]>(ids ? `${taskStatusesRoute}?${taskIdsQuery(ids)}` : taskStatusesRoute),
     },
   }
 }

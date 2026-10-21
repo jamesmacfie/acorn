@@ -3,11 +3,12 @@ import { render } from 'solid-js/web'
 import { afterEach, expect, it, vi } from 'vitest'
 import { setActiveNode } from '@acorn/plugin-api/client'
 import type { Task } from '@acorn/protocol/api.ts'
-const api = vi.hoisted(() => ({ linked: vi.fn() }))
-vi.mock('./dockerClient', () => ({ fetchTaskContainers: api.linked }))
+const api = vi.hoisted(() => ({ linked: vi.fn(), summaries: vi.fn() }))
+vi.mock('./dockerClient', () => ({ fetchTaskContainers: api.linked, fetchTaskSummaries: api.summaries }))
 vi.mock('./wsChannel', () => ({ wsOnDockerChanged: () => () => {} }))
 vi.mock('./ContainerDetail', () => ({ default: (props: { target: string }) => <div>{props.target}</div> }))
 import { DockerChips, DockerTaskDetail } from './DockerTaskPane'
+import { refreshDockerTaskSummaries } from './dockerStore'
 const stops: (() => void)[] = []
 afterEach(() => {
   stops.splice(0).forEach((stop) => stop())
@@ -58,4 +59,17 @@ it('shares one task root across regions and retires held A reads before same-tas
   await Promise.resolve()
   expect(b.textContent).not.toContain('from A')
   expect(a.textContent).not.toContain('from B')
+})
+
+it("says how old Docker's list is once it's over a minute", async () => {
+  setActiveNode('a')
+  api.linked.mockResolvedValue([])
+  const summary = { taskId: 'same-task', running: 1, total: 1, projects: [] }
+  api.summaries.mockResolvedValueOnce([{ ...summary, observedAt: Date.now() - 30_000 }])
+  await refreshDockerTaskSummaries()
+  const host = mount()
+  expect(host.textContent).not.toContain('Docker last answered')
+  api.summaries.mockResolvedValueOnce([{ ...summary, observedAt: Date.now() - 3.5 * 60_000 }])
+  await refreshDockerTaskSummaries()
+  await vi.waitFor(() => expect(host.textContent).toContain('Docker last answered 3m ago.'))
 })

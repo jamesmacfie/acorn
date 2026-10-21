@@ -105,6 +105,13 @@ The rail and footer show a dirty marker and a changed-file count for each task. 
 the Changes tab asks the same question for its list. Two clients over four worktrees would cost 16
 processes for each poll.
 
+The desktop names the tasks it draws, the rail's rows and the open task, in `?ids=`, so a task off the
+rail costs no process (`taskStatusScheduleContribution` in
+`packages/client-core/src/features/tasks/taskStatus.ts`). It asks every 10 seconds, every 30 while the
+window has no focus, on `worktree:status-changed`, and when the rail's rows change. An agent's turn
+doesn't trigger a sweep, because an agent that writes files raises `worktree:status-changed` already.
+The terminal client names no tasks and sweeps every active worktree.
+
 `worktreeStatus.ts` runs one process per worktree per two seconds (`WORKTREE_STATUS_TTL_MS`).
 Concurrent callers join the run in flight, and a caller inside the window gets that run's output.
 The Changes tab reads the same output, which is why the command carries `--branch`. The pane's two
@@ -126,7 +133,8 @@ These rules keep the cache honest:
 
 The sweep also observes each task's HEAD. Only the newest observation for a task can publish
 `head:changed`. The first observation seeds silently, and an unknown HEAD keeps the last good one.
-Four workers run the sweep's Git reads, and the client drives its clock. Boot doesn't run the sweep.
+Four workers run the sweep's Git reads, and the client drives its clock. A task no client asks about
+isn't observed, so its `head:changed` waits until a client asks again. Boot doesn't run the sweep.
 It only checks that each active task's folder exists and warns about the missing ones, so a commit
 made before a client's first status read raises no `head:changed`.
 

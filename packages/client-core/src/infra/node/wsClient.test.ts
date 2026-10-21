@@ -220,13 +220,22 @@ describe('wsClient', () => {
   // The node's hub shed invalidation frames because this socket was too far behind to take them. The
   // remedy is the reconnect remedy, because nothing says which ones were dropped
   // (node-core/server/transport/wsHub.ts).
-  it('treats a shed marker as a reason to refetch what is on screen', () => {
-    const reconnects: number[] = []
-    client.wsOnReconnect(() => reconnects.push(1))
+  it('treats a shed marker as a reason to refetch what is on screen, once the socket has had a moment', () => {
+    vi.useFakeTimers()
+    try {
+      const reconnects: number[] = []
+      client.wsOnReconnect(() => reconnects.push(1))
 
-    bridge.emitFrame({ channel: 'ws:shed' })
+      bridge.emitFrame({ channel: 'ws:shed' })
+      vi.advanceTimersByTime(400)
+      bridge.emitFrame({ channel: 'ws:shed' })
+      expect(reconnects).toEqual([])
+      vi.advanceTimersByTime(100)
 
-    expect(reconnects).toEqual([1])
+      expect(reconnects).toEqual([1])
+    } finally {
+      vi.useRealTimers()
+    }
   })
 
   it('ignores a frame that is not channel-tagged', () => {

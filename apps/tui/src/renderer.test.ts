@@ -1,6 +1,6 @@
 import { EventEmitter } from 'node:events'
 import { afterEach, describe, expect, it } from 'vitest'
-import { setHostFocused } from '@acorn/client-core/features/notifications/deliver.ts'
+import { setHostFocused } from '@acorn/client-core/infra/platform'
 import { installKeymap } from './keys/install'
 import { _resetRegions } from './keys/regions'
 import { openTerminal, type TerminalInput, type TerminalOutput } from './input/terminal'

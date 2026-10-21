@@ -273,9 +273,17 @@ for (const prefix of [
 
 // The only prefix that is an apology. The node's hub shed invalidation frames because
 // this socket was too far behind to take them (node-core/server/transport/wsHub.ts). Nothing says which
-// ones, so the remedy is the reconnect remedy: mark what is on screen stale and let it refetch.
+// ones, so the remedy is the reconnect remedy: mark what is on screen stale and let it refetch. It waits
+// half a second, so the refetches don't join a socket that is still draining, and a second shed in that
+// time joins the first.
+const SHED_SETTLE_MS = 500
+let shedTimer: ReturnType<typeof setTimeout> | undefined
 registerWsChannel('ws', (frame) => {
-  if (frame.channel === 'ws:shed') reconnectSubs.forEach((cb) => cb())
+  if (frame.channel !== 'ws:shed' || shedTimer) return
+  shedTimer = setTimeout(() => {
+    shedTimer = undefined
+    reconnectSubs.forEach((cb) => cb())
+  }, SHED_SETTLE_MS)
 })
 
 // Fires when the node's socket comes back after a drop. The app shell uses it to mark that node's
@@ -296,6 +304,8 @@ export function _resetWsClient(): void {
   // Not _resetWsChannels(). This module registers its prefixes at import time, so clearing the map
   // leaves the socket mute for every later test in the file.
   everOnline.clear()
+  clearTimeout(shedTimer)
+  shedTimer = undefined
   binaryHandler = null
   statusSubs.clear()
   pluginsSubs.clear()

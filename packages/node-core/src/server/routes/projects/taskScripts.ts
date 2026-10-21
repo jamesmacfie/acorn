@@ -1,10 +1,15 @@
 import { Hono } from 'hono'
 import { BridgeError } from '../../bridge'
 import { z } from 'zod'
-import { taskScriptLogsInputSchema, taskScriptWaitInputSchema } from '@acorn/protocol/taskScripts.ts'
+import {
+  taskScriptLogsInputSchema,
+  taskScriptWaitInputSchema,
+  type TaskScriptsStatus,
+} from '@acorn/protocol/taskScripts.ts'
+import { taskIdsQuerySchema } from '@acorn/protocol/task.ts'
 import { getDb } from '../../db'
 import type { AppEnv } from '../../middleware/auth'
-import { requireTaskScope } from '../../middleware/requireUser'
+import { mayActOnTask, requireTaskScope } from '../../middleware/requireUser'
 import { respondError } from '../../respond'
 import { taskScripts } from '../../taskScripts/service'
 
@@ -21,6 +26,24 @@ export const scripts = new Hono<AppEnv>()
   .onError((error, c) => {
     if (error instanceof BridgeError) return respondError(c, error.status, error.code, [error.message])
     throw error
+  })
+  // The rail's read: every task it draws, in one request. Filtered rather than gated, the same answer
+  // /task-statuses gives: a task token gets its own task's entry and nothing else. A task that's gone
+  // is left out, so one archive between the rail's render and this read doesn't fail the rest.
+  .get('/task-scripts', (c) => {
+    const parsed = taskIdsQuerySchema.safeParse(c.req.query('ids'))
+    if (!parsed.success) return respondError(c, 400, 'bad_request')
+    const service = taskScripts(getDb(c.env))
+    const statuses: Record<string, TaskScriptsStatus> = {}
+    for (const id of parsed.data) {
+      if (!mayActOnTask(c, id)) continue
+      try {
+        statuses[id] = service.status(id)
+      } catch (error) {
+        if (!(error instanceof BridgeError && error.status === 404)) throw error
+      }
+    }
+    return c.json(statuses)
   })
   .use('/tasks/:id/scripts', requireTaskScope)
   .use('/tasks/:id/scripts/*', requireTaskScope)

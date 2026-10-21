@@ -128,7 +128,7 @@ export function dockerBridge(
       }),
     taskSummary: () =>
       run(async () => {
-        const [tasks, cs] = await Promise.all([core.tasks.active(), service.containers()])
+        const [tasks, { at, list: cs }] = await Promise.all([core.tasks.active(), service.containerSnapshot()])
         if (!cs.length) return []
         const out: DockerTaskSummary[] = []
         for (const task of tasks) {
@@ -140,6 +140,7 @@ export function dockerBridge(
             running: matched.filter(isActive).length,
             total: matched.length,
             projects: [...new Set(matched.flatMap((c) => (c.composeProject ? [c.composeProject] : [])))],
+            observedAt: at,
           })
         }
         return out

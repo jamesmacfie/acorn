@@ -133,7 +133,7 @@ Workspace and project routes are device-only. Task tokens reach only their own t
 | `GET`, `POST` | `/v1/core/tasks` | List tasks, or create one. `?status=archived` lists archived tasks, newest first |
 | `PATCH` | `/v1/core/tasks/:id` | Update task metadata |
 | `POST` | `/v1/core/tasks/:id/links` | Add an external item link |
-| `GET` | `/v1/core/task-statuses` | Git status for active tasks |
+| `GET` | `/v1/core/task-statuses` | Git status for active tasks, or only those in `?ids=`, so a task off screen costs no `git status` |
 | `GET`, `POST` | `/v1/core/tasks/:id/config-trust` | Read the executable config snapshot, or acknowledge it |
 | `POST` | `/v1/core/tasks/:id/preview-url` | Resolve the task's preview URL |
 | `POST` | `/v1/core/tasks/:id/on-created` | Prepare a new branch task's worktree and setup |
@@ -177,14 +177,14 @@ These reads enforce task-token confinement. The typed contract is `@acorn/protoc
 
 | Method | Route | Result |
 | --- | --- | --- |
-| `GET` | `/v1/core/tasks/:id/scripts` | Setup and teardown snapshots, generation, archive progress, and up to 50 attempts |
+| `GET` | `/v1/core/tasks/:id/scripts`, or `/v1/core/task-scripts?ids=…` for many | Setup and teardown snapshots, generation, archive progress, and up to 50 attempts. The batch is keyed by task ID and leaves out a task that's gone or not the caller's |
 | `GET` | `/v1/core/tasks/:id/scripts/wait?phase=setup&timeoutMs=30000&attemptId=…` | `{ snapshot, matched, reason }` |
 | `GET` | `/v1/core/tasks/:id/scripts/logs?phase=setup&tailLines=100&maxBytes=32768&attemptId=…` | The snapshot, UTF-8 output, availability, truncation, and byte counts |
 
 Waits range from 0 to 30,000 ms, tails from one to 1,000 lines, and bytes from one to 32,768. An
 unknown task or attempt returns 404. The reads never run a script or create a worktree. A wait binds
 once to its attempt and generation, and a generation change doesn't satisfy it. Aborting the request
-releases the wait without cancelling the process.
+releases the wait without cancelling the process. `?ids=` takes 1 to 100 task IDs.
 
 ## Data, queries, dashboards, and authoring
 

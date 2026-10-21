@@ -240,12 +240,13 @@ export function clientFor(nodeId: string): NodeCache {
   }
   const client = new QueryClient({
     ...failureCaches(),
-    // Keeps focus refreshes useful without turning a quick app switch into a fan-out across every
-    // active query. Queries that need fresher data override this. gcTime has to outlive a session so
-    // persisted entries survive a reload (docs/caching.md § Renderer query cache).
+    // Coming back to the window fetches nothing by default: the socket keeps data fresh while it's
+    // connected, and a reconnect marks the Node's queries stale. A query that reads something no frame
+    // announces sets `refetchOnWindowFocus` itself. gcTime has to outlive a session so persisted entries
+    // survive a reload (docs/caching.md § Renderer query cache).
     defaultOptions: {
       queries: {
-        refetchOnWindowFocus: true,
+        refetchOnWindowFocus: false,
         staleTime: 30_000,
         gcTime: 1000 * 60 * 60 * 24,
         retry: retryReadOnce,

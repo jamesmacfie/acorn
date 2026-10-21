@@ -11,7 +11,12 @@ import { docker, DockerCliError } from './cli'
 
 const mocks = vi.hoisted(() => ({ containers: vi.fn(), invalidate: vi.fn(), config: vi.fn(), logTail: vi.fn() }))
 vi.mock('./dockerService', () => ({
-  getDockerService: () => ({ containers: mocks.containers, invalidate: mocks.invalidate, logTail: mocks.logTail }),
+  getDockerService: () => ({
+    containers: mocks.containers,
+    containerSnapshot: async () => ({ at: 1, list: await mocks.containers() }),
+    invalidate: mocks.invalidate,
+    logTail: mocks.logTail,
+  }),
   disposeDocker: vi.fn(),
 }))
 vi.mock('./dockerConfig', () => ({
@@ -101,7 +106,7 @@ describe('Docker task authority', () => {
 
   it('preserves display-only hints in the device summary but excludes explicit foreign roots', async () => {
     const [summary] = await dockerBridge(ctx.core).taskSummary()
-    expect(summary).toMatchObject({ taskId: task.id, running: 3, total: 3 })
+    expect(summary).toMatchObject({ taskId: task.id, running: 3, total: 3, observedAt: 1 })
     expect(mocks.config).toHaveBeenCalledWith(root)
   })
 

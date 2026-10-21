@@ -1,4 +1,5 @@
 // Core task, worktree and archive wire contracts.
+import { z } from 'zod'
 
 // Result of archiving a task (docs/workspaces-and-tasks.md). `reason` carries the guard refusal
 // (running sessions / dirty worktree) for the UI to surface. A failed teardown script sets
@@ -53,6 +54,15 @@ export type TaskArchiveConcern = {
   // Present only when the plugin declared a cleanup route to go with it.
   action?: { label: string; checked: boolean }
 }
+
+// A read narrowed to the tasks a window draws, such as the rail's rows, names them in `?ids=a,b,c`. A
+// hundred UUIDs keep the URL near 4 KB, well inside the Node's header limit.
+export const TASK_IDS_PER_READ = 100
+export const taskIdsQuery = (ids: readonly string[]): string => `ids=${ids.map(encodeURIComponent).join(',')}`
+export const taskIdsQuerySchema = z
+  .string()
+  .transform((list) => [...new Set(list.split(',').filter(Boolean))])
+  .pipe(z.array(z.string().max(200)).min(1).max(TASK_IDS_PER_READ))
 
 // Live worktree status for a task (docs/workspaces-and-tasks.md). `missing` = the task has a
 // worktreePath but the directory is gone (removed outside acorn) → needs repair. Computed on the node

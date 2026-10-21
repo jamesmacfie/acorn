@@ -96,7 +96,7 @@ wired, it still answers the bridge's 503 rather than its own 404, because the cl
 keys on the 503.
 
 Some lists are filtered rather than gated: `GET /v1/core/tasks`, `GET /v1/core/task-statuses`,
-`GET /v1/core/runs`, and terminal's session roster. A task token has a reason to ask about its own task
+`GET /v1/core/task-scripts`, `GET /v1/core/runs`, and terminal's session roster. A task token has a reason to ask about its own task
 and none to see every other task's title, branch, worktree path, and dirty count. `task-statuses`
 filters before it runs any Git, so a confined caller can't make the Node do work for tasks it may not
 see. Plugin frames reach that path under `core.tasks:read`, and the same filter covers them.

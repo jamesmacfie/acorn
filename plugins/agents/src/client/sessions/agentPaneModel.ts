@@ -92,8 +92,9 @@ export function createAgentPaneModel(task: Task, pane: PaneModelContext) {
   const [dialog, setDialog] = createSignal<AgentDialog | null>(null)
   const [renameText, setRenameText] = createSignal('')
   const queryClient = useQueryClient()
-  const providersQuery = createQuery(() => agentProvidersOptions())
-  const customAgents = createQuery(() => customAgentsOptions())
+  // Only while the pane is on screen, so a kept task's model is no reason to read these again.
+  const providersQuery = createQuery(() => ({ ...agentProvidersOptions(), enabled: pane.shown() }))
+  const customAgents = createQuery(() => ({ ...customAgentsOptions(), enabled: pane.shown() }))
   // `.data` is read only once there is some. On an empty cache solid-query suspends the boundary above
   // whoever reads it, and this model is built inside the first region that asks for it, which is the
   // list header. Reading it bare held "Agents" off the screen for the whole providers probe. The New

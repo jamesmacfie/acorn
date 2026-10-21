@@ -258,5 +258,14 @@ describe('worktree routes', () => {
     // everyone.
     const all = (await (await authed().fetch(req('/core/task-statuses'), env())).json()) as { taskId: string }[]
     expect(all.map((row) => row.taskId).sort()).toEqual(['task1', 'task2'])
+
+    // `?ids=` narrows the roster for anyone, and never widens a confined caller's.
+    const asked = (await (await authed().fetch(req('/core/task-statuses?ids=task2'), env())).json()) as {
+      taskId: string
+    }[]
+    expect(asked.map((row) => row.taskId)).toEqual(['task2'])
+    const widened = (await (await confined.fetch(req('/core/task-statuses?ids=task2'), env())).json()) as unknown[]
+    expect(widened).toEqual([])
+    expect((await authed().fetch(req('/core/task-statuses?ids='), env())).status).toBe(400)
   })
 })

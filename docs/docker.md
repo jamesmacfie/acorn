@@ -39,9 +39,10 @@ Both surfaces are host layouts filled with kit nodes, and the plugin ships no st
 [pane layouts](./panes/layout.md).
 
 The task pane is `header-body-footer` with no footer. The header is a `ChipRow`, one chip per linked
-container, and the body is the shared container detail. The Docker Source is a `list-detail`: a tab
-strip over containers, images, volumes, and networks in the list column, and the same container detail
-in the other.
+container, and the body is the shared container detail. Under the chips, the header says when Docker
+last answered once the task summary's list is over a minute old. The Docker Source is a `list-detail`:
+a tab strip over containers, images, volumes, and networks in the list column, and the same container
+detail in the other.
 
 The container detail places `Tabs` directly below the header, with lifecycle actions beside the tabs.
 A compact status footer holds the container name, image, state, and health. Info uses grouped `Facts`
@@ -118,6 +119,13 @@ equal or sit beneath the host-stored task worktree path. Matching uses normalize
 components, with POSIX, Windows drive and UNC forms supported. Relative paths, traversal, invalid
 paths, sibling prefixes, missing roots and missing working-directory metadata confer no association.
 Daemon path strings are compared directly; they are not resolved against this Node's filesystem.
+
+Every window polls the device-only task summary every 15 seconds and on `docker:changed`. It answers
+from the Node's last `docker ps` list at once and reads it again behind the answer at most every 10
+seconds (`containerSnapshot` in `plugins/docker/src/server/dockerService.ts`). After a docker event, the
+next read waits for a fresh list. A failure is remembered for 30 seconds, and the last good list is
+served through it. Each entry's `observedAt` says when the list was read. Task listings, cleanup, and
+the archive check never get an old list.
 
 The device-only task summary can additionally suggest containers using declarative project, label and
 branch-name hints from the layered home/repository configuration. Explicit foreign or invalid

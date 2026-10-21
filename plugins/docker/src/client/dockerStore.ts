@@ -71,8 +71,12 @@ export function disposeDockerStore(): void {
 // Polled, because containers can change without docker events reaching us after a reconnect, plus the
 // docker:changed edge for immediacy.
 const [taskSummaries, setTaskSummaries] = createSignal<Record<string, DockerTaskSummary>>({})
+// When the Node read the container list behind the summaries. Kept apart from them, because it moves
+// on every poll and the badges should redraw only when a count does.
+const [summariesObservedAt, setSummariesObservedAt] = createSignal<number | null>(null)
 
 export const dockerTaskSummary = (taskId: string): DockerTaskSummary | undefined => taskSummaries()[taskId]
+export { summariesObservedAt }
 
 let summaryInflight: Promise<void> | null = null
 export async function refreshDockerTaskSummaries(): Promise<void> {
@@ -81,6 +85,7 @@ export async function refreshDockerTaskSummaries(): Promise<void> {
   const pending = fetchTaskSummaries(owner.nodeId)
     .then((list) => {
       if (!owner.current()) return
+      setSummariesObservedAt(list[0]?.observedAt ?? null)
       setTaskSummaries((current) => {
         if (
           Object.keys(current).length === list.length &&
@@ -117,6 +122,7 @@ onDockerRetired(() => {
   setLoadError('')
   setLoading(false)
   setTaskSummaries({})
+  setSummariesObservedAt(null)
 })
 
 export const dockerTaskScheduleContribution: ClientScheduleContribution = {

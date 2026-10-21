@@ -38,10 +38,10 @@ import { hasHostCapability } from '../../infra/node/hostCapabilities'
 import { availableSources } from './railSources'
 import { parseRailVisibility, shownInRail } from './railVisibility'
 import { createSourceScope } from './sourceScope'
-import { taskStatus } from '../tasks/taskStatus'
+import { setRailTaskIds, taskStatus } from '../tasks/taskStatus'
 import { markersFor } from '../../host/registries/rail/railMarkerFeed'
 import { railStatusMarkers } from '../tasks/railStatus'
-import { createTaskScripts } from '../tasks/taskScripts'
+import { createTaskScriptsBatch } from '../tasks/taskScripts'
 import { requestTaskAnnotations } from '../../host/annotations/taskAnnotations'
 import { requestSourceAnnotations } from '../../host/annotations/statusAnnotations'
 import { unreadForTask } from '../notifications/notifications'
@@ -193,6 +193,10 @@ export default function TabRail() {
   // list, re-asked when the list changes and not when the rail merely re-renders. The answers arrive as rail
   // markers through `markersFor` below, so nothing here reads them.
   createEffect(() => requestTaskAnnotations(visibleTasks().map((task) => task.id)))
+  // Every row's scripts in one read, rather than a poll per row, and worktree status only for the rows.
+  const scripts = createTaskScriptsBatch(() => visibleTasks().map((task) => task.id))
+  createEffect(() => setRailTaskIds(visibleTasks().map((task) => task.id)))
+  onCleanup(() => setRailTaskIds(null))
 
   // Every source that can open, then the ones this device draws an icon for. The palette opens the
   // rest, so a hidden source is still one click away from somewhere.
@@ -518,7 +522,6 @@ export default function TabRail() {
     <div class="tabrail-list">
       <For each={visibleTasks()}>
         {(w) => {
-          const scripts = createTaskScripts(() => w.id)
           const st = () => taskStatus(w.id)
           // Core's own states plus whatever plugins publish for this task. RailTab orders them,
           // picks a free corner for each, and legends the lot in the hover tooltip, so the icons
@@ -528,10 +531,11 @@ export default function TabRail() {
               unread: !!unreadForTask(w.id),
               status: st(),
               archiving:
-                isArchiving(w.id) || (scripts.freshness() === 'live' && !!scripts.query.data?.archiveInProgress),
+                isArchiving(w.id) ||
+                (scripts.freshness() === 'live' && !!scripts.query.data?.[w.id]?.archiveInProgress),
               settingUp:
                 scripts.freshness() === 'live' &&
-                ['starting', 'running'].includes(scripts.query.data?.setup.state ?? ''),
+                ['starting', 'running'].includes(scripts.query.data?.[w.id]?.setup.state ?? ''),
               pinned: pinnedTasks().has(w.id),
             }),
             ...markersFor({ kind: 'task', id: w.id }),

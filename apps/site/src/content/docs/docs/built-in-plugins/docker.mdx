@@ -51,7 +51,8 @@ task's worktree. A container started anywhere else isn't the task's.
 So to give a task its containers, run `docker compose up` in its worktree. The easiest way is a run
 target that runs it, which you start from the task
 ([Project configuration](/docs/using/project-configuration/)). The task then shows a **Docker** pane, and its footer shows
-how many containers are running.
+how many containers are running. If Docker stops answering, the counts stay at its last answer, and
+the pane says how long ago that was.
 
 The project's `.acorn/config.toml` can add hints under `[docker]`: a Compose project name, label keys,
 or matching the branch name in a container's name ([Configuration files](/docs/reference/configuration-files/#the-project-config-file)). A hint only suggests containers in the task's

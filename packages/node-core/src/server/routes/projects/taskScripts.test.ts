@@ -18,10 +18,14 @@ beforeEach(() => {
       .run()
 })
 afterEach(() => db.cleanup())
-const request = (path: string, taskId = 'own') =>
+const request = (path: string, taskId: string | null = 'own') =>
   app.request(
     path,
-    { headers: { 'x-acorn-internal': mintInternalToken(key, { scope: 'task', taskId }) } },
+    {
+      headers: {
+        'x-acorn-internal': mintInternalToken(key, taskId ? { scope: 'task', taskId } : { scope: 'service' }),
+      },
+    },
     testEnv({
       DB: db.db,
       INTERNAL_TOKEN: key,
@@ -36,6 +40,16 @@ it('confines status, waits and historical log reads to the authenticated task', 
   expect((await request(`/v1/core/tasks/own/scripts/logs?phase=setup&attemptId=${foreign.attemptId}`)).status).toBe(404)
   expect((await request('/v1/core/tasks/own/scripts/wait?phase=setup&timeoutMs=30001')).status).toBe(400)
   expect((await request('/v1/core/tasks/own/scripts/logs?phase=setup&tailLines=1001')).status).toBe(400)
+})
+it('answers a batched read with the tasks the caller may see, and leaves out tasks that are gone', async () => {
+  const own = taskScripts(db.db).status('own')
+  const confined = await request('/v1/core/task-scripts?ids=own,foreign,gone')
+  expect(await confined.json()).toEqual({ own })
+  const unconfined = await request('/v1/core/task-scripts?ids=own,foreign,gone', null)
+  expect(await unconfined.json()).toEqual({ own, foreign: taskScripts(db.db).status('foreign') })
+  expect((await request('/v1/core/task-scripts')).status).toBe(400)
+  const tooMany = Array.from({ length: 101 }, (_, index) => `task-${index}`).join(',')
+  expect((await request(`/v1/core/task-scripts?ids=${tooMany}`)).status).toBe(400)
 })
 it('projects strict task tools over the same authoritative service without caller task substitution', async () => {
   const tools = buildAgentTools({ db: db.db, secrets: db.secrets }).filter((tool) =>

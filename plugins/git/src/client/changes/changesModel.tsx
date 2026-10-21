@@ -93,7 +93,8 @@ let commandHolder: { dispose(): void } | null = null
 
 /** `shown` is the Changes tab on screen; `paneShown` is the Git pane on screen, on any tab. */
 export function createChangesModel(task: Task, pane: PaneModelContext & { paneShown: Accessor<boolean> }) {
-  const projects = createQuery(() => projectsOptions(true))
+  // Read only while the pane is on screen, so a kept task's model doesn't count as a reader.
+  const projects = createQuery(() => projectsOptions(pane.paneShown()))
   const project = () => projects.data?.find((candidate) => candidate.id === task.projectId)
   const [selectedKey, setSelectedKey] = createSignal<string | null>(null)
   const [actionError, setActionError] = createSignal('')
@@ -169,7 +170,7 @@ export function createChangesModel(task: Task, pane: PaneModelContext & { paneSh
   // List or tree, the sort, and the grouping: one device preference, so the shape survives a relaunch
   // and does not follow the reader to another machine.
   const queryClient = useQueryClient()
-  const prefs = createQuery(() => prefsOptions(true))
+  const prefs = createQuery(() => prefsOptions(pane.paneShown()))
   const view = createMemo(() => readChangeView(prefs.data))
 
   // Which folders the reader has closed, this session only. A memo over the groups and the view, so

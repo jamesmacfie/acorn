@@ -101,7 +101,7 @@ const { startClientRuntime } = await import('@acorn/client-core/host/clientRunti
 const { themeColorTokens } = await import('@acorn/client-core/infra/styles/themeColorTokens.ts')
 const { paletteFor, reportsTruecolor, setPalette } = await import('./appearance')
 const { createEffect, createRoot, createSignal } = await import('solid-js')
-const { setHostFocused } = await import('@acorn/client-core/features/notifications/deliver.ts')
+const { setHostFocused } = await import('@acorn/client-core/infra/platform')
 const [linkReady, setLinkReady] = createSignal(false)
 
 // The query cache persists to files rather than to IndexedDB, which there is none of here. Installed
@@ -302,12 +302,13 @@ process.on('warning', (warning) => {
   heldWarnings.add(`${warning.name}: ${warning.message}`)
 })
 // Whether this terminal is the one the reader is looking at, which is the gate's `focused()` and
-// therefore the difference between a notice that lands read and one that raises a banner. The
-// renderer asks for DEC 1004 focus reports and turns `ESC [ I` and `ESC [ O` into these two events.
+// therefore the difference between a notice that lands read and one that raises a banner. Client
+// schedules read it too, to slow a backstop clock. The renderer asks for DEC 1004 focus reports and
+// turns `ESC [ I` and `ESC [ O` into these two events.
 //
 // A plain variable rather than a signal: the gate reads it imperatively a second after an edge, and
 // nothing draws from it. It starts true because unknown counts as focused — a terminal that never
-// answers must not be treated as one nobody is watching (client-core § defaultDeliveryContext).
+// answers must not be treated as one nobody is watching (client-core § hostFocused).
 let terminalFocused = true
 renderer.on('focus', () => {
   terminalFocused = true

@@ -3,7 +3,7 @@ import { admitCheckout } from '../../core/checkoutAdmission'
 import { Hono } from 'hono'
 import { z } from 'zod'
 import type { TeardownResult } from '../../storage/archive'
-import type { ArchiveOpts, ArchiveResult } from '@acorn/protocol/task.ts'
+import { taskIdsQuerySchema, type ArchiveOpts, type ArchiveResult } from '@acorn/protocol/task.ts'
 import { archiveTask, restoreTask, taskArchiveTree } from '../../storage/archive'
 import { runProcess } from '../../core/proc'
 import { broadcastWorktreeStatusChanged } from '../../notify'
@@ -24,7 +24,7 @@ import { runHook } from '../../pluginHost/hooks'
 import { BridgeError, routeCapability, routeCapabilityFor, setRouteTestCapability, viaBridge } from '../../bridge'
 import { getDb } from '../../db'
 import type { AppEnv } from '../../middleware/auth'
-import { isTaskConfined, mayActOnTask, requireDevice } from '../../middleware/requireUser'
+import { mayActOnTask, requireDevice } from '../../middleware/requireUser'
 import { respondError } from '../../respond'
 import { createLogger, describeError } from '../../telemetry/logger'
 
@@ -155,11 +155,17 @@ export const worktree = new Hono<AppEnv>()
   // Transport and auth). A task-scoped credential has a legitimate reason to ask about its own task,
   // and no reason to be handed every other active task's id, absolute worktree path and dirty count.
   // The filter also covers the plugin-frame caller, since `core.tasks:read` grants this path.
-  .get('/task-statuses', async (c) =>
-    c.json(
-      await computeTaskStatuses(getDb(c.env), isTaskConfined(c) ? (taskId) => mayActOnTask(c, taskId) : undefined),
-    ),
-  )
+  //
+  // `?ids=` narrows it to the tasks a window draws, so a task off the rail costs no `git status`.
+  .get('/task-statuses', async (c) => {
+    const ids = c.req.query('ids')
+    const parsed = ids === undefined ? undefined : taskIdsQuerySchema.safeParse(ids)
+    if (parsed && !parsed.success) return respondError(c, 400, 'bad_request')
+    const asked = parsed ? new Set(parsed.data) : null
+    return c.json(
+      await computeTaskStatuses(getDb(c.env), (taskId) => (!asked || asked.has(taskId)) && mayActOnTask(c, taskId)),
+    )
+  })
   // --- task lifecycle ---
   // Device-only, because it runs the script in the body as the person. The renderer sends the
   // project's own preview script.

@@ -233,3 +233,42 @@ it('retires a dirty follow-up when the contribution loses its capability', async
   expect(run).toHaveBeenCalledOnce()
   expect(unsubscribe).toHaveBeenCalledOnce()
 })
+
+it('slows the clock while the window has no focus, and still answers an event at once', async () => {
+  vi.useFakeTimers()
+  const focus = vi.spyOn(document, 'hasFocus').mockReturnValue(false)
+  try {
+    let refresh!: () => void
+    const run = vi.fn()
+    registered.push(
+      clientScheduleRegistry.register({
+        id: 'test.backstop',
+        intervalMs: 10_000,
+        unfocusedIntervalMs: 30_000,
+        run,
+        subscribe: (edge) => {
+          refresh = edge
+          return () => {}
+        },
+      }),
+    )
+    stop = startClientSchedules()
+    await vi.advanceTimersByTimeAsync(0)
+    expect(run).toHaveBeenCalledTimes(1)
+
+    await vi.advanceTimersByTimeAsync(20_000)
+    expect(run).toHaveBeenCalledTimes(1)
+    refresh()
+    await vi.advanceTimersByTimeAsync(0)
+    expect(run).toHaveBeenCalledTimes(2)
+    await vi.advanceTimersByTimeAsync(10_000)
+    expect(run).toHaveBeenCalledTimes(3)
+
+    focus.mockReturnValue(true)
+    await vi.advanceTimersByTimeAsync(10_000)
+    expect(run).toHaveBeenCalledTimes(4)
+  } finally {
+    focus.mockRestore()
+    vi.useRealTimers()
+  }
+})

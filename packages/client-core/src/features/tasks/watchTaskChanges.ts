@@ -21,9 +21,9 @@ export function watchTaskChanges(): () => void {
     // The active node's cache only: the socket that delivered this belongs to it, and no other node
     // has a mounted query to refetch. Same reasoning as the reconnect sweep in the desktop bootstrap.
     void clientFor(activeCacheId()).client.invalidateQueries({ queryKey: tasksKey })
-    void clientFor(activeCacheId()).client.invalidateQueries({
-      queryKey: event.taskId ? [...taskScriptsKey, event.taskId] : taskScriptsKey,
-    })
+    // Every scripts query, even for a frame that names one task: the rail reads all its rows in one
+    // query, so that one read is what moves the named task's markers.
+    void clientFor(activeCacheId()).client.invalidateQueries({ queryKey: taskScriptsKey })
     // …and re-emit for everything that listens on the client bus rather than on the cache, which is
     // how a plugin frame hears it: a frame can subscribe to the bus but not to the socket.
     clientEvents.emit('tasks:changed', event)

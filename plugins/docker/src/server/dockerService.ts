@@ -24,11 +24,14 @@ import {
 
 const INFO_TTL_MS = 10_000
 const LIST_TTL_MS = 5_000 // backstop only; the events watcher invalidates eagerly
+const SNAPSHOT_REFRESH_MS = 10_000
+const SNAPSHOT_FAILURE_MS = 30_000
 const BROADCAST_DEBOUNCE_MS = 300
 const EVENTS_BACKOFF_MAX_MS = 60_000
 const MAX_STREAM_CHILDREN = 32 // Bound concurrent stream readers to protect the local daemon.
 
 type VersionJson = { Client?: { Context?: string }; Server?: { Version?: string } }
+type ContainerSnapshot = { at: number; list: DockerContainerSummary[] }
 
 class DockerService {
   constructor(
@@ -44,6 +47,10 @@ class DockerService {
   private eventsBackoffMs = 1_000
   private eventsRestartTimer: ReturnType<typeof setTimeout> | null = null
   private dirtyScopes = new Set<DockerScope>()
+  private snapshot: ContainerSnapshot | null = null
+  private snapshotDirty = false
+  private snapshotFailure: { at: number; error: unknown } | null = null
+  private snapshotLoad: Promise<ContainerSnapshot> | null = null
   private broadcastTimer: ReturnType<typeof setTimeout> | null = null
   private disposed = false
 
@@ -104,11 +111,67 @@ class DockerService {
     )
   }
 
+  // The container list behind every window's polled task summary. The last good `docker ps` comes back
+  // at once and is read again behind it at most every ten seconds, so a daemon that stalls costs the
+  // poll no wait. After a docker event the next read waits for a fresh list, because the event is why
+  // the windows are asking. A failure is remembered for thirty seconds, and the last good list is served
+  // through it. Reads that act on or describe containers use `containers()`, which never serves an old
+  // list.
+  async containerSnapshot(): Promise<ContainerSnapshot> {
+    const now = Date.now()
+    const failure =
+      this.snapshotFailure && now - this.snapshotFailure.at < SNAPSHOT_FAILURE_MS ? this.snapshotFailure : null
+    const last = this.snapshot
+    if (last && !this.snapshotDirty) {
+      if (!failure && now - last.at >= SNAPSHOT_REFRESH_MS) this.loadSnapshot().catch(() => {})
+      return last
+    }
+    if (failure) {
+      if (last) return last
+      throw failure.error
+    }
+    try {
+      return await this.loadSnapshot()
+    } catch (error) {
+      if (last) return last
+      throw error
+    }
+  }
+
+  private loadSnapshot(): Promise<ContainerSnapshot> {
+    if (this.snapshotLoad) return this.snapshotLoad
+    const load: Promise<ContainerSnapshot> = this.containers().then(
+      // A load that an invalidation or disposal replaced answers its own callers and remembers nothing.
+      (list) => {
+        const snapshot = { at: Date.now(), list }
+        if (this.snapshotLoad === load) {
+          this.snapshotLoad = null
+          this.snapshot = snapshot
+          this.snapshotDirty = false
+          this.snapshotFailure = null
+        }
+        return snapshot
+      },
+      (error: unknown) => {
+        if (this.snapshotLoad === load) {
+          this.snapshotLoad = null
+          this.snapshotFailure = { at: Date.now(), error }
+        }
+        throw error
+      },
+    )
+    this.snapshotLoad = load
+    return load
+  }
+
   // Mutations bypass the cache and dirty it immediately. The events watcher confirms shortly after,
   // but an eager invalidate keeps the UI honest if events lag.
   invalidate(scope: DockerScope): void {
     this.lists.delete(scope)
     this.pending.delete(scope)
+    if (scope !== 'containers') return
+    this.snapshotDirty = true
+    this.snapshotLoad = null
   }
 
   private async cachedList<T>(scope: DockerScope, load: () => Promise<T>): Promise<T> {
@@ -288,6 +351,9 @@ class DockerService {
     this.streams.clear()
     this.lists.clear()
     this.pending.clear()
+    this.snapshot = null
+    this.snapshotFailure = null
+    this.snapshotLoad = null
     this.pendingInfo = null
     this.infoCache = null
     this.dirtyScopes.clear()

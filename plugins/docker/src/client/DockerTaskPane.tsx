@@ -7,14 +7,15 @@
 import { useQueryClient } from '@tanstack/solid-query'
 import { captureDockerScope, dockerScopeKey, onDockerRetired } from './dockerScope'
 import { createEffect, createMemo, createResource, createRoot, createSignal, For, on, onCleanup, Show } from 'solid-js'
-import { queryOwner, onScopeEvicted } from '@acorn/plugin-api/client'
+import { formatRelativeTime, queryOwner, onScopeEvicted } from '@acorn/plugin-api/client'
 import type { Task } from '@acorn/protocol/api.ts'
 import type { DockerContainerSummary } from '../shared/model'
 import { fetchTaskContainers } from './dockerClient'
 import { wsOnDockerChanged } from './wsChannel'
 import { containerTone, dockerSelection, rememberDockerSelection } from './dockerViewStore'
+import { summariesObservedAt } from './dockerStore'
 import ContainerDetail from './ContainerDetail'
-import { Chip, ChipRow, EmptyState, StatusDot } from '@acorn/plugin-api/ui'
+import { Chip, ChipRow, EmptyState, StatusDot, Text } from '@acorn/plugin-api/ui'
 
 // One resource per task, shared by the two regions. The chips list the containers and the body draws
 // the selected one, and a second fetch for the same list would be one poll too many.
@@ -92,22 +93,36 @@ export function DockerChips(props: { task: Task }) {
     if (owner.current() && scopes.includes('containers')) void state().refetch()
   })
   onCleanup(off)
+  // The Node reads Docker's list again every ten seconds while windows ask, so a list over a minute old
+  // means Docker has stopped answering, and the rail's container counts are that old too.
+  const [now, setNow] = createSignal(Date.now())
+  const clock = setInterval(() => setNow(Date.now()), 30_000)
+  onCleanup(() => clearInterval(clock))
+  const staleSince = () => {
+    const at = summariesObservedAt()
+    return at !== null && now() - at > 60_000 ? at : null
+  }
 
   return (
-    <ChipRow ariaLabel="Linked containers">
-      <For each={state().linked()}>
-        {(c) => (
-          <Chip
-            title={c.name}
-            selected={state().selected() === c.id}
-            leading={<StatusDot tone={containerTone(c.state)} />}
-            onPress={() => state().setSelected(c.id)}
-          >
-            {chipLabel(c)}
-          </Chip>
-        )}
-      </For>
-    </ChipRow>
+    <>
+      <ChipRow ariaLabel="Linked containers">
+        <For each={state().linked()}>
+          {(c) => (
+            <Chip
+              title={c.name}
+              selected={state().selected() === c.id}
+              leading={<StatusDot tone={containerTone(c.state)} />}
+              onPress={() => state().setSelected(c.id)}
+            >
+              {chipLabel(c)}
+            </Chip>
+          )}
+        </For>
+      </ChipRow>
+      <Show when={staleSince()}>
+        {(at) => <Text emphasis="muted">Docker last answered {formatRelativeTime(at(), now())}.</Text>}
+      </Show>
+    </>
   )
 }
 

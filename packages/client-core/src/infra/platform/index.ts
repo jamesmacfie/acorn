@@ -566,6 +566,19 @@ export const hostHidden = (): boolean => {
   return typeof document !== 'undefined' && document.hidden
 }
 
+// A host that knows whether it has the person's focus and is not a document says so here. The terminal
+// client installs its DEC 1004 state (apps/tui/src/main.tsx); a host that doesn't falls back to the
+// page's own answer.
+let hostFocusAnswer: (() => boolean) | null = null
+export const setHostFocused = (answer: (() => boolean) | null): void => {
+  hostFocusAnswer = answer
+}
+
+/** Whether this client has the person's focus. Unknown counts as focused, which is the quiet answer: a
+ *  host that can't say shouldn't be treated as one nobody is watching. */
+export const hostFocused = (): boolean =>
+  hostFocusAnswer?.() ?? (typeof document === 'undefined' ? true : document.hasFocus())
+
 /** Called whenever `hostHidden()` may have changed its answer. */
 export const onHostVisibilityChange = (cb: () => void): (() => void) => {
   const host = acornGlobal()?.visibility

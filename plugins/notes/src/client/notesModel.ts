@@ -52,7 +52,7 @@ export function createNotesModel(taskId: string, projectId: string | null, shown
   const live = () => !disposed && activeNodeId() === nodeId
   let titleField: HTMLInputElement | undefined
   const workspaces = createQuery(() => ({
-    ...workspacesOptions(nodeReady()),
+    ...workspacesOptions(nodeReady() && shown()),
     queryFn: ({ signal }) => readJson<Workspace[]>(workspacesRoute, { nodeId, signal }),
   }))
   const workspace = () => workspaceForProject(workspaces.data, projectId ?? undefined)

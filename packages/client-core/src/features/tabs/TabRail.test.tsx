@@ -467,6 +467,21 @@ describe('task lineage in the core rail fallback', () => {
   })
 })
 
+describe("the rail's scripts read", () => {
+  it('reads a hundred rows in one request', async () => {
+    const scriptReads: string[] = []
+    readJsonMock.mockImplementation(async (url: string) => {
+      if (!url.includes('scripts')) throw new Error('No live Node in this test.')
+      scriptReads.push(url)
+      return {}
+    })
+    mount(Array.from({ length: 100 }, (_, index) => task(`t${index}`, `Task ${index}`)))
+    await vi.advanceTimersByTimeAsync(0)
+    expect(scriptReads).toHaveLength(1)
+    expect(scriptReads[0]).toMatch(/^\/v1\/core\/task-scripts\?ids=t0,t1,/)
+  })
+})
+
 describe('a row whose markers are read again', () => {
   // A contributor builds fresh marker objects on every read, and the agents plugin's rail marker is
   // read again on every event a streaming agent sends. Rebuilding the elements each time would restart a

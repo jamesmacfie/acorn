@@ -114,6 +114,38 @@ describe('read retries', () => {
   })
 })
 
+describe('coming back to the window', () => {
+  it('refetches only a query on screen that asks to, and no other', async () => {
+    const { focusManager } = await import('@tanstack/solid-query')
+    const { client } = clientFor('focus-node')
+    client.mount()
+    const read = (key: string, options: { refetchOnWindowFocus?: boolean; enabled?: boolean } = {}) => {
+      const queryFn = vi.fn(async () => key)
+      client.setQueryData([key], key)
+      const off = new QueryObserver(client, { queryKey: [key], queryFn, staleTime: 0, ...options }).subscribe(() => {})
+      return { queryFn, off }
+    }
+    const plain = read('plain')
+    const asks = read('asks', { refetchOnWindowFocus: true })
+    // A kept task's pane model reads only while its pane is shown.
+    const hidden = read('hidden', { refetchOnWindowFocus: true, enabled: false })
+    await vi.waitFor(() => {
+      expect(plain.queryFn).toHaveBeenCalledOnce()
+      expect(asks.queryFn).toHaveBeenCalledOnce()
+    })
+    for (const query of [plain, asks, hidden]) query.queryFn.mockClear()
+
+    focusManager.setFocused(false)
+    focusManager.setFocused(true)
+    await vi.waitFor(() => expect(asks.queryFn).toHaveBeenCalledOnce())
+    expect(plain.queryFn).not.toHaveBeenCalled()
+    expect(hidden.queryFn).not.toHaveBeenCalled()
+    for (const query of [plain, asks, hidden]) query.off()
+    focusManager.setFocused(undefined)
+    client.unmount()
+  })
+})
+
 describe('per-node cache partitioning', () => {
   it('does not collide when two nodes hold the same resource UUID', () => {
     // Two nodes may coincidentally hold the same UUID; that must never collide in the client

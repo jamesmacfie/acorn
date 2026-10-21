@@ -24,12 +24,12 @@ import {
   replaceAttentionSource,
   registerNoticeSink,
   resetDelivery,
-  setHostFocused,
   systemSink,
   type DeliveryContext,
   type NoticeSink,
 } from './deliver'
 import { noticeKindContributions } from './kindContributions'
+import { setHostFocused } from '../../infra/platform'
 import { noticeKindRegistry } from '../../host/registries/rail/notices'
 import { _resetPluginRowSources, setPluginRowSource } from '../../host/plugins/rowTargets'
 import { DEFAULT_NOTIFICATION_SETTINGS, type NotificationSettings } from './settings'

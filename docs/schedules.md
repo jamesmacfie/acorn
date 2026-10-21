@@ -98,8 +98,11 @@ below the 300-second floor a schedule is a poll, and polling is the client's job
 client schedules, from the shared start in `packages/client-core/src/host/clientRuntime.ts`, once the
 Node is ready. A schedule starts when its plugin becomes available, stops when the plugin goes, admits
 no reads while its host is hidden, and coalesces timer, event, and visibility edges into one refresh and
-one follow-up. The host reports whether it's hidden through the platform seam, and the terminal client
-always reports itself visible
+one follow-up. A schedule whose events keep it current can set `unfocusedIntervalMs`, a slower clock
+while the window has no focus. Its events still refresh it at once. The task status poll runs every
+10 seconds, or every 30 while the window has no focus. The host reports whether it's hidden and
+whether it has focus through the platform seam. The terminal client always reports itself visible, and
+reports focus from the terminal's focus reports
 ([the platform seam](./architecture/node-api.md#the-platform-seam)).
 
 ## Policies
