@@ -18,12 +18,15 @@ export const codexModeOption = (session: AgentSession) => {
 
 export type CodexPlanHandoffState = 'actionable' | 'handled' | 'unavailable'
 
+/** What the rule reads of a plan proposal, so a caller that holds a projected card can supply it. */
+export type PlanProposalRecord = Pick<AgentEventRecord, 'id' | 'turnId' | 'event'>
+
 /** Both hosts and the Node apply the same visible eligibility rule; the Node repeats it in SQLite. */
 export function codexPlanHandoffState(
   session: AgentSession,
   turns: readonly AgentTurn[],
-  events: readonly AgentEventRecord[],
-  proposal: AgentEventRecord,
+  events: readonly PlanProposalRecord[],
+  proposal: PlanProposalRecord,
 ): CodexPlanHandoffState {
   if (proposal.event.type !== 'plan_proposal' || !proposal.turnId) return 'unavailable'
   const { itemId, providerTurnId } = proposal.event

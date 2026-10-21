@@ -292,6 +292,83 @@ describe('wsClient', () => {
     expect(span?.attrs).toMatchObject({ bytes: 37, slow: true })
   })
 
+  describe('agent frames', () => {
+    const agentFrame = (n: number) => ({ channel: 'agent:event', n })
+
+    it('waits for the next drain and applies together, in order, while other channels apply on arrival', async () => {
+      const applied: unknown[] = []
+      const agent = registerWsChannel('agent', (frame) => applied.push(frame.n))
+      const probe = registerWsChannel('probe', (frame) => applied.push(frame.channel))
+      try {
+        client.wsConnect()
+        bridge.emitFrame(agentFrame(1))
+        bridge.emitFrame({ channel: 'probe:thing' })
+        bridge.emitFrame(agentFrame(2))
+        expect(applied).toEqual(['probe:thing'])
+        await vi.waitFor(() => expect(applied).toEqual(['probe:thing', 1, 2]))
+      } finally {
+        agent.dispose()
+        probe.dispose()
+      }
+    })
+
+    it('drops a frame from a node that stopped being active before the drain', async () => {
+      const applied: unknown[] = []
+      const agent = registerWsChannel('agent', (frame) => applied.push(frame.n))
+      try {
+        client.wsConnect()
+        bridge.emitFrame(agentFrame(1))
+        setActiveNode('n2')
+        bridge.emitFrame(agentFrame(2), 'n2')
+        await vi.waitFor(() => expect(applied).toEqual([2]))
+      } finally {
+        agent.dispose()
+      }
+    })
+
+    it('yields to input once a drain runs past its slice, and keeps the frames in order', async () => {
+      const applied: unknown[] = []
+      const agent = registerWsChannel('agent', (frame) => applied.push(frame.n))
+      // Each read of the clock costs 3 ms, so a slice takes two frames.
+      let now = 0
+      const clock = vi.spyOn(performance, 'now').mockImplementation(() => (now += 3))
+      try {
+        client.wsConnect()
+        for (let n = 1; n <= 6; n++) bridge.emitFrame(agentFrame(n))
+        await vi.waitFor(() => expect(applied).toEqual([1, 2]))
+        await vi.waitFor(() => expect(applied).toEqual([1, 2, 3, 4, 5, 6]))
+      } finally {
+        clock.mockRestore()
+        agent.dispose()
+      }
+    })
+
+    it('counts the frames a drain took on its slow span', async () => {
+      const posted: TelemetryRecord[] = []
+      startClientTelemetry({ runtime: 'tui', post: async (records) => void posted.push(...records) })
+      setTelemetryEnabled(true)
+      let now = 0
+      const clock = vi.spyOn(performance, 'now').mockImplementation(() => now)
+      // The first frame leaves the slice open, so the slow second one belongs to the same drain.
+      const agent = registerWsChannel('agent', (frame) => {
+        now += frame.n === 1 ? 1 : 150
+      })
+      try {
+        client.wsConnect()
+        bridge.emitFrame(agentFrame(1))
+        bridge.emitFrame(agentFrame(2))
+        await vi.waitFor(() => expect(now).toBe(151))
+        await flushTelemetry()
+      } finally {
+        agent.dispose()
+        clock.mockRestore()
+        setTelemetryEnabled(false)
+      }
+      const span = posted.find((record) => record.kind === 'span' && record.name === 'ws.inbound.agent')
+      expect(span?.attrs).toMatchObject({ frames: 2, slow: true })
+    })
+  })
+
   it('delivers inactive-node plugin changes only to the fleet lifecycle subscriber', () => {
     const active: string[] = []
     const fleet: string[] = []

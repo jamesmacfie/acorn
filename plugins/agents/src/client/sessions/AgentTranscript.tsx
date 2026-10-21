@@ -101,19 +101,25 @@ export default function AgentTranscript(props: {
   // the row rather than from its own event, because whether anybody has answered yet, and what they
   // said, both live on the row and keep changing long after the event is written.
   const requestsById = createMemo(() => new Map(requests().map((request) => [request.providerRequestId, request])))
+  // A plan proposal's state reads the session row, the turns and the other proposals, so it keeps to the
+  // proposal cards instead of walking every event. The memos before it hold their value across an
+  // ordinary event, which is what keeps this from running on every frame.
+  const sessionRow = createMemo(() => props.snapshot.session)
+  const proposals = createMemo(
+    () =>
+      conversation()
+        .filter((item) => item.event.type === 'plan_proposal')
+        .map((item) => ({ id: item.key, turnId: item.turnId, event: item.event })),
+    [],
+    { equals: (a, b) => a.length === b.length && a.every((proposal, at) => proposal.id === b[at].id) },
+  )
   const proposalStates = createMemo(
     () =>
       new Map(
-        props.snapshot.events.flatMap((record) =>
-          record.event.type === 'plan_proposal'
-            ? [
-                [
-                  record.id,
-                  codexPlanHandoffState(props.snapshot.session, turns(), props.snapshot.events, record),
-                ] as const,
-              ]
-            : [],
-        ),
+        proposals().map((proposal) => [
+          proposal.id,
+          codexPlanHandoffState(sessionRow(), turns(), proposals(), proposal),
+        ]),
       ),
   )
   // The selected subagent's card, when there is one. A complex child run does not fit in a box inside

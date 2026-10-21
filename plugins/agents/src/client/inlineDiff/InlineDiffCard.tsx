@@ -69,7 +69,7 @@ export default function InlineDiffCard(props: Props) {
     () => (session() ? undefined : 'new'),
     () => managedAgentApi.providers(),
   )
-  const snapshot = createMemo(() => (session() ? managedAgentStore.snapshots()[session()!.id] : undefined))
+  const snapshot = createMemo(() => (session() ? managedAgentStore.snapshotFor(session()!.id) : undefined))
   const requestsById = createMemo(
     () => new Map((snapshot()?.requests ?? []).map((request) => [request.providerRequestId, request])),
   )

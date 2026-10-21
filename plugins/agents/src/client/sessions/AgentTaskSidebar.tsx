@@ -122,7 +122,7 @@ export default function AgentTaskSidebar(props: { task: Task; model: AgentPaneMo
     model
       .taskSessions()
       .flatMap((session) =>
-        (managedAgentStore.snapshots()[session.id]?.requests ?? [])
+        (managedAgentStore.snapshotFor(session.id)?.requests ?? [])
           .filter((request) => request.status === 'pending' || request.status === 'resolving')
           .map((request) => ({ session, request })),
       ),

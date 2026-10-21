@@ -89,7 +89,7 @@ function SessionConversation(input: {
   const chatsOnly = () => managedChatsOnly(sessionId())
   const toggleChatsOnly = () => toggleManagedChatsOnly(sessionId())
   const [collapseTick, setCollapseTick] = createSignal(0)
-  const snapshot = createMemo(() => managedAgentStore.snapshots()[sessionId()])
+  const snapshot = createMemo(() => managedAgentStore.snapshotFor(sessionId()))
   const stored = createMemo(() => managedAgentStore.sessions().find((item) => item.id === sessionId()))
   // The store's row where there is one, the snapshot's where the roster has not caught up. Both are the
   // same row; `loadSnapshot` upserts what it fetched.

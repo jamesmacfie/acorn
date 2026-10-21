@@ -34,7 +34,12 @@ const log = createLogger('agents', 'agents')
 
 const [sessions, setSessions] = createSignal<AgentSession[]>([])
 const [delegations, setDelegations] = createSignal<Record<string, AgentSessionDelegation>>({})
-const [snapshots, setSnapshots] = createSignal<Record<string, AgentSessionSnapshot>>({})
+// Each session's transcript is its own signal, written only when that session's snapshot changes, so
+// an event for one session wakes the readers of that session and no other's. A slot is made on first
+// read or write and kept, because a reader may still hold it, like `taskSlices` below.
+const snapshotSlots = new Map<string, Signal<AgentSessionSnapshot | undefined>>()
+// Which sessions hold a snapshot, for the readers that list them. Written only when one comes or goes.
+const [snapshotIds, setSnapshotIds] = createSignal<readonly string[]>([])
 // Each task's sessions, for readers that ask about one task, such as the rail marker on every task
 // row. A slice is its own signal, written only when that task's rows change, so a roster change wakes
 // only that task's readers. A slice is made on first read and kept, because a reader may still hold
@@ -103,6 +108,33 @@ const recent = new Set<string>()
 // of folding every event again. It goes with the snapshot's events (forgetSnapshot).
 const projections = new Map<string, (events: AgentEventRecord[]) => AgentConversationItem[]>()
 
+function snapshotSlot(sessionId: string): Signal<AgentSessionSnapshot | undefined> {
+  let slot = snapshotSlots.get(sessionId)
+  if (!slot) {
+    slot = createSignal<AgentSessionSnapshot | undefined>()
+    snapshotSlots.set(sessionId, slot)
+  }
+  return slot
+}
+
+/** This session's snapshot, if the store holds one. Wakes its reader on this session's changes only. */
+const snapshotFor = (sessionId: string): AgentSessionSnapshot | undefined => snapshotSlot(sessionId)[0]()
+
+const peekSnapshot = (sessionId: string): AgentSessionSnapshot | undefined => untrack(snapshotSlot(sessionId)[0])
+
+// The one write to a session's snapshot. `update` returns what it was given when nothing changed, and
+// that wakes nobody.
+function updateSnapshot(
+  sessionId: string,
+  update: (current: AgentSessionSnapshot | undefined) => AgentSessionSnapshot | undefined,
+): void {
+  const [read, write] = snapshotSlot(sessionId)
+  const held = untrack(read) !== undefined
+  const next = write(update)
+  if ((next !== undefined) !== held)
+    setSnapshotIds((ids) => (next ? [...ids, sessionId] : ids.filter((id) => id !== sessionId)))
+}
+
 function touch(sessionId: string): void {
   recent.delete(sessionId)
   recent.add(sessionId)
@@ -128,18 +160,15 @@ function trimSnapshots(): void {
   const dropped = idle.slice(0, -KEEP_RECENT)
   if (dropped.length) {
     for (const id of dropped) forgetSnapshot(id)
-    setSnapshots((current) => {
-      const next = { ...current }
-      for (const id of dropped) delete next[id]
-      return next
+    batch(() => {
+      for (const id of dropped) updateSnapshot(id, () => undefined)
     })
   }
   // The store's share of the window's memory, which grows with the events it keeps. A bound that
   // stops holding shows as this count climbing.
-  const kept = Object.values(untrack(snapshots))
   agentTelemetry.gauge(
     'agents.snapshots.events',
-    kept.reduce((total, snapshot) => total + snapshot.events.length, 0),
+    untrack(snapshotIds).reduce((total, id) => total + (peekSnapshot(id)?.events.length ?? 0), 0),
   )
 }
 
@@ -177,6 +206,15 @@ function sessionsForTask(taskId: string): readonly AgentSession[] {
   return slice[0]()
 }
 
+// A row the roster just took, put onto the snapshot that holds the same session.
+function adoptSession(session: AgentSession): void {
+  updateSnapshot(session.id, (snapshot) => {
+    if (!snapshot) return snapshot
+    const newest = newestManagedSession(snapshot.session, session)
+    return newest === snapshot.session ? snapshot : { ...snapshot, session: newest }
+  })
+}
+
 function upsertSession(session: AgentSession): void {
   agentTelemetry.observe('agents.session.update', 1)
   if (deletedSessionIds.has(session.id)) return
@@ -187,12 +225,7 @@ function upsertSession(session: AgentSession): void {
       : [...current, session]
     return next.sort(byRecent)
   })
-  setSnapshots((current) => {
-    const snapshot = current[session.id]
-    if (!snapshot) return current
-    const newest = newestManagedSession(snapshot.session, session)
-    return newest === snapshot.session ? current : { ...current, [session.id]: { ...snapshot, session: newest } }
-  })
+  adoptSession(session)
   // Notices come from the row, not from the events. The node projects `attention` from the driver's
   // own events and broadcasts the row whenever an event changes it, so the client reads a state instead
   // of guessing one per event.
@@ -218,16 +251,7 @@ function upsertSessions(incoming: readonly AgentSession[]): void {
       }
       return [...merged.values()].sort(byRecent)
     })
-    setSnapshots((current) => {
-      let next: Record<string, AgentSessionSnapshot> | undefined
-      for (const session of wanted) {
-        const snapshot = current[session.id]
-        if (!snapshot) continue
-        next ??= { ...current }
-        next[session.id] = { ...snapshot, session: newestManagedSession(snapshot.session, session) }
-      }
-      return next ?? current
-    })
+    for (const session of wanted) adoptSession(session)
     // One call with the whole page, which is the shape this verb takes anyway: it diffs what it is
     // given against what it last saw, so a page is one diff rather than one per row.
     observeAttention(wanted.map((session) => fromManagedSession(session, activeNodeId() ?? '')))
@@ -264,12 +288,7 @@ function removeSession(sessionId: string): void {
     delete next[sessionId]
     return next
   })
-  setSnapshots((current) => {
-    if (!(sessionId in current)) return current
-    const next = { ...current }
-    delete next[sessionId]
-    return next
-  })
+  updateSnapshot(sessionId, () => undefined)
 }
 
 // Both halves of a session's per-event bookkeeping, rebuilt from an array. Called once per snapshot
@@ -362,9 +381,8 @@ function appendEvent(event: AgentEventRecord): void {
   if (deletedSessionIds.has(event.sessionId)) return
   let duplicate = false
   let stored = false
-  setSnapshots((current) => {
-    const snapshot = current[event.sessionId]
-    if (!snapshot) return current
+  updateSnapshot(event.sessionId, (snapshot) => {
+    if (!snapshot) return snapshot
     stored = true
     let seen = seenEventIds.get(event.sessionId)
     if (!seen) {
@@ -373,7 +391,7 @@ function appendEvent(event: AgentEventRecord): void {
     }
     if (seen.has(event.id)) {
       duplicate = true
-      return current
+      return snapshot
     }
     seen.add(event.id)
     if (completeThrough.get(event.sessionId) === event.seq - 1) completeThrough.set(event.sessionId, event.seq)
@@ -390,7 +408,7 @@ function appendEvent(event: AgentEventRecord): void {
         usageLines.set(event.sessionId, { at: snapshot.events.length - 1, turnId: event.turnId })
       }
     }
-    return { ...current, [event.sessionId]: { ...snapshot } }
+    return { ...snapshot }
   })
   if (duplicate) return
   // Only a snapshot the store holds has requests to expire. One it does not hold is read whole when it
@@ -424,32 +442,30 @@ function foldUsage(sessionId: string, events: AgentEventRecord[], event: AgentEv
 }
 
 function upsertTurn(turn: AgentTurn): void {
-  setSnapshots((current) => {
-    const snapshot = current[turn.sessionId]
-    if (!snapshot) return current
+  updateSnapshot(turn.sessionId, (snapshot) => {
+    if (!snapshot) return snapshot
     const known = snapshot.turns.some((item) => item.id === turn.id)
     // A steered row is part of the turn it joined, so it moves out of `turns` as the Node's read has it.
     if (turn.status === 'steered') {
       const steeredTurns = [...(snapshot.steeredTurns ?? []).filter((item) => item.id !== turn.id), turn]
       const turns = known ? snapshot.turns.filter((item) => item.id !== turn.id) : snapshot.turns
-      return { ...current, [turn.sessionId]: { ...snapshot, turns, steeredTurns } }
+      return { ...snapshot, turns, steeredTurns }
     }
     const turns = known
       ? snapshot.turns.map((item) => (item.id === turn.id ? turn : item))
       : [...snapshot.turns, turn].sort((left, right) => left.ordinal - right.ordinal)
-    return { ...current, [turn.sessionId]: { ...snapshot, turns } }
+    return { ...snapshot, turns }
   })
 }
 
 function upsertRequest(request: AgentRequest): void {
-  setSnapshots((current) => {
-    const snapshot = current[request.sessionId]
-    if (!snapshot) return current
+  updateSnapshot(request.sessionId, (snapshot) => {
+    if (!snapshot) return snapshot
     const known = snapshot.requests.some((item) => item.id === request.id)
     const requests = known
       ? snapshot.requests.map((item) => (item.id === request.id ? request : item))
       : [...snapshot.requests, request].sort((left, right) => left.createdAt - right.createdAt)
-    return { ...current, [request.sessionId]: { ...snapshot, requests } }
+    return { ...snapshot, requests }
   })
 }
 
@@ -529,7 +545,11 @@ export const managedAgentStore = {
     return Math.max(session.lastEventSeq, eventSeq(session.id)[0]())
   },
   delegations,
-  snapshots,
+  snapshotFor,
+  /** Every held snapshot, for the readers that list them. It wakes on any session's change, so a reader
+   *  of one session asks `snapshotFor`. */
+  snapshots: (): Record<string, AgentSessionSnapshot> =>
+    Object.fromEntries(snapshotIds().map((id) => [id, snapshotFor(id)!])),
   /**
    * Start a session on this provider and put the row in the store.
    *
@@ -659,7 +679,7 @@ export const managedAgentStore = {
    */
   loadSnapshot(sessionId: string): Promise<AgentSessionSnapshot> {
     const inflight = snapshotLoads.get(sessionId)
-    const held = snapshots()[sessionId] ? (completeThrough.get(sessionId) ?? 0) : 0
+    const held = peekSnapshot(sessionId) ? (completeThrough.get(sessionId) ?? 0) : 0
     agentTelemetry.observe('agents.snapshot.load', 1, '1', { cache: inflight ? 'inflight' : held ? 'resume' : 'miss' })
     if (inflight) return inflight
     const owner = captureRead(sessionId)
@@ -673,7 +693,7 @@ export const managedAgentStore = {
       owner.check()
       // A read that started part-way along is only half a snapshot. If the store dropped the rows
       // below it while the read was out (a node switch clears it), read the whole session instead.
-      if (fetched.from && !snapshots()[sessionId]) fetched = await read(0)
+      if (fetched.from && !peekSnapshot(sessionId)) fetched = await read(0)
       owner.check()
       const full = fetched.snapshot
       // Complete through wherever the walk ended. The row's own `lastEventSeq` counts too: the walk
@@ -684,11 +704,10 @@ export const managedAgentStore = {
       // One update rather than two. The merge and the row write each hand the transcript a new
       // snapshot, and each would have re-projected it.
       batch(() => {
-        setSnapshots((current) => {
-          const previous = current[sessionId]
+        updateSnapshot(sessionId, (previous) => {
           snapshot = agentTelemetry.measure('agents.snapshot.merge', () => mergeManagedSnapshot(previous, full))
           eventsChanged = snapshot.events !== previous?.events
-          return { ...current, [sessionId]: snapshot }
+          return snapshot
         })
         completeThrough.set(sessionId, Math.max(completeThrough.get(sessionId) ?? 0, reached))
         touch(sessionId)
@@ -712,7 +731,7 @@ export const managedAgentStore = {
    * Keep this session's snapshot while a surface draws it. Returns the release.
    *
    * The store keeps only the held snapshots and the few most recently released (`KEEP_RECENT`), so a
-   * surface that reads `snapshots()` for a session holds it for as long as it reads, or the bound can
+   * surface that reads `snapshotFor()` for a session holds it for as long as it reads, or the bound can
    * drop the transcript from under it. Holding reads nothing: `loadSnapshot` still does that.
    */
   hold(sessionId: string): () => void {
@@ -726,7 +745,7 @@ export const managedAgentStore = {
       const count = (holds.get(sessionId) ?? 1) - 1
       if (count > 0) return void holds.set(sessionId, count)
       holds.delete(sessionId)
-      if (!untrack(snapshots)[sessionId]) return
+      if (!peekSnapshot(sessionId)) return
       touch(sessionId)
       trimSnapshots()
     }
@@ -764,7 +783,9 @@ export const managedAgentStore = {
     holds.clear()
     setRoster(() => [])
     setDelegations({})
-    setSnapshots({})
+    batch(() => {
+      for (const id of untrack(snapshotIds)) updateSnapshot(id, () => undefined)
+    })
     deletedSessionIds.clear()
     seenEventIds.clear()
     usageLines.clear()

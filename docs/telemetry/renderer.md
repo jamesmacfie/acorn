@@ -68,7 +68,7 @@ Paths are under `packages/client-core/src` unless they start with `apps/`.
 | Every request that leaves the renderer | `infra/node/apiClient.ts` `send()` | Span `api.request` with method, route namespace, status, and `responseBytes`. Sets `traceparent` and `x-request-id` |
 | Slow renderer-helper calls | `apps/desktop/src/shell/bridge.ts` `call()` | A `bridge.call` histogram for every call, and a console diagnostic over one second splitting helper, queue, parse, and continuation time |
 | Every failed query and mutation | `infra/node/fleet.ts` `clientFor` | A handled error with the first two key segments |
-| Every inbound WebSocket frame | `infra/node/wsClient.ts` `dispatch` | Histogram `ws.inbound.<channel prefix>`. A slow dispatch's span adds the frame's JSON size as `bytes` |
+| Every inbound WebSocket frame | `infra/node/wsClient.ts` `measureInbound` | Histogram `ws.inbound.<channel prefix>`, one sample per frame, or per drain of the queued `agent` frames. A slow dispatch's span adds the JSON size as `bytes` and the count as `frames` |
 | Every command | `host/registries/commands/commands.ts` `executeCommand` | Span `command`, owner from `ownerId`. Opens an interaction |
 | Every page change | `features/tasks/pageChange.ts` | Span `nav.change`. Opens an interaction. Ends with `outcome: 'hidden'` when the window goes hidden, or `'timeout'` after 30 seconds without a frame |
 | Consequential view lifecycle | `infra/telemetry/emitter.ts` `startOperation` | A child span under an open interaction, or an interaction root |

@@ -4,7 +4,9 @@ The transcript store holds the sessions a client reads. Nothing is virtualized, 
 drawn card, and the cost of a streamed event is the lever that matters. This page covers how the store
 takes a frame, how it loads a session, what it keeps, and how the ledger stores a tool call.
 `plugins/agents/src/client/sessions/managedStore.ts` holds one snapshot per kept session: the row, its
-turns, its events, and its requests.
+turns, its events, and its requests. Each snapshot is its own signal, and `snapshotFor(sessionId)` wakes
+a reader on that session's changes and no other's. `snapshots()` is a view over all of them, for a reader
+that lists every session, and it wakes on any change.
 
 ## The transcript store
 
@@ -24,12 +26,29 @@ at 40 ms or 16 KB (`durableEventBuffer.ts`). Five rules keep each frame cheap:
   are still in place, and rebuilds from the start when a row lands behind the tail or a read replaced
   a record. An untouched item keeps its object, and each row reads its item from its own signal.
 
-A frame costs about a millisecond, so frames aren't batched. In the plugin's jsdom tier, with the
-canonical session drawing 200 of 3,387 cards, a message delta took 0.8 ms at the median and 1.3 ms at
-the 95th percentile. An event behind the tail costs about 20 ms, and the Node commits in order, so a
-live frame doesn't arrive that way. Over three days of Sentry data, 95% of five-second windows had no
-agent frame over 36 ms. One session's frames arrive about 40 ms apart, so a batch would nearly always
-hold one frame.
+The store applies one frame in about a millisecond. In the plugin's jsdom tier, with the canonical
+session drawing 200 of 3,387 cards, a message delta took 0.8 ms at the median and 1.3 ms at the 95th
+percentile. An event behind the tail costs about 20 ms, and the Node commits in order, so a live frame
+doesn't arrive that way. What costs more is who wakes. With several sessions streaming, frames arrive
+dozens of times a second, and each one used to wake every reader on the page.
+
+## The frame queue
+
+`wsClient.ts` doesn't apply an `agent:` frame on arrival. It holds the frame, and applies everything
+held in one Solid `batch` on the next animation frame, so a reader runs once for however many frames
+arrived. A timer 50 ms out drains too, for a window that is hidden and gets no animation frames. Frames
+keep their order, and a frame from a Node that is no longer active is dropped.
+
+A drain that runs past 8 ms stops and goes on from a message-channel task, so input that arrived in the
+meantime runs first. Other channels apply on arrival. The terminal's JSON frames have to stay in order
+with its bytes, and the bytes don't wait.
+
+The `ws.inbound.agent` histogram times a whole drain, readers included. Its slow span carries `frames`,
+the count the drain took, and `bytes`, their total JSON size. The store's `agents.frame.apply` is the
+write inside it, so the difference between the two sums is what the readers cost.
+
+A handler on a queued channel must take frames that arrive together. The agents store drops an event it
+has seen, by ID, and orders the rest by sequence.
 
 A snapshot read and the socket can disagree about a usage line, because both fold it.
 `managedSnapshot.ts` unions the two, socket first.

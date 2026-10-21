@@ -12,14 +12,14 @@ vi.mock('@tanstack/solid-query', () => ({
   useQueryClient: () => ({ setQueryData: () => {} }),
 }))
 
-const drawn: { turnId: string | null; turn: AgentTurn | undefined }[] = []
+const drawn: { turnId: string | null; turn: AgentTurn | undefined; planHandoffState?: string }[] = []
 // Every time a card's bindings re-read its item, by key.
 const woken: string[] = []
 vi.mock('./AgentEventCard', () => ({
   // A focusable node tagged with the row's key, so a test can prove a surviving row keeps its own DOM
   // (and the focus and local state that ride on it) when the list around it changes.
-  default: (props: { item: { key: string; turnId: string | null }; turn?: AgentTurn }) => {
-    drawn.push({ turnId: props.item.turnId, turn: props.turn })
+  default: (props: { item: { key: string; turnId: string | null }; turn?: AgentTurn; planHandoffState?: string }) => {
+    drawn.push({ turnId: props.item.turnId, turn: props.turn, planHandoffState: props.planHandoffState })
     createRenderEffect(() => woken.push(props.item.key))
     return (
       <div data-item={props.item.key} tabindex={-1}>
@@ -366,6 +366,40 @@ describe('a long transcript', () => {
     api!.toTop()
     expect(rows(host)).toHaveLength(1000)
     expect(earlier(host)).toBeUndefined()
+  })
+
+  it('gives a plan proposal its handoff state from the proposal cards', () => {
+    const session = {
+      id: 's1',
+      title: 'A session',
+      kind: 'interactive',
+      driverKind: 'codex-app-server',
+      controller: 'acorn',
+      config: { configOptions: [{ id: 'mode', currentValue: 'plan', values: [{ value: 'default' }] }] },
+    }
+    const planTurn: AgentTurn = {
+      ...turn('a', 0),
+      stopReason: 'completed',
+      providerTurnRef: 'codex-turn-1',
+      effectivePolicy: { mode: 'plan' },
+    }
+    const proposal = record(2, 'a', {
+      type: 'plan_proposal',
+      itemId: 'plan-1',
+      providerTurnId: 'codex-turn-1',
+      text: 'Do it',
+    })
+    const host = mount(
+      () =>
+        ({
+          session,
+          turns: [planTurn],
+          events: [message(1, 'a'), proposal],
+          requests: [],
+        }) as unknown as AgentSessionSnapshot,
+    )
+    expect(host.querySelector('[data-item="e2"]')).not.toBeNull()
+    expect(drawn.find((row) => row.turnId === 'a' && row.planHandoffState)?.planHandoffState).toBe('actionable')
   })
 
   it('keeps a selection across two cards while the newest one streams', () => {

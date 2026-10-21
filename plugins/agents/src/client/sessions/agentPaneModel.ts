@@ -139,7 +139,7 @@ export function createAgentPaneModel(task: Task, pane: PaneModelContext) {
   })
   const snapshot = createMemo(() => {
     const session = selected()
-    return session ? managedAgentStore.snapshots()[session.id] : undefined
+    return session ? managedAgentStore.snapshotFor(session.id) : undefined
   })
   const provider = createMemo(() => providers()?.find((candidate) => candidate.id === selected()?.providerId))
 
@@ -271,7 +271,7 @@ export function createAgentPaneModel(task: Task, pane: PaneModelContext) {
     if (kind === 'rename') setRenameText(session.title)
     if (kind === 'archive') {
       const shared = composerDraftState(session.id)
-      const blank = sessionIsBlank(managedAgentStore.snapshots()[session.id], {
+      const blank = sessionIsBlank(managedAgentStore.snapshotFor(session.id), {
         text: managedDraft(session.id),
         attachments: shared.attachments(),
         contexts: shared.contexts(),

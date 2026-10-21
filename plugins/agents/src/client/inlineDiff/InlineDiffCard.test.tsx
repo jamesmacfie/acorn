@@ -13,7 +13,7 @@ vi.mock('../sessions/managedStore.ts', () => ({
   managedAgentStore: {
     captureRead: () => ({ nodeId: null, check: () => {} }),
     sessionsForTask: () => store.sessions,
-    snapshots: () => store.snapshots,
+    snapshotFor: (id: string) => store.snapshots[id],
     hold: () => () => undefined,
     loadSnapshot: async () => undefined,
   },

@@ -6,14 +6,27 @@
 // project runs `.tsx` under jsdom with the browser build (plugins/vitest.shared.ts). `toolFoldPrefs`
 // splits its tests the same way.
 import { describe, expect, it, vi } from 'vitest'
-import { createEffect, createRoot, createSignal } from 'solid-js'
-import type { AgentSession } from '../../contract/wire.ts'
+import { batch, createEffect, createMemo, createRoot, createSignal } from 'solid-js'
+import type { AgentEventRecord, AgentSession } from '../../contract/wire.ts'
 
-vi.mock('./wsChannel', () => ({ wsOnAgentFrame: () => () => {} }))
+let onFrame: ((value: unknown) => void) | undefined
+vi.mock('./wsChannel', () => ({
+  wsOnAgentFrame: (cb: (value: unknown) => void) => {
+    onFrame = cb
+    return () => {}
+  },
+}))
 
 const sessionCalls: { archived?: boolean }[] = []
 vi.mock('./managedClient', () => ({
   managedAgentApi: {
+    snapshot: async (sessionId: string) => ({
+      session: rosterRow(sessionId, 1),
+      turns: [],
+      events: [],
+      requests: [],
+    }),
+    events: async () => ({ events: [], nextCursor: null }),
     sessions: async (query: { archived?: boolean } = {}) => {
       sessionCalls.push(query)
       return { sessions: [], delegations: [], nextCursor: null }
@@ -102,5 +115,53 @@ describe('a page of sessions', () => {
     // rebuild per session in the workspace.
     expect(lengths).toEqual([0, 3])
     expect(managedAgentStore.sessions().map((session) => session.id)).toEqual(['s1', 's2', 's3'])
+  })
+})
+
+describe('a session’s transcript', () => {
+  const frame = (sessionId: string, seq: number) => ({
+    channel: 'agent:event',
+    event: {
+      id: `${sessionId}-${seq}`,
+      sessionId,
+      turnId: 'turn1',
+      seq,
+      schemaVersion: 1,
+      event: { type: 'assistant_message', text: `line ${seq}`, messageId: 'm1' },
+      searchText: null,
+      createdAt: seq,
+    } satisfies AgentEventRecord,
+  })
+
+  it('wakes only the readers of the session whose event arrived', async () => {
+    managedAgentStore.activate()
+    await Promise.all([managedAgentStore.loadSnapshot('a'), managedAgentStore.loadSnapshot('b')])
+    const reads: string[] = []
+    createRoot(() => {
+      createMemo(() => reads.push(`a:${managedAgentStore.snapshotFor('a')?.events.length}`))
+      createMemo(() => reads.push(`b:${managedAgentStore.snapshotFor('b')?.events.length}`))
+    })
+    reads.length = 0
+
+    onFrame?.(frame('a', 1))
+    expect(reads).toEqual(['a:1'])
+    onFrame?.(frame('b', 1))
+    expect(reads).toEqual(['a:1', 'b:1'])
+  })
+
+  it('updates its readers once for frames applied together', async () => {
+    managedAgentStore.activate()
+    await managedAgentStore.loadSnapshot('a')
+    const reads: number[] = []
+    createRoot(() => createMemo(() => reads.push(managedAgentStore.snapshotFor('a')?.events.length ?? 0)))
+    const before = reads.pop()!
+    reads.length = 0
+
+    // The socket client's drain applies a queued run of frames inside one batch.
+    batch(() => {
+      for (let seq = 10; seq < 20; seq++) onFrame?.(frame('a', seq))
+    })
+
+    expect(reads).toEqual([before + 10])
   })
 })

@@ -32,7 +32,7 @@ export default function ManagedChildRows(props: { parentSessionId: string; paren
       if (!['permission', 'question'].includes(child.attention)) continue
       const key = `${nodeId}:${child.id}`
       waiting.add(key)
-      if (managedAgentStore.snapshots()[child.id] || requestedSnapshots.has(key)) continue
+      if (managedAgentStore.snapshotFor(child.id) || requestedSnapshots.has(key)) continue
       // The store retains only three idle snapshots. Remember this read while the request is
       // pending, or 12 waiting children would evict one another and trigger an endless read loop.
       requestedSnapshots.add(key)
@@ -43,8 +43,8 @@ export default function ManagedChildRows(props: { parentSessionId: string; paren
 
   const requestKind = (sessionId: string) =>
     managedAgentStore
-      .snapshots()
-      [sessionId]?.requests.find((request) => request.status === 'pending' || request.status === 'resolving')?.kind
+      .snapshotFor(sessionId)
+      ?.requests.find((request) => request.status === 'pending' || request.status === 'resolving')?.kind
   const open = (sessionId: string) => {
     const child = children().find((candidate) => candidate.id === sessionId)
     const task = child && taskById().get(child.taskId)

@@ -7,6 +7,7 @@
 //
 // Dispatch is a prefix registry (wsChannels.ts). Core handles the generic `term:status` chrome
 // invalidation and workflow notices; Terminal registers the PTY `term:` payload handler.
+import { batch } from 'solid-js'
 import type {
   AgentSessionChangedEvent,
   ConnectionChangedEvent,
@@ -148,7 +149,7 @@ function connect(): void {
       for (const cb of fleetWorkspacesModeSubs) cb(nodeId, { mode })
     }
     if (nodeId !== activeNodeId()) return
-    dispatch(raw)
+    dispatch(nodeId, raw)
   })
   // Binary stream output has the same node filter. Its owner decodes the payload.
   transport.onBytes((nodeId, frame) => {
@@ -177,31 +178,93 @@ function connect(): void {
   })
 }
 
-function dispatch(raw: unknown): void {
+function dispatch(nodeId: string, raw: unknown): void {
   if (!raw || typeof raw !== 'object' || typeof (raw as { channel?: unknown }).channel !== 'string') return
   const frame = raw as WsServerFrame
   const prefix = frame.channel.split(':')[0]
+  if (prefix === QUEUED_PREFIX) {
+    queued.push({ nodeId, frame })
+    cancelWake ??= waitForFrame(drainQueued)
+    return
+  }
+  measureInbound(prefix, [frame], () => route(frame))
+}
+
+function route(frame: WsServerFrame): void {
+  // The broker's gap detection strips `seq` before this point. Core reads `channel` and the owner
+  // narrows the rest.
+  if (frame.channel === 'term:status') {
+    const { pluginId } = frame as { pluginId?: unknown }
+    statusSubs.forEach((cb) => cb(typeof pluginId === 'string' ? pluginId : undefined))
+  } else routeWsFrame(frame)
+}
+
+// A histogram and never a span. Terminal output alone is hundreds of frames a second while an
+// agent is writing, so this is one record every five seconds however hot the socket is
+// (docs/telemetry/model.md § Hot seams are metrics). Keyed on the prefix, because `term:out` and
+// `plugin:machine-stats:sample` are different questions and one channel per session is not.
+// `frames` is read after `apply` runs, because a queued drain only knows what it took by then.
+function measureInbound(prefix: string, frames: readonly WsServerFrame[], apply: () => void): void {
   // A frame is how a streaming reply or a busy terminal reaches the screen without any input.
   noteScreenWork(prefix)
-  // A histogram and never a span. Terminal output alone is hundreds of frames a second while an
-  // agent is writing, so this is one record every five seconds however hot the socket is
-  // (docs/telemetry/model.md § Hot seams are metrics). Keyed on the prefix, because `term:out` and
-  // `plugin:machine-stats:sample` are different questions and one channel per session is not.
-  measure(
-    'core',
-    `ws.inbound.${prefix}`,
-    () => {
-      // The broker's gap detection strips `seq` before this point. Core reads `channel` and the owner
-      // narrows the rest.
-      if (frame.channel === 'term:status') {
-        const { pluginId } = frame as { pluginId?: unknown }
-        statusSubs.forEach((cb) => cb(typeof pluginId === 'string' ? pluginId : undefined))
-      } else routeWsFrame(frame)
-    },
-    undefined,
+  measure('core', `ws.inbound.${prefix}`, apply, undefined, () => ({
     // Encoded again only for a slow dispatch, which is at most twenty a flush.
-    () => ({ bytes: new TextEncoder().encode(JSON.stringify(frame)).byteLength }),
+    bytes: frames.reduce((total, frame) => total + new TextEncoder().encode(JSON.stringify(frame)).byteLength, 0),
+    frames: frames.length,
+  }))
+}
+
+// An agent's frames arrive tens of times a second, and each one wakes every reader of a transcript.
+// They wait for the next animation frame and apply together in one batch, so the readers run once.
+// Every other channel applies on arrival. The terminal's JSON frames have to stay in order with its
+// bytes, and the bytes don't wait.
+const QUEUED_PREFIX = 'agent'
+// Past this a drain stops and lets input run before it goes on.
+const DRAIN_SLICE_MS = 8
+// A window that is hidden gets no animation frames, so a timer drains it as well.
+const DRAIN_FALLBACK_MS = 50
+// The node rides along so a frame queued before a node switch is dropped, not applied to the new
+// node's store.
+const queued: { nodeId: string; frame: WsServerFrame }[] = []
+// Set while a drain is waiting to run, and cancels whatever else was racing to run it.
+let cancelWake: (() => void) | undefined
+
+function waitForFrame(run: () => void): () => void {
+  const frame = typeof requestAnimationFrame === 'function' ? requestAnimationFrame(run) : undefined
+  const timer = setTimeout(run, DRAIN_FALLBACK_MS)
+  return () => {
+    if (frame !== undefined) cancelAnimationFrame(frame)
+    clearTimeout(timer)
+  }
+}
+
+// A message task runs after the input already waiting, which a timer's clamped delay does not promise.
+function waitForInput(run: () => void): () => void {
+  const { port1, port2 } = new MessageChannel()
+  port1.onmessage = () => {
+    port1.close()
+    run()
+  }
+  port2.postMessage(null)
+  return () => port1.close()
+}
+
+function drainQueued(): void {
+  cancelWake?.()
+  cancelWake = undefined
+  const applied: WsServerFrame[] = []
+  measureInbound(QUEUED_PREFIX, applied, () =>
+    batch(() => {
+      const started = performance.now()
+      while (queued.length && performance.now() - started < DRAIN_SLICE_MS) {
+        const { nodeId, frame } = queued.shift()!
+        if (nodeId !== activeNodeId()) continue
+        applied.push(frame)
+        route(frame)
+      }
+    }),
   )
+  if (queued.length) cancelWake = waitForInput(drainQueued)
 }
 
 // Workflow notices for the bell, and step events and status changes for run views.
@@ -306,6 +369,9 @@ export function _resetWsClient(): void {
   everOnline.clear()
   clearTimeout(shedTimer)
   shedTimer = undefined
+  cancelWake?.()
+  cancelWake = undefined
+  queued.length = 0
   binaryHandler = null
   statusSubs.clear()
   pluginsSubs.clear()

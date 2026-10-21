@@ -61,5 +61,5 @@ Sentry org `acorn-u3`, project `acorn-development`, following
 - Slow `broker.request` spans for `route:/v1/core/plugins` and `route:/v1/core/tasks`: the median and
   p95 of `queue.ms` against the span's duration, and the `pool.active` and `pool.queued` they saw.
 - `ws.inbound.agent` count and sum beside `agents.frame.apply` count and sum. The gap is the reactive
-  work phase 7 removes.
+  work phase 7 removes. From phase 7 the first count is drains, not frames, so compare the sums.
 - `ui.stall` grouped by `inbound`, `cache.saving`, and whether an interaction was open.

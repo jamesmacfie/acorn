@@ -30,7 +30,7 @@ vi.mock('./managedStore', () => ({
   managedAgentStore: {
     sessions,
     delegations,
-    snapshots,
+    snapshotFor: (id: string) => snapshots()[id],
     loadSnapshot,
   },
 }))
