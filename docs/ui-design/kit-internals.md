@@ -16,6 +16,13 @@ resolves to `primitives.ts`. Specificity is layered by convention:
 
 A pack wins because it's more specific, never because its stylesheet loads last.
 
+Every dropdown draws one trigger, `DropdownTrigger` in `kit/components/inputs/`: the kit's button,
+with the choice or the name on it and a chevron after. A `Select` and a `Picker` both use it, so the
+model select and the **Insert** picker in a composer match in height, type, and look on every form
+factor. A select's trigger also carries `ui-select`, which tests use to find it. In a form row, a
+select's `width="full"` fills the row as a text input does. A toolbar sizes a select with its buttons,
+since the select is a button.
+
 Direct chips in a `Toolbar` take at most 40% of its width and shrink when space is limited. Their
 labels truncate with an ellipsis so long workflow or parent names leave room for the toolbar controls.
 

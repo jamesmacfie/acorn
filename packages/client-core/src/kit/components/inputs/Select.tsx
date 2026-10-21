@@ -2,7 +2,8 @@ import { createSignal, For, onMount, Show } from 'solid-js'
 import { Portal } from 'solid-js/web'
 import { createAnchoredPopover, type AnchoredPopover } from '../../lib/controls/anchor'
 import { createDomCollection } from '../../keys/collection'
-import { claimField, controlAttrs, FieldProvider, NO_FIELD, type ControlOwn } from './controlAttrs'
+import { claimField, FieldProvider, NO_FIELD, type ControlOwn } from './controlAttrs'
+import { DropdownTrigger } from './DropdownTrigger'
 import { Input } from './Input'
 
 /** How many options it takes before the list grows a filter box. A native <select> answers a
@@ -200,25 +201,30 @@ export function Select(props: SelectProps) {
           )}
         </For>
       </select>
-      <button
-        {...controlAttrs(props, 'ui-input ui-select', field)}
-        type="button"
-        ref={triggerRef}
+      <DropdownTrigger
+        select
+        label={props.label}
+        size={props.size}
+        width={props.width ?? 'full'}
+        invalid={props.invalid}
+        id={field?.id ?? props.id}
+        describedBy={field?.describedBy()}
+        title={props.title}
+        disabled={props.disabled}
         autofocus={props.autofocus}
-        aria-haspopup="listbox"
-        aria-expanded={popover.open()}
-        onClick={() => popover.toggle()}
+        expanded={popover.open()}
+        ref={(element) => {
+          triggerRef = element
+        }}
+        onPress={() => popover.toggle()}
         onKeyDown={(event) => {
           if (event.key !== 'ArrowDown' && event.key !== 'ArrowUp') return
           event.preventDefault()
           popover.show()
         }}
       >
-        <span class="ui-select-value">{label()}</span>
-        <span class="ui-select-chevron" aria-hidden="true">
-          ▾
-        </span>
-      </button>
+        {label()}
+      </DropdownTrigger>
       <Show when={popover.open()}>
         {/* The list's filter box is not the control a caption names. */}
         <FieldProvider value={NO_FIELD}>
