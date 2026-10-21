@@ -26,8 +26,8 @@ same interrupt as its own control, and only after a person's press inside that c
 
 A terminal tab stays alive until it's closed. Its xterm and attachment last from the first frame the
 tab shows until its session leaves the roster: closed, removed, killed, its task archived, or the
-Node switched. Output that arrives while you're on another task keeps parsing into it, so coming back
-needs no new xterm, no `term:attach`, and no rebuild on the Node. A failed roster read keeps every
+Node switched. Output that arrives while you're on another task keeps parsing into it for 10 seconds
+(below), so coming back soon needs no new xterm, no `term:attach`, and no rebuild on the Node. A failed roster read keeps every
 terminal. Only a roster the Node answered removes one.
 
 Terminals are the exception to the rule that a pane's view doesn't outlive its task
@@ -38,7 +38,10 @@ xterm, a WebGL context, an attach, and a parse.
 Inside the drawer, every open session gets a surface and all but one are hidden. Across tasks the
 drawer unmounts, so the xterms don't belong to it. A module-level map keyed by Node and session
 (`heldTerminals.ts`) holds each one, and a surface lends it an element while drawn (`liveXterm.ts`).
-A terminal nobody draws is out of the document, and xterm's renderer pauses.
+A terminal nobody draws is out of the document, and xterm's renderer pauses. One that stays hidden
+for 10 seconds (`HIDDEN_DETACH_MS`) also detaches, so the Node stops sending its output and the page
+stops parsing it. Showing it attaches again, and the Node sends its screen after a reset, so what it
+missed draws over a cleared terminal.
 
 The cost is the parse, about 20 ms per megabyte of colored output in Chromium out of the document,
 against about 25 ms on screen. WebKit hasn't been measured. A WebKit page gets 16 live WebGL contexts,

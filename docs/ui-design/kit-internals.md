@@ -85,8 +85,12 @@ Appending to a message changes one key, the last. Callers depend on this:
   times a second, and only the growing block's node is replaced.
 - A copy button lives on its block, so it mounts once.
 - A closed code fence is highlighted once. Behind that, `highlightToHtml` in
-  `packages/client-core/src/infra/highlight/shiki.ts` keeps a small cache of fence HTML keyed by text
+  `packages/client-core/src/infra/highlight/worker.ts` keeps a small cache of fence HTML keyed by text
   and language.
+
+A fence is highlighted in the same worker that colors diffs, so no Shiki call runs on the page's thread.
+The main thread highlights it only when the worker can't start or answer, and records `highlight.fallback`
+and `highlight.main_thread` when it does.
 
 An open code fence stays plain while its text changes. After 300 ms without a change, the component
 highlights it once, so a finished message with an unclosed fence still gains color. Closing a fence
@@ -100,7 +104,7 @@ The `images` option decides what an image becomes, and it's part of the block ke
 - `thumb` is `inline` drawn as a short cropped band, for a picture that stands in for a file, such as
   an attachment above its file name.
 
-A fence takes its color from the theme. `highlightToHtml` asks Shiki for dual-theme HTML with
+A fence takes its color from the theme. `fenceHtml` asks Shiki for dual-theme HTML with
 `defaultColor: false`, so each token carries both colors as `--l` and `--r`, and `.ui-markdown .shiki`
 picks one with `light-dark()`, as `.diff-code span` does.
 

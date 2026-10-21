@@ -152,11 +152,11 @@ The host saves a program's `$` variables, except `$placement`, to the app's `sta
 mounts, so ticks and typed values come back after a reload and a restart. Every interactive view of the
 head saves: the head's card and the pane. Views in one window share one copy, so ticking in the pane
 ticks the card beside it, and the last change wins. A read-only older revision neither reads nor
-saves state. A save waits 400 milliseconds after the last change, and a state over 256 KiB isn't sent.
+saves state. A save waits 400 milliseconds after the last change, and a larger state isn't sent. [How
+the program runs](./agent-built-apps/runtime.md) covers when it evaluates.
 
-The browser extension's sidebar keeps its own copy. The sidebar and the desktop each save what they
-hold, and the last save wins, as two desktop windows do. A tick in the desktop shows in the sidebar
-when its card next mounts and reads the state again.
+The browser extension's sidebar keeps its own copy, and the last save wins, as with two desktop
+windows. A tick in the desktop shows in the sidebar when its card next mounts and reads the state.
 
 State survives revisions by variable name. A view seeds only the variables its revision declares, so
 one a revision dropped is gone at the next save, and a new one starts at its declared default. The host

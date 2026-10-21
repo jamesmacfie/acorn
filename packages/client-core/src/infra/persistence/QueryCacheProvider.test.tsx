@@ -2,6 +2,7 @@ import { createQuery, dehydrate, QueryClient, useIsRestoring } from '@tanstack/s
 import { render } from 'solid-js/web'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { QueryCacheProvider } from './QueryCacheProvider'
+import { tasksKey } from '@acorn/protocol/api.ts'
 import { queryCacheLifecycle } from './queryCacheLifecycle'
 
 const dispose: (() => void)[] = []
@@ -13,7 +14,7 @@ afterEach(() => {
 describe('query cache provider restoration', () => {
   it('gates query requests until public restore and preserves the restore context', async () => {
     const seed = new QueryClient()
-    seed.setQueryData(['tasks'], ['cached'])
+    seed.setQueryData(tasksKey, ['cached'])
     let read!: (value: string) => void
     const client = new QueryClient()
     const persistence = queryCacheLifecycle({
@@ -38,7 +39,7 @@ describe('query cache provider restoration', () => {
     )
     const Consumer = () => {
       const restoring = useIsRestoring()
-      const query = createQuery(() => ({ queryKey: ['tasks'], queryFn: request }))
+      const query = createQuery(() => ({ queryKey: tasksKey, queryFn: request }))
       return <div>{restoring() ? 'restoring' : query.data?.join(',')}</div>
     }
     const container = document.createElement('main')
@@ -68,7 +69,7 @@ describe('query cache provider restoration', () => {
 
   it('releases an unmounted restoring provider without late publication or an idle persistence subscription', async () => {
     const seed = new QueryClient()
-    seed.setQueryData(['tasks'], ['cached'])
+    seed.setQueryData(tasksKey, ['cached'])
     let read!: (value: string) => void
     const client = new QueryClient(),
       write = vi.fn(async () => {})
@@ -88,7 +89,7 @@ describe('query cache provider restoration', () => {
     })
     const request = vi.fn(async () => ['fresh'])
     const Consumer = () => {
-      const query = createQuery(() => ({ queryKey: ['tasks'], queryFn: request }))
+      const query = createQuery(() => ({ queryKey: tasksKey, queryFn: request }))
       return <div>{query.data?.join(',')}</div>
     }
     const container = document.createElement('main')
@@ -104,10 +105,10 @@ describe('query cache provider restoration', () => {
     await vi.waitFor(() => expect(read).toBeTypeOf('function'))
     unmount()
     read(JSON.stringify({ buster: '', timestamp: Date.now(), clientState: dehydrate(seed) }))
-    await vi.waitFor(() => expect(client.getQueryData(['tasks'])).toEqual(['cached']))
+    await vi.waitFor(() => expect(client.getQueryData(tasksKey)).toEqual(['cached']))
     expect(container.textContent).toBe('')
     expect(request).not.toHaveBeenCalled()
-    client.setQueryData(['tasks'], ['inactive update'])
+    client.setQueryData(tasksKey, ['inactive update'])
     await new Promise((resolve) => setTimeout(resolve, 10))
     expect(write).not.toHaveBeenCalled()
     await persistence.retire()
@@ -115,7 +116,7 @@ describe('query cache provider restoration', () => {
 
   it('does not publish a delayed read into a retired provider', async () => {
     const seed = new QueryClient()
-    seed.setQueryData(['tasks'], ['retired'])
+    seed.setQueryData(tasksKey, ['retired'])
     let read!: (value: string) => void
     const client = new QueryClient()
     const persistence = queryCacheLifecycle({
@@ -153,7 +154,7 @@ describe('query cache provider restoration', () => {
     await Promise.resolve()
     await Promise.resolve()
     await Promise.resolve()
-    expect(client.getQueryData(['tasks'])).toBeUndefined()
+    expect(client.getQueryData(tasksKey)).toBeUndefined()
     expect(container.textContent).toBe('restoring')
   })
 })

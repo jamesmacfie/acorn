@@ -3,6 +3,7 @@ import type { TelemetryRecord } from '../../runtime/telemetry.ts'
 // Run targets (docs/workflows/routes-and-ui.md § Routes and UI): the renderer shares the `RunBridge`
 // routes the MCP run tools use.
 export const runTargetsRoute = (taskId: string) => `/v1/core/tasks/${taskId}/run`
+export const runTargetsKey = ['run-targets'] as const
 export const runDefaultUrlRoute = (taskId: string) => `/v1/core/tasks/${taskId}/run/default-url`
 export const runStartRoute = (taskId: string, targetId: string) =>
   `/v1/core/tasks/${taskId}/run/${encodeURIComponent(targetId)}/start`

@@ -108,6 +108,8 @@ async function runInteractions(
       }
       await handler(text)
       await settle()
+      // Unlike the reference runner, this runtime waits for typing to pause before it runs a query.
+      if ('type' in step) await new Promise((resolve) => setTimeout(resolve, 300))
     }
 
     // Each expected event is compared on the keys it lists; null means absent or null.

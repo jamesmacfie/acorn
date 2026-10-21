@@ -1,8 +1,15 @@
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 import { fileMentionSuggestions, formatFileMention, parseFileMentions } from './fileMentions'
 
 describe('managed composer file mentions', () => {
   const files = ['src/app.ts', 'README.md', 'docs/product brief.md', 'src/a.ts']
+
+  it('builds the worktree lookup once, however many keys read it', () => {
+    const list = [...files]
+    const read = vi.spyOn(list, Symbol.iterator)
+    for (let key = 1; key <= 20; key++) parseFileMentions(`Review @${'a'.repeat(key)}`, list)
+    expect(read).toHaveBeenCalledTimes(1)
+  })
 
   it('extracts relative paths and line ranges', () => {
     expect(parseFileMentions('Review @src/app.ts:4-9 and @README.md.', files)).toEqual([

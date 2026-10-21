@@ -143,7 +143,7 @@ globalThis.ResizeObserver ??= class {
 const { default: TerminalPanel } = await import('./TerminalPanel')
 const { refreshSessions } = await import('./sessionStore')
 const { heldTerminalCount } = await import('./heldTerminals')
-const { WEBGL_TERMINALS, webglTerminalCount } = await import('./liveXterm')
+const { HIDDEN_DETACH_MS, WEBGL_TERMINALS, webglTerminalCount } = await import('./liveXterm')
 
 const A = '11111111-2222-3333-4444-555555555555'
 const B = '99999999-8888-7777-6666-555555555555'
@@ -378,6 +378,46 @@ describe('a terminal outlives the drawer that drew it', () => {
     expect(StubTerminal.built).toEqual([xterm])
     expect(attaches).toEqual([A])
     expect(surfaces()[0].contains(xterm.element!)).toBe(true)
+  })
+
+  it('lets go of a terminal nobody has drawn for ten seconds, and attaches again when it is shown', async () => {
+    vi.useFakeTimers()
+    try {
+      const [open, setOpen] = createSignal(true)
+      mount({ open })
+      await vi.advanceTimersByTimeAsync(100)
+      const [xterm] = StubTerminal.built
+
+      setOpen(false)
+      await vi.advanceTimersByTimeAsync(HIDDEN_DETACH_MS - 1)
+      expect(detaches).toEqual([])
+      await vi.advanceTimersByTimeAsync(1)
+      expect(detaches).toEqual([A])
+
+      setOpen(true)
+      await vi.advanceTimersByTimeAsync(100)
+      expect(StubTerminal.built).toEqual([xterm])
+      expect(attaches).toEqual([A, A])
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+
+  it('stays attached when the drawer comes back inside the ten seconds', async () => {
+    vi.useFakeTimers()
+    try {
+      const [open, setOpen] = createSignal(true)
+      mount({ open })
+      await vi.advanceTimersByTimeAsync(100)
+      setOpen(false)
+      await vi.advanceTimersByTimeAsync(HIDDEN_DETACH_MS - 1_000)
+      setOpen(true)
+      await vi.advanceTimersByTimeAsync(HIDDEN_DETACH_MS * 2)
+      expect(detaches).toEqual([])
+      expect(attaches).toEqual([A])
+    } finally {
+      vi.useRealTimers()
+    }
   })
 
   it('keeps writing output that arrives while nobody draws it', async () => {

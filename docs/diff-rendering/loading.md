@@ -81,11 +81,13 @@ reset, word marks are left out and the complete lines stay.
 
 ### Code fences in Markdown
 
-Markdown skips fences that were removed after its lazy import and before dispatch. The same language
-and source share one in-flight highlight through grammar loading and rendering, and a removed block
-can't cancel a surviving identical one. If every block waiting on a highlight leaves while the grammar
-loads, it renders nothing. The completed cache in
-`packages/client-core/src/infra/highlight/shiki.ts` holds 200 entries and skips fences over 16 KB.
+Markdown skips fences that were removed after its lazy import and before dispatch. A fence is sent to
+the highlight worker as one request that answers with its HTML, so the page's thread runs no Shiki
+call. The same language and source share one in-flight highlight, and a removed block can't cancel a
+surviving identical one. When the worker can't answer, the main thread highlights the fence instead,
+unless every block waiting on it left while the grammar loaded. A worker that missed its deadline
+leaves the fence plain. The completed cache in
+`packages/client-core/src/infra/highlight/worker.ts` holds 200 entries and skips fences over 16 KB.
 Large changing fences still render in full.
 
 ## Resident segments

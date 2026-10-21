@@ -1,4 +1,14 @@
-import { defaultShouldDehydrateQuery, type Query, type QueryKey } from '@tanstack/solid-query'
+import { defaultShouldDehydrateQuery, type Query, type QueryKey, type QueryMeta } from '@tanstack/solid-query'
+import {
+  integrationsKey,
+  modelBackendsKey,
+  prefsKey,
+  projectsKey,
+  runTargetsKey,
+  tasksKey,
+  workspacesKey,
+} from '@acorn/protocol/api.ts'
+import { taskScriptsKey } from '@acorn/protocol/taskScripts.ts'
 
 const DAY_MS = 24 * 60 * 60 * 1000
 
@@ -14,13 +24,25 @@ export const PERSISTED_SNAPSHOT_MAX_AGE_MS = 7 * DAY_MS
 // next write unless its screen refetched it.
 export const PERSISTED_QUERY_MAX_AGE_MS = DAY_MS
 
-// File bodies and patch-bearing file queries are reconstructable from the loopback API/blob cache
-// and dominate IndexedDB size. Summaries remain useful offline because they contain no patch body.
-export const shouldPersistQueryKey = (key: QueryKey): boolean => {
-  if (key[0] === 'blob') return false
-  if (key[0] === 'files' && key[4] !== 'summary') return false
-  return true
-}
+// The first frame draws from these and nothing else: preferences, workspaces, projects, the task list
+// with each task's script markers and run buttons, and the lists that name the model backends and
+// integrations. Everything else is fetched when its screen opens, so it costs the main thread nothing to
+// save and nothing to restore. A key matches by prefix, so a versioned key such as `['tasks', 'v4']`
+// follows its constant. A plugin's query that the first frame needs opts in with `meta: { persist: true }`,
+// because core can't name a plugin's keys.
+const PERSISTED_KEY_PREFIXES: readonly (readonly unknown[])[] = [
+  prefsKey,
+  workspacesKey,
+  projectsKey,
+  tasksKey,
+  integrationsKey,
+  modelBackendsKey,
+  runTargetsKey,
+  taskScriptsKey,
+]
+
+export const shouldPersistQueryKey = (key: QueryKey, meta?: QueryMeta): boolean =>
+  meta?.persist === true || PERSISTED_KEY_PREFIXES.some((prefix) => prefix.every((part, at) => key[at] === part))
 
 // Supplying a custom TanStack dehydration predicate replaces its default predicate. Preserve the
 // success-state gate explicitly: pending queries contain live Promises that cannot survive JSON
@@ -33,5 +55,5 @@ export const shouldPersistQueryKey = (key: QueryKey): boolean => {
 export const shouldPersistQuery = (query: Query): boolean =>
   defaultShouldDehydrateQuery(query) &&
   query.meta?.persist !== false &&
-  shouldPersistQueryKey(query.queryKey) &&
+  shouldPersistQueryKey(query.queryKey, query.meta) &&
   query.state.dataUpdatedAt >= Date.now() - PERSISTED_QUERY_MAX_AGE_MS

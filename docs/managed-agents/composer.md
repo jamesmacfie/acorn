@@ -122,6 +122,12 @@ and back keeps typed text, and the Workflows run pane can draw a second composer
 The queue shows each waiting turn's text and attachment tiles, and an attachment-only turn shows the
 tiles alone.
 
+A key shows in the field at once and reaches `localStorage` 300 ms after typing stops, or when the field
+loses focus (`typeText` and `flushText` in `composerState.ts`). Any other change to the text, such as
+a completion's insert or a send's clear, writes straight away. The worktree file list is turned into a
+lookup set once per load, not once per key, and a key rebuilds the `#` categories only when a source's
+list or the draft's token map changed.
+
 ## Draft and operation ownership
 
 `composerState.ts` owns one mutable draft for each Node and session. It holds text, attachment IDs,

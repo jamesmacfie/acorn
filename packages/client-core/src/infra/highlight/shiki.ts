@@ -1,13 +1,14 @@
-import { measure, recordSample } from '../telemetry/emitter'
+import { measure } from '../telemetry/emitter'
 import { createHighlighterCore, tokenizeAnsiWithTheme, type HighlighterCore } from 'shiki/core'
 import { createJavaScriptRegexEngine } from 'shiki/engine/javascript'
 import { keepAnsiColour } from '../../kit/lib/rendering/ansi'
+import { fenceHtml } from './fenceHtml'
 import { loadGrammar } from './langs'
 
 // The main-thread highlighter, for the callers a worker would not pay for: the terminal's ANSI
-// palette, CI log output, and agent markdown code fences. Diffs tokenize in
-// highlighter.worker.ts under Oniguruma (docs/diff-rendering/loading.md § Syntax highlighting), and
-// ./worker.ts falls back here when the worker cannot start.
+// palette and CI log output. Diffs and markdown code fences highlight in highlighter.worker.ts under
+// Oniguruma (docs/diff-rendering/loading.md § Syntax highlighting), and ./worker.ts falls back here
+// when the worker cannot start.
 //
 // The engine is JavaScript regex rather than Oniguruma, which is what the renderer's CSP allows.
 // `forgiving` skips an unsupported regex rather than throwing, because a highlighter that degrades
@@ -30,71 +31,17 @@ export async function getHighlighter(lang?: string): Promise<HighlighterCore> {
   return hl
 }
 
-// A fence's highlighted html, keyed by its language and its exact text. Block reuse in the kit
-// `Markdown` already stops an unchanged fence from being re-tokenized while a streaming message is on
-// screen; this catches the rest: the same fence coming back after a scroll, a view switch or a
-// remount, and the same snippet appearing twice.
-//
-// Exact keys rather than a hash, because a hash collision would show a reader the wrong code. The
-// price is memory, so the window is small and a fence over 16 KB is not kept at all.
-const HTML_CACHE_ENTRIES = 200
-const HTML_CACHE_MAX_BYTES = 16 * 1024
-const htmlCache = new Map<string, string>()
-type HtmlFlight = { live: Set<() => boolean>; promise: Promise<string> }
-const htmlFlights = new Map<string, HtmlFlight>()
-
 /**
- * Highlight one whole fence to html, dual-themed, loading its grammar first. It can reject — a grammar
- * that will not load is a rejected dynamic import — so a caller catches and renders the fence plain.
- *
- * Each token carries both colours as --l/--r and the stylesheet picks a side with light-dark(), the
- * same way diff rows do (styles/primitives.css § Markdown, docs/ui-design/tokens.md § Token axes). Shiki's
- * own dual-theme default instead writes the light colour into `color` and the dark one into a
- * --shiki-dark no stylesheet here reads, so a dark theme would draw every fence in github-light.
+ * Render one fence on the main thread. The fallback for ./worker.ts's `highlightToHtml`, which asks the
+ * worker first. It can reject, because a grammar that will not load is a rejected dynamic import, so a
+ * caller catches and renders the fence plain. `isLive` is checked once the grammar has loaded: a fence
+ * nobody waits for any more is not rendered.
  */
-export function highlightToHtml(code: string, lang: string, isLive: () => boolean = () => true): Promise<string> {
-  const key = `${lang}\u0000${code}`
-  const hit = htmlCache.get(key)
-  recordSample('core', 'highlight.html.cache', 1, '1', { cache: hit === undefined ? 'miss' : 'hit' })
-  if (hit !== undefined) return Promise.resolve(hit)
-  const joining = htmlFlights.get(key)
-  if (joining) {
-    joining.live.add(isLive)
-    return joining.promise
-  }
-  const live = new Set([isLive])
-  const flight: HtmlFlight = { live, promise: Promise.resolve('') }
-  flight.promise = (async () => {
-    const hl = await getHighlighter(lang)
-    // Grammar admission is shared. A leaving block cannot cancel another block's highlight.
-    if (![...live].some((consumer) => consumer())) return ''
-    recordSample('core', 'highlight.html.characters', code.length)
-    const html = measure('core', 'highlight.html.render', () =>
-      hl.codeToHtml(code, {
-        lang,
-        themes: { l: 'github-light', r: 'github-dark' },
-        defaultColor: false,
-        cssVariablePrefix: '--',
-      }),
-    )
-    if (code.length <= HTML_CACHE_MAX_BYTES) {
-      if (htmlCache.size >= HTML_CACHE_ENTRIES) {
-        const oldest = htmlCache.keys().next()
-        if (!oldest.done) htmlCache.delete(oldest.value)
-      }
-      htmlCache.set(key, html)
-    }
-    return html
-  })().finally(() => {
-    if (htmlFlights.get(key) === flight) htmlFlights.delete(key)
-    live.clear()
-  })
-  htmlFlights.set(key, flight)
-  return flight.promise
+export async function renderFenceOnMainThread(code: string, lang: string, isLive: () => boolean): Promise<string> {
+  const hl = await getHighlighter(lang)
+  if (!isLive()) return ''
+  return measure('core', 'highlight.html.render', () => fenceHtml(hl, code, lang))
 }
-
-/** Tests only: forget what has been highlighted so a spy can count calls from a known state. */
-export const resetHighlightHtmlCache = (): void => htmlCache.clear()
 
 // The vocabulary lives in langs.ts, because the worker needs it too and must not import this
 // module. Re-exported because this is where callers look for it.

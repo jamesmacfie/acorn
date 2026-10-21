@@ -2,6 +2,7 @@ import { createSignal } from 'solid-js'
 import { render } from 'solid-js/web'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { dehydrate, QueryClient, QueryClientProvider } from '@tanstack/solid-query'
+import { tasksKey } from '@acorn/protocol/api.ts'
 import { segmentContentKey, type DiffDocumentFile, type DiffSegmentRequest } from '@acorn/diff-document/document'
 import type { DiffThread } from '../../kit/diff/diffModel'
 import { _resetSurfaceHealth, surfaceHealthSnapshot } from '../../kit/lib/telemetry/surfaceHealth'
@@ -389,7 +390,7 @@ describe('resident segments', () => {
     }))
     const host = mount(largeDiffSource(files))
     await vi.waitFor(() => expect(host.textContent).toContain(CANARY), { timeout: 5_000 })
-    host.client.setQueryData(['tasks'], [{ id: 'kept' }])
+    host.client.setQueryData(tasksKey, [{ id: 'kept' }])
     const snapshot = JSON.stringify(dehydrate(host.client, { shouldDehydrateQuery: shouldPersistQuery }))
     expect(snapshot).toContain('kept')
     expect(snapshot).not.toContain(CANARY)

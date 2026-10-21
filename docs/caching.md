@@ -99,10 +99,10 @@ the terminal client installs a directory of files. Each partition captures its a
 partition. Both hosts take a lease. Concurrent leases share one restore and one subscription, and a
 later remount restores again. Hydration keeps fresher in-memory rows.
 
-- Meaningful query and mutation events mark the partition dirty. One five-second clock coalesces
-  dehydration, serialization, and the write, and observer-only changes schedule nothing. Writes run one
-  at a time, with a follow-up if changes arrive during one. Capture reports `cache.dehydrate` and
-  `cache.dehydrate.count`.
+- A result, a state write, a removal, or a mutation event marks the partition dirty
+  ([what it saves](./caching/persisted-query-cache.md)). One five-second clock coalesces dehydration,
+  serialization, and the write. Writes run one at a time, with a follow-up if changes arrive during
+  one. Capture reports `cache.dehydrate` and `cache.dehydrate.count`.
 - Releasing the last lease stops the subscriptions, and pending durability survives an ordinary switch.
 - Retiring a Node stops every subscriber and queued capture, fences reads, drains started writes, and
   deletes through the captured adapter. A replacement with the same Node ID waits for the deletion.
@@ -126,15 +126,10 @@ A failed read retries once by default (`clientFor` in `packages/client-core/src/
 It doesn't retry a timeout, which already waited out the broker's deadline, a 4xx answer, or a read
 refused because the Node is offline. A query can set its own `retry`.
 
-A query whose options set `meta: { persist: false }` stays in memory only. Provider search answers do,
-so a relaunch never shows an old answer as though it had just arrived. GitHub job logs and dashboard
-panel previews do too, and set a short `gcTime` as well. A job log is a whole CI log with no size cap,
-and a preview gets a new key on every edit, so a day in memory would keep each one long after the
-screen that read it closed.
-
-Two ages bound it (`packages/client-core/src/infra/persistence/queryPersistence.ts`). A snapshot is
-restored if it was written in the last seven days, so the first launch after a weekend draws last-known
-rows. An entry goes into the next snapshot only if it was fetched in the last day, matching `gcTime`.
+The partition saves only what the first frame draws, and keeps the rest in memory: pull requests, files,
+dashboards, and search answers. A snapshot from before that restores minus the entries no longer kept.
+[What the renderer persists](./caching/persisted-query-cache.md) lists the keys, the two ages that bound
+a snapshot, and the queries that opt out with `meta: { persist: false }`.
 
 **Clear cache** on Settings > Machines > Storage and memory empties the cache of the Node the settings
 header names, while it stays connected (`clearNodeCache` in `packages/client-core/src/infra/node/fleet.ts`).
@@ -149,7 +144,7 @@ again, and a reconnect reads the run list and the selected run's steps. Its mode
 active Node's shell, so identical IDs on two Nodes can't cross.
 
 No diff segment, parsed row, token, or whole patch is in the query cache. A pull request's document sits
-under a `files` key that isn't persisted (`['files', owner, repo, number, 'diff']`). Each provider keeps
+under a `files` key (`['files', owner, repo, number, 'diff']`), which isn't persisted. Each provider keeps
 up to 64 MB of parsed patches per plugin process on the Node, by digest. The git plugin's Changes tab also records
 which digest the last document gave each file, and refuses a segment request for any other.
 

@@ -1,4 +1,5 @@
 import { createEffect, createMemo, createSignal, For, Show, type Accessor, type JSX } from 'solid-js'
+import { unwrap } from 'solid-js/store'
 import { Portal } from 'solid-js/web'
 import { useNavigate } from '@solidjs/router'
 import { createQuery, useQueryClient } from '@tanstack/solid-query'
@@ -129,9 +130,9 @@ export default function PublishedDashboardPanel(props: {
     staleTime: 30_000,
     refetchInterval: ((props.plan ?? published.data?.content)?.refresh ?? 0) * 1000 || false,
   }))
-  const fresh = createMemo(() =>
-    loaded.data ? (JSON.parse(JSON.stringify(loaded.data)) as NonNullable<typeof loaded.data>) : undefined,
-  )
+  // The answer as a plain object, replaced by each refetch and never changed after, so `lastAnswered`
+  // below can keep one.
+  const fresh = createMemo(() => (loaded.data ? unwrap(loaded.data) : undefined))
   // A source that can't answer now, such as a derived source whose plugin is off, keeps the last data
   // the panel got on screen, greyed out under the reason and its fix (docs/dashboards.md § Published
   // panels), rather than emptying the panel.

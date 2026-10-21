@@ -523,6 +523,33 @@ describe('a row whose markers are read again', () => {
   })
 })
 
+describe('a rail with many sources', () => {
+  it("reads each source's markers once when a marker changes", () => {
+    const [tick, setTick] = createSignal(0)
+    const reads: string[] = []
+    for (let index = 0; index < 10; index++)
+      registered.push(
+        sourceRegistry.register({ id: `bulk-${index}`, order: 100 + index, glyph: 'box', label: `Bulk ${index}` }),
+      )
+    registered.push(
+      railMarkerRegistry.register({
+        id: 'counting',
+        order: 10,
+        markers: (target) => {
+          tick()
+          if (target.kind === 'source') reads.push(target.id)
+          return []
+        },
+      }),
+    )
+    mount()
+    expect(host.querySelectorAll('.tabrail-source').length).toBeGreaterThanOrEqual(10)
+    reads.length = 0
+    setTick(1)
+    expect(reads.filter((id) => id.startsWith('bulk-'))).toHaveLength(10)
+  })
+})
+
 describe('a source button with live presentation', () => {
   const sourceButton = (id: string) => host.querySelector<HTMLElement>(`.tabrail-source[data-source-id="${id}"]`)
   const presenting = () => {

@@ -28,6 +28,7 @@ import {
   type ProjectsResponse,
   prefsKey,
   prefsRoute,
+  runTargetsKey,
   runTargetsRoute,
   tasksKey,
   tasksRoute,
@@ -42,7 +43,7 @@ import {
   type WorkspaceExternalProjectsResponse,
 } from '@acorn/protocol/api.ts'
 
-export { integrationsKey, prefsKey, projectsKey, tasksKey, workspacesKey } from '@acorn/protocol/api.ts'
+export { integrationsKey, prefsKey, projectsKey, runTargetsKey, tasksKey, workspacesKey } from '@acorn/protocol/api.ts'
 export type {
   ArchivedTask,
   IntegrationMapping,
@@ -65,11 +66,13 @@ export const tasksOptions = (enabled: boolean) => ({
 })
 
 // Archived tasks for the archive page, newest first. Keyed under tasksKey so every invalidation of the
-// active list, including `tasks:changed`, refreshes this one too.
+// active list, including `tasks:changed`, refreshes this one too. Not persisted: it grows without
+// bound and no first frame draws it.
 const archivedTasksKey = [...tasksKey, 'archived'] as const
 export const archivedTasksOptions = (enabled: boolean) => ({
   queryKey: archivedTasksKey,
   enabled,
+  meta: { persist: false },
   queryFn: async ({ signal }: QueryContext): Promise<ArchivedTask[]> =>
     readJson<ArchivedTask[]>(archivedTasksRoute, { signal }),
 })
@@ -90,7 +93,6 @@ export const deletedTasksOptions = (enabled: boolean) => ({
 // entry (node/watchNodeEvents.ts) and `project:changed` every entry (projects/watchProjectChanges.ts).
 // Nothing reports a hand edit to `.acorn/config.toml`, so the stale time and window focus are what
 // pick one up. A configuration the node cannot read answers with no buttons.
-export const runTargetsKey = ['run-targets'] as const
 export const runTargetsOptions = (taskId: string, enabled: boolean) => ({
   queryKey: [...runTargetsKey, taskId] as const,
   enabled,

@@ -1,4 +1,4 @@
-import { createEffect, createMemo, createSignal, For, onCleanup, onMount, Show } from 'solid-js'
+import { createEffect, createMemo, createSignal, For, mapArray, onCleanup, onMount, Show } from 'solid-js'
 import { useLocation, useNavigate, useParams } from '@solidjs/router'
 import { createQuery, useQueryClient } from '@tanstack/solid-query'
 import {
@@ -202,10 +202,10 @@ export default function TabRail() {
   // rest, so a hidden source is still one click away from somewhere.
   const openableSources = () =>
     applySourceOrder(availableSources(integrations.data?.integrations, sourceScope()), railOrder())
-  const sources = () => {
+  const sources = createMemo(() => {
     const visibility = parseRailVisibility(prefs.data?.[PrefKeys.railVisibility])
     return openableSources().filter((source) => shownInRail(source.id, visibility))
-  }
+  })
   // `core:source`, for the icons drawn and the routed project (`requestSourceAnnotations`).
   // Only sources whose owner consented are asked about, and the marks come back through `markersFor`.
   createEffect(() =>
@@ -632,13 +632,21 @@ export default function TabRail() {
   onCleanup(() => coreTaskList.dispose())
 
   const taskListRef = mintSlotRef()
-  const railProps = (): RailProps => ({
-    sources: sources().map((source) => ({
+  // One memo per drawn source, held across a reorder because it follows the id. A marker change then
+  // reads the source it names again, not every source.
+  const sourceMarkers = mapArray(
+    () => sources().map((source) => source.id),
+    (id) => createMemo(() => markersFor({ kind: 'source', id })),
+  )
+  // A memo, so the rail's buttons and a plugin's rail share one build per change. A getter rebuilt
+  // every source each time a button read it.
+  const railProps = createMemo((): RailProps => ({
+    sources: sources().map((source, at) => ({
       id: source.id,
       label: source.label,
       icon: source.glyph,
       selected: selectedSource() === source.id,
-      markers: markersFor({ kind: 'source', id: source.id }),
+      markers: sourceMarkers()[at]!(),
     })),
     workspaces: (workspaces.data ?? [])
       .filter((workspace) => workspace.projects.length)
@@ -676,20 +684,22 @@ export default function TabRail() {
       void saveOrder({ ...railOrder(), sources: merged })
     },
     createTask: openNew,
-  })
+  }))
 
   const CoreRail = (own: { value?: unknown }) => {
     const value = () => own.value as RailProps
+    const sourceIds = createMemo(() => value().sources.map((source) => source.id))
+    const sourceById = createMemo(() => new Map(value().sources.map((source) => [source.id, source])))
     return (
       <nav class="tabrail" data-collapsed={value().collapsed || undefined}>
         <div class="tabrail-zone tabrail-sources">
           {/* Keyed by id rather than by row, so a button and the presentation it reads live as long as
               the source is drawn, not as long as one render of the rail's data. */}
-          <For each={value().sources.map((source) => source.id)}>
+          <For each={sourceIds()}>
             {(id) => {
               const presentation = createSourcePresentation(id)
               return (
-                <Show when={value().sources.find((source) => source.id === id)}>
+                <Show when={sourceById().get(id)}>
                   {(source) => (
                     <RailTab
                       class="tabrail-source"

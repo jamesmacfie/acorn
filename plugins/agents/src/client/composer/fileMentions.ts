@@ -1,6 +1,14 @@
 import type { AgentInputPart } from '../../contract/wire.ts'
 import { fuzzyScore } from '@acorn/plugin-api/client'
 
+// The composer reads mentions on every key, and the worktree list is the same array until it reloads.
+const pathSets = new WeakMap<readonly string[], ReadonlySet<string>>()
+const pathSet = (files: readonly string[]): ReadonlySet<string> => {
+  let set = pathSets.get(files)
+  if (!set) pathSets.set(files, (set = new Set(files)))
+  return set
+}
+
 // Composer file mentions are deliberately conservative: a token must begin with @ at a word
 // boundary, name a file in the worktree list, and may end in :line or :line-line. Unmatched text,
 // email addresses, absolute paths and parent traversal remain ordinary text.
@@ -12,7 +20,7 @@ export function* fileMentionMatches(
   text: string,
   files: readonly string[],
 ): Generator<Extract<AgentInputPart, { type: 'file' }> & { start: number; end: number }> {
-  const available = new Set(files)
+  const available = pathSet(files)
   const expression = /(?:^|\s)@(?:"((?:[^"\\]|\\.)+)"((?::\d+(?:-\d+)?)?)|([^\s]+))/g
   for (const match of text.matchAll(expression)) {
     const quotedPath = match[1]?.replace(/\\(["\\])/g, '$1')

@@ -2,7 +2,7 @@ import { afterEach, expect, it, vi } from 'vitest'
 const fixture = vi.hoisted(() => ({ grammar: Promise.resolve(), html: vi.fn((code: string) => `<pre>${code}</pre>`) }))
 vi.mock('shiki/core', () => ({ createHighlighterCore: async () => ({ codeToHtml: fixture.html }) }))
 vi.mock('./langs', () => ({ loadGrammar: async () => fixture.grammar, LANGS: {}, langFor: () => 'text' }))
-import { highlightToHtml, resetHighlightHtmlCache } from './shiki'
+import { highlightToHtml, resetHighlightHtmlCache, resetHighlightWorker } from './worker'
 const deferred = () => {
   let resolve!: () => void
   let reject!: (error: Error) => void
@@ -12,7 +12,10 @@ const deferred = () => {
   })
   return { promise, resolve, reject }
 }
+// Node has no Worker, so these fences fall back to the main-thread highlighter the mocks above stand in for.
 afterEach(() => {
+  resetHighlightWorker()
+  vi.unstubAllGlobals()
   resetHighlightHtmlCache()
   fixture.html.mockClear()
   fixture.grammar = Promise.resolve()
@@ -65,4 +68,20 @@ it('does not retain oversized completed fences, while joining their live highlig
   await Promise.all([first, second])
   await highlightToHtml(code, 'text')
   expect(fixture.html).toHaveBeenCalledTimes(2)
+})
+it('highlights every fence in the worker and runs no Shiki call on the page', async () => {
+  class AnsweringWorker {
+    onmessage: ((event: MessageEvent) => void) | null = null
+    postMessage(request: { id: number; code: string; output: string }) {
+      expect(request.output).toBe('html')
+      queueMicrotask(() =>
+        this.onmessage?.({ data: { id: request.id, ok: true, html: `<pre>${request.code}</pre>` } } as MessageEvent),
+      )
+    }
+    terminate() {}
+  }
+  vi.stubGlobal('Worker', AnsweringWorker)
+  const html = await Promise.all(['one', 'two', 'three'].map((code) => highlightToHtml(code, 'typescript')))
+  expect(html).toEqual(['<pre>one</pre>', '<pre>two</pre>', '<pre>three</pre>'])
+  expect(fixture.html).not.toHaveBeenCalled()
 })

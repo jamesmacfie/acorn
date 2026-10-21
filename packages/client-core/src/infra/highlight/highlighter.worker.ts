@@ -7,6 +7,7 @@
 // .wasm at runtime and would need a network permission this worker is better off without.
 import { createHighlighterCore, type HighlighterCore } from 'shiki/core'
 import { createOnigurumaEngine } from 'shiki/engine/oniguruma'
+import { fenceHtml } from './fenceHtml'
 import { loadGrammar } from './langs'
 import type { HighlightLines, HighlightRequest, HighlightResponse } from './messages'
 
@@ -37,15 +38,25 @@ async function tokenize(lang: string, code: string): Promise<HighlightLines> {
   )
 }
 
+async function renderFence(lang: string, code: string): Promise<string> {
+  const hl = await highlighter()
+  if (!(await loadGrammar(hl, loaded, lang))) throw new Error(`no grammar for ${lang}`)
+  return fenceHtml(hl, code, lang)
+}
+
 const post = (message: HighlightResponse) => (self as unknown as Worker).postMessage(message)
 
 self.onmessage = (event: MessageEvent<HighlightRequest>) => {
-  const { id, lang, code, sentAt } = event.data
+  const { id, lang, code, sentAt, output } = event.data
   const started = sentAt === undefined ? 0 : performance.now()
   const queueMs = sentAt === undefined ? undefined : Math.max(0, performance.timeOrigin + started - sentAt)
   const timing = () => (sentAt === undefined ? {} : { queueMs, executionMs: performance.now() - started })
-  void tokenize(lang, code).then(
-    (lines) => post({ id, ok: true, lines, ...timing() }),
+  const result =
+    output === 'html'
+      ? renderFence(lang, code).then((html) => ({ html }))
+      : tokenize(lang, code).then((lines) => ({ lines }))
+  void result.then(
+    (answer) => post({ id, ok: true, ...answer, ...timing() }),
     // A grammar that fails to load or a pattern the engine rejects takes out one request, not the
     // worker: the client falls back to plain text for that document and the next one still tries.
     (error: unknown) => post({ id, ok: false, error: String((error as Error)?.message ?? error), ...timing() }),

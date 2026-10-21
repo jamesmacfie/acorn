@@ -67,3 +67,26 @@ it('keeps legacy source through a partial field write and restores scoped edits 
   clearComposerDrafts()
   expect(composerDraftState('partial-fields', 'partial-A').text()).toBe('saved text')
 })
+
+it('writes typed text once typing pauses, and at once on flush or a programmatic set', () => {
+  vi.useFakeTimers()
+  try {
+    const draft = composerDraftState('typing', 'A')
+    const stored = () => readComposerPayload('A', 'typing').text
+    draft.typeText('h')
+    draft.typeText('he')
+    expect(draft.text()).toBe('he')
+    expect(stored()).toBe('')
+    vi.advanceTimersByTime(300)
+    expect(stored()).toBe('he')
+    draft.typeText('hel')
+    draft.flushText()
+    expect(stored()).toBe('hel')
+    draft.typeText('help')
+    draft.setText('')
+    vi.advanceTimersByTime(300)
+    expect(stored()).toBe('')
+  } finally {
+    vi.useRealTimers()
+  }
+})

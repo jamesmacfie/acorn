@@ -1,6 +1,7 @@
 import { dehydrate, QueryClient, QueryObserver } from '@tanstack/solid-query'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { queryCacheLifecycle, type CacheStorage, type QueryCacheLifecycle } from './queryCacheLifecycle'
+import { tasksKey } from '@acorn/protocol/api.ts'
 import { PERSISTED_QUERY_MAX_AGE_MS, shouldPersistQuery } from './queryPersistence'
 
 const deferred = <T>() => {
@@ -73,10 +74,10 @@ describe('query cache capture lifecycle', () => {
       removeItem,
     })
     await persistence.acquire().restored
-    client.setQueryData(['inactive'], 'discard')
-    client.setQueryData(['active'], 'keep')
+    client.setQueryData([...tasksKey, 'inactive'], 'discard')
+    client.setQueryData([...tasksKey, 'active'], 'keep')
     const observer = new QueryObserver(client, {
-      queryKey: ['active'],
+      queryKey: [...tasksKey, 'active'],
       staleTime: Infinity,
       queryFn: async () => 'keep',
     })
@@ -90,19 +91,19 @@ describe('query cache capture lifecycle', () => {
     await capture
     await clearing
     expect(records.size).toBe(0)
-    expect(client.getQueryData(['inactive'])).toBeUndefined()
-    expect(client.getQueryData(['active'])).toBe('keep')
+    expect(client.getQueryData([...tasksKey, 'inactive'])).toBeUndefined()
+    expect(client.getQueryData([...tasksKey, 'active'])).toBe('keep')
     await vi.advanceTimersByTimeAsync(5_000)
     expect(
       JSON.parse(records.get('partition')!).clientState.queries.map((row: { queryKey: unknown[] }) => row.queryKey),
-    ).toEqual([['active']])
+    ).toEqual([[...tasksKey, 'active']])
     off()
   })
 
   it('finishes hydration before clearing restored inactive data', async () => {
     const read = deferred<string>()
     const seed = new QueryClient()
-    seed.setQueryData(['restored'], 'discard')
+    seed.setQueryData([...tasksKey, 'restored'], 'discard')
     const removeItem = vi.fn(async () => {})
     const { client, persistence } = setup({ getItem: () => read.promise, setItem: async () => {}, removeItem })
     const lease = persistence.acquire()
@@ -110,7 +111,7 @@ describe('query cache capture lifecycle', () => {
     read.resolve(snapshot(seed))
     await lease.restored
     await clearing
-    expect(client.getQueryData(['restored'])).toBeUndefined()
+    expect(client.getQueryData([...tasksKey, 'restored'])).toBeUndefined()
     expect(removeItem).toHaveBeenCalledOnce()
   })
 
@@ -118,7 +119,7 @@ describe('query cache capture lifecycle', () => {
     const { client, persistence, records, visits } = setup()
     const lease = persistence.acquire()
     await lease.restored
-    for (let i = 0; i < 3_000; i++) client.setQueryData(['row', i], { i })
+    for (let i = 0; i < 3_000; i++) client.setQueryData([...tasksKey, 'row', i], { i })
     await client.invalidateQueries({ refetchType: 'none' })
     expect(visits()).toBe(0)
     await vi.advanceTimersByTimeAsync(4_999)
@@ -138,27 +139,46 @@ describe('query cache capture lifecycle', () => {
     const { client, persistence, records } = setup()
     await persistence.acquire().restored
     const value = { stable: true }
-    client.setQueryData(['same'], value, { updatedAt: Date.now() - PERSISTED_QUERY_MAX_AGE_MS - 1 })
-    client.setQueryData(['same'], { stable: true })
-    expect(client.getQueryData(['same'])).toBe(value)
-    client.setQueryData(['removed'], 'gone')
-    client.removeQueries({ queryKey: ['removed'] })
-    client.setQueryData(['blob', 'sha'], 'excluded')
-    client.setQueryData(['files', 1, 2, 3, 'patch'], 'excluded')
-    client.setQueryData(['files', 1, 2, 3, 'summary'], 'included')
-    client.setQueryData(['failed'], 'previous')
+    client.setQueryData([...tasksKey, 'same'], value, { updatedAt: Date.now() - PERSISTED_QUERY_MAX_AGE_MS - 1 })
+    client.setQueryData([...tasksKey, 'same'], { stable: true })
+    expect(client.getQueryData([...tasksKey, 'same'])).toBe(value)
+    client.setQueryData([...tasksKey, 'removed'], 'gone')
+    client.removeQueries({ queryKey: [...tasksKey, 'removed'] })
+    client.setQueryData(['pull', 'acorn', 'desktop', '1'], 'not on the allowlist')
+    client.setQueryData([...tasksKey, 'failed'], 'previous')
     await client
-      .fetchQuery({ queryKey: ['failed'], queryFn: () => Promise.reject(new Error('offline')) })
+      .fetchQuery({ queryKey: [...tasksKey, 'failed'], queryFn: () => Promise.reject(new Error('offline')) })
       .catch(() => {})
-    client.getQueryCache().build(client, { queryKey: ['pending'] })
+    client.getQueryCache().build(client, { queryKey: [...tasksKey, 'pending'] })
     await persistence.flush()
     const rows = JSON.parse(records.get('partition')!).clientState.queries
-    expect(rows.map((row: { queryKey: unknown[] }) => row.queryKey)).toEqual([['same'], ['files', 1, 2, 3, 'summary']])
+    expect(rows.map((row: { queryKey: unknown[] }) => row.queryKey)).toEqual([[...tasksKey, 'same']])
     expect(rows[0].state.dataUpdatedAt).toBe(Date.now())
     const restored = setup()
     restored.records.set('partition', records.get('partition')!)
     await restored.persistence.acquire().restored
-    expect(restored.client.getQueryData(['same'])).toEqual(value)
+    expect(restored.client.getQueryData([...tasksKey, 'same'])).toEqual(value)
+  })
+
+  it('does not schedule a save for a fetch that starts and fails, or for a key it does not keep', async () => {
+    const { client, persistence, records } = setup()
+    await persistence.acquire().restored
+    client.setQueryData([...tasksKey, 'held'], 'before')
+    await persistence.flush()
+    records.clear()
+    await client
+      .fetchQuery({
+        queryKey: [...tasksKey, 'held'],
+        queryFn: () => Promise.reject(new Error('offline')),
+        staleTime: 0,
+      })
+      .catch(() => {})
+    client.setQueryData(['pull', 'acorn', 'desktop', '1'], 'not kept')
+    await vi.advanceTimersByTimeAsync(5_000)
+    expect(records.size).toBe(0)
+    client.setQueryData([...tasksKey, 'held'], 'after')
+    await vi.advanceTimersByTimeAsync(5_000)
+    expect(records.size).toBe(1)
   })
 
   it('includes paused mutations, records their updates, and persists removal', async () => {
@@ -189,11 +209,11 @@ describe('query cache capture lifecycle', () => {
 
   it('ignores observer-only changes', async () => {
     const { client, persistence, visits } = setup()
-    client.setQueryData(['row'], 'value')
+    client.setQueryData([...tasksKey, 'row'], 'value')
     await persistence.acquire().restored
-    const observer = new QueryObserver(client, { queryKey: ['row'], enabled: false })
+    const observer = new QueryObserver(client, { queryKey: [...tasksKey, 'row'], enabled: false })
     const off = observer.subscribe(() => {})
-    observer.setOptions({ queryKey: ['row'], enabled: false, staleTime: 100 })
+    observer.setOptions({ queryKey: [...tasksKey, 'row'], enabled: false, staleTime: 100 })
     off()
     await vi.advanceTimersByTimeAsync(5_000)
     expect(visits()).toBe(0)
@@ -205,28 +225,28 @@ describe('query cache capture lifecycle', () => {
       b = persistence.acquire()
     expect(a.restored).toBe(b.restored)
     await a.restored
-    client.setQueryData(['row'], 'outgoing')
+    client.setQueryData([...tasksKey, 'row'], 'outgoing')
     a.release()
     b.release()
-    client.setQueryData(['row'], 'cleanup')
+    client.setQueryData([...tasksKey, 'row'], 'cleanup')
     await vi.advanceTimersByTimeAsync(5_000)
     expect(JSON.parse(records.get('partition')!).clientState.queries[0].state.data).toBe('cleanup')
     const writes = vi.mocked(adapter.setItem).mock.calls.length
-    client.setQueryData(['row'], 'inactive fleet update')
+    client.setQueryData([...tasksKey, 'row'], 'inactive fleet update')
     await vi.advanceTimersByTimeAsync(5_000)
     expect(adapter.setItem).toHaveBeenCalledTimes(writes)
     // Simulate the inactive GC interval: the disk snapshot still supplies offline return rows.
     client.clear()
     const remount = persistence.acquire()
     await remount.restored
-    expect(client.getQueryData(['row'])).toBe('cleanup')
+    expect(client.getQueryData([...tasksKey, 'row'])).toBe('cleanup')
     expect(adapter.getItem).toHaveBeenCalledTimes(2)
     remount.release()
   })
 
   it('does not capture a clean acquire/release or rewrite an unchanged week-old restore', async () => {
     const seed = new QueryClient()
-    seed.setQueryData(['row'], 'weekend')
+    seed.setQueryData([...tasksKey, 'row'], 'weekend')
     const { persistence, records, visits, adapter } = setup()
     records.set('partition', snapshot(seed, Date.now() - 3 * 86_400_000))
     const previous = records.get('partition')
@@ -241,7 +261,7 @@ describe('query cache capture lifecycle', () => {
 
   it('shares a pending restore across release/remount without leaving duplicate subscriptions', async () => {
     const seed = new QueryClient()
-    seed.setQueryData(['row'], 'restored')
+    seed.setQueryData([...tasksKey, 'row'], 'restored')
     const gate = deferred<string>(),
       entered = deferred<void>()
     const write = vi.fn(async () => {})
@@ -262,7 +282,7 @@ describe('query cache capture lifecycle', () => {
     gate.resolve(snapshot(seed))
     await remount.restored
     expect(visits()).toBe(0)
-    client.setQueryData(['row'], 'fresh')
+    client.setQueryData([...tasksKey, 'row'], 'fresh')
     await vi.advanceTimersByTimeAsync(5_000)
     expect(visits()).toBe(1)
     expect(write).toHaveBeenCalledTimes(1)
@@ -289,11 +309,11 @@ describe('query cache capture lifecycle', () => {
       },
     })
     await persistence.acquire().restored
-    client.setQueryData(['row'], 1)
+    client.setQueryData([...tasksKey, 'row'], 1)
     const first = persistence.flush()
     await entered.promise
-    client.setQueryData(['row'], 2)
-    client.setQueryData(['row'], 3)
+    client.setQueryData([...tasksKey, 'row'], 2)
+    client.setQueryData([...tasksKey, 'row'], 3)
     const final = persistence.flush()
     gate.resolve()
     await Promise.all([first, final])
@@ -310,7 +330,7 @@ describe('query cache capture lifecycle', () => {
     })
     const lease = persistence.acquire()
     await lease.restored
-    client.setQueryData(['row'], 'durable after retry')
+    client.setQueryData([...tasksKey, 'row'], 'durable after retry')
     await expect(persistence.flush()).rejects.toThrow('disk full')
     await persistence.flush()
     expect(write).toHaveBeenCalledTimes(2)
@@ -319,7 +339,7 @@ describe('query cache capture lifecycle', () => {
     write.mockRejectedValueOnce(new Error('again'))
     const remount = persistence.acquire()
     await remount.restored
-    client.setQueryData(['row'], 'reacquire retry')
+    client.setQueryData([...tasksKey, 'row'], 'reacquire retry')
     await expect(persistence.flush()).rejects.toThrow('again')
     remount.release()
     await Promise.resolve()
@@ -345,7 +365,7 @@ describe('query cache capture lifecycle', () => {
     })
     owners.push(owner)
     await owner.acquire().restored
-    broken.setQueryData(['row'], 'retry codec')
+    broken.setQueryData([...tasksKey, 'row'], 'retry codec')
     await expect(owner.flush()).rejects.toThrow('codec')
     failing = false
     await owner.flush()
@@ -370,10 +390,10 @@ describe('query cache capture lifecycle', () => {
     const { client, persistence } = setup(storage)
     const lease = persistence.acquire()
     await lease.restored
-    client.setQueryData(['row'], 'started')
+    client.setQueryData([...tasksKey, 'row'], 'started')
     const saving = persistence.flush()
     await entered.promise
-    client.setQueryData(['row'], 'queued')
+    client.setQueryData([...tasksKey, 'row'], 'queued')
     lease.release()
     const retiring = persistence.retire()
     expect(storage.removeItem).not.toHaveBeenCalled()
@@ -388,7 +408,7 @@ describe('query cache capture lifecycle', () => {
     const gate = deferred<string>(),
       entered = deferred<void>()
     const seed = new QueryClient()
-    seed.setQueryData(['row'], 'retired read')
+    seed.setQueryData([...tasksKey, 'row'], 'retired read')
     const remove = vi.fn().mockRejectedValueOnce(new Error('blocked')).mockResolvedValue(undefined)
     const { client, persistence } = setup({
       getItem: () => {
@@ -403,15 +423,26 @@ describe('query cache capture lifecycle', () => {
     await expect(persistence.retire()).rejects.toThrow('blocked')
     gate.resolve(snapshot(seed))
     await lease.restored
-    expect(client.getQueryData(['row'])).toBeUndefined()
+    expect(client.getQueryData([...tasksKey, 'row'])).toBeUndefined()
     await persistence.retire()
     expect(remove).toHaveBeenCalledTimes(2)
     lease.release()
   })
 
+  it('restores an older snapshot without the entries the allowlist no longer keeps', async () => {
+    const seed = new QueryClient()
+    seed.setQueryData([...tasksKey, 'kept'], 'row')
+    seed.setQueryData(['pull', 'acorn', 'desktop', '1'], 'dropped')
+    const { client, persistence, records } = setup()
+    records.set('partition', snapshot(seed))
+    await persistence.acquire().restored
+    expect(client.getQueryData([...tasksKey, 'kept'])).toBe('row')
+    expect(client.getQueryData(['pull', 'acorn', 'desktop', '1'])).toBeUndefined()
+  })
+
   it('restores seven-day snapshots, discards expired and malformed snapshots with public restore', async () => {
     const seed = new QueryClient()
-    seed.setQueryData(['row'], 'weekend')
+    seed.setQueryData([...tasksKey, 'row'], 'weekend')
     for (const [text, expected] of [
       [snapshot(seed, Date.now() - 3 * 86_400_000), 'weekend'],
       [snapshot(seed, Date.now() - 8 * 86_400_000), undefined],
@@ -420,7 +451,7 @@ describe('query cache capture lifecycle', () => {
       const { client, persistence, records } = setup()
       records.set('partition', text)
       await persistence.acquire().restored.catch(() => {})
-      expect(client.getQueryData(['row'])).toBe(expected)
+      expect(client.getQueryData([...tasksKey, 'row'])).toBe(expected)
       if (expected === undefined) expect(records.size).toBe(0)
     }
   })

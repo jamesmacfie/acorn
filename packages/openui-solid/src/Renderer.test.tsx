@@ -1,12 +1,16 @@
 import { createLibrary, defineComponent } from '@openuidev/lang-core'
-import { createSignal } from 'solid-js'
+import { createEffect, createSignal } from 'solid-js'
 import { render } from 'solid-js/web'
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 import { z } from 'zod'
 import { Renderer, createOpenUIRuntime, createStateField, reactive, type ComponentRenderer } from './index.ts'
 
 const Stack: ComponentRenderer<{ children: unknown[] }> = (props) => <div>{props.renderNode(props.props.children)}</div>
-const Text: ComponentRenderer<{ text: string }> = (props) => <p>{props.props.text}</p>
+let onText: ((text: string) => void) | undefined
+const Text: ComponentRenderer<{ text: string }> = (props) => {
+  createEffect(() => onText?.(props.props.text))
+  return <p>{props.props.text}</p>
+}
 const Input: ComponentRenderer<{ name: string; value: unknown }> = (props) => {
   const field = createStateField(
     () => props.props.name,
@@ -56,13 +60,13 @@ function mount(initialState?: Record<string, unknown>, text = () => program) {
 }
 
 describe('Renderer', () => {
-  it('keeps a bound input mounted while the state it writes changes the tree', () => {
+  it('keeps a bound input mounted while the state it writes changes the tree', async () => {
     const { host, dispose } = mount()
     const input = host.querySelector('input')!
     input.value = 'late'
     input.dispatchEvent(new Event('input', { bubbles: true }))
+    await vi.waitFor(() => expect(host.querySelector('p')!.textContent).toBe('You typed: late'))
     expect(host.querySelector('input')).toBe(input)
-    expect(host.querySelector('p')!.textContent).toBe('You typed: late')
     dispose()
   })
 
@@ -119,5 +123,47 @@ root = Stack([Text(a.text), Text(b.text)])`,
     expect(calls.sort()).toEqual(['a', 'a', 'b', 'b', 'b'])
     dispose()
     host.remove()
+  })
+
+  it('evaluates the program once for the writes of a frame', async () => {
+    const seen: string[] = []
+    onText = (text) => seen.push(text)
+    const { host, runtime, dispose } = mount()
+    for (const text of ['a', 'ab', 'abc']) runtime.setState('$q', text)
+    await vi.waitFor(() => expect(host.querySelector('p')!.textContent).toBe('You typed: abc'))
+    expect(seen).toEqual(['You typed: ', 'You typed: abc'])
+    onText = undefined
+    dispose()
+  })
+
+  it('runs a query again once typing has paused, and at once for an action that sets its argument', async () => {
+    vi.useFakeTimers()
+    try {
+      const calls: unknown[] = []
+      const tools = { find: async (args: Record<string, unknown>) => (calls.push(args.q), { text: String(args.q) }) }
+      const host = document.body.appendChild(document.createElement('div'))
+      let runtime!: ReturnType<typeof createOpenUIRuntime>
+      const dispose = render(() => {
+        runtime = createOpenUIRuntime({
+          program: () => `$q = ""
+hits = Query("find", {q: $q}, {text: ""})
+root = Stack([Text(hits.text)])`,
+          library,
+          tools,
+        })
+        return <Renderer runtime={runtime} />
+      }, host)
+      await vi.advanceTimersByTimeAsync(0)
+      expect(calls).toEqual([''])
+      for (const text of ['a', 'ab', 'abc']) runtime.setState('$q', text)
+      await vi.advanceTimersByTimeAsync(249)
+      expect(calls).toEqual([''])
+      await vi.advanceTimersByTimeAsync(1)
+      expect(calls).toEqual(['', 'abc'])
+      dispose()
+      host.remove()
+    } finally {
+      vi.useRealTimers()
+    }
   })
 })

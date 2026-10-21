@@ -11,6 +11,10 @@ default after plugin registration, falling back to rail order. The shell uses it
 selection, persistence, workspace restore, and task fallbacks. Provider navigation commands belong to
 the owning plugin.
 
+The rail's props are built once per change, in `TabRail.tsx`. Each source's markers have their own memo, so a
+marker change reads the source it names again and not all of them, and the core rail finds each button's
+source by id.
+
 A rail source can gate itself with `when`. Core's Fleet home uses it: it shows only once more than one
 Node is registered. Trellis's **Apps** source shows only while the open workspace has a project app
 ([project apps](../agent-built-apps/project-apps.md#the-apps-source)). A gate has no route to read, so

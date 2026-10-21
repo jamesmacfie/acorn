@@ -1,7 +1,7 @@
 import { dehydrate, type DehydrateOptions, type QueryClient } from '@tanstack/solid-query'
 import { persistQueryClientRestore, type PersistedClient, type Persister } from '@tanstack/query-persist-client-core'
 import { measure, recordSample } from '../telemetry/emitter'
-import { PERSISTED_SNAPSHOT_MAX_AGE_MS, shouldPersistQuery } from './queryPersistence'
+import { PERSISTED_SNAPSHOT_MAX_AGE_MS, shouldPersistQuery, shouldPersistQueryKey } from './queryPersistence'
 
 export type CacheStorage = {
   getItem(key: string): Promise<string | undefined | null>
@@ -80,7 +80,15 @@ export function queryCacheLifecycle(options: {
       await writes.catch(() => {})
       const text = await measure('core', 'cache.read', () => storage.getItem(key))
       if (retired || !text) return undefined
-      return measure('core', 'cache.deserialize', () => JSON.parse(text) as PersistedClient)
+      return measure('core', 'cache.deserialize', () => {
+        const saved = JSON.parse(text) as PersistedClient
+        // An older snapshot holds what the allowlist no longer keeps. Leave it out, so it neither
+        // draws stale rows nor sits in memory until the next write drops it.
+        saved.clientState.queries = saved.clientState.queries.filter((query) =>
+          shouldPersistQueryKey(query.queryKey, query.meta),
+        )
+        return saved
+      })
     },
     removeClient: () => (retired ? Promise.resolve() : remove()),
   }
@@ -123,11 +131,18 @@ export function queryCacheLifecycle(options: {
   }
   const subscribe = () => {
     if (retired || !leases || unsubscribe) return
-    const onEvent = (event: { type: string }) => {
+    const onMutationEvent = (event: { type: string }) => {
       if (event.type === 'added' || event.type === 'removed' || event.type === 'updated') markDirty()
     }
-    const queryOff = client.getQueryCache().subscribe(onEvent)
-    const mutationOff = client.getMutationCache().subscribe(onEvent)
+    // A fetch starting, failing, or retrying changes nothing the snapshot holds, so only a result, a
+    // direct state write, or a removal counts, and only for a key the snapshot keeps.
+    const queryOff = client.getQueryCache().subscribe((event) => {
+      const changed =
+        event.type === 'removed' ||
+        (event.type === 'updated' && (event.action.type === 'success' || event.action.type === 'setState'))
+      if (changed && shouldPersistQueryKey(event.query.queryKey, event.query.meta)) markDirty()
+    })
+    const mutationOff = client.getMutationCache().subscribe(onMutationEvent)
     unsubscribe = () => {
       queryOff()
       mutationOff()

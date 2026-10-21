@@ -112,7 +112,7 @@ export default function Markdown(props: {
     // highlighter can route to it. The import is dynamic so a plugin frame that renders a ticket
     // description does not carry the engine for one it never shows.
     void (async () => {
-      const { highlightToHtml } = await import('../../../infra/highlight/shiki')
+      const { highlightToHtml } = await import('../../../infra/highlight/worker')
       // Started together, applied in order: three fences in three languages are three grammar loads,
       // and awaiting them one at a time would make the last one wait for the first two.
       // Caught per fence: a grammar that fails to load leaves that block plain rather than taking the

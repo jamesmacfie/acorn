@@ -116,6 +116,28 @@ it.each<PanelPlan['view']>([{ kind: 'list' }, { kind: 'table' }])('draws a later
   expect(host.textContent).toContain('Fix the login again')
 })
 
+it.each<PanelPlan['view']>([{ kind: 'list' }, { kind: 'table' }])(
+  'keeps a row’s element across a refetch that returns the same rows in a %o',
+  (view) => {
+    const plan = planFor(view)
+    const [run, setRun] = createSignal(runOf(plan))
+    const host = draw(() => <RunPanel plan={plan} run={run()} />)
+    // The row's own element: the table row, or the list row that holds the title.
+    const rowFor = (title: string) =>
+      [...host.querySelectorAll('*')]
+        .find((element) => element.children.length === 0 && element.textContent === title)
+        ?.closest('tr, .ui-row')
+    const before = rowFor('Write the docs')
+    expect(before).toBeDefined()
+    // A refetch is a new object for every row, as the query gives them back.
+    setRun(structuredClone(run()))
+    expect(rowFor('Write the docs')).toBe(before)
+    setRun({ ...run(), rows: run().rows.map((row) => ({ ...row, values: { ...row.values, points: 9 } })) })
+    expect(rowFor('Write the docs')).toBe(before)
+    expect(rowFor('Write the docs')?.textContent).toContain('9')
+  },
+)
+
 it('says where supplied rows came from before the run arrives, and what an unread plan shows after', () => {
   const plan = planFor({ kind: 'table' })
   const host = draw(() => <RunPanel plan={plan} run={undefined} describe />)

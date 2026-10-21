@@ -381,14 +381,18 @@ export default function AgentComposer(props: {
   // source's items when someone asks for them, and the draft's map says which item each completed
   // token means.
   const catalog = createContextCatalog(() => ({ taskId: props.session.taskId, sessionId: props.session.id }))
-  const composerContexts = createMemo<ComposerContexts>(() => {
+  // A token typed by hand resolves against its source's list, so a draft holding one reads it. Apart
+  // from the memo below, so a key that adds no list leaves `composerContexts` as it was.
+  createEffect(() => {
     const text = draft()
-    // A token typed by hand resolves against its source's list, so a draft holding one reads it.
     for (const contribution of catalog.contributions())
       if (!contribution.itemless && !contribution.search && text.includes(`#${contribution.keyword}:`))
         catalog.listing(contribution)
-    return { categories: catalog.categories(), map: shared().references() }
   })
+  const composerContexts = createMemo<ComposerContexts>(() => ({
+    categories: catalog.categories(),
+    map: shared().references(),
+  }))
   const contextReferences = createMemo(() =>
     resolveContextReferences(draft(), composerContexts().categories, composerContexts().map),
   )
@@ -651,11 +655,12 @@ export default function AgentComposer(props: {
         rows={expanded() ? 18 : 3}
         sources={sources()}
         segments={segments}
-        onInput={setDraft}
+        onInput={(text) => shared().typeText(text)}
         onFocus={() => {
           files.want()
           catalog.refresh()
         }}
+        onBlur={() => shared().flushText()}
         onFiles={addFiles}
         onSubmit={() => void send()}
         onCancel={canStopAgent(props.session) ? () => void stop() : undefined}

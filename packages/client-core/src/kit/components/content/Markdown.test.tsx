@@ -3,7 +3,7 @@ import { render } from 'solid-js/web'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import Markdown from './Markdown'
 import type { MarkdownFence, MarkdownFenceAdapter } from '../../lib/rendering/markdown'
-import * as shiki from '../../../infra/highlight/shiki'
+import * as shiki from '../../../infra/highlight/worker'
 
 // What a streaming message costs to redraw.
 //

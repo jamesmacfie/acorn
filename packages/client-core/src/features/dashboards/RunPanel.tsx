@@ -1,4 +1,6 @@
 import { createMemo, Show, splitProps, type JSX } from 'solid-js'
+import { createStore, reconcile } from 'solid-js/store'
+import type { DashboardDisplayRow } from '@acorn/dashboards-core/render'
 import { displayPlanGroups, displayPlanRun, type DashboardRun } from '@acorn/dashboards-core/plan.ts'
 import type { PanelPlan } from '@acorn/protocol/dashboards.ts'
 import { Alert, Button, EmptyState } from '../../kit/components/primitives'
@@ -53,7 +55,17 @@ export default function RunPanel(
     const reference = props.plan?.sources[0]?.reference
     return reference?.kind === 'supplied' ? reference : undefined
   }
-  const display = createMemo(() => props.run && displayPlanRun(props.run.plan, props.run.rows))
+  // A refetch hands back new row objects. Reconciled by id into one store array, a row that came
+  // back keeps its object, so its cells update where they are and the view doesn't mount it again. The
+  // rows go to the views as the store itself, because a view reads `props.rows` where it picks table or
+  // sections, and a new object there redraws the lot.
+  const [rows, setRows] = createStore<DashboardDisplayRow[]>([])
+  const display = createMemo(() => {
+    if (!props.run) return undefined
+    const shown = displayPlanRun(props.run.plan, props.run.rows)
+    setRows(reconcile(shown.rows, { key: 'id' }))
+    return { schema: shown.schema, fields: shown.fields }
+  })
 
   return (
     <>
@@ -131,9 +143,9 @@ export default function RunPanel(
                   view={plan().view}
                   schema={value().schema}
                   fields={value().fields}
-                  rows={value().rows}
-                  groups={displayPlanGroups(props.run!.groups, value().rows)}
-                  {...(plan().group?.[0] ? { groupBy: plan().group![0]!.column } : {})}
+                  rows={rows}
+                  groups={displayPlanGroups(props.run!.groups, rows)}
+                  groupBy={plan().group?.[0]?.column}
                   provenance={plan().sources.length > 1}
                   pressConfigured={!!plan().actions?.press}
                   buttons={plan().actions?.buttons ?? []}

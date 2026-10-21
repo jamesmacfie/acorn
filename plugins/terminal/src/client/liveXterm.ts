@@ -52,6 +52,10 @@ export type LiveXterm = HeldTerminal & {
 // back. Four covers flipping between a couple of tasks with a couple of tabs each.
 export const WEBGL_TERMINALS = 4
 
+// How long a terminal nobody is drawing stays attached. Past this it lets go, so the node stops
+// sending its output and the page stops parsing it; the node sends the screen again when it is shown.
+export const HIDDEN_DETACH_MS = 10_000
+
 type Renderer = { terminal: Terminal; addon: WebglAddon | null; shown: boolean }
 // Most recently shown last.
 const gpu: Renderer[] = []
@@ -163,38 +167,49 @@ function buildXterm(nodeId: string, sessionId: string, firstHost: HTMLElement, i
   // the size field ignores it and reports the old size in `ready`, so a mismatch there still posts the
   // resize. A reconnect re-attaches and lands here again.
   //
-  // The attachment lasts as long as the xterm, drawn or not, so output keeps being parsed into it
-  // while the reader is on another task. What that costs is the parse and nothing else: xterm's render
-  // service pauses while its element is out of view.
-  const detach = api.attach(
-    sessionId,
-    (m) => {
-      if (disposed) return
-      if (m.type === 'ready') {
-        if (m.session.cols !== term.cols || m.session.rows !== term.rows)
-          void api.resize(sessionId, term.cols, term.rows)
-      } else if (m.type === 'output') {
-        const size = m.data.length
-        pendingOutput += size
-        telemetry.observe('terminal.output.size', size)
-        telemetry.observe('terminal.pending.size', pendingOutput)
-        void telemetry.measure(
-          'terminal.write',
-          () =>
-            new Promise<void>((resolve) => {
-              term.write(m.data, () => {
-                pendingOutput -= size
-                resolve()
-              })
-            }),
-        )
-      } else if (m.type === 'exit') {
-        term.write(`\r\n\x1b[90m[process exited${m.exitCode != null ? ` (${m.exitCode})` : ''}]\x1b[0m\r\n`)
-        onExit?.(m.exitCode)
-      }
-    },
-    { cols: term.cols, rows: term.rows },
-  )
+  // The attachment lasts while the xterm is drawn, and for `HIDDEN_DETACH_MS` after, so flipping between
+  // tabs and tasks keeps parsing output into it. What that costs is the parse and nothing else: xterm's
+  // render service pauses while its element is out of view. Attaching again makes the node send the
+  // screen after a reset, so what was missed while detached draws over a cleared terminal.
+  const attach = () =>
+    api.attach(
+      sessionId,
+      (m) => {
+        if (disposed) return
+        if (m.type === 'ready') {
+          if (m.session.cols !== term.cols || m.session.rows !== term.rows)
+            void api.resize(sessionId, term.cols, term.rows)
+        } else if (m.type === 'output') {
+          const size = m.data.length
+          pendingOutput += size
+          telemetry.observe('terminal.output.size', size)
+          telemetry.observe('terminal.pending.size', pendingOutput)
+          void telemetry.measure(
+            'terminal.write',
+            () =>
+              new Promise<void>((resolve) => {
+                term.write(m.data, () => {
+                  pendingOutput -= size
+                  resolve()
+                })
+              }),
+          )
+        } else if (m.type === 'exit') {
+          term.write(`\r\n\x1b[90m[process exited${m.exitCode != null ? ` (${m.exitCode})` : ''}]\x1b[0m\r\n`)
+          onExit?.(m.exitCode)
+        }
+      },
+      { cols: term.cols, rows: term.rows },
+    )
+  let detach: (() => void) | null = attach()
+  let detachTimer: ReturnType<typeof setTimeout> | undefined
+  const detachSoon = () => {
+    detachTimer ??= setTimeout(() => {
+      detachTimer = undefined
+      detach?.()
+      detach = null
+    }, HIDDEN_DETACH_MS)
+  }
   // Shift+Enter → newline instead of submit. Terminals send CR (\r) for Enter and Claude submits
   // on CR; a bare LF (\n, same byte as Ctrl+J) is Claude's setup-free "insert newline". Swallow
   // the event so xterm doesn't also send the CR that would submit.
@@ -249,6 +264,7 @@ function buildXterm(nodeId: string, sessionId: string, firstHost: HTMLElement, i
       host = null
       onExit = undefined
       renderer.shown = false
+      detachSoon()
       ro.disconnect()
       if (term.element?.contains(document.activeElement)) term.blur()
       term.element?.remove()
@@ -263,10 +279,14 @@ function buildXterm(nodeId: string, sessionId: string, firstHost: HTMLElement, i
       renderer.shown = true
       takeWebgl(renderer)
       safeFit()
+      clearTimeout(detachTimer)
+      detachTimer = undefined
+      detach ??= attach()
       term.focus()
     },
     hide() {
       renderer.shown = false
+      detachSoon()
     },
     setFontSize(next) {
       fontSize = next
@@ -280,7 +300,8 @@ function buildXterm(nodeId: string, sessionId: string, firstHost: HTMLElement, i
       host = null
       onExit = undefined
       dropWebgl(renderer)
-      detach()
+      clearTimeout(detachTimer)
+      detach?.()
       unwatchAppearance()
       ro.disconnect()
       term.dispose()

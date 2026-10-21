@@ -115,6 +115,12 @@ nothing from the shell, so a client with no router, query client, or Node connec
 The client runs the plan, picks which answer to show, describes the latest answer's problems, and
 passes its own notices and confirms in as children.
 
+`RunPanel` keeps each row's element across runs. A refetch returns new row objects, and the panel
+reconciles them by row ID into one store, so a row that came back updates its cells where they are and
+nothing mounts it again. A view reads `props.rows` as that store, and `RunPanel` passes no props through a
+spread that depends on the run, because such a spread makes every read of any prop depend on the run too.
+Group sections still redraw with a new run.
+
 `PublishedDashboardPanel` is the desktop's client for it. It reads the published revision or runs a
 draft plan, keeps the last good answer while a source can't answer, and owns drill-downs, board
 writes, and row actions. It passes source failures in as `SourceFailureAlert`, with their settings

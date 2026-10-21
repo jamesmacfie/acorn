@@ -88,6 +88,8 @@ export type MentionTextareaProps = {
   onKeyDown?: (event: KeyboardEvent) => void
   /** The field took focus: the agents composer starts reading its `@` list here. */
   onFocus?: () => void
+  /** The field lost focus: the agents composer writes its draft here. */
+  onBlur?: () => void
   /** Drawn inside the field's box, in its top-right corner: the agents composer's expand toggle. */
   overlay?: JSX.Element
   /** Draws the box's border in the danger colour, for a field whose sends carry a risk the caller
@@ -231,7 +233,10 @@ export default function MentionTextarea(props: MentionTextareaProps) {
           sync()
           props.onFocus?.()
         }}
-        onBlur={() => setFocused(false)}
+        onBlur={() => {
+          setFocused(false)
+          props.onBlur?.()
+        }}
         onPress={sync}
         onInput={(value) => {
           props.onInput(value)
@@ -264,9 +269,10 @@ export default function MentionTextarea(props: MentionTextareaProps) {
           event.preventDefault()
           props.onFiles(dropped)
         }}
+        // A key that types has already moved the list through `onInput`. Only the keys that move the
+        // caret without typing need a second look.
         onKeyUp={(event) => {
-          if (['ArrowDown', 'ArrowUp', 'Enter', 'Tab', 'Escape'].includes(event.key)) return
-          sync()
+          if (['ArrowLeft', 'ArrowRight', 'Home', 'End', 'PageUp', 'PageDown'].includes(event.key)) sync()
         }}
         onKeyDown={(event) => {
           if (event.isComposing) return

@@ -123,10 +123,10 @@ describe('what a program can reach', () => {
       expect.objectContaining({ body: expect.stringContaining('"inputs":{"taskId":"task"}') }),
     )
     const boxes = () => [...host.querySelectorAll<HTMLInputElement>('input[type=checkbox]')]
-    expect(boxes()).toHaveLength(2)
+    // The program evaluates on the next animation frame.
+    await vi.waitFor(() => expect(boxes()).toHaveLength(2))
     boxes()[1]!.click()
-    await settle()
-    expect(host.textContent).toContain('1 ticked')
+    await vi.waitFor(() => expect(host.textContent).toContain('1 ticked'))
     expect(boxes().map((box) => box.checked)).toEqual([false, true])
   })
 

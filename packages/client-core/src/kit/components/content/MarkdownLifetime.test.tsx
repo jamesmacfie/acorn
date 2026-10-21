@@ -2,7 +2,8 @@ import { createSignal } from 'solid-js'
 import { render } from 'solid-js/web'
 import { expect, it, vi } from 'vitest'
 import Markdown from './Markdown'
-import { getHighlighter, resetHighlightHtmlCache } from '../../../infra/highlight/shiki'
+import { getHighlighter } from '../../../infra/highlight/shiki'
+import { resetHighlightHtmlCache } from '../../../infra/highlight/worker'
 
 it('skips obsolete and disposed fences while retaining duplicate live copy controls', async () => {
   const highlighter = await getHighlighter('typescript')

@@ -1,5 +1,6 @@
 import { dehydrate, hydrate, QueryClient } from '@tanstack/solid-query'
 import { describe, expect, it } from 'vitest'
+import { prefsKey, projectsKey, tasksKey, workspacesKey } from '@acorn/protocol/api.ts'
 import {
   PERSISTED_QUERY_MAX_AGE_MS,
   PERSISTED_SNAPSHOT_MAX_AGE_MS,
@@ -8,26 +9,31 @@ import {
 } from './queryPersistence'
 
 describe('query cache persistence policy', () => {
-  it('excludes file bodies and every patch-bearing files query', () => {
-    expect(shouldPersistQueryKey(['blob', 'acorn', 'desktop', 'sha'])).toBe(false)
-    expect(shouldPersistQueryKey(['files', 'acorn', 'desktop', '12'])).toBe(false)
-    expect(shouldPersistQueryKey(['files', 'acorn', 'desktop', '12', 'patch', 'src/a.ts'])).toBe(false)
-  })
-
-  it('retains small file summaries and normal domain queries', () => {
-    expect(shouldPersistQueryKey(['files', 'acorn', 'desktop', '12', 'summary'])).toBe(true)
-    expect(shouldPersistQueryKey(['tasks'])).toBe(true)
+  it('keeps what the first frame draws and nothing else', () => {
+    for (const key of [prefsKey, workspacesKey, projectsKey, tasksKey, ['task-scripts', 'v1', 't1']])
+      expect(shouldPersistQueryKey(key)).toBe(true)
+    // A plugin's query the first frame needs opts in, since core can't name its key.
+    expect(shouldPersistQueryKey(['agents', 'providers'], { persist: true })).toBe(true)
+    for (const key of [
+      ['blob', 'acorn', 'desktop', 'sha'],
+      ['files', 'acorn', 'desktop', '12', 'summary'],
+      ['pull', 'acorn', 'desktop', '12'],
+      ['agents', 'pricing'],
+      ['dashboard-plan-run', 'node-a', { source: 'a transcript panel card, whole plan in its key' }],
+      ['tasks'],
+    ])
+      expect(shouldPersistQueryKey(key)).toBe(false)
   })
 
   it("preserves TanStack Query's successful-query-only dehydration gate", () => {
     const client = new QueryClient()
-    const tasksKey: readonly unknown[] = ['tasks']
-    const pending = client.getQueryCache().build(client, { queryKey: tasksKey })
+    const key: readonly unknown[] = tasksKey
+    const pending = client.getQueryCache().build(client, { queryKey: key })
     expect(pending.state.status).toBe('pending')
     expect(shouldPersistQuery(pending)).toBe(false)
 
-    client.setQueryData(tasksKey, [])
-    const successful = client.getQueryCache().find({ queryKey: tasksKey })
+    client.setQueryData(key, [])
+    const successful = client.getQueryCache().find({ queryKey: key })
     expect(successful?.state.status).toBe('success')
     expect(shouldPersistQuery(successful!)).toBe(true)
   })
@@ -43,8 +49,8 @@ describe('query cache persistence policy', () => {
 
   it('does not carry stale entries forward when a newer cache snapshot is written', () => {
     const client = new QueryClient()
-    const oldKey: readonly unknown[] = ['pull', 'acorn', 'desktop', '1']
-    const recentKey: readonly unknown[] = ['pull', 'acorn', 'desktop', '2']
+    const oldKey = [...tasksKey, 'old']
+    const recentKey = [...tasksKey, 'recent']
     client.setQueryData(oldKey, { number: 1 }, { updatedAt: Date.now() - PERSISTED_QUERY_MAX_AGE_MS - 1_000 })
     client.setQueryData(recentKey, { number: 2 }, { updatedAt: Date.now() - PERSISTED_QUERY_MAX_AGE_MS + 1_000 })
 
@@ -56,7 +62,6 @@ describe('query cache persistence policy', () => {
     const day = 24 * 60 * 60 * 1000
     const quitAt = Date.now() - 3 * day
     const before = new QueryClient()
-    const tasksKey: readonly unknown[] = ['tasks']
     const pullKey: readonly unknown[] = ['pull', 'acorn', 'desktop', '1']
     before.setQueryData(tasksKey, [{ id: 'a' }], { updatedAt: quitAt })
     before.setQueryData(pullKey, { number: 1 }, { updatedAt: quitAt })

@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { tasksKey } from '@acorn/protocol/api.ts'
 import type { NodeRecord, NodeStatus } from '@acorn/protocol/broker.ts'
 
 // idb-keyval is the persister's storage and dropNode's delete. There is no IndexedDB in the node
@@ -409,9 +410,9 @@ describe('partition persistence custody', () => {
     setCacheStorage(b)
     const lease = selected.persistence.acquire()
     await lease.restored
-    selected.client.setQueryData(['tasks'], ['A'])
+    selected.client.setQueryData(tasksKey, ['A'])
     await selected.persistence.flush()
-    memoryOnly.client.setQueryData(['tasks'], ['memory-only'])
+    memoryOnly.client.setQueryData(tasksKey, ['memory-only'])
     expect(a.getItem).toHaveBeenCalledTimes(1)
     expect(a.setItem).toHaveBeenCalledTimes(1)
     expect(b.getItem).not.toHaveBeenCalled()
@@ -438,7 +439,7 @@ describe('partition persistence custody', () => {
     const old = clientFor('same')
     const lease = old.persistence.acquire()
     await lease.restored
-    old.client.setQueryData(['tasks'], ['old'])
+    old.client.setQueryData(tasksKey, ['old'])
     const saving = old.persistence.flush()
     await entered.promise
     const dropping = dropNode('same')
@@ -452,7 +453,7 @@ describe('partition persistence custody', () => {
     writeGate.release()
     await Promise.all([saving, dropping, mounted.restored])
     expect(first.records.size).toBe(0)
-    fresh.client.setQueryData(['tasks'], ['fresh'])
+    fresh.client.setQueryData(tasksKey, ['fresh'])
     await fresh.persistence.flush()
     expect(JSON.parse(replacement.records.get(cacheKeyFor('same'))!).clientState.queries[0].state.data).toEqual([
       'fresh',
@@ -471,7 +472,7 @@ describe('partition persistence custody', () => {
     setCacheStorage(first)
     const old = clientFor('retry')
     await old.persistence.acquire().restored
-    old.client.setQueryData(['tasks'], ['old'])
+    old.client.setQueryData(tasksKey, ['old'])
     await old.persistence.flush()
     await dropNode('retry')
     setCacheStorage(replacement)
@@ -485,7 +486,7 @@ describe('partition persistence custody', () => {
     expect(replacement.removeItem).toHaveBeenCalledTimes(1)
     const recovered = clientFor('retry')
     await recovered.persistence.acquire().restored
-    recovered.client.setQueryData(['tasks'], ['recovered'])
+    recovered.client.setQueryData(tasksKey, ['recovered'])
     await recovered.persistence.flush()
     expect(replacement.records.size).toBe(1)
   })
@@ -502,7 +503,7 @@ describe('partition persistence custody', () => {
     const fresh = clientFor('mounted-retry'),
       mounted = fresh.persistence.acquire()
     await expect(mounted.restored).rejects.toThrow('locked')
-    fresh.client.setQueryData(['tasks'], ['dirty while blocked'])
+    fresh.client.setQueryData(tasksKey, ['dirty while blocked'])
     await expect(fresh.persistence.flush()).rejects.toThrow('locked')
     expect(replacement.setItem).not.toHaveBeenCalled()
     await retryCacheRetirement('mounted-retry')
@@ -510,7 +511,7 @@ describe('partition persistence custody', () => {
     expect(
       JSON.parse(replacement.records.get(cacheKeyFor('mounted-retry'))!).clientState.queries[0].state.data,
     ).toEqual(['dirty while blocked'])
-    fresh.client.setQueryData(['tasks'], ['still mounted'])
+    fresh.client.setQueryData(tasksKey, ['still mounted'])
     await fresh.persistence.flush()
     expect(replacement.setItem).toHaveBeenCalledTimes(2)
     mounted.release()

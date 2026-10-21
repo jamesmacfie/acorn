@@ -252,7 +252,9 @@ Each landing page in the tables above has topic pages in a folder of the same na
   and dialogs](./ui-design/overlays.md), [Shell hierarchy](./ui-design/shell-hierarchy.md),
   [States and accessibility](./ui-design/states.md), [Design tokens](./ui-design/tokens.md),
   [Tooltips](./ui-design/tooltips.md), [Two-column panes](./ui-design/two-column-panes.md).
-- [agent-built-apps.md](./agent-built-apps.md): [Project apps](./agent-built-apps/project-apps.md).
+- [caching.md](./caching.md): [What the renderer persists](./caching/persisted-query-cache.md).
+- [agent-built-apps.md](./agent-built-apps.md): [Project apps](./agent-built-apps/project-apps.md),
+  [How an app's program runs](./agent-built-apps/runtime.md).
 - [panes.md](./panes.md): [Pane contributions](./panes/contributions.md),
   [Pane layouts](./panes/layout.md), [Pane models](./panes/models.md),
   [Pane regions](./panes/regions.md).

@@ -28,7 +28,7 @@ vi.mock('../tree/RemoteTree', () => ({
   },
 }))
 // The highlighter would replace each `<pre>`; these tests are about what stands beside it.
-vi.mock('../../infra/highlight/shiki', () => ({ highlightToHtml: async () => null }))
+vi.mock('../../infra/highlight/worker', () => ({ highlightToHtml: async () => null }))
 
 const registered: Disposable[] = []
 let events: string[] = []

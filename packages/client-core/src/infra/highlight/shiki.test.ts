@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { getHighlighter, highlightToHtml, LANGS, langFor, tokenizeAnsiLines } from './shiki'
+import { getHighlighter, LANGS, langFor, renderFenceOnMainThread, tokenizeAnsiLines } from './shiki'
 
 describe('langFor', () => {
   it('maps known extensions to their shiki language id', () => {
@@ -75,7 +75,7 @@ describe('the highlighter itself', () => {
 // colours have to leave as variables, and nothing may leave as a fixed colour.
 describe('fence html', () => {
   it('carries both theme colours as variables and hardcodes neither', async () => {
-    const html = await highlightToHtml('const a = 1', 'typescript')
+    const html = await renderFenceOnMainThread('const a = 1', 'typescript', () => true)
     expect(html).toContain('--l:')
     expect(html).toContain('--r:')
     expect(html).not.toMatch(/(^|[^-])\b(color|background-color):/)

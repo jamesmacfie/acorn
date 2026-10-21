@@ -10,6 +10,10 @@ import {
   writeComposerPayload,
 } from './composerDraftStorage'
 
+// How long typing has to pause before the draft is written to localStorage. A write on every key
+// costs a synchronous round trip into the browser's storage.
+const DRAFT_WRITE_DELAY_MS = 300
+
 type Update<T> = T | ((current: T) => T)
 export type ComposerDraftState = ReturnType<typeof createDraft>
 const states = new Map<string, ComposerDraftState>()
@@ -38,6 +42,12 @@ function createDraft(nodeId: string | null, sessionId: string) {
   const [hydrated, setHydrated] = createSignal(false)
   const payload = () => ({ text: text(), attachmentIds, contexts: contexts(), references: references() })
   const persist = (field: keyof ReturnType<typeof payload>) => valid && writeComposerPayload(key, payload(), field)
+  let textTimer: ReturnType<typeof setTimeout> | undefined
+  const persistText = () => {
+    clearTimeout(textTimer)
+    textTimer = undefined
+    persist('text')
+  }
   const reap = () => {
     if (!valid || preserveHydration || holders || sending() || uploading() || replacing() || capturing() || !hydrated())
       return
@@ -65,7 +75,18 @@ function createDraft(nodeId: string | null, sessionId: string) {
       if (!valid) return
       textRevision++
       setText(next)
-      persist('text')
+      persistText()
+    },
+    /** A keystroke's edit: the text changes now and is written once typing pauses, or at `flushText`. */
+    typeText(next: string) {
+      if (!valid) return
+      textRevision++
+      setText(next)
+      clearTimeout(textTimer)
+      textTimer = setTimeout(persistText, DRAFT_WRITE_DELAY_MS)
+    },
+    flushText() {
+      if (textTimer !== undefined) persistText()
     },
     setAttachments(next: Update<AgentAttachment[]>) {
       if (!valid) return

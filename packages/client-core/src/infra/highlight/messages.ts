@@ -20,9 +20,12 @@ export type HighlightRequest = {
   lang: string
   /** A whole document, newline-separated, never a single line: see worker.ts for why. */
   code: string
+  /** `html` answers a markdown fence as dual-themed html; the default answers tokens for a diff. */
+  output?: 'html'
 }
 
 export type HighlightResponse = (
   | { id: number; ok: true; lines: HighlightLines }
+  | { id: number; ok: true; html: string }
   | { id: number; ok: false; error: string }
 ) & { queueMs?: number; executionMs?: number }

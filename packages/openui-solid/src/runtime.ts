@@ -65,6 +65,21 @@ function copyPlain<T>(value: T): T {
   return Object.fromEntries(Object.entries(value).map(([k, v]) => [k, copyPlain(v)])) as T
 }
 
+// A hidden window gets no animation frames, so a timer runs the work too, and whichever fires first
+// cancels the other.
+const FRAME_FALLBACK_MS = 50
+function waitForFrame(run: () => void): () => void {
+  const frame = typeof requestAnimationFrame === 'function' ? requestAnimationFrame(run) : undefined
+  const timer = setTimeout(run, FRAME_FALLBACK_MS)
+  return () => {
+    if (frame !== undefined) cancelAnimationFrame(frame)
+    clearTimeout(timer)
+  }
+}
+
+// How long typing pauses before a query whose arguments it changed runs again.
+const QUERY_DELAY_MS = 250
+
 function toolProvider(tools: Tools): ToolProvider {
   return {
     async callTool(name, args) {
@@ -102,8 +117,36 @@ export function createOpenUIRuntime(options: OpenUIRuntimeOptions) {
   const queries = createQueryManager(options.tools ? toolProvider(options.tools) : null)
   const [stateVersion, bumpState] = createSignal<void>(undefined, { equals: false })
   const [queryVersion, bumpQueries] = createSignal<void>(undefined, { equals: false })
-  onCleanup(store.subscribe(() => bumpState()))
-  onCleanup(queries.subscribe(() => bumpQueries()))
+  // The tree is evaluated once per animation frame, from whatever the store holds then. A field reads
+  // its own value through `stateVersion`, so typing still draws at once.
+  const [treeVersion, bumpTree] = createSignal<void>(undefined, { equals: false })
+  let cancelFrame: (() => void) | undefined
+  const evaluateSoon = () => {
+    cancelFrame ??= waitForFrame(() => {
+      cancelFrame?.()
+      cancelFrame = undefined
+      bumpTree()
+    })
+  }
+  let queryTimer: ReturnType<typeof setTimeout> | undefined
+  onCleanup(() => {
+    cancelFrame?.()
+    clearTimeout(queryTimer)
+  })
+  onCleanup(
+    store.subscribe(() => {
+      bumpState()
+      evaluateSoon()
+      clearTimeout(queryTimer)
+      queryTimer = setTimeout(runQueries, QUERY_DELAY_MS)
+    }),
+  )
+  onCleanup(
+    queries.subscribe(() => {
+      bumpQueries()
+      evaluateSoon()
+    }),
+  )
   queries.activate()
   onCleanup(() => {
     queries.dispose()
@@ -139,22 +182,26 @@ export function createOpenUIRuntime(options: OpenUIRuntimeOptions) {
     seeded = {}
   })
 
-  createComputed(() => {
-    stateVersion()
-    const statements = result()?.queryStatements ?? []
-    untrack(() =>
-      queries.evaluateQueries(
-        statements.map((q) => ({
-          statementId: q.statementId,
-          toolName: q.toolAST ? String(evaluate(q.toolAST, ctx)) : '',
-          args: q.argsAST ? evaluate(q.argsAST, ctx) : null,
-          defaults: q.defaultsAST ? evaluate(q.defaultsAST, ctx) : null,
-          refreshInterval: q.refreshAST ? (evaluate(q.refreshAST, ctx) as number) : undefined,
-          deps: q.deps?.length ? Object.fromEntries(q.deps.map((name) => [name, store.get(name)])) : undefined,
-          complete: q.complete,
-        })),
-      ),
+  // Runs from a program change at once, and from a state change once typing has paused. An action that
+  // sets state or runs a query runs it first, because `invalidate` reads the arguments this last saw.
+  function runQueries() {
+    clearTimeout(queryTimer)
+    const statements = untrack(() => result()?.queryStatements ?? [])
+    queries.evaluateQueries(
+      statements.map((q) => ({
+        statementId: q.statementId,
+        toolName: q.toolAST ? String(evaluate(q.toolAST, ctx)) : '',
+        args: q.argsAST ? evaluate(q.argsAST, ctx) : null,
+        defaults: q.defaultsAST ? evaluate(q.defaultsAST, ctx) : null,
+        refreshInterval: q.refreshAST ? (evaluate(q.refreshAST, ctx) as number) : undefined,
+        deps: q.deps?.length ? Object.fromEntries(q.deps.map((name) => [name, store.get(name)])) : undefined,
+        complete: q.complete,
+      })),
     )
+  }
+  createComputed(() => {
+    result()
+    untrack(runQueries)
   })
   createComputed(() => {
     const statements = result()?.mutationStatements ?? []
@@ -174,8 +221,7 @@ export function createOpenUIRuntime(options: OpenUIRuntimeOptions) {
   const [evaluationErrors, setEvaluationErrors] = createSignal<OpenUIError[]>([])
   const [renderErrors, setRenderErrors] = createSignal<OpenUIError[]>([])
   createComputed(() => {
-    stateVersion()
-    queryVersion()
+    treeVersion()
     const current = result()
     const errors: OpenUIError[] = []
     const root = current ? untrack(() => evaluateRoot(current, { ctx, library, store, errors })) : null
@@ -234,6 +280,7 @@ export function createOpenUIRuntime(options: OpenUIRuntimeOptions) {
       switch (step.type) {
         case ACTION_STEPS.Run: {
           if (step.refType !== 'mutation') {
+            runQueries()
             queries.invalidate([step.statementId])
             break
           }
@@ -260,10 +307,12 @@ export function createOpenUIRuntime(options: OpenUIRuntimeOptions) {
           break
         case ACTION_STEPS.Set:
           if (step.valueAST) store.set(step.target, evaluate(step.valueAST, ctx))
+          runQueries()
           break
         case ACTION_STEPS.Reset: {
           const declared = result()?.stateDeclarations ?? {}
           for (const target of step.targets) store.set(target, declared[target] ?? null, { pristine: true })
+          runQueries()
           break
         }
       }

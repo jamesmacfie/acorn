@@ -24,7 +24,7 @@ import { dropSegmentCache } from '../../features/diff/segmentCaches'
 // Partitioning at the client gives each node its own persister and cache without a nodeId in the key:
 //
 //   - Prefixing keys means touching every `*Options()` factory, every cache-mutation call site, and
-//     `shouldPersistQueryKey`, which reads `key[0]` and `key[4]` positionally. A client per node
+//     `shouldPersistQueryKey`, which matches the key's leading parts. A client per node
 //     touches this file and index.tsx.
 //   - Two nodes holding the same UUID cannot collide by construction, rather than by every call site
 //     remembering the convention.
