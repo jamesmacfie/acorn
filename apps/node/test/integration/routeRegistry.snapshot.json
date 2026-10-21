@@ -243,6 +243,7 @@
     "GET /v1/p/agents/sessions/:sessionId/mcp",
     "GET /v1/p/agents/sessions/:sessionId/reference-context",
     "GET /v1/p/agents/sessions/:sessionId/reference-context",
+    "GET /v1/p/agents/sessions/:sessionId/tools/:toolId",
     "GET /v1/p/agents/sessions/:sessionId/wait",
     "GET /v1/p/agents/sessions/search",
     "GET /v1/p/agents/usage",

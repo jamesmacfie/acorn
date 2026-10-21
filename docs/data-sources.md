@@ -138,11 +138,10 @@ offer; this is authoring metadata, not current eligibility. The source's `action
 for one full record reference at press time. The Node checks the reference's scope and connection,
 then checks the current action ID and risk before it dispatches a confined plugin route. Record verbs
 also include `navigate` and `createTask`; host navigation and task creation use the row's project
-context. A source that declares no named actions needs no `actions` handler.
-For `runNodeAction`, the plugin receives the press's idempotency key and must deduplicate any side
-effect by that key; a transport failure after dispatch can be retried without a stored response.
-Once the route has run, the Node drops every dashboard read it shares for five seconds, so a panel
-that runs again right after the action reads the source afresh.
+context. A source that declares no named actions needs no `actions` handler. For `runNodeAction`,
+the plugin receives the press's idempotency key and must deduplicate any side effect by that key; a
+transport failure after dispatch can be retried without a stored response. After the route runs, the
+Node drops its shared dashboard reads for five seconds, so the next panel run reads afresh.
 
 A source can also declare `writable` fields with an exact field pointer, its own confined plugin route,
 a write or execute risk tier, and a finite set of typed target values. A writable source must support
@@ -193,8 +192,7 @@ intents. [Record processing history](./workflows/record-history.md) has the tran
 - [Authoring controls](./data-sources/authoring-controls.md) covers the client cache, the conformance
   fixture, and the shared source and query editor.
 - [Workspace query library](./data-sources/query-library.md) covers saved queries.
-- [Say when records changed](./data-sources/changes.md) covers `ctx.dataSources.changed` and the
-  `data-source:changed` event.
+- [Say when records changed](./data-sources/changes.md) covers `ctx.dataSources.changed`.
 - [Provider data sources](./data-sources/provider-sources.md) covers Linear issues and Rollbar error
   groups.
 - [Derived sources](./data-sources/derived-sources.md) covers sources that read other sources as inputs.
