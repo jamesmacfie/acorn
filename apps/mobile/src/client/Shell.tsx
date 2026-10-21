@@ -18,11 +18,13 @@ import { QueryCacheProvider } from '@acorn/client-core/infra/persistence/QueryCa
 import { prefsOptions, projectsKey, tasksKey, type Project, type Task } from '@acorn/client-core/infra/queries.ts'
 import { Button, EmptyState } from '@acorn/client-core/kit/components/primitives.tsx'
 import { signedOut } from './platform'
-import { Home } from './Home'
 import { trackKeyboardInset } from './keyboardInset'
 import { SignIn } from './SignIn'
 import { TaskScreen } from './TaskScreen'
 import { trackThemeColor } from './themeColor'
+import { WaitingProvider } from './waiting'
+import { Workspace } from './Workspace'
+import { Workspaces } from './Workspaces'
 
 // The phone's screens: sign-in while the gateway says this phone has no session, a wait while it
 // names its Node, and then the routes. The routes draw only once a Node is selected, and the cached
@@ -55,7 +57,9 @@ export function Shell() {
             <QueryCacheProvider cache={clientFor(cacheId)}>
               <PaneModelHost nodeId={activeNodeId()}>
                 <Router root={Frame}>
-                  <Route path="/" component={Home} />
+                  <Route path="/" component={Workspaces} />
+                  <Route path="/w/:workspaceId" component={() => <Workspace view="dashboard" />} />
+                  <Route path="/w/:workspaceId/tasks" component={() => <Workspace view="tasks" />} />
                   <Route path="/t/:taskId/:paneId?" component={TaskScreen} />
                 </Router>
               </PaneModelHost>
@@ -81,7 +85,7 @@ function Frame(props: ParentProps) {
   })
   return (
     <div class="mobile-shell">
-      {props.children}
+      <WaitingProvider>{props.children}</WaitingProvider>
       <ToastHost />
     </div>
   )

@@ -212,6 +212,7 @@ Start with the plugin map, then follow the authoring guide or API reference.
 | [shell.md](./shell.md) | The Tauri shell: schemes, custody, webviews, the helper, and packaging. |
 | [tui.md](./tui.md) | The terminal client: `acorn` in a terminal, its process model, its host switch, how it draws a frame, and its chrome. |
 | [mobile.md](./mobile.md) | The mobile web app: its platform seam over the gateway, its screens, how to run it, and how to drive it at phone width. |
+| [mobile/agent-pane.md](./mobile/agent-pane.md) | How the Agents pane draws on a phone: the one-row header, the folded composer, sheets, and the keyboard. |
 | [mobile/phone-setup.md](./mobile/phone-setup.md) | Reaching the mobile web app over Tailscale, installing it to the home screen, its service worker, and its reconnect on return. |
 | [cli.md](./cli.md) | Headless `acorn` commands, Node selection, read resources, output, and exit codes. |
 | [cli/workspaces-projects-tasks.md](./cli/workspaces-projects-tasks.md) | CLI core writes, retries, stdin piping, and task script reads. |
@@ -467,8 +468,9 @@ Each plugin landing page above has topic pages in a folder of the same name:
 - [Build a mobile web app](./future/mobile/README.md), with phases for [the
   gateway](./future/mobile/01-gateway.md), [the shell](./future/mobile/02-shell.md), [narrow
   mode](./future/mobile/03-narrow-mode.md), [narrow layouts](./future/mobile/04-narrow-layouts.md),
-  [Needs you and the conversation](./future/mobile/05-needs-you.md), and [running on a
-  phone](./future/mobile/06-on-a-phone.md), then [later work](./future/mobile/later.md).
+  [Needs you and the conversation](./future/mobile/05-needs-you.md), [running on a
+  phone](./future/mobile/06-on-a-phone.md), and [workspaces and compact
+  controls](./future/mobile/07-workspaces-and-compact-controls.md), then [later work](./future/mobile/later.md).
 
 ## Node for other machines proposal
 

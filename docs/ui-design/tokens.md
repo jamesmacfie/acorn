@@ -128,12 +128,17 @@ hide it.
 ## The narrow sheet
 
 `narrow.css` is the one stylesheet that isn't a pack. Its single `:root[data-form-factor='narrow']`
-block raises the control and row heights to 44px for a finger, trims the pane padding, and sets
+block draws controls at 40, 32, and 28px for `--control-h`, `--control-h-sm`, and `--control-h-xs`,
+raises the row heights to 44px or more for a finger, trims the pane padding, and sets
 `--fs-input` to 16px, because iOS Safari zooms the page into an input set smaller than that. Every
 input draws its text from `--fs-input`, which is `--fs-sm` until a form factor changes it. It loads
 after the packs, so its sizes win in all of them, and `tokenAxes.test.ts` pins that order. It sets
 style tokens only. A shell turns it on by putting `data-form-factor="narrow"` on `<html>`, and
 `formFactor()` in `infra/platform` reads the same attribute. Nothing measures the window.
+
+A small or extra small button or select draws under the 44-point tap guideline on iOS, so on a phone
+an invisible `::after` box centered on it keeps a 44px tap area (`primitives.css`). A toolbar on a
+phone spaces its controls 16px apart, so two neighbors' tap areas don't overlap.
 
 Controls that appear on hover show on a touch screen by a `@media (hover: none)` rule beside each
 hover rule in `primitives.css` and `dashboards.css`. That rule doesn't depend on the attribute, so a

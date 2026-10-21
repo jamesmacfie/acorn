@@ -84,6 +84,7 @@
     "./features/workspaces/Home.tsx": "./src/features/workspaces/Home.tsx",
     "./features/workspaces/WorkspaceProjectAssignments.tsx": "./src/features/workspaces/WorkspaceProjectAssignments.tsx",
     "./features/workspaces/NoProjects.tsx": "./src/features/workspaces/NoProjects.tsx",
+    "./features/workspaces/WorkspaceIcon.tsx": "./src/features/workspaces/WorkspaceIcon.tsx",
     "./host/annotations": "./src/host/annotations/public.ts",
     "./host/annotations/annotationKey.ts": "./src/host/annotations/annotationKey.ts",
     "./host/annotations/taskAnnotations.ts": "./src/host/annotations/taskAnnotations.ts",

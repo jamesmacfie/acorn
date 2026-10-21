@@ -8,14 +8,14 @@ import { queuedMark, subagentIcon, subagentTone } from './stateTone'
 // word in the pane header, the Agent Center roster. Shape and colour are `runtimeIcon` and
 // `runtimeTone`, which the sessions dashboard panel also reads, so a state looks the same on every
 // surface. The
-// mark carries no title: every surface that draws it also writes the state out beside it, and a
-// screen reader meeting both would read the state twice.
+// mark carries no title where a surface writes the state out beside it, because a screen reader
+// meeting both would read the state twice. A surface with no room for the words passes them as `title`.
 //
 // Motion is the third thing the mark says: a state that is mid-flight turns, which is what a reader
 // scanning the sidebar is actually asking about.
 const SPINS = new Set(['working', 'cancelling', 'reconnecting'])
 
-export default function RuntimeStateIcon(props: { state: string; queued?: number }) {
+export default function RuntimeStateIcon(props: { state: string; queued?: number; title?: string }) {
   // A queued follow-up is not a runtime state: a session holds one while it works and while it rests.
   // It takes the slot only when nothing is in flight, because motion is what a reader scans a busy list
   // for. The case worth the slot is a session resting at `ready` behind the concurrency limit with a
@@ -27,7 +27,14 @@ export default function RuntimeStateIcon(props: { state: string; queued?: number
   return (
     <Show
       when={queued()}
-      fallback={<Icon name={runtimeIcon(props.state)} tone={runtimeTone(props.state)} spin={SPINS.has(props.state)} />}
+      fallback={
+        <Icon
+          name={runtimeIcon(props.state)}
+          tone={runtimeTone(props.state)}
+          spin={SPINS.has(props.state)}
+          title={props.title}
+        />
+      }
     >
       <Icon {...queuedMark(props.queued ?? 0)} />
     </Show>
@@ -36,7 +43,14 @@ export default function RuntimeStateIcon(props: { state: string; queued?: number
 
 // The same mark for a subagent, which has its own smaller vocabulary of statuses. Drawn here rather
 // than as a dot, so a running child turns exactly like the session above it does.
-export function SubagentStateIcon(props: { status: AgentSubagentStatus | undefined }) {
+export function SubagentStateIcon(props: { status: AgentSubagentStatus | undefined; title?: string }) {
   const status = () => props.status ?? 'running'
-  return <Icon name={subagentIcon(props.status)} tone={subagentTone(props.status)} spin={status() === 'running'} />
+  return (
+    <Icon
+      name={subagentIcon(props.status)}
+      tone={subagentTone(props.status)}
+      spin={status() === 'running'}
+      title={props.title}
+    />
+  )
 }

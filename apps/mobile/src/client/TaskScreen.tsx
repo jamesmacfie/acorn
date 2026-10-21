@@ -9,7 +9,8 @@ import {
 import { paneAvailable, paneContributions, paneRegistry } from '@acorn/client-core/host/registries/panes/panes.ts'
 import { markersFor } from '@acorn/client-core/host/registries/rail'
 import { pluginRosterKnown } from '@acorn/client-core/infra/node'
-import { tasksOptions } from '@acorn/client-core/infra/queries.ts'
+import { workspaceForProject } from '@acorn/client-core/features/workspaces'
+import { tasksOptions, workspacesOptions } from '@acorn/client-core/infra/queries.ts'
 import { ContributionBoundary } from '@acorn/client-core/kit/components/content/ContributionBoundary.tsx'
 import { EmptyState } from '@acorn/client-core/kit/components/primitives.tsx'
 import { rosterReady } from './roster'
@@ -29,7 +30,14 @@ export function TaskScreen() {
   const params = useParams<{ taskId: string; paneId?: string }>()
   const navigate = useNavigate()
   const tasks = createQuery(() => tasksOptions(true))
+  const workspaces = createQuery(() => workspacesOptions(true))
   const task = () => tasks.data?.find((candidate) => candidate.id === params.taskId)
+  // The route keeps no workspace, so a link from a notification lands here too. Back goes to the
+  // tasks of the workspace the task's project is in.
+  const back = () => {
+    const workspace = workspaceForProject(workspaces.data, task()?.projectId)
+    return workspace ? `/w/${workspace.id}/tasks` : '/'
+  }
   // The desktop switcher's list. Empty until the roster registers, after the first frame.
   const panes = () => {
     const shown = task()
@@ -57,7 +65,7 @@ export function TaskScreen() {
       when={task()}
       fallback={
         <>
-          <TopBar title="Task" back />
+          <TopBar title="Task" back="/" />
           <Show when={tasks.data} fallback={<EmptyState busy title="Loading the task" />}>
             <EmptyState title="No such task">
               It may have been archived. Go back to see the tasks on this Node.
@@ -68,7 +76,7 @@ export function TaskScreen() {
     >
       {(shown) => (
         <>
-          <TopBar title={shown().title} detail={taskState(shown().id)} back />
+          <TopBar title={shown().title} detail={taskState(shown().id)} back={back()} />
           <main class="mobile-pane">
             {/* Remounted for each pane, and for each task, because a pane captures its task's model
                 when it mounts. */}
@@ -93,7 +101,7 @@ export function TaskScreen() {
               )}
             </Show>
           </main>
-          <nav class="mobile-bar mobile-panes" aria-label="Task panes">
+          <nav class="mobile-bar mobile-tabs" aria-label="Task panes">
             <For each={panes()}>
               {(entry) => (
                 <RailTab

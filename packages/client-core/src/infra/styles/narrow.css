@@ -7,10 +7,11 @@
  * style tokens only, and it is not a pack: it composes with all of them.
  */
 :root[data-form-factor='narrow'] {
-  /* A tap target meets the 44-point guideline on iOS, so the small rungs rise to it too. */
-  --control-h: 44px;
-  --control-h-sm: 44px;
-  --control-h-xs: 44px;
+  /* The small rungs draw under iOS's 44-point tap guideline, and each keeps a 44px tap area of its
+     own in primitives.css, so a toolbar on a phone isn't as tall as a form. */
+  --control-h: 40px;
+  --control-h-sm: 32px;
+  --control-h-xs: 28px;
   --row-h: 48px;
   --row-h-virt: 48px;
   --row-h-sm: 44px;

@@ -1,5 +1,6 @@
 /** @jsxImportSource @acorn/tui/jsx */
 import { Show, type JSX } from 'solid-js'
+import type { FormFactor } from '@acorn/protocol/chrome.ts'
 import { HOST, NODE_SUPPORT, type Host, type KitNode } from '@acorn/client-core/kit/tokens'
 import { Line, slot } from './cells'
 import { boxBorder } from './roles'
@@ -62,11 +63,18 @@ export function Rectangle(props: {
   )
 }
 
-/** Children exist on the named hosts and nowhere else; no fallback wanted. Written here rather than
+/** Children exist on the named hosts or form factors and nowhere else; no fallback wanted. Both must
+ *  match when both are given, and a terminal's form factor is always `tui`. Written here rather than
  *  imported so this package's table is its own, but it reads the same `HOST` and the same matrix, so
  *  the two hosts cannot disagree about what a node's level is. */
-export function Only(props: { hosts: readonly Host[]; children: JSX.Element }) {
-  return <Show when={props.hosts.includes(HOST)}>{props.children}</Show>
+export function Only(props: { hosts?: readonly Host[]; formFactors?: readonly FormFactor[]; children: JSX.Element }) {
+  return (
+    <Show
+      when={(!props.hosts || props.hosts.includes(HOST)) && (!props.formFactors || props.formFactors.includes('tui'))}
+    >
+      {props.children}
+    </Show>
+  )
 }
 
 /** What to draw where the matrix says this host cannot draw the node it is inside. */

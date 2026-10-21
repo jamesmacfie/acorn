@@ -1,5 +1,5 @@
 import { For, onCleanup, onMount, Show } from 'solid-js'
-import { Button, Icon, Inline, Meter, Popover, StatusDot, Text } from '@acorn/plugin-api/ui'
+import { Button, Icon, Inline, Meter, Only, Popover, StatusDot, Text } from '@acorn/plugin-api/ui'
 import AgentUsageSection from './AgentUsageSection'
 import { usageSummaryEntries } from './usageModel'
 import { usageTone } from '../sessions/stateTone'
@@ -40,8 +40,16 @@ export default function AgentUsageIndicator(props: {
               "Codex 13%" read as two readings rather than one run of words. */}
           <Inline gap="stack" divided>
             <Icon name="gauge" />
-            {/* The placeholder names no harness, because only the node knows which ones exist. */}
-            <Show when={entries().length} fallback={<Text emphasis="muted">reading usage…</Text>}>
+            {/* The placeholder names no harness, because only the node knows which ones exist. A
+                phone's header has room for the gauge and a dot per harness, so it draws no words. */}
+            <Show
+              when={entries().length}
+              fallback={
+                <Only formFactors={['desktop', 'tui']}>
+                  <Text emphasis="muted">reading usage…</Text>
+                </Only>
+              }
+            >
               <For each={entries()}>
                 {(entry) => {
                   const provider = () => props.providers?.find((candidate) => candidate.id === entry.provider)
@@ -50,26 +58,30 @@ export default function AgentUsageIndicator(props: {
                     <Inline>
                       {/* How much of the window is still to run, as a pie that empties toward the
                           reset. Muted, because time passing is not a warning; the dot says that. */}
-                      <Show when={entry.timeLeft != null}>
-                        <Meter shape="pie" tone="muted" value={entry.timeLeft!} label={entry.timeLeftLabel} />
-                      </Show>
+                      <Only formFactors={['desktop', 'tui']}>
+                        <Show when={entry.timeLeft != null}>
+                          <Meter shape="pie" tone="muted" value={entry.timeLeft!} label={entry.timeLeftLabel} />
+                        </Show>
+                      </Only>
                       <StatusDot tone={usageTone(entry.health)} size="sm" />
-                      <Show
-                        when={icon()}
-                        fallback={
-                          <Text emphasis="muted">
-                            {entry.label} {entry.value}
-                          </Text>
-                        }
-                      >
-                        {(name) => (
-                          <>
-                            <Text emphasis="muted">{entry.harness}</Text>
-                            <Icon name={name()} title={accountLabel(provider(), entry.account!)} />
-                            <Text emphasis="muted">{entry.value}</Text>
-                          </>
-                        )}
-                      </Show>
+                      <Only formFactors={['desktop', 'tui']}>
+                        <Show
+                          when={icon()}
+                          fallback={
+                            <Text emphasis="muted">
+                              {entry.label} {entry.value}
+                            </Text>
+                          }
+                        >
+                          {(name) => (
+                            <>
+                              <Text emphasis="muted">{entry.harness}</Text>
+                              <Icon name={name()} title={accountLabel(provider(), entry.account!)} />
+                              <Text emphasis="muted">{entry.value}</Text>
+                            </>
+                          )}
+                        </Show>
+                      </Only>
                     </Inline>
                   )
                 }}

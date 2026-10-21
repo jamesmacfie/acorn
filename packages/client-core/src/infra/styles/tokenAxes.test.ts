@@ -183,6 +183,15 @@ describe('the narrow sheet', () => {
     expect([...blocks.keys()]).toEqual([`:root[data-form-factor='narrow']`])
     expect([...declaredIn(narrow.text)].filter((t) => !style.has(t))).toEqual([])
   })
+
+  it('draws controls at 40, 32, and 28px, below the 44px tap area the small ones keep', () => {
+    const height = (token: string) => narrow.text.match(new RegExp(`${token}:\\s*([^;]+);`))?.[1]
+    expect([height('--control-h'), height('--control-h-sm'), height('--control-h-xs')]).toEqual([
+      '40px',
+      '32px',
+      '28px',
+    ])
+  })
 })
 
 describe('cross-axis selectors are banned', () => {

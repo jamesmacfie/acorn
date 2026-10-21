@@ -3,6 +3,7 @@ import { createQuery } from '@tanstack/solid-query'
 import {
   clientCapability,
   featureUsable,
+  formFactor,
   openPane,
   requestTerminalFocusIntent,
   setTerminalOpen,
@@ -27,6 +28,7 @@ import {
   Input,
   Menu,
   Modal,
+  Only,
   Picker,
   Stack,
   Text,
@@ -105,6 +107,140 @@ export function AgentDetailHeader(props: { task: Task; model: AgentPaneModel }) 
   const runningBackground = createMemo(() => runningBackgroundCommands(model.snapshot()?.events ?? []), [], {
     equals: (left, right) => left.length === right.length && left.every((title, at) => title === right[at]),
   })
+  // What the session is part of: chips on the bar, and rows of the session menu on a phone, where the
+  // bar has room for one row.
+  const sessionChips = (): SessionChip[] => {
+    const chips: SessionChip[] = []
+    const found = workflow()
+    if (found)
+      chips.push({
+        id: 'workflow',
+        icon: 'workflow',
+        label: `Workflow: ${found.run.name} · ${found.step.name}`,
+        press: () =>
+          openPane(props.task.id, 'workflows', {
+            kind: 'workflows:show-run',
+            runId: found.run.id,
+            stepId: found.step.id,
+          }),
+      })
+    // Background commands outlive their turn and their card's place on screen, so the ones still
+    // running stay named here (docs/managed-agents/background-commands.md).
+    const count = runningBackground().length
+    if (count)
+      chips.push({
+        id: 'background',
+        icon: 'terminal',
+        label: count === 1 ? '1 command running in background' : `${count} commands running in background`,
+        title: runningBackground().join('\n'),
+      })
+    // The custom agent the session started from, by the name it had then. The snapshot is the
+    // session's own, so renaming or deleting the agent later leaves this alone.
+    const agent = sessionCustomAgent(model.selected()?.config ?? {})
+    if (agent) chips.push({ id: 'agent', icon: 'bot', label: agent.name })
+    const parent = model.selectedManagedParent()
+    if (parent)
+      chips.push({
+        id: 'parent',
+        icon: 'arrow-left',
+        label: `Parent: ${parent.title}`,
+        press: () => model.openManagedParent(),
+      })
+    return chips
+  }
+  const subagentId = () => {
+    const session = model.selected()
+    return session ? selectedManagedSubagent(session.id) : undefined
+  }
+  const subagent = () => model.selected()?.subagents.find((child) => child.id === subagentId())
+  const canStop = () => {
+    const session = model.selected()
+    return !!session && (subagentId() ? canStopSubagent(session, subagent()) : canStopAgent(session))
+  }
+  const stop = () => {
+    const session = model.selected()
+    const childId = subagentId()
+    if (!session) return
+    void model.action(() =>
+      childId ? managedAgentApi.cancelSubagent(session.id, childId) : managedAgentApi.cancel(session.id),
+    )
+  }
+  const stateWords = () => {
+    const session = model.selected()
+    return subagentId() ? subagentStatusLabel(subagent()?.status) : (session?.runtimeState ?? '')
+  }
+  const stateIcon = (title?: string) => (
+    <Show
+      when={subagentId()}
+      fallback={<RuntimeStateIcon state={model.selected()?.runtimeState ?? ''} title={title} />}
+    >
+      <SubagentStateIcon status={subagent()?.status} title={title} />
+    </Show>
+  )
+  // A Menu, not a Picker: nobody types to find "Rename session" among a handful of actions.
+  const sessionMenu = (withChips: boolean) => (
+    <Menu
+      ariaLabel="Session actions"
+      placement="bottom-end"
+      trigger={({ toggle, open }) => (
+        <IconButton icon="ellipsis" label="Session actions" opens="menu" expanded={open()} onPress={toggle} />
+      )}
+    >
+      {(menu) => (
+        <>
+          <Show when={withChips && sessionChips().length}>
+            <For each={sessionChips()}>
+              {(chip) => (
+                <Show
+                  when={chip.press}
+                  fallback={
+                    <Menu.Label>
+                      <Inline>
+                        <Icon name={chip.icon} />
+                        {chip.label}
+                      </Inline>
+                    </Menu.Label>
+                  }
+                >
+                  {(press) => (
+                    <Menu.Item context={menu} title={chip.title} leading={<Icon name={chip.icon} />} onSelect={press()}>
+                      {chip.label}
+                    </Menu.Item>
+                  )}
+                </Show>
+              )}
+            </For>
+            <Menu.Separator />
+          </Show>
+          <For
+            each={model
+              .sessionActions()
+              .filter((item) => props.task.status === 'active' || READS_STORED_SESSION.has(item.id))}
+          >
+            {(item) => (
+              <>
+                {/* The one destructive action is last, below a rule
+                    (docs/ui-design/interaction.md § Menus and right-click). */}
+                <Show when={item.tone === 'danger'}>
+                  <Menu.Separator />
+                </Show>
+                <Menu.Item
+                  context={menu}
+                  disabled={!!item.disabled}
+                  tone={item.tone}
+                  title={item.description}
+                  leading={item.icon ? <Icon name={item.icon} /> : undefined}
+                  onSelect={() => item.run()}
+                >
+                  {item.label}
+                </Menu.Item>
+              </>
+            )}
+          </For>
+        </>
+      )}
+    </Menu>
+  )
   return (
     <Toolbar ariaLabel="Agent session">
       {/* The provider's mark, then the title, on one line. The mark takes the title here because
@@ -151,121 +287,51 @@ export function AgentDetailHeader(props: { task: Task; model: AgentPaneModel }) 
           )
         }}
       </Show>
-      <Show when={workflow()}>
-        {(found) => (
-          <Chip
-            leading={<Icon name="workflow" />}
-            onPress={() =>
-              openPane(props.task.id, 'workflows', {
-                kind: 'workflows:show-run',
-                runId: found().run.id,
-                stepId: found().step.id,
-              })
-            }
-          >
-            {`Workflow: ${found().run.name} · ${found().step.name}`}
-          </Chip>
-        )}
-      </Show>
-      {/* Background commands outlive their turn and their card's place on screen, so the ones still
-          running stay named here (docs/managed-agents/background-commands.md). */}
-      <Show when={runningBackground().length}>
-        {(count) => (
-          <Chip leading={<Icon name="terminal" />} title={runningBackground().join('\n')}>
-            {count() === 1 ? '1 command running in background' : `${count()} commands running in background`}
-          </Chip>
-        )}
-      </Show>
-      {/* The custom agent the session started from, by the name it had then. The snapshot is the
-          session's own, so renaming or deleting the agent later leaves this alone. */}
-      <Show when={sessionCustomAgent(model.selected()?.config ?? {})}>
-        {(agent) => <Chip leading={<Icon name="bot" />}>{agent().name}</Chip>}
-      </Show>
-      <Show when={model.selectedManagedParent()}>
-        {(parent) => (
-          <Chip leading={<Icon name="arrow-left" />} onPress={() => model.openManagedParent()}>
-            {`Parent: ${parent().title}`}
-          </Chip>
-        )}
-      </Show>
+      <Only formFactors={['desktop', 'tui']}>
+        <For each={sessionChips()}>
+          {(chip) => (
+            <Chip leading={<Icon name={chip.icon} />} title={chip.title} onPress={chip.press}>
+              {chip.label}
+            </Chip>
+          )}
+        </For>
+      </Only>
       {/* Right after the title, not after the session's controls: the title truncates, so a spacer
           further along the bar never gets any width and the state and the buttons end up crowding
           the last word of it. */}
       <Toolbar.Spacer />
       <Show when={model.selected()}>
-        {(narrowed) => {
-          const session = narrowed
-          const subagentId = () => selectedManagedSubagent(session().id)
-          const subagent = () => session().subagents.find((child) => child.id === subagentId())
-          return (
-            <>
-              <Inline>
-                <Show when={subagentId()} fallback={<RuntimeStateIcon state={session().runtimeState} />}>
-                  <SubagentStateIcon status={subagent()?.status} />
-                </Show>
-                <Text emphasis="muted">
-                  {subagentId() ? subagentStatusLabel(subagent()?.status) : session().runtimeState}
-                </Text>
-              </Inline>
-              <Button
-                size="sm"
-                disabled={subagentId() ? !canStopSubagent(session(), subagent()) : !canStopAgent(session())}
-                onPress={() => {
-                  const childId = subagentId()
-                  void model.action(() =>
-                    childId
-                      ? managedAgentApi.cancelSubagent(session().id, childId)
-                      : managedAgentApi.cancel(session().id),
-                  )
-                }}
-              >
-                Stop
-              </Button>
-              {/* A Menu, not a Picker: nobody types to find "Rename session" among a handful of actions. */}
-              <Menu
-                ariaLabel="Session actions"
-                placement="bottom-end"
-                trigger={({ toggle, open }) => (
-                  <IconButton icon="ellipsis" label="Session actions" opens="menu" expanded={open()} onPress={toggle} />
-                )}
-              >
-                {(menu) => (
-                  <For
-                    each={model
-                      .sessionActions()
-                      .filter((item) => props.task.status === 'active' || READS_STORED_SESSION.has(item.id))}
-                  >
-                    {(item) => (
-                      <>
-                        {/* The one destructive action is last, below a rule
-                            (docs/ui-design/interaction.md § Menus and right-click). */}
-                        <Show when={item.tone === 'danger'}>
-                          <Menu.Separator />
-                        </Show>
-                        <Menu.Item
-                          context={menu}
-                          disabled={!!item.disabled}
-                          tone={item.tone}
-                          title={item.description}
-                          leading={item.icon ? <Icon name={item.icon} /> : undefined}
-                          onSelect={() => item.run()}
-                        >
-                          {item.label}
-                        </Menu.Item>
-                      </>
-                    )}
-                  </For>
-                )}
-              </Menu>
-            </>
-          )
-        }}
+        <Only formFactors={['desktop', 'tui']}>
+          <Inline>
+            {stateIcon()}
+            <Text emphasis="muted">{stateWords()}</Text>
+          </Inline>
+          <Button size="sm" disabled={!canStop()} onPress={stop}>
+            Stop
+          </Button>
+          {sessionMenu(false)}
+        </Only>
+        {/* A phone's bar has room for one row: the state without its words, and Stop only while
+            there is something to stop. */}
+        <Only formFactors={['narrow']}>
+          {stateIcon(stateWords())}
+          <Show when={canStop()}>
+            <IconButton icon="circle-stop" label="Stop" size="sm" onPress={stop} />
+          </Show>
+        </Only>
       </Show>
       <AgentUsageIndicator defaultAccounts={usageAccounts()} providers={model.providers()} />
       {/* An archived task has no worktree to start a session in (docs/panes/contributions.md § Contributions). */}
       <Show when={props.task.status === 'active'}>
         <Picker<NewSessionChoice>
-          label="New"
+          label={
+            <>
+              <Only formFactors={['desktop', 'tui']}>New</Only>
+              <Only formFactors={['narrow']}>
+                <Icon name="plus" />
+              </Only>
+            </>
+          }
           ariaLabel="New session"
           size="sm"
           placement="bottom-end"
@@ -315,9 +381,15 @@ export function AgentDetailHeader(props: { task: Task; model: AgentPaneModel }) 
           }
         />
       </Show>
+      {/* Last on a phone, where it also holds the chips the bar has no room for. */}
+      <Only formFactors={['narrow']}>
+        <Show when={model.selected()}>{sessionMenu(true)}</Show>
+      </Only>
     </Toolbar>
   )
 }
+
+type SessionChip = { id: string; icon: string; label: string; title?: string; press?: () => void }
 
 // The session actions an archived task keeps, because they only read or relabel what is stored. Fork,
 // retry, compact and the terminal hand-offs all start a harness, and the task has no worktree for one.
@@ -487,7 +559,9 @@ export default function AgentPaneDetail(props: { task: Task; model: AgentPaneMod
           <AgentConversation
             sessionId={narrowed().id}
             viewKeyPrefix="agents"
-            autoFocus={!archived()}
+            // On a phone, focus raises the keyboard over the transcript. It rises when someone taps
+            // the message box.
+            autoFocus={!archived() && formFactor() !== 'narrow'}
             composerDisabled={archived()}
             note={archived() ? 'This task is archived. Restore it to send a message.' : undefined}
           />

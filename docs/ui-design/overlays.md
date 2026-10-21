@@ -94,6 +94,13 @@ when one is up (`--keyboard-inset`, which [the phone's shell](../mobile.md#the-k
 its actions at the foot. An `alertdialog` stays a box, because its question is short. The rule is in
 `overlays.css`, keyed on the root attribute like the drawer's.
 
+On a phone, `createAnchoredPopover` drops the anchored position, so every `Popover`, `Menu`, `Picker`,
+and `Select` opens as a sheet along the bottom edge, full width, above the keyboard. A caller's
+`placement` and `minWidth` don't apply there. The hook puts a backdrop just before the surface. A tap
+on it closes that sheet and no other, and it never reaches the control underneath. **Escape** closes
+the top sheet, as on the desktop. The geometry is the narrow rule on `.ui-popover` in
+`primitives.css`. Tooltips aren't popovers and don't change.
+
 Changing `Modal.size` animates the dialog's width and height over 220 milliseconds. The same dialog
 stays mounted, so its fields and focus survive expansion. Reduced motion disables the animation.
 Generation dialogs can start compact and expand when they reveal a result field.

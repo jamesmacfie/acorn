@@ -16,7 +16,9 @@ draws the same plugin panes the desktop draws, one at a time, with its own chrom
 | `apps/mobile/src/client/start.tsx` | The client runtime, the Node selection, and the first render |
 | `apps/mobile/src/client/roster.ts` | Registers the built-in plugins in `plugins.ts` after the first frame |
 | `apps/mobile/src/client/Shell.tsx` | Sign-in, the wait for the gateway, and the routes |
-| `apps/mobile/src/client/Home.tsx` | **Needs you**, **New task**, and the task list |
+| `apps/mobile/src/client/Workspaces.tsx` | The list of workspaces, or of projects with workspaces off |
+| `apps/mobile/src/client/Workspace.tsx` | A workspace's dashboard and tasks, **New task**, and their bar |
+| `apps/mobile/src/client/waiting.tsx` | The one attention inbox, and which workspace each row waits in |
 | `apps/mobile/src/client/NeedsYou.tsx` | The list of what agents are waiting on |
 | `apps/mobile/src/client/keyboardInset.ts` | Measures the on-screen keyboard |
 | `apps/mobile/src/client/TaskScreen.tsx` | One pane of a task, and the bar of its panes |
@@ -43,25 +45,33 @@ it was.
 
 ### Screens
 
-The shell has three routes:
-
 | Route | What it shows |
 | --- | --- |
-| `/` | **Needs you**, then tasks grouped by workspace. Each task row has the task's state: the words of the desktop rail's markers for it. |
+| `/` | The workspaces in the Node's order, or the visible projects with `core.workspaces` off, from the desktop picker's `pickerWorkspaces`. Each row has its `WorkspaceIdentity`, its name, its task count, and how many items wait in it. What waits on the Node itself is listed under them. |
+| `/w/:workspaceId` | The workspace's dashboard, which is empty |
+| `/w/:workspaceId/tasks` | **Needs you** for the workspace, then its tasks grouped by its visible projects. Each task row has the task's state: the words of the desktop rail's markers for it. |
 | `/t/:taskId` | The first pane the task offers, once the built-in plugins have registered and the Node has said which of them it runs |
 | `/t/:taskId/:paneId` | That pane, under a bar with **Back**, the title, and the state, over a bar of the task's panes |
 
-**Needs you** is the desktop bell's inbox (`createAttentionInbox`), drawn as a list above the tasks. It
-hides while nothing waits, and the title reads "Tasks · 2 waiting". A row names the agent and what it
-asks, then the task and the session's state. A tap runs the source's own target handler, which selects
-the session and shows its pane in the task's layout, and then opens that pane. The phone reads the pane
-the handler showed from the layout, so a workflow gate opens Workflows the same way. The phone never
-persists that layout. The inbox is made after the built-in plugins register, because it reads the
-registered sources once.
+The two workspace routes share a bottom bar of **Dashboard** and **Tasks**, drawn like the task's bar
+of panes. **Tasks** carries a marker while something waits in the workspace, so someone on the empty
+dashboard can see it. The top bar's title is the workspace's name, and on `/` it's **Workspaces** or
+**Projects**, from `createWorkspaceWords`. A task route names no workspace, so a link from a
+notification works too. **Back** from a task goes to the tasks of the workspace its project is in,
+from `workspaceForProject`.
 
-**New task** is in the top bar. It opens the desktop's `TaskDraftDialog` with every visible project, as a
-full-screen sheet ([dialogs](./ui-design/overlays.md#dialogs)), and opens the task it makes.
-The desktop offers the active workspace's projects, and the phone has no active workspace.
+**Needs you** is the desktop bell's inbox (`createAttentionInbox`). `WaitingProvider` makes it once
+for every screen, after the built-in plugins register, because it reads the registered sources once.
+A row waits in the workspace of its task's project, or else of its project. A row that names neither
+is about the Node, and `/` lists it. The list hides while nothing waits. A row names the agent and what
+it asks, then the task and the session's state. A tap runs the source's own target handler, which
+selects the session and shows its pane in the task's layout, and then opens that pane. The phone reads
+the pane the handler showed from the layout, so a workflow gate opens Workflows the same way. The
+phone never persists that layout.
+
+**New task** is in the top bar of a workspace's tasks. It opens the desktop's `TaskDraftDialog` with the
+workspace's visible projects, as the desktop offers the active workspace's, in a full-screen sheet
+([dialogs](./ui-design/overlays.md#dialogs)), and opens the task it makes.
 
 The pane is the contribution's own component inside a `ContributionBoundary`, the way the terminal
 client draws one. The phone doesn't use `TaskPaneHost`, which draws a row of panes from the task's
@@ -149,18 +159,7 @@ an init script, set its `height`, and dispatch `resize`.
 
 ## The conversation
 
-The Agents pane is the shared one, and the phone adds no code to it. These parts were checked at 390
-pixels:
-
-- Each permission button takes a whole row. A lone single-choice question draws a button for each
-  option, and the tap on one is the answer, with no dropdown to open and no **Submit answers** to find.
-  A question that takes several answers, or a typed one, draws as on the desktop. `AgentRequestCard`
-  reads `formFactor()` from `@acorn/plugin-api/client` for both
-  ([request cards](./managed-agents/transcript.md#request-cards)).
-- **Stop** is in the pane's header while a turn runs.
-- A long tool call is folded, and the transcript scrolls without moving the composer.
-- **Attach** opens the page's own file chooser, because the phone has no `files` group.
-- With the keyboard up, the composer and **Send** stay in view.
+[The agent pane on a phone](./mobile/agent-pane.md) covers how the shared Agents pane draws here.
 
 ## Narrow layouts
 

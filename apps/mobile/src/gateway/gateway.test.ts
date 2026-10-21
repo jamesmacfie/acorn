@@ -318,7 +318,7 @@ describe('the event socket', () => {
 
 describe('the web app', () => {
   it('serves the page with a same-origin script policy, for the app’s own routes too', async () => {
-    for (const path of ['/', '/t/task-1']) {
+    for (const path of ['/', '/w/workspace-1', '/w/workspace-1/tasks', '/t/task-1']) {
       const reply = await send(path)
       expect(reply.status).toBe(200)
       expect(reply.body).toContain('<title>Acorn</title>')

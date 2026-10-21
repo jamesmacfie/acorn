@@ -625,6 +625,25 @@ textarea.ui-input[data-grow] { flex: 1; min-height: 0; resize: none; }
   border-radius: var(--radius-popover);
   box-shadow: var(--elev-popover);
 }
+/* Narrow: a sheet along the bottom edge, full width, stopping above the keyboard (--keyboard-inset,
+   which the phone's shell keeps). surfaceStyle() leaves the geometry to this rule on a phone, and
+   createAnchoredPopover draws the backdrop. A Picker's list has its own class but the same hook. */
+:root[data-form-factor='narrow'] :is(.ui-popover, .repo-picker-popover-fixed) {
+  inset: auto 0 var(--keyboard-inset, 0px);
+  width: auto;
+  max-width: none;
+  max-height: calc(100dvh - var(--keyboard-inset, 0px) - env(safe-area-inset-top) - var(--space-8));
+  overflow-y: auto;
+  padding-bottom: max(var(--space-1), env(safe-area-inset-bottom));
+  border-width: var(--bw) 0 0;
+  border-radius: var(--radius-popover) var(--radius-popover) 0 0;
+}
+.ui-sheet-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: var(--z-picker);
+  background: var(--scrim);
+}
 /* A menu wants its items against the edge, where the hover band reaches the full width. A dialog
    holds prose and numbers, and 2px of surface left them touching the border. Anything that wants
    the tight surface back sets `padding: 0` on its own content, the way the notification inbox does. */
@@ -1992,6 +2011,23 @@ button.ui-chip:hover { background: var(--bg-hover); border-color: var(--accent);
 .ui-btn[data-size='xs'] { min-height: var(--control-h-xs); padding: 0 var(--space-3); font-size: var(--fs-xs); }
 /* Not when armed: the armed prompt is words, and this rule comes after the one that widens it. */
 .ui-btn[data-size='xs'][data-icon-only]:not([data-armed]) { width: var(--control-h-xs); }
+/* Narrow: a small or extra small control draws smaller than a fingertip, so an invisible box centred
+   on it keeps a 44px tap area, Apple's guideline. `:where` keeps the `relative` at zero specificity,
+   so a control some other rule positions keeps that position and still anchors the box. */
+:where(:root[data-form-factor='narrow'] :is(.ui-btn, .ui-select):is([data-size='sm'], [data-size='xs'])) {
+  position: relative;
+}
+:root[data-form-factor='narrow'] :is(.ui-btn, .ui-select):is([data-size='sm'], [data-size='xs'])::after {
+  content: '';
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: max(100%, 44px);
+  height: max(100%, 44px);
+  transform: translate(-50%, -50%);
+}
+/* Wide enough that two extra small neighbours' tap areas, 8px past each edge, don't overlap. */
+:root[data-form-factor='narrow'] :is(.ui-toolbar, .ui-toolbar-group:not([data-joined])) { column-gap: var(--space-8); }
 /* An <a class="ui-btn"> has to shed the UA's link decoration and pick up the button's box. */
 a.ui-btn { text-decoration: none; }
 a.ui-btn:hover { text-decoration: none; }

@@ -6,7 +6,7 @@ Date: October 17, 2026. Status: shipped October 21, 2026. Needs [phase 3](./03-n
 ## Completion note
 
 Completed October 21, 2026. [Mobile web app](../../mobile.md) owns the shipped behavior,
-[the conversation](../../mobile.md#the-conversation) owns the card's phone behavior, and
+[the conversation](../../mobile/agent-pane.md) owns the card's phone behavior, and
 [the gate](../../notifications/gate.md#keeping-the-inbox-current) owns the inbox refresh. This page
 keeps what the later phases need.
 

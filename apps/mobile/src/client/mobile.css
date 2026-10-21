@@ -1,5 +1,5 @@
-/* The phone's chrome: a bar on top, the screen under it, and on a task, a bar of its panes at the
-   bottom. Everything inside a screen is the kit's and the plugins'. The bars pad around the notch and
+/* The phone's chrome: a bar on top, the screen under it, and on a task or a workspace, a bar of its
+   views at the bottom. Everything inside a screen is the kit's and the plugins'. The bars pad around the notch and
    the home indicator, which `viewport-fit=cover` in index.html lets the page draw under. */
 
 .mobile-shell {
@@ -54,8 +54,8 @@
   min-width: 0;
 }
 
-/* Scrolls sideways when the panes don't fit. */
-.mobile-panes {
+/* A task's panes, or a workspace's views. Scrolls sideways when they don't fit. */
+.mobile-tabs {
   overflow-x: auto;
   padding: 0 env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left);
   border-top-width: var(--bw);
@@ -63,7 +63,7 @@
 
 /* The desktop switcher's rail controls fill a rail's width. Here each takes its label's width, with
    the label under the icon. */
-.mobile-panes > .tabrail-tab {
+.mobile-tabs > .tabrail-tab {
   flex: none;
   flex-direction: column;
   gap: var(--space-1);
@@ -72,8 +72,8 @@
   padding: 0 var(--space-3);
 }
 
-/* With the keyboard up the pane needs every line, and the bar's panes are out of reach under it. */
-:root[data-keyboard] .mobile-panes {
+/* With the keyboard up the pane needs every line, and the bar is out of reach under it. */
+:root[data-keyboard] .mobile-tabs {
   display: none;
 }
 

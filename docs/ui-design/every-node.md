@@ -182,5 +182,5 @@ shared provider error codes. It adds no kit node.
 | Node | Focus | At 80×24 |
 | --- | --- | --- |
 | `Rectangle` | stop | Absent, with two exceptions the node handles itself: `kind="pty"` and `kind="editor"` are native, and `webview` and `frame` draw their `<Fallback>` child or nothing |
-| `Only` | none | Children exist on the named hosts and nowhere else. No fallback wanted |
+| `Only` | none | Children exist on the named hosts or form factors and nowhere else. No fallback wanted |
 | `Fallback` | none | What to draw where the matrix says this host cannot draw the node it is inside |

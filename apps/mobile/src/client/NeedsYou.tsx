@@ -1,18 +1,17 @@
 import { For, Show } from 'solid-js'
 import { useNavigate } from '@solidjs/router'
-import { openTarget, type AttentionInbox } from '@acorn/client-core/features/notifications'
+import { openTarget } from '@acorn/client-core/features/notifications'
 import { layoutForTask } from '@acorn/client-core/features/tasks/tasks.ts'
 import type { Task } from '@acorn/client-core/infra/queries.ts'
 import { Text } from '@acorn/client-core/kit/components/content'
 import { Row, SectionHeader } from '@acorn/client-core/kit/components/primitives.tsx'
+import type { WaitingRow } from './waiting'
 
-type Rows = AttentionInbox['rows']
-
-/** What is waiting on a person, across every task: the desktop bell's "Needs you" section as a list.
- *  Nothing draws while nothing waits. */
-export function NeedsYou(props: { rows: Rows; tasks: Task[] | undefined }) {
+/** What is waiting on a person: the desktop bell's "Needs you" section as a list, of the rows the
+ *  screen picks. Nothing draws while nothing waits. */
+export function NeedsYou(props: { rows: WaitingRow[]; tasks: Task[] | undefined }) {
   const navigate = useNavigate()
-  const open = ({ item }: Rows[number]) => {
+  const open = ({ item }: WaitingRow) => {
     // The source's own handler selects the thing and shows its pane in the task's layout. The route
     // names the pane on a phone, so it takes the one the handler just showed.
     openTarget(item.taskId ?? '', item.target)

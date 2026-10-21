@@ -101,8 +101,18 @@ resolves the reference and `kit/components/content/ArtworkFrame.tsx` draws the s
 it's the `fallback` in brackets, with no image read.
 
 **`Only` and `Fallback` are the host wrappers.** `Only hosts={['dom']}` draws its children only on the
-named hosts. `Fallback forNode="Grid"` draws its children where the matrix says this host can't draw
-that node.
+named hosts. `Only formFactors={['narrow']}` draws them only on a phone, and when both lists are given,
+both must match. The DOM `Only` reads the root attribute that `isNarrow()` reads, and the terminal's
+`Only` matches `tui`. `Fallback forNode="Grid"` draws its children where the matrix says this host
+can't draw that node.
+
+**A control's shape on a phone is the kit's, and what a plugin shows is the plugin's.** When a
+control needs a different shape on a phone, the kit component changes it and no plugin does, the
+way the terminal draws a `Popover` as a block under its trigger. Narrow is a projection of the `dom`
+host. A popover, menu, picker, or select opens as a sheet along the bottom edge, and a small control
+keeps a 44px tap area. When the content itself differs, such as a usage button with no words on it,
+the plugin says so with `Only formFactors`. Nothing reads the window's width. The prop is a plain
+list, so it crosses to a plugin that draws in a worker.
 
 **A node has one name, and a handler has one of twelve.** On the remote path a node is a type string
 and a prop is JSON. A dotted name can't cross, so `Modal.Body`, `Modal.Actions`, `Tabs.Panel`, and
