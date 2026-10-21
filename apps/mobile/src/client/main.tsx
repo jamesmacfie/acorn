@@ -4,3 +4,6 @@ import { installPlatform } from './platform'
 // `window.acorn` existed would find no transport for the life of the page.
 installPlatform()
 await import('./start')
+
+// The app's own files stay for a relaunch (apps/mobile/public/sw.js). The dev server has no use for them.
+if (import.meta.env.PROD && 'serviceWorker' in navigator) void navigator.serviceWorker.register('/sw.js')

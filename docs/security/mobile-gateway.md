@@ -13,7 +13,7 @@ gets a session cookie. The Node's auth and routes don't change.
 
 | File | What it owns |
 | --- | --- |
-| `apps/mobile/src/gateway/main.ts` | Picks and pairs the Node, starts the broker and the server, prints the sign-in code, and runs `sessions` and `revoke` |
+| `apps/mobile/src/gateway/main.ts` | Picks and pairs the Node, starts the broker and the server, prints the sign-in code, and runs `sessions` and `revoke`. It's also the CLI's `mobile-gateway` bundle entry |
 | `apps/mobile/src/gateway/gateway.ts` | The HTTP server: the checks, sign-in, `/node` forwarding, the `/events` socket, and the web app's files |
 | `apps/mobile/src/gateway/sessions.ts` | Phone sessions on disk |
 | `apps/mobile/src/gateway/denylist.ts` | The Node routes a phone can't reach |
@@ -51,7 +51,9 @@ offline. The phone's next `/node` request gets `401 signed_out`.
 ### Check every request
 
 The gateway listens on `127.0.0.1` only. It serves one address, given with `--origin`, and defaults
-to `http://127.0.0.1:PORT`. These checks run before anything else:
+to `http://127.0.0.1:PORT`. Behind `tailscale serve`, that address is the tailnet name, such as
+`https://HOST.TAILNET.ts.net`, with a certificate a phone trusts ([use it on a
+phone](../mobile/phone-setup.md)). These checks run before anything else:
 
 - `Host` must be the served address's host, on every request and on the socket upgrade. This stops a
   page on another name that resolves to the gateway from reading its answers.
@@ -127,7 +129,11 @@ a cookie, a code, a token, or a body.
 
 ## Run it
 
-Run `pnpm dev:mobile:gateway` beside `pnpm dev` or `pnpm dev:node`. It attaches to the Node for the
+`acorn mobile` runs the gateway from a packaged build. It takes `--node`, `--port`, and `--origin`, and
+`--app-dir` for a web app that isn't the one beside the CLI. `acorn mobile sessions` and
+`acorn mobile revoke ID` list and end sessions ([the command](../cli/mobile.md)).
+
+In a checkout, run `pnpm dev:mobile:gateway` beside `pnpm dev` or `pnpm dev:node`. It attaches to the Node for the
 checkout's data root, `apps/node/.acorn/`, unless `ACORN_DATA_DIR` names another. Pass `--port` to
 move it from 4320 and `--origin` to serve another address, such as
 `pnpm dev:mobile:gateway -- --origin https://HOST.TAILNET.ts.net`. Then sign in with `curl`:

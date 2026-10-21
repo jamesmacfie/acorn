@@ -7,6 +7,17 @@
     <!-- viewport-fit=cover lets the bars pad themselves with env(safe-area-inset-*) around the notch. -->
     <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
     <title>Acorn</title>
+    <!-- Install to the home screen. The manifest covers Android and Chrome. iOS reads its own tags: the
+         icon, and the standalone flag. theme-color starts at the manifest's value, and client/themeColor.ts
+         follows the active theme. -->
+    <link rel="icon" type="image/png" href="/icon-192.png" />
+    <link rel="manifest" href="/manifest.webmanifest" />
+    <meta name="theme-color" content="#fafafa" />
+    <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-title" content="Acorn" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="default" />
   </head>
   <body>
     <div id="root"></div>

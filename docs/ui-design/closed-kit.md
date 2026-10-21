@@ -169,7 +169,9 @@ free `postMessage` between plugin origins, nested slots, and reopening `frame-sr
 
 ## What the kit and layouts must never do
 
-These 12 constraints keep the terminal client and a future mobile web app possible:
+These 12 constraints keep the terminal client and the [mobile web app](../mobile.md) possible. The mobile shell
+sets its form factor on the root element, and layouts read that, never the window
+([narrow mode](../mobile.md#narrow-mode)):
 
 1. No `class`, `className`, or `style` prop on any kit node.
 2. No raw scale value in a plugin-facing enum.

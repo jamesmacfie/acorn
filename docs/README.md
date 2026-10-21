@@ -192,6 +192,7 @@ Start with the plugin map, then follow the authoring guide or API reference.
 | [testing/rail-artwork-2026-10-19.md](./testing/rail-artwork-2026-10-19.md) | One desktop check of a plugin's live rail artwork and tooltip words, using the acme-tracker example. |
 | [testing/context-references-2026-10-19.md](./testing/context-references-2026-10-19.md) | One check of `#` context references in the desktop and terminal clients, with real Claude Code and Codex sessions. |
 | [testing/triggers-2026-10-21.md](./testing/triggers-2026-10-21.md) | The first-party suggested triggers: what the dialog offered, the threshold and run-fails walks, and the real-account walks that didn't run. |
+| [testing/mobile-on-a-phone.md](./testing/mobile-on-a-phone.md) | The real-device acceptance for the mobile web app: eight checks on an iPhone and an Android phone, none run yet. |
 | [testing/sentry-baseline-2026-10-13.md](./testing/sentry-baseline-2026-10-13.md) | A day of Sentry telemetry from real use: git calls, session-open timing, agent process and renderer memory, and response sizes. The before numbers for UI performance phases 06 to 10. |
 | [testing/ui-performance-open-checks-2026-10-14.md](./testing/ui-performance-open-checks-2026-10-14.md) | The real-window and Sentry checks still to run for all ten UI performance phases. |
 | [testing/runtime-packaging-2026-10-09.md](./testing/runtime-packaging-2026-10-09.md) | Dated bytes removed from desktop staging and a standalone install by the October 2026 runtime packaging work. |
@@ -210,12 +211,14 @@ Start with the plugin map, then follow the authoring guide or API reference.
 | [shell.md](./shell.md) | The Tauri shell: schemes, custody, webviews, the helper, and packaging. |
 | [tui.md](./tui.md) | The terminal client: `acorn` in a terminal, its process model, its host switch, how it draws a frame, and its chrome. |
 | [mobile.md](./mobile.md) | The mobile web app: its platform seam over the gateway, its screens, how to run it, and how to drive it at phone width. |
+| [mobile/phone-setup.md](./mobile/phone-setup.md) | Reaching the mobile web app over Tailscale, installing it to the home screen, its service worker, and its reconnect on return. |
 | [cli.md](./cli.md) | Headless `acorn` commands, Node selection, read resources, output, and exit codes. |
 | [cli/workspaces-projects-tasks.md](./cli/workspaces-projects-tasks.md) | CLI core writes, retries, stdin piping, and task script reads. |
 | [cli/agents-and-workflows.md](./cli/agents-and-workflows.md) | CLI agent sessions, workflow runs, and the run list. |
 | [cli/plugin-commands.md](./cli/plugin-commands.md) | Discovering and running a plugin's CLI commands. |
 | [cli/local-service.md](./cli/local-service.md) | The CLI-owned background Node: start, status, and stop. |
 | [cli/browser-host.md](./cli/browser-host.md) | `acorn browser install`, `status`, and `uninstall`: registering the extension's native host. |
+| [cli/mobile.md](./cli/mobile.md) | `acorn mobile`: serve the phone app, and list and end phone sessions. |
 | [browser-extension.md](./browser-extension.md) | The Chrome and Firefox extension, its native bridge, the native messaging contract, pairing, and sidebar states. |
 | [browser-extension/native-messaging.md](./browser-extension/native-messaging.md) | The frames, operations, and events between the extension's background and its native host, and the frame limits the host enforces. |
 | [browser-extension/setup.md](./browser-extension/setup.md) | Installing the extension's development builds and native bridge on macOS, pairing, repair and removal, and every sidebar state with its next step. |

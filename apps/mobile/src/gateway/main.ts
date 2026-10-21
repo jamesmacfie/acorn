@@ -1,3 +1,4 @@
+import { existsSync } from 'node:fs'
 import { hostname } from 'node:os'
 import { join } from 'node:path'
 import { fileURLToPath } from 'node:url'
@@ -23,7 +24,7 @@ import { sessionStore } from './sessions'
 // as a device of its own.
 
 const DEFAULT_PORT = 4320
-const USAGE = `Usage: gateway [--node NAME|URL] [--port N] [--origin URL]
+const USAGE = `Usage: gateway [--node NAME|URL] [--port N] [--origin URL] [--app-dir PATH]
        gateway sessions
        gateway revoke ID`
 
@@ -58,12 +59,17 @@ function printSignIn(origin: string, code: string): void {
   console.log(`  Another code         kill -USR1 ${process.pid}\n`)
 }
 
-async function serve(flags: { node?: string; port?: string; origin?: string }): Promise<void> {
+async function serve(flags: { node?: string; port?: string; origin?: string; 'app-dir'?: string }): Promise<void> {
   const port = flags.port === undefined ? DEFAULT_PORT : Number(flags.port)
   if (!Number.isInteger(port) || port < 1 || port > 65_535) throw new Error(`--port takes a port number.\n${USAGE}`)
   // The listening address itself, because `localhost` can resolve to IPv6 and reach something else.
   const origin = new URL(flags.origin ?? `http://127.0.0.1:${port}`).origin
   if (!/^https?:/.test(origin)) throw new Error(`--origin takes an http or https address.\n${USAGE}`)
+
+  // The built web app. A packaged build names its own copy with --app-dir.
+  const appDir = flags['app-dir'] ?? fileURLToPath(new URL('../../dist', import.meta.url))
+  if (!existsSync(join(appDir, 'index.html')))
+    throw new Error(`The web app isn't built at ${appDir}. Run pnpm --filter @acorn/mobile build, or pass --app-dir.`)
 
   const at = custody(dir)
   const node = await pairedNode(at, flags.node)
@@ -88,7 +94,7 @@ async function serve(flags: { node?: string; port?: string; origin?: string }): 
     sessions,
     codes,
     origin,
-    appDir: fileURLToPath(new URL('../../dist', import.meta.url)),
+    appDir,
     port,
   })
   broker.upsert({ ...toNodeRecord(node), token, ...(node.certPem ? { certPem: node.certPem } : {}) })
@@ -124,7 +130,12 @@ try {
   const { values, positionals } = parseArgs({
     // `pnpm dev:mobile:gateway -- --node x` passes the separator through.
     args: process.argv.slice(2).filter((arg) => arg !== '--'),
-    options: { node: { type: 'string' }, port: { type: 'string' }, origin: { type: 'string' } },
+    options: {
+      node: { type: 'string' },
+      port: { type: 'string' },
+      origin: { type: 'string' },
+      'app-dir': { type: 'string' },
+    },
     allowPositionals: true,
   })
   const [command, ...rest] = positionals

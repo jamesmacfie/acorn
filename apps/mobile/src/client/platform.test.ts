@@ -81,6 +81,7 @@ beforeEach(async () => {
   FakeSocket.opened = []
   fetchMock = vi.fn(async () => json(200, { nodeId: 'node-1', label: 'Studio Mac' }))
   vi.stubGlobal('window', globalThis)
+  vi.stubGlobal('document', Object.assign(new EventTarget(), { visibilityState: 'visible' }))
   vi.stubGlobal('location', new URL('http://127.0.0.1:4321/t/task-1'))
   vi.stubGlobal('WebSocket', FakeSocket)
   vi.stubGlobal('fetch', fetchMock)
@@ -161,6 +162,46 @@ describe('the transport', () => {
     await vi.advanceTimersByTimeAsync(250)
     expect(FakeSocket.opened).toHaveLength(2)
     expect(signedOut()).toBe(false)
+  })
+})
+
+describe('coming back to the foreground', () => {
+  const show = (state: 'hidden' | 'visible') => {
+    Object.assign(document, { visibilityState: state })
+    document.dispatchEvent(new Event('visibilitychange'))
+  }
+
+  it('replaces the socket at once, without waiting out the backoff or saying the Node is offline', async () => {
+    const statuses: NodeStatus[] = []
+    acorn.onNodeStatus((status) => statuses.push(status))
+    socket().open()
+    socket().receive(JSON.stringify({ status: ONLINE }))
+    const slept = socket()
+    show('hidden')
+    expect(FakeSocket.opened).toHaveLength(1)
+    show('visible')
+    expect(FakeSocket.opened).toHaveLength(2)
+    // The old socket's late close is the old one's business.
+    slept.drop()
+    expect(statuses).toEqual([ONLINE])
+    expect(FakeSocket.opened).toHaveLength(2)
+  })
+
+  it('skips the wait when the gateway was unreachable', async () => {
+    socket().open()
+    socket().drop()
+    await vi.advanceTimersByTimeAsync(250)
+    socket().drop()
+    expect(FakeSocket.opened).toHaveLength(2)
+    show('visible')
+    expect(FakeSocket.opened).toHaveLength(3)
+  })
+
+  it('leaves a signed-out phone alone', () => {
+    socket().open()
+    socket().drop(GATEWAY_SIGNED_OUT)
+    show('visible')
+    expect(FakeSocket.opened).toHaveLength(1)
   })
 })
 

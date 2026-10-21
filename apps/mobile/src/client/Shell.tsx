@@ -22,6 +22,7 @@ import { Home } from './Home'
 import { trackKeyboardInset } from './keyboardInset'
 import { SignIn } from './SignIn'
 import { TaskScreen } from './TaskScreen'
+import { trackThemeColor } from './themeColor'
 
 // The phone's screens: sign-in while the gateway says this phone has no session, a wait while it
 // names its Node, and then the routes. The routes draw only once a Node is selected, and the cached
@@ -70,6 +71,7 @@ export function Shell() {
 // person's theme and style from their preferences.
 function Frame(props: ParentProps) {
   trackKeyboardInset()
+  trackThemeColor()
   const client = useQueryClient()
   setTaskLookup((taskId) => client.getQueryData<Task[]>(tasksKey)?.find((task) => task.id === taskId))
   setProjectsLookup(() => client.getQueryData<Project[]>(projectsKey) ?? [])

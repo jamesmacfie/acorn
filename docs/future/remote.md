@@ -40,6 +40,28 @@ Acceptance: a browser can sign in, open a task, supervise an agent, answer a per
 reconnect, and sign out. A revoked session loses HTTP and WebSocket access. Cross-origin and
 unauthorized task requests fail. Reload preserves only the state and credentials the design permits.
 
+### What the mobile programme answered
+
+The [mobile web app](../mobile.md) answered these five decisions for its own deployment, with a gateway
+in front of the Node ([mobile gateway](../security/mobile-gateway.md)). They stay open for a browser
+host that the Node serves itself:
+
+1. **Session storage.** The gateway keeps one file per session and renews none. A session lasts until
+   `acorn mobile revoke`. The Node sees one device for every phone, so per-browser devices remain open.
+2. **Authentication.** A one-time code opens a cookie session, and the cookie authenticates both the
+   requests and the socket upgrade. The gateway holds the Node's device token, so the browser has none.
+3. **Cross-site protection.** `Host` and `Origin` checks, a 4 KiB sign-in body with one failure answer, and
+   five attempts per code. A cookie is `HttpOnly`, `Secure`, and `SameSite=Strict`.
+4. **Where the bundle is served.** The gateway serves `apps/mobile/dist` and its service worker, so the
+   Node can't replace the bytes. The Node serving the shell remains open.
+5. **TLS and reachability.** Tailscale's `serve` gives the gateway a trusted certificate and the tailnet
+   gives reachability. Any other trusted HTTPS name works too, but only Tailscale is tested. A Node-served
+   certificate remains open.
+
+Real-device acceptance is still outstanding ([the checklist](../testing/mobile-on-a-phone.md)).
+Background push, browser plugin custody, and more than one Node are in
+[mobile work after the first release](./mobile/later.md).
+
 ## Implement browser plugin custody
 
 Implement the complete `PluginCustody` group, including install and removal of device bundles.

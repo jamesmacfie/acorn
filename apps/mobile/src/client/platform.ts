@@ -108,6 +108,21 @@ export function installPlatform(): void {
     retryMs = Math.min(retryMs * 2, LAST_RETRY_MS)
   }
 
+  // A suspended page can hold a dead socket that never said so, and a live one may have missed events
+  // while it slept. Back in the foreground, the socket is replaced at once instead of waiting out the
+  // backoff. The new socket's first status makes the client re-attach and refetch
+  // (client-core/infra/node/wsClient.ts), and the Node shows offline only if this attempt fails too.
+  document.addEventListener('visibilitychange', () => {
+    if (document.visibilityState !== 'visible') return
+    if (socket) {
+      socket.onclose = null
+      socket.close()
+      socket = undefined
+    }
+    retryMs = FIRST_RETRY_MS
+    connect()
+  })
+
   const acorn = {
     nodeFetch: async (_nodeId: string, request: NodeFetchRequest): Promise<NodeFetchResponse> => {
       const controller = new AbortController()

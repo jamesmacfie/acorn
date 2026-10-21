@@ -28,7 +28,8 @@ The phone installs two groups of the [platform seam](./architecture/node-api.md#
 - `transport` sends each request to `/node` plus the Node path, and keeps an `AbortController` per
   request ID. Events come over one `/events` socket. Frames sent before the socket opens wait in a
   queue. When the socket closes, the transport reports the Node `offline` and reconnects after 250
-  milliseconds, doubling to five seconds.
+  milliseconds, doubling to five seconds. When the page becomes visible again, it replaces the socket at
+  once ([coming back to the foreground](./mobile/phone-setup.md#come-back-to-the-foreground)).
 - `fleet` lists the gateway's one Node from `GET /session`. The verbs that change the fleet reject
   with "Pair and manage Nodes from Acorn on your computer."
 
@@ -78,6 +79,11 @@ without plugin custody has no other source for `hasHostCapability`.
 
 The phone paints the theme and style from the Node's preferences with `applyAppearance`. It doesn't
 restore or save the desktop's persisted shell state, so it never changes a layout the desktop shows.
+
+## Use it on a phone
+
+`acorn mobile` serves the app, and `tailscale serve` gives it the HTTPS name a phone needs. [Use the app on a
+phone](./mobile/phone-setup.md) has the steps, the install, the service worker, and the reconnect.
 
 ## Run it
 
@@ -180,9 +186,9 @@ by `formFactor()` once per mount ([pane layouts](./panes/layout.md#named-layouts
 - Telemetry stays off, because nothing on the phone switches it on.
 - The phone tells the plugin distribution it's the desktop app, because it draws the desktop's DOM
   plugin halves.
-- The built app can't load while the gateway is down, until the app caches its own files
-  ([on a phone](./future/mobile/06-on-a-phone.md)). In the dev server, a cold start shows "Can't
-  reach the gateway" and opens Acorn when the gateway answers.
+- A phone that has never loaded the app can't open it while the gateway is down. Afterward the service
+  worker draws the shell, which says "Can't reach the gateway" until the gateway answers.
+- No one has run it on a real phone yet ([the acceptance](./testing/mobile-on-a-phone.md)).
 - The gateway sends no `timeoutMs`, so a request that runs past the broker's 30-second default fails
   with `504`.
 
