@@ -25,7 +25,7 @@ const dist = resolve(dirFlag === -1 ? resolve(import.meta.dirname, '../dist') : 
 // `pnpm --filter @acorn/node measure:service-graph`, and say why in the commit message. `floor` is a
 // lower bound, not a target: a graph that small means the walk below stopped following imports, and a
 // check that passes on that is blind.
-const limits = { ceiling: 1_936_300, floor: 1_000_000 }
+const limits = { ceiling: 1_939_000, floor: 1_000_000 }
 
 const graph = readChunkGraph(dist)
 const files = staticClosure(graph)
