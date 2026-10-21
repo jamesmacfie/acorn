@@ -189,6 +189,7 @@
     "GET /v1/core/security",
     "GET /v1/core/security/secret-publication",
     "GET /v1/core/storage",
+    "GET /v1/core/task-scripts",
     "GET /v1/core/task-statuses",
     "GET /v1/core/tasks",
     "GET /v1/core/tasks/:id/archive-concerns",

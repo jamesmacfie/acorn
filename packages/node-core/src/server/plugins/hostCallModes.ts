@@ -65,7 +65,7 @@ const modes = {
     agentToolProvenance: { verify: 'async' },
     fs: { isContainedPath: 'sync', isValidRepoIdent: 'sync', resolveInRoot: 'sync', confineExistingFile: 'async' },
     git: { git: 'async', gitOrThrow: 'async', gitText: 'async' },
-    proc: { brokerEnv: 'sync', runProcess: 'async', runProcessOrThrow: 'async' },
+    proc: { brokerEnv: 'sync', lowerPriority: 'sync', runProcess: 'async', runProcessOrThrow: 'async' },
     secrets: { use: 'async', useOptional: 'async', seal: 'async', reveal: 'async' },
     tasks: {
       load: 'async',
