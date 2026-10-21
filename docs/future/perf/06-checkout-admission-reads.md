@@ -40,9 +40,7 @@ Decisions and deviations:
    with `worktree-unavailable`. A reservation already prevents the case.
 4. The `git.worktree.add` phase span no longer includes the wait for the queue. That wait shows as
    `checkout.admission.wait`.
-5. `tsc --noEmit` in node-core reports `lowerPriority` missing from `Methods<CoreProcService>` in
-   `server/plugins/hostCallModes.ts`. It comes from phase 4 and isn't touched here. The service budget is
-   1,933,025 B against a ceiling of 1,934,100 B.
+5. The service budget is 1,933,025 B against a ceiling of 1,934,100 B.
 6. A hook that reads the root of the task it is creating for now waits on its own creation. It did
    before too, because the queue was held.
 

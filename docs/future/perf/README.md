@@ -1,6 +1,8 @@
 # Keep the window responsive under load
 
-Date: October 21, 2026. Status: proposed. Implementation not started.
+Date: October 21, 2026. Status: phases 1 to 9 built on October 22, 2026. None of the targets below
+is measured yet, and phase 10 is open. Each phase's completion note says what it built, what it left,
+and what still needs the owner's machine.
 
 This programme makes the desktop window answer input and show data sooner, most of all while the
 machine is busy with agents and builds. It covers the helper's connection to the Node, background

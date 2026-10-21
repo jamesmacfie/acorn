@@ -56,9 +56,9 @@ Not done:
 For later phases:
 
 - The Node service bundle is 1,933,484 B.
-- Two failures were on the base before this phase and still fail: `routeRegistry.test.ts` lacks phase 3's
-  `GET /v1/core/task-scripts` in its golden list, and four loaded `http` plugin tests in `apps/node` fail
-  with "Unclassified host context method ... core.proc.lowerPriority" from phase 4.
+- Two failures from phases 3 and 4 were on the base: the route golden list lacked
+  `GET /v1/core/task-scripts`, and loaded plugins failed on `core.proc.lowerPriority`. Both are fixed
+  on the programme branch, and `lowerPriority` now lives in `core/priority.ts`, off the plugin context.
 
 Date: October 21, 2026. Status: proposed. Can run beside phases 7 and 8.
 

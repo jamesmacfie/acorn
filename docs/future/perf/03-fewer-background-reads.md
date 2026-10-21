@@ -75,9 +75,9 @@ Not done:
 
 For later phases:
 
-- The Node service bundle is 1,932,148 bytes against a ceiling of 1,931,900. The base measured
-  1,930,648, so this phase adds 1,500 bytes, from the two routes and Docker's remembered list. The
-  ceiling isn't raised here.
+- The Node service bundle is 1,932,148 bytes. The base measured 1,930,648, so this phase adds 1,500
+  bytes, from the two routes and Docker's remembered list. The coordinator raised the ceiling to
+  1,934,100 in a separate commit.
 - Phase 4: Docker summaries now run `docker ps` at most once every 10 seconds for each Node, and a
   failing daemon once every 30.
 - Phase 9: the agent pane's harness list is enabled once the pane is drawn. The host marks it drawn
