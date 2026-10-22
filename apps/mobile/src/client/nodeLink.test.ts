@@ -42,7 +42,6 @@ function fakeChannel(listeners: ChannelListeners): FakeChannel {
 let channels: FakeChannel[]
 let statuses: NodeStatus[]
 let frames: unknown[]
-let opens: (() => Promise<void>)[]
 let openFails: Error[]
 let signedOut: LinkHooks['signedOut'] & ReturnType<typeof vi.fn>
 let hooks: LinkHooks

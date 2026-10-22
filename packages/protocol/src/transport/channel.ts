@@ -1,5 +1,4 @@
 import { z } from 'zod'
-import { nodeFetchRequestSchema } from './broker.ts'
 
 // What crosses a phone's encrypted channel to a Node (docs/relay/phone-channel.md). Each message is a JSON
 // header, plus bytes for the three that carry a body. The shapes are a request and its answer, and the event

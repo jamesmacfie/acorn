@@ -12,7 +12,7 @@ import type { Duplex } from 'node:stream'
 // plugin builder inlines every non-builtin (apps/node/scripts/build-plugin.mjs), and ws is CommonJS, so
 // inlining it makes the bundler emit `createRequire` from `node:module`, which the plugin sandbox
 // forbids (server/plugins/nodePluginWorker.ts), taking the whole plugin down with it.
-import type { WebSocket, WebSocketServer } from 'ws'
+import type { WebSocketServer } from 'ws'
 import type { DeviceService } from '../auth/deviceTokens'
 import {
   MAX_NODE_WS_MESSAGE_BYTES,
