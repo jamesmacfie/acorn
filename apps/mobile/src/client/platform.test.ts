@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { SEAM_GROUPS, seamProblems, type SeamGroup } from '@acorn/client-core/infra/platform'
+import type { ChannelClient, ChannelListeners } from '@acorn/channel/client.ts'
 import type { NodeStatus } from '@acorn/protocol/broker.ts'
-import { SIGNED_OUT_CLOSE_CODE as GATEWAY_SIGNED_OUT } from '../gateway/gateway'
 
 // The phone's half of the platform-seam contract, beside the desktop's and the terminal's
 // (apps/tui/src/platform.test.ts). The list below is the decision: a group added to the seam fails
@@ -24,37 +24,6 @@ const LEFT_OUT: SeamGroup[] = [
   'webviews',
 ]
 
-class FakeSocket {
-  static readonly OPEN = 1
-  static opened: FakeSocket[] = []
-  readyState = 0
-  binaryType = 'blob'
-  sent: string[] = []
-  onopen?: () => void
-  onmessage?: (event: { data: unknown }) => void
-  onclose?: (event: { code: number }) => void
-  constructor(readonly url: string) {
-    FakeSocket.opened.push(this)
-  }
-  send(message: string): void {
-    this.sent.push(message)
-  }
-  close(): void {
-    this.readyState = 3
-  }
-  open(): void {
-    this.readyState = FakeSocket.OPEN
-    this.onopen?.()
-  }
-  receive(data: unknown): void {
-    this.onmessage?.({ data })
-  }
-  drop(code = 1006): void {
-    this.readyState = 3
-    this.onclose?.({ code })
-  }
-}
-
 type Acorn = {
   nodeFetch(
     nodeId: string,
@@ -62,34 +31,92 @@ type Acorn = {
   ): Promise<{ status: number; headers: Record<string, string>; body: Uint8Array }>
   nodeAbort(requestId: string): void
   nodeSend(nodeId: string, frame: unknown, options?: unknown): void
+  nodeInterest(nodeId: string | null): void
   onNodeFrame(cb: (nodeId: string, frame: unknown) => void): () => void
   onNodeStatus(cb: (status: NodeStatus) => void): () => void
-  fleetList(): Promise<{ nodes: { nodeId: string; label: string }[] }>
+  fleetList(): Promise<{
+    nodes: { nodeId: string; label: string; endpoint: string; local: boolean }[]
+    statuses: NodeStatus[]
+  }>
+  nodeForget(nodeId: string, revoke: boolean): Promise<void>
+  nodeRename(nodeId: string, label: string): Promise<unknown>
+  nodeAdopt(): Promise<unknown>
 }
 
-const ONLINE: NodeStatus = { nodeId: 'node-1', state: 'online' }
-const json = (status: number, body: unknown) =>
-  new Response(JSON.stringify(body), { status, headers: { 'content-type': 'application/json' } })
+const stored = vi.hoisted(() => ({
+  nodes: new Map<string, { nodeId: string; label: string; channelKey: string; pairedAt: number }>(),
+  // Errors the next channels fail to open with.
+  openFails: [] as Error[],
+}))
+vi.mock('./pairedNodes', () => ({
+  pairedNodes: async () => [...stored.nodes.values()],
+  readToken: async (nodeId: string) => (stored.nodes.has(nodeId) ? `token-for-${nodeId}` : null),
+  forgetPaired: async (nodeId: string) => void stored.nodes.delete(nodeId),
+  renamePaired: async (nodeId: string, label: string) => {
+    const node = stored.nodes.get(nodeId)
+    if (node) stored.nodes.set(nodeId, { ...node, label })
+  },
+}))
 
-let fetchMock: ReturnType<typeof vi.fn>
+type Opened = {
+  nodeId: string
+  channelKey: string
+  listeners: ChannelListeners
+  client: ChannelClient & { sent: unknown[] }
+}
+const opened: Opened[] = []
+vi.mock('./openChannel', () => ({
+  openNodeChannel: async (nodeId: string, channelKey: string, listeners: ChannelListeners) => {
+    const failure = stored.openFails.shift()
+    if (failure) throw failure
+    let end!: () => void
+    const sent: unknown[] = []
+    const client = {
+      sent,
+      closed: new Promise<void>((resolve) => (end = resolve)),
+      close: () => end(),
+      openEvents: async () => true,
+      sendFrame: (json: string) => void sent.push(JSON.parse(json)),
+      request: (
+        request: { path: string; headers: Record<string, string>; body?: Uint8Array },
+        signal?: AbortSignal,
+      ) => {
+        sent.push(request)
+        if (request.path === '/v1/slow')
+          return new Promise((_resolve, reject) =>
+            signal?.addEventListener('abort', () => reject(new Error('aborted'))),
+          )
+        return Promise.resolve({
+          status: 200,
+          headers: { 'content-type': 'application/json' },
+          body: new TextEncoder().encode(`{"node":"${nodeId}"}`),
+        })
+      },
+    }
+    opened.push({ nodeId, channelKey, listeners, client })
+    return client
+  },
+}))
+
 let acorn: Acorn
 let signedOut: () => boolean
-const socket = () => FakeSocket.opened.at(-1)!
+const settle = () => vi.advanceTimersByTimeAsync(0)
 
 beforeEach(async () => {
   vi.useFakeTimers()
-  FakeSocket.opened = []
-  fetchMock = vi.fn(async () => json(200, { nodeId: 'node-1', label: 'Studio Mac' }))
+  opened.length = 0
+  stored.openFails.length = 0
+  stored.nodes.clear()
+  stored.nodes.set('node-1', { nodeId: 'node-1', label: 'Studio Mac', channelKey: 'aa'.repeat(32), pairedAt: 1 })
+  stored.nodes.set('node-2', { nodeId: 'node-2', label: 'Linux box', channelKey: 'bb'.repeat(32), pairedAt: 2 })
   vi.stubGlobal('window', globalThis)
   vi.stubGlobal('document', Object.assign(new EventTarget(), { visibilityState: 'visible' }))
-  vi.stubGlobal('location', new URL('http://127.0.0.1:4321/t/task-1'))
-  vi.stubGlobal('WebSocket', FakeSocket)
-  vi.stubGlobal('fetch', fetchMock)
   vi.resetModules()
   const platform = await import('./platform')
   platform.installPlatform()
   signedOut = platform.signedOut
   acorn = (globalThis as unknown as { acorn: Acorn }).acorn
+  await acorn.fleetList()
 })
 
 afterEach(() => {
@@ -103,135 +130,113 @@ describe('the phone satisfies the platform seam', () => {
     expect(seamProblems(IMPLEMENTED)).toEqual([])
     expect([...IMPLEMENTED, ...LEFT_OUT].sort()).toEqual([...SEAM_GROUPS].sort())
   })
+})
 
-  it('closes on the code the gateway sends a revoked phone', async () => {
-    const { SIGNED_OUT_CLOSE_CODE } = await import('./platform')
-    expect(SIGNED_OUT_CLOSE_CODE).toBe(GATEWAY_SIGNED_OUT)
+describe('the fleet', () => {
+  it('lists every Node this phone is paired with, as not on this computer, at the name the relay uses', async () => {
+    const { nodes } = await acorn.fleetList()
+    expect(nodes).toEqual([
+      { nodeId: 'node-1', label: 'Studio Mac', endpoint: 'https://node-1.relay.acorn', local: false },
+      { nodeId: 'node-2', label: 'Linux box', endpoint: 'https://node-2.relay.acorn', local: false },
+    ])
+  })
+
+  it('forgets a Node on this phone only, and closes its channel', async () => {
+    await acorn.nodeFetch('node-1', { requestId: 'r', path: '/v1/node' })
+    await acorn.nodeForget('node-1', true)
+    expect((await acorn.fleetList()).nodes.map((node) => node.nodeId)).toEqual(['node-2'])
+    await expect(opened[0]!.client.closed).resolves.toBeUndefined()
+    await expect(acorn.nodeFetch('node-1', { requestId: 'r2', path: '/v1/node' })).rejects.toThrow('isn’t paired')
+  })
+
+  it('renames a Node, and has no screen for the other ways into the fleet', async () => {
+    await acorn.nodeRename('node-2', 'Build box')
+    expect((await acorn.fleetList()).nodes.at(-1)?.label).toBe('Build box')
+    await expect(acorn.nodeAdopt()).rejects.toThrow('Nodes screen')
   })
 })
 
 describe('the transport', () => {
-  it('sends a Node request to the gateway under /node and hands back its answer', async () => {
-    fetchMock.mockResolvedValueOnce(json(200, { tasks: [] }))
-    const answer = await acorn.nodeFetch('node-1', {
-      requestId: 'r1',
-      path: '/v1/core/tasks?archived=1',
-      method: 'GET',
-      headers: { 'x-request-id': 'r1' },
+  it('sends each request over the channel of the Node it names, with that Node’s pinned key', async () => {
+    const one = await acorn.nodeFetch('node-1', { requestId: 'r1', path: '/v1/core/tasks?archived=1' })
+    const two = await acorn.nodeFetch('node-2', { requestId: 'r2', path: '/v1/core/tasks' })
+    expect(JSON.parse(new TextDecoder().decode(one.body))).toEqual({ node: 'node-1' })
+    expect(JSON.parse(new TextDecoder().decode(two.body))).toEqual({ node: 'node-2' })
+    expect(opened.map((channel) => [channel.nodeId, channel.channelKey])).toEqual([
+      ['node-1', 'aa'.repeat(32)],
+      ['node-2', 'bb'.repeat(32)],
+    ])
+    expect(opened[0]!.client.sent[0]).toMatchObject({ method: 'GET', path: '/v1/core/tasks?archived=1' })
+    expect(one.status).toBe(200)
+    expect(one.headers['content-type']).toBe('application/json')
+  })
+
+  it('sends a form as the bytes a browser would, with the type that names its boundary', async () => {
+    await acorn.nodeFetch('node-1', {
+      requestId: 'form',
+      path: '/v1/core/attachments',
+      method: 'POST',
+      body: { kind: 'form', parts: [{ name: 'note', value: 'hello' }] },
     })
-    expect(fetchMock).toHaveBeenCalledWith(
-      '/node/v1/core/tasks?archived=1',
-      expect.objectContaining({ method: 'GET', headers: { 'x-request-id': 'r1' } }),
-    )
-    expect(answer.status).toBe(200)
-    expect(answer.headers['content-type']).toBe('application/json')
-    expect(new TextDecoder().decode(answer.body)).toBe('{"tasks":[]}')
+    const sent = opened[0]!.client.sent[0] as { headers: Record<string, string>; body: Uint8Array }
+    expect(sent.headers['content-type']).toMatch(/^multipart\/form-data; boundary=/)
+    expect(new TextDecoder().decode(sent.body)).toContain('hello')
   })
 
   it('aborts a request by its ID', async () => {
-    fetchMock.mockImplementationOnce(
-      (_url: string, init: RequestInit) =>
-        new Promise((_done, fail) => init.signal!.addEventListener('abort', () => fail(new Error('aborted')))),
-    )
-    const pending = acorn.nodeFetch('node-1', { requestId: 'r2', path: '/v1/core/tasks' })
-    acorn.nodeAbort('r2')
+    const pending = acorn.nodeFetch('node-1', { requestId: 'slow', path: '/v1/slow' })
+    await settle()
+    acorn.nodeAbort('slow')
     await expect(pending).rejects.toThrow('aborted')
   })
 
-  it('holds frames until the socket opens, then relays both ways', () => {
-    const frames: unknown[] = []
-    acorn.onNodeFrame((_nodeId, frame) => frames.push(frame))
-    acorn.nodeSend('node-1', { channel: 'term:attach', sessionId: 's1' }, { intent: { kind: 'subscribe' } })
-    expect(socket().url).toBe('ws://127.0.0.1:4321/events')
-    expect(socket().sent).toEqual([])
-    socket().open()
-    expect(socket().sent.map((message) => JSON.parse(message))).toEqual([
-      { frame: { channel: 'term:attach', sessionId: 's1' }, intent: { kind: 'subscribe' } },
-    ])
-    socket().receive(JSON.stringify({ frame: { channel: 'tasks:changed' } }))
-    expect(frames).toEqual([{ channel: 'tasks:changed' }])
+  it('fails a request that outlasts its deadline as a timeout', async () => {
+    const pending = acorn.nodeFetch('node-1', { requestId: 'late', path: '/v1/slow', timeoutMs: 2000 })
+    const failure = pending.catch((error: Error) => error)
+    await vi.advanceTimersByTimeAsync(2000)
+    expect(await failure).toMatchObject({ name: 'TimeoutError', message: expect.stringContaining('2000ms') })
   })
 
-  it('says the Node is offline while the gateway is gone, and reconnects', async () => {
+  it('opens the event feed only for the Node on screen, and hears its frames and status', async () => {
+    const heard: unknown[] = []
     const statuses: NodeStatus[] = []
+    acorn.onNodeFrame((nodeId, frame) => heard.push([nodeId, frame]))
     acorn.onNodeStatus((status) => statuses.push(status))
-    socket().open()
-    socket().receive(JSON.stringify({ status: ONLINE }))
-    socket().drop()
-    expect(statuses.at(-1)).toMatchObject({ nodeId: 'node-1', state: 'offline', error: { code: 'unreachable' } })
-    await vi.advanceTimersByTimeAsync(250)
-    expect(FakeSocket.opened).toHaveLength(2)
+    acorn.nodeInterest('node-1')
+    await settle()
+    expect(opened.map((channel) => channel.nodeId)).toEqual(['node-1'])
+    expect(statuses.at(-1)).toMatchObject({ nodeId: 'node-1', state: 'online' })
+    opened[0]!.listeners.onFrame('{"channel":"term:status","seq":1}')
+    expect(heard).toEqual([['node-1', { channel: 'term:status', seq: 1 }]])
+
+    acorn.nodeSend('node-1', { channel: 'term:attach', id: 't1' })
+    expect(opened[0]!.client.sent.at(-1)).toEqual({ channel: 'term:attach', id: 't1' })
+  })
+
+  it('replays the latest status of each Node to someone who starts listening late', async () => {
+    acorn.nodeInterest('node-2')
+    await settle()
+    const late: NodeStatus[] = []
+    acorn.onNodeStatus((status) => late.push(status))
+    expect(late).toEqual([expect.objectContaining({ nodeId: 'node-2', state: 'online' })])
+  })
+
+  it('replaces the channel of the Node on screen when the page comes back to the foreground', async () => {
+    acorn.nodeInterest('node-1')
+    await settle()
+    ;(document as unknown as EventTarget).dispatchEvent(new Event('visibilitychange'))
+    await settle()
+    expect(opened.filter((channel) => channel.nodeId === 'node-1')).toHaveLength(2)
+  })
+})
+
+describe('the account', () => {
+  it('shows the sign-in screen once a link learns the account session ended', async () => {
+    const { AccountError } = await import('./account')
     expect(signedOut()).toBe(false)
-  })
-})
-
-describe('coming back to the foreground', () => {
-  const show = (state: 'hidden' | 'visible') => {
-    Object.assign(document, { visibilityState: state })
-    document.dispatchEvent(new Event('visibilitychange'))
-  }
-
-  it('replaces the socket at once, without waiting out the backoff or saying the Node is offline', async () => {
-    const statuses: NodeStatus[] = []
-    acorn.onNodeStatus((status) => statuses.push(status))
-    socket().open()
-    socket().receive(JSON.stringify({ status: ONLINE }))
-    const slept = socket()
-    show('hidden')
-    expect(FakeSocket.opened).toHaveLength(1)
-    show('visible')
-    expect(FakeSocket.opened).toHaveLength(2)
-    // The old socket's late close is the old one's business.
-    slept.drop()
-    expect(statuses).toEqual([ONLINE])
-    expect(FakeSocket.opened).toHaveLength(2)
-  })
-
-  it('skips the wait when the gateway was unreachable', async () => {
-    socket().open()
-    socket().drop()
-    await vi.advanceTimersByTimeAsync(250)
-    socket().drop()
-    expect(FakeSocket.opened).toHaveLength(2)
-    show('visible')
-    expect(FakeSocket.opened).toHaveLength(3)
-  })
-
-  it('leaves a signed-out phone alone', () => {
-    socket().open()
-    socket().drop(GATEWAY_SIGNED_OUT)
-    show('visible')
-    expect(FakeSocket.opened).toHaveLength(1)
-  })
-})
-
-describe('signing out', () => {
-  it('follows the gateway when it closes the socket for a revoked session', () => {
-    socket().open()
-    socket().drop(GATEWAY_SIGNED_OUT)
+    stored.openFails.push(new AccountError(401, 'invalid_token'))
+    acorn.nodeInterest('node-1')
+    await settle()
     expect(signedOut()).toBe(true)
-  })
-
-  it('tells a refused socket from a stopped gateway', async () => {
-    fetchMock.mockResolvedValueOnce(json(401, { error: { code: 'signed_out' } }))
-    socket().drop()
-    await vi.advanceTimersByTimeAsync(5_000)
-    expect(signedOut()).toBe(true)
-    expect(FakeSocket.opened).toHaveLength(1)
-  })
-
-  it('follows a signed-out answer to a Node request', async () => {
-    fetchMock.mockResolvedValueOnce(json(401, { error: { code: 'signed_out' } }))
-    await acorn.nodeFetch('node-1', { requestId: 'r3', path: '/v1/core/tasks' })
-    expect(signedOut()).toBe(true)
-  })
-})
-
-describe('the fleet', () => {
-  it('lists the gateway’s one Node by the name the gateway gives it', async () => {
-    const fleet = await acorn.fleetList()
-    expect(fleet.nodes).toEqual([
-      { nodeId: 'node-1', label: 'Studio Mac', endpoint: 'http://127.0.0.1:4321', local: false },
-    ])
   })
 })
