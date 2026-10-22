@@ -19,7 +19,7 @@ import { CHANNEL_HANDSHAKE_TIMEOUT_MS, CHANNEL_MAX_MESSAGE_BYTES } from '@acorn/
 export type ChannelSocket = {
   binaryType: string
   readonly bufferedAmount: number
-  send(data: Uint8Array): void
+  send(data: Uint8Array<ArrayBuffer>): void
   close(code?: number): void
   addEventListener(type: 'message', listener: (event: { data: unknown }) => void): void
   addEventListener(type: 'close', listener: (event: { wasClean: boolean }) => void, options?: { once: boolean }): void
@@ -67,7 +67,8 @@ class SocketStream extends AbstractMessageStream {
     })
   }
   sendData(data: Parameters<AbstractMessageStream['sendData']>[0]) {
-    for (const bytes of data) this.socket.send(bytes)
+    // What libp2p hands over is always a view of an ArrayBuffer, which its type doesn't say.
+    for (const bytes of data) this.socket.send(bytes as Uint8Array<ArrayBuffer>)
     const canSendMore = this.socket.bufferedAmount < MAX_BUFFERED_BYTES
     if (!canSendMore) this.drainPoll ??= setInterval(() => this.checkDrained(), DRAIN_POLL_MS)
     return { sentBytes: data.byteLength, canSendMore }
@@ -123,13 +124,24 @@ async function wrap(
 export const fromHex = (hex: string): Uint8Array =>
   Uint8Array.from(hex.match(/../g) ?? [], (pair) => Number.parseInt(pair, 16))
 
+/** The Node on the other end isn't the one pinned. Retrying can't fix it, and the phone must not go on. */
+export class IdentityMismatchError extends Error {
+  constructor(options?: ErrorOptions) {
+    super('The Node answered with a different identity than the one this phone pinned.', options)
+    this.name = 'IdentityMismatchError'
+  }
+}
+
 // A handshake that fails leaves the stream to close, or the other end waits for a message that never comes.
 async function closingOnFailure<T>(socket: ChannelSocket, handshake: Promise<T>): Promise<T> {
   try {
     return await handshake
   } catch (error) {
     socket.close()
-    throw error
+    // libp2p's name for a peer whose identity key isn't the one the handshake was told to expect.
+    throw error instanceof Error && error.name === 'UnexpectedPeerError'
+      ? new IdentityMismatchError({ cause: error })
+      : error
   }
 }
 

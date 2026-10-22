@@ -190,7 +190,7 @@ export async function serveChannel(socket: ChannelSocket, host: ChannelHost): Pr
         request = new Request(`https://${host.host}${message.path}`, {
           method,
           headers: { ...forwardedHeaders(message.headers), host: host.host },
-          ...(body.byteLength && method !== 'GET' && method !== 'HEAD' ? { body } : {}),
+          ...(body.byteLength && method !== 'GET' && method !== 'HEAD' ? { body: body.slice() } : {}),
           signal: controller.signal,
         })
       } catch {

@@ -6,13 +6,14 @@ import { accountAuth } from '../apps/relay/src/auth.ts'
 import { startRelay } from '../apps/relay/src/relay.ts'
 import { startAccountStub } from '../packages/node-core/src/testkit/accountStub.ts'
 
-const port = (name: string): number => Number(process.env[name] ?? 0)
+// Fixed ports, so `pnpm dev:mobile` and a Node's `ACORN_ACCOUNT_URL` find them again after a restart.
+const port = (name: string, fallback: number): number => Number(process.env[name] ?? fallback)
 const login = process.env.ACORN_DEV_ACCOUNT_LOGIN ?? 'test-account'
 const manual = process.env.ACORN_DEV_ACCOUNT_APPROVE === 'manual'
-const account = await startAccountStub({ port: port('ACORN_DEV_ACCOUNT_PORT'), approveAs: manual ? false : login })
+const account = await startAccountStub({ port: port('ACORN_DEV_ACCOUNT_PORT', 48781), approveAs: manual ? false : login })
 const relay = await startRelay({
   auth: await accountAuth({ url: account.url, log: console.log }),
-  port: port('ACORN_DEV_RELAY_PORT'),
+  port: port('ACORN_DEV_RELAY_PORT', 48782),
   log: (line) => console.log(`[relay] ${line}`),
 })
 account.setRelayUrl(`ws://127.0.0.1:${relay.port}`)

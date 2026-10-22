@@ -1,7 +1,9 @@
 import type { NodePairRequest, NodeProbeResult, NodeRecord } from '@acorn/protocol/broker.ts'
 import { canPairNodes, fleetBridge } from '../platform'
-import type { PairingDecision, PairingRequestResponse, PairingWindow } from '@acorn/protocol/node.ts'
+import type { DevicesResponse, PairingDecision, PairingRequestResponse, PairingWindow } from '@acorn/protocol/node.ts'
 import {
+  coreDeviceRoute,
+  coreDevicesRoute,
   coreNodePowerRoute,
   coreNodeReachRoute,
   corePairRequestRoute,
@@ -117,3 +119,11 @@ export const answerPairingRequest = (
     headers: { 'content-type': 'application/json' },
     body: JSON.stringify({ decision }),
   })
+
+// The devices paired with a Node, newest first, and the one revoke that signs a device out of it. Any
+// paired device may do both, except a phone's (docs/relay/phone-channel.md § What a phone device may do).
+export const readNodeDevices = (nodeId: string): Promise<DevicesResponse> =>
+  readJson<DevicesResponse>(coreDevicesRoute, { nodeId })
+
+export const revokeNodeDevice = (nodeId: string, deviceId: string): Promise<void> =>
+  sendJson(coreDeviceRoute(deviceId), { method: 'DELETE', nodeId })

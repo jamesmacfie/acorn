@@ -7,6 +7,7 @@ import { WorkspaceIdentity } from '@acorn/client-core/features/workspaces/Worksp
 import { activeNodeId } from '@acorn/client-core/infra/node/activeNode.ts'
 import { prefsOptions, projectsOptions, tasksOptions, workspacesOptions } from '@acorn/client-core/infra/queries.ts'
 import { Text } from '@acorn/client-core/kit/components/content'
+import { IconButton } from '@acorn/client-core/kit/components/inputs'
 import { EmptyState, Row } from '@acorn/client-core/kit/components/primitives.tsx'
 import { NeedsYou } from './NeedsYou'
 import { TopBar } from './TopBar'
@@ -48,7 +49,10 @@ export function Workspaces() {
   }
   return (
     <>
-      <TopBar title={words().capitalizedPlural} />
+      <TopBar
+        title={words().capitalizedPlural}
+        action={<IconButton icon="server" label="Nodes" onPress={() => navigate('/nodes')} />}
+      />
       <main class="mobile-body">
         <Show when={list()} fallback={<EmptyState busy title={`Loading ${words().plural}`} />}>
           <For

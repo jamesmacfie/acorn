@@ -1,9 +1,10 @@
-// Keeps the app's own files so a relaunch draws before the gateway answers. A file comes from the
-// network when it can, and from here when it can't. `/node`, `/session` and `/events` are the Node's
-// data, and the client's own query cache keeps what it wants of them, so this never sees them.
+// Keeps the app's own files so a relaunch draws before the network answers. A file comes from the
+// network when it can, and from here when it can't. `/account` is the account service, whose answers are
+// the person's session and tickets, and the Node's data never comes this way at all: it crosses an
+// encrypted channel the client's own query cache keeps what it wants of. So this never sees either.
 // shortcut: files of old builds stay in the cache, which is small; clear them if that ever isn't so.
 const CACHE = 'acorn-app'
-const LIVE = /^\/(node|session|events)(\/|$)/
+const LIVE = /^\/account(\/|$)/
 
 self.addEventListener('fetch', (event) => {
   const { request } = event

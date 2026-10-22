@@ -1,52 +1,31 @@
-import { spawn } from 'node:child_process'
 import { resolve } from 'node:path'
 import { createServer } from 'vite'
 
-// `pnpm dev:mobile [-- --node NAME|URL]`: the gateway, and Vite's dev server in front of it.
+// `pnpm dev:mobile`: Vite's dev server for the phone's web app, with the account service's routes
+// proxied to a stand-in on this computer (docs/mobile.md § Run it). The app expects to be served by the
+// account website, so `/account` has to answer on its own origin.
 //
-// The gateway checks `Host` and `Origin` against the one address phones open, so it serves the dev
-// server's address and the proxy keeps `Host` as the browser sent it. Anything after `--` goes to the
-// gateway. It shares this terminal, which is where it prints the sign-in code and asks for a pairing
-// code the first time it meets a Node.
+// Start the stand-in and its relay first with `pnpm dev:account`, and a Node with remote access on
+// (`pnpm dev:agent` with `ACORN_ACCOUNT_URL` set, then Settings → Account). `ACORN_ACCOUNT_URL` says
+// where the account service is when it isn't on the port `dev:account` uses.
 
 const root = resolve(import.meta.dirname, '..')
-const appPort = Number(process.env.ACORN_MOBILE_PORT ?? 4321)
-const gatewayPort = Number(process.env.ACORN_MOBILE_GATEWAY_PORT ?? 4320)
-const gateway = `http://127.0.0.1:${gatewayPort}`
+const port = Number(process.env.ACORN_MOBILE_PORT ?? 4321)
+const account = process.env.ACORN_ACCOUNT_URL ?? 'http://127.0.0.1:48781'
 
-const child = spawn(
-  process.execPath,
-  [
-    '--import',
-    'tsx',
-    'src/gateway/main.ts',
-    '--port',
-    String(gatewayPort),
-    '--origin',
-    `http://127.0.0.1:${appPort}`,
-    ...process.argv.slice(2).filter((arg) => arg !== '--'),
-  ],
-  { cwd: root, stdio: 'inherit' },
-)
-
-// Spelled out, because Vite's string shorthand rewrites `Host` to the target's. The paths are patterns,
-// because a plain `/node` prefix would also send Vite's own `/node_modules` to the gateway.
-const toGateway = { target: gateway, changeOrigin: false }
+// `changeOrigin` stays off, so the service sees the host the browser used and its session cookie is
+// the app's own. The path is a pattern, so Vite's own paths that begin with `/account` don't go along.
 const server = await createServer({
   configFile: resolve(root, 'vite.config.ts'),
   server: {
-    host: '127.0.0.1',
-    port: appPort,
+    host: process.env.ACORN_MOBILE_HOST ?? '127.0.0.1',
+    port,
     strictPort: true,
-    proxy: {
-      '^/node(/|$)': toGateway,
-      '^/session$': toGateway,
-      '^/events$': { ...toGateway, ws: true },
-    },
+    proxy: { '^/account(/|$)': { target: account, changeOrigin: false } },
   },
 })
 await server.listen()
 server.printUrls()
+console.log(`Account service  ${account}`)
 
-child.once('exit', (code) => void server.close().then(() => process.exit(code ?? 0)))
-for (const signal of ['SIGINT', 'SIGTERM']) process.once(signal, () => child.kill(signal))
+for (const signal of ['SIGINT', 'SIGTERM']) process.once(signal, () => void server.close().then(() => process.exit(0)))

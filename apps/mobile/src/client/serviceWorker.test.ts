@@ -15,7 +15,7 @@ function worker(fetchImpl: (request: unknown) => Promise<Response>) {
   let handler: Handler | undefined
   new Function('self', 'location', 'caches', 'fetch', 'Response', source)(
     { addEventListener: (_type: string, listener: Handler) => (handler = listener) },
-    new URL('https://studio.tail.ts.net'),
+    new URL('https://app.example.test'),
     {
       open: async () => ({ put: async (key: unknown, response: Response) => void stored.set(key, response) }),
       match: async (key: unknown) => stored.get(key),
@@ -34,25 +34,25 @@ function worker(fetchImpl: (request: unknown) => Promise<Response>) {
 }
 
 describe('the service worker', () => {
-  it('leaves the Node’s data to the network and the client’s own cache', async () => {
+  it('leaves the account service to the network', async () => {
     const { visit, stored } = worker(async () => new Response('x'))
-    for (const path of ['/node/v1/core/tasks', '/session', '/events'])
-      expect(await visit(`https://studio.tail.ts.net${path}`)).toBeUndefined()
-    expect(await visit('https://studio.tail.ts.net/node/v1/core/tasks', 'cors', 'POST')).toBeUndefined()
+    for (const path of ['/account/v1/account', '/account/v1/browser/sign-in?next=/'])
+      expect(await visit(`https://app.example.test${path}`)).toBeUndefined()
+    expect(await visit('https://app.example.test/account/v1/tickets', 'cors', 'POST')).toBeUndefined()
     expect(await visit('https://elsewhere.test/app.js')).toBeUndefined()
     expect(stored.size).toBe(0)
   })
 
-  it('keeps the app’s files, and serves them when the gateway is down', async () => {
+  it('keeps the app’s files, and serves them when the network is down', async () => {
     let up = true
     const { visit, stored } = worker(async () => {
       if (!up) throw new TypeError('Failed to fetch')
       return new Response('page')
     })
-    await visit('https://studio.tail.ts.net/t/task-1', 'navigate')
+    await visit('https://app.example.test/t/task-1', 'navigate')
     expect([...stored.keys()]).toEqual(['/'])
     up = false
-    const answer = await visit('https://studio.tail.ts.net/t/task-2', 'navigate')
+    const answer = await visit('https://app.example.test/t/task-2', 'navigate')
     expect(await answer!.text()).toBe('page')
   })
 })

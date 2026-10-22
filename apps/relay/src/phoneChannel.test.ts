@@ -6,7 +6,7 @@ import { join } from 'node:path'
 import { WebSocket } from 'ws'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 import { ChannelFailure, runChannelClient, type ChannelClient } from '@acorn/channel/client.ts'
-import { openChannel } from '@acorn/channel/secure.ts'
+import { IdentityMismatchError, openChannel } from '@acorn/channel/secure.ts'
 import type { RuntimeBindings } from '@acorn/node-core/server/bindings.ts'
 import { openDataRoot, type DataRoot } from '@acorn/node-core/server/storage'
 import { channelPublicKey } from '@acorn/node-core/server/transport/channelKey.ts'
@@ -156,7 +156,7 @@ describe('a phone’s channel through a relay', () => {
 
   it('refuses a Node whose key is not the one the phone pinned', async () => {
     await connectPhone()
-    await expect(phone('ab'.repeat(32))).rejects.toThrow(/identity key/i)
+    await expect(phone('ab'.repeat(32))).rejects.toBeInstanceOf(IdentityMismatchError)
   })
 
   it('never makes a channel a loopback caller', async () => {

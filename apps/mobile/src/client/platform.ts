@@ -1,36 +1,60 @@
 import { createSignal } from 'solid-js'
 import { bodyForFetch } from '@acorn/client-core/infra/node/fetchBody.ts'
 import type {
+  NodeFetchBody,
   NodeFetchRequest,
   NodeFetchResponse,
   NodeRecord,
   NodeStatus,
   NodeTransportError,
 } from '@acorn/protocol/broker.ts'
+import { relayHost } from '@acorn/protocol/relay.ts'
 import type { WsClientFrame, WsSendOptions } from '@acorn/protocol/ws.ts'
+import { createNodeLink, type NodeLink } from './nodeLink'
+import { openNodeChannel } from './openChannel'
+import { forgetPaired, pairedNodes, readToken, renamePaired, type PairedNode } from './pairedNodes'
 
-// The platform seam, from a phone's browser, through the gateway (docs/security/mobile-gateway.md).
+// The platform seam, from a phone's browser, through the account and an encrypted channel
+// (docs/relay/phone-channel.md).
 //
-// Two groups: `transport` and `fleet`. Requests go to `/node` plus the Node path, and events come
-// over one `/events` socket. The gateway holds the device token and the pinned connection. This page
-// holds a session cookie it can't read, so nothing here is a credential. Every other group is absent,
-// and client-core hides what needs one: no pairing screen, no loaded plugins, and the page's own
-// notifications and file inputs.
+// Two groups: `transport` and `fleet`. Each Node the phone is paired with gets a channel through the relay
+// when something needs it, a device token only this module can read, and its own query cache in
+// client-core. Events come over the channel of the Node on screen. Every other group is absent, and
+// client-core hides what needs one: no loaded plugins, and the page's own notifications and file inputs.
 //
 // It imports nothing that reads the seam, because `main.tsx` installs it before the app loads.
 
-// The gateway's close code for a revoked session, `SIGNED_OUT_CLOSE_CODE` there. Not imported,
-// because the gateway's module is Node code.
-export const SIGNED_OUT_CLOSE_CODE = 4401
-const FIRST_RETRY_MS = 250
-const LAST_RETRY_MS = 5_000
-const LEAVE_FLEET_ALONE = 'Pair and manage Nodes from Acorn on your computer.'
+const LEAVE_FLEET_ALONE = 'Pair a Node from the Nodes screen.'
+const DEFAULT_TIMEOUT_MS = 30_000
 
-type GatewayMessage = { status: NodeStatus } | { frame: unknown } | { error: NodeTransportError }
-
-// True once the gateway says this phone has no session. The shell shows the sign-in screen.
+// True once the account says this phone has no session. The shell shows the sign-in screen.
 const [signedOut, setSignedOut] = createSignal(false)
-export { signedOut }
+export { signedOut, setSignedOut }
+
+// Set when the pairing screen finishes, so the seam's fleet list is read again.
+const [pairedVersion, setPairedVersion] = createSignal(0)
+export { pairedVersion }
+
+type Encoded = { bytes?: Uint8Array; contentType?: string }
+
+// A form becomes the bytes a browser would have sent, so the channel carries one kind of body.
+async function encodeBody(body: NodeFetchBody | undefined): Promise<Encoded> {
+  const init = bodyForFetch(body)
+  if (!init) return {}
+  if (init instanceof Uint8Array) return { bytes: init }
+  const response = new Response(init)
+  return {
+    bytes: new Uint8Array(await response.arrayBuffer()),
+    contentType: response.headers.get('content-type') ?? '',
+  }
+}
+
+const toRecord = (node: PairedNode): NodeRecord => ({
+  nodeId: node.nodeId,
+  label: node.label,
+  endpoint: `https://${relayHost(node.nodeId)}`,
+  local: false,
+})
 
 export function installPlatform(): void {
   const frameHandlers = new Set<(nodeId: string, frame: unknown) => void>()
@@ -38,158 +62,126 @@ export function installPlatform(): void {
   const statusHandlers = new Set<(status: NodeStatus) => void>()
   const errorHandlers = new Set<(nodeId: string, error: NodeTransportError) => void>()
   const requests = new Map<string, AbortController>()
-  // Frames sent while the socket is down. The desktop's helper holds the same queue, and the first
-  // subscriptions go out before the socket has opened.
-  const queued: string[] = []
-  let socket: WebSocket | undefined
-  let retryMs = FIRST_RETRY_MS
-  let retry: ReturnType<typeof setTimeout> | undefined
-  // The gateway serves one Node. Its ID arrives with the first status, or from `GET /session`.
-  let nodeId = ''
-  let latest: NodeStatus | undefined
+  const latest = new Map<string, NodeStatus>()
+  const known = new Map<string, PairedNode>()
+  const links = new Map<string, NodeLink>()
+  let interest: string | null = null
 
   const subscribe = <T>(handlers: Set<T>, handler: T): (() => void) => {
     handlers.add(handler)
     return () => handlers.delete(handler)
   }
-  const report = (status: NodeStatus): void => {
-    nodeId = status.nodeId
-    latest = status
-    for (const handler of statusHandlers) handler(status)
-  }
-  const signOut = (): void => {
-    clearTimeout(retry)
-    socket?.close()
-    setSignedOut(true)
+
+  const refreshKnown = async (): Promise<PairedNode[]> => {
+    const nodes = await pairedNodes()
+    known.clear()
+    for (const node of nodes) known.set(node.nodeId, node)
+    return nodes
   }
 
-  const receive = (event: MessageEvent): void => {
-    if (event.data instanceof ArrayBuffer) {
-      for (const handler of byteHandlers) handler(nodeId, new Uint8Array(event.data))
-      return
-    }
-    let message: GatewayMessage
-    try {
-      message = JSON.parse(String(event.data)) as GatewayMessage
-    } catch {
-      return
-    }
-    if ('status' in message) report(message.status)
-    else if ('frame' in message) for (const handler of frameHandlers) handler(nodeId, message.frame)
-    else if ('error' in message) for (const handler of errorHandlers) handler(nodeId, message.error)
+  function linkFor(nodeId: string): NodeLink {
+    const existing = links.get(nodeId)
+    if (existing) return existing
+    const node = known.get(nodeId)
+    if (!node) throw new Error('This phone isn’t paired with that Node.')
+    const link = createNodeLink(nodeId, {
+      open: (listeners) => openNodeChannel(nodeId, node.channelKey, listeners),
+      token: () => readToken(nodeId),
+      report: (status) => {
+        latest.set(nodeId, status)
+        for (const handler of statusHandlers) handler(status)
+      },
+      frame: (frame) => {
+        for (const handler of frameHandlers) handler(nodeId, frame)
+      },
+      bytes: (frame) => {
+        for (const handler of byteHandlers) handler(nodeId, frame)
+      },
+      signedOut: () => setSignedOut(true),
+    })
+    links.set(nodeId, link)
+    return link
   }
 
-  const connect = (): void => {
-    clearTimeout(retry)
-    if (socket || signedOut()) return
-    const opened = new WebSocket(`${location.protocol === 'https:' ? 'wss' : 'ws'}://${location.host}/events`)
-    opened.binaryType = 'arraybuffer'
-    opened.onopen = () => {
-      retryMs = FIRST_RETRY_MS
-      for (const message of queued.splice(0)) opened.send(message)
-    }
-    opened.onmessage = receive
-    opened.onclose = (event) => {
-      socket = undefined
-      // The phone can't reach its Node while the gateway is down, whatever the Node's own state.
-      if (latest && latest.state !== 'offline')
-        report({ nodeId: latest.nodeId, state: 'offline', error: { code: 'unreachable' }, lastSeenAt: Date.now() })
-      if (event.code === SIGNED_OUT_CLOSE_CODE) return signOut()
-      // A refused upgrade closes the same way a stopped gateway does, so ask which it was.
-      void fetch('/session', { cache: 'no-store' }).then(
-        (answer) => (answer.status === 401 ? signOut() : schedule()),
-        schedule,
-      )
-    }
-    socket = opened
-  }
-  const schedule = (): void => {
-    retry = setTimeout(connect, retryMs)
-    retryMs = Math.min(retryMs * 2, LAST_RETRY_MS)
-  }
-
-  // A suspended page can hold a dead socket that never said so, and a live one may have missed events
-  // while it slept. Back in the foreground, the socket is replaced at once instead of waiting out the
-  // backoff. The new socket's first status makes the client re-attach and refetch
-  // (client-core/infra/node/wsClient.ts), and the Node shows offline only if this attempt fails too.
+  // A suspended page can hold a dead channel that never said so, and a live one may have missed events
+  // while it slept. Back in the foreground, the channel of the Node on screen is replaced at once instead
+  // of waiting for the heartbeat. Its first status makes the client re-attach and refetch
+  // (client-core/infra/node/wsClient.ts).
   document.addEventListener('visibilitychange', () => {
-    if (document.visibilityState !== 'visible') return
-    if (socket) {
-      socket.onclose = null
-      socket.close()
-      socket = undefined
-    }
-    retryMs = FIRST_RETRY_MS
-    connect()
+    if (document.visibilityState === 'visible' && interest) links.get(interest)?.restart()
   })
 
   const acorn = {
-    nodeFetch: async (_nodeId: string, request: NodeFetchRequest): Promise<NodeFetchResponse> => {
+    nodeFetch: async (nodeId: string, request: NodeFetchRequest): Promise<NodeFetchResponse> => {
       const controller = new AbortController()
       requests.set(request.requestId, controller)
+      const timeoutMs = request.timeoutMs ?? DEFAULT_TIMEOUT_MS
+      let timedOut = false
+      const timer = setTimeout(() => ((timedOut = true), controller.abort()), timeoutMs)
       try {
-        const answer = await fetch(`/node${request.path}`, {
-          method: request.method ?? 'GET',
-          headers: request.headers ?? {},
-          body: bodyForFetch(request.body),
-          signal: controller.signal,
-        })
-        const body = new Uint8Array(await answer.arrayBuffer())
-        if (answer.status === 401 && errorCode(body) === 'signed_out') signOut()
-        return { status: answer.status, headers: Object.fromEntries(answer.headers), body }
+        const { bytes, contentType } = await encodeBody(request.body)
+        const headers = { ...request.headers }
+        if (contentType && !Object.keys(headers).some((name) => name.toLowerCase() === 'content-type'))
+          headers['content-type'] = contentType
+        const answer = await linkFor(nodeId).request(
+          { method: request.method ?? 'GET', path: request.path, headers, ...(bytes ? { body: bytes } : {}) },
+          controller.signal,
+        )
+        // A view of an ArrayBuffer, which the channel's type doesn't say.
+        return { ...answer, body: answer.body as Uint8Array<ArrayBuffer> }
+      } catch (error) {
+        if (timedOut)
+          throw Object.assign(new Error(`The node did not answer within ${timeoutMs}ms`), { name: 'TimeoutError' })
+        throw error
       } finally {
+        clearTimeout(timer)
         requests.delete(request.requestId)
       }
     },
     nodeAbort: (requestId: string) => requests.get(requestId)?.abort(),
-    nodeSend: (_nodeId: string, frame: WsClientFrame, options?: WsSendOptions) => {
-      const message = JSON.stringify({ frame, ...options })
-      if (socket?.readyState === WebSocket.OPEN) socket.send(message)
-      else queued.push(message)
+    nodeSend: (nodeId: string, frame: WsClientFrame, _options?: WsSendOptions) =>
+      linkFor(nodeId).sendFrame(JSON.stringify(frame)),
+    // Only the Node on screen holds the event feed, so another Node's events aren't carried at all.
+    nodeInterest: (nodeId: string | null) => {
+      if (nodeId === interest) return
+      if (interest) links.get(interest)?.setEvents(false)
+      interest = nodeId
+      if (nodeId && known.has(nodeId)) linkFor(nodeId).setEvents(true)
     },
-    // The gateway serves one Node, so there is no other Node's events to turn away.
-    nodeInterest: () => {},
     onNodeTransportError: (cb: (nodeId: string, error: NodeTransportError) => void) => subscribe(errorHandlers, cb),
     onNodeFrame: (cb: (nodeId: string, frame: unknown) => void) => subscribe(frameHandlers, cb),
     onNodeBytes: (cb: (nodeId: string, frame: Uint8Array) => void) => subscribe(byteHandlers, cb),
     onNodeStatus: (cb: (status: NodeStatus) => void) => {
       // A status the client never hears reads as `offline` until the next one.
-      if (latest) cb(latest)
+      for (const status of latest.values()) cb(status)
       return subscribe(statusHandlers, cb)
     },
 
-    // Read from the gateway rather than from the socket, so a signed-out phone and a stopped gateway
-    // fail differently and the list doesn't wait for the socket.
     fleetList: async (): Promise<{ nodes: NodeRecord[]; statuses: NodeStatus[] }> => {
-      const answer = await fetch('/session', { cache: 'no-store' })
-      if (answer.status === 401) signOut()
-      if (!answer.ok) throw new Error(`The gateway answered ${answer.status}.`)
-      const served = (await answer.json()) as { nodeId: string; label: string }
-      nodeId = served.nodeId
-      return {
-        nodes: [{ nodeId: served.nodeId, label: served.label, endpoint: location.origin, local: false }],
-        statuses: latest ? [latest] : [],
-      }
+      const nodes = await refreshKnown()
+      return { nodes: nodes.map(toRecord), statuses: [...latest.values()] }
     },
     nodeAdopt: () => Promise.reject(new Error(LEAVE_FLEET_ALONE)),
     nodeCollectAdoption: () => Promise.reject(new Error(LEAVE_FLEET_ALONE)),
-    nodeRename: () => Promise.reject(new Error(LEAVE_FLEET_ALONE)),
-    nodeForget: () => Promise.reject(new Error(LEAVE_FLEET_ALONE)),
-    nodeRestartLocal: () => Promise.reject(new Error(LEAVE_FLEET_ALONE)),
-    nodeReconnect: () => {
-      retryMs = FIRST_RETRY_MS
-      connect()
+    nodeRename: async (nodeId: string, label: string): Promise<NodeRecord | null> => {
+      await renamePaired(nodeId, label)
+      await refreshKnown()
+      const node = known.get(nodeId)
+      return node ? toRecord(node) : null
     },
+    // A phone can't revoke its own device on the Node, because it may not manage devices. It forgets the
+    // Node, and the device stays on the Node's list until someone revokes it from a computer.
+    nodeForget: async (nodeId: string, _revoke: boolean): Promise<void> => {
+      links.get(nodeId)?.stop()
+      links.delete(nodeId)
+      latest.delete(nodeId)
+      await forgetPaired(nodeId)
+      await refreshKnown()
+      setPairedVersion((version) => version + 1)
+    },
+    nodeRestartLocal: () => Promise.reject(new Error(LEAVE_FLEET_ALONE)),
+    nodeReconnect: (nodeId: string) => links.get(nodeId)?.reconnectNow(),
   }
   // The seam reads this global and nothing else may name it (tools/arch/boundaries.test.ts).
   ;(globalThis as { acorn?: unknown }).acorn = acorn
-  connect()
-}
-
-function errorCode(body: Uint8Array): string | undefined {
-  try {
-    return (JSON.parse(new TextDecoder().decode(body)) as { error?: { code?: string } }).error?.code
-  } catch {
-    return undefined
-  }
 }

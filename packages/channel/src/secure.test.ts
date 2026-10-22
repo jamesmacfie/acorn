@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { acceptChannel, openChannel } from './secure'
+import { acceptChannel, IdentityMismatchError, openChannel } from './secure'
 import { channelIdentity, socketPair } from './testkit'
 
 const text = (bytes: Uint8Array | null) => new TextDecoder().decode(bytes ?? new Uint8Array())
@@ -40,8 +40,7 @@ describe('the phone channel', () => {
       openChannel(phoneSocket, (await channelIdentity()).publicKey),
       acceptChannel(nodeSocket, node.identity),
     ])
-    expect(result[0]).toMatchObject({ status: 'rejected' })
-    expect(String((result[0] as PromiseRejectedResult).reason)).toMatch(/identity key/i)
+    expect((result[0] as PromiseRejectedResult).reason).toBeInstanceOf(IdentityMismatchError)
   })
 
   it('ends a read with null when the other end closes', async () => {
