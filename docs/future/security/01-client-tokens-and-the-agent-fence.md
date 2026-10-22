@@ -32,6 +32,10 @@ Decisions and deviations:
   blocked, but one created there after a session starts is caught only by the file guard.
 - Each folder is listed as the Node's environment spells it and as the platform default, because a
   client started from another shell may have had a different `XDG_CONFIG_HOME` or `APPDATA`.
+- An installed desktop Node's custody root is also read from its own data root, the parent of
+  `com.acorn.desktop/node`. On Linux, Tauri puts that under `~/.local/share`, which `appDataDir`
+  doesn't name. The same mismatch means `desktopDataRootDir()` and `dataRootDir()` miss an installed
+  desktop on Linux. That's older than this phase and I left it alone.
 - **Check this node** reports only the switch and the harnesses, not folder coverage, so the
   diagnostics test didn't change.
 - The file guard's refusal still says "Acorn's data folder" for a client folder. That matches the
