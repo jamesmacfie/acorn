@@ -88,6 +88,7 @@ sends it in the Node's start message, never its environment ([Node keys](./secur
 | `ACORN_BUNDLED_PLUGINS_DIR` | Gives a standalone Node a directory of app-owned plugin packages to reconcile from, in place of the tarball's `plugins` folder. The desktop always has one. `pnpm dev:node` doesn't, and without it the reconcile step doesn't run. |
 | `ACORN_PROMPT_BUNDLED_PLUGIN_TRUST=1` | Shows the trust dialog for the app's own bundled packages, which a development build otherwise accepts as a packaged build does. |
 | `ACORN_PERF=1` | Prints boot and request timing. See [profiling](./local-development/profiling.md). |
+| `ACORN_ACCOUNT_URL` | The account service that **Settings** > **Account** signs in to. Unset, the Node offers no sign-in and no remote access. Use `https://account.trolley-problem.app` for the hosted service, or the address `pnpm dev:account` prints for a stand-in. See [the account API](./account-api.md). |
 
 ## Develop the headless CLI
 
