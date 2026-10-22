@@ -64,6 +64,9 @@ October 22, 2026.
 
 - Node service static graph: 1,937,025 bytes on the base commit, 1,938,514 with this phase, so +1,489
   bytes, under the 1,939,000 ceiling. The tunnel (1,646 bytes) is a lazy chunk. Ceiling unchanged.
+  After merging main on October 22, 2026, the graph came to 1,939,332 bytes, over the ceiling. The
+  relay protocol schemas and `relayHost` moved behind the tunnel's lazy load, which brought it to
+  1,938,584 bytes.
 - Terminal client startup graph: +3,364 bytes (785,816 to 789,180). It's over its 770,000 ceiling on
   the base commit already, which also makes `pnpm pack:node` fail. Ceiling unchanged.
 

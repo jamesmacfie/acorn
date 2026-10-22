@@ -6,6 +6,7 @@ import {
   RELAY_REPLACED,
   RELAY_TLS_STREAM,
   relayControlMessageSchema,
+  relayHost,
   relayUrls,
 } from '@acorn/protocol/relay.ts'
 import type { RelaySettings } from './relaySettings'
@@ -20,6 +21,10 @@ const JITTER = 0.2
 const MAX_CONTROL_MESSAGE_BYTES = 64 * 1024
 
 export type RelayTunnel = { close(): void }
+
+// Re-exported so the listener adds the relay Host only once this module loads, keeping the relay
+// protocol off a boot with no relay settings.
+export { relayHost }
 
 // The Node's outbound connection to its relay (docs/relay.md). Each stream the relay offers becomes
 // one more connection to this Node's HTTPS server, entered by `emit('connection')`, so TLS, the Host

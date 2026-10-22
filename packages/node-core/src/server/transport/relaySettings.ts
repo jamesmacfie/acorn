@@ -1,4 +1,3 @@
-import { relayRouteSchema } from '@acorn/protocol/relay.ts'
 import type { DataRoot } from '../storage/dataRoot'
 
 // Which relay this Node dials out to, if any (docs/relay.md § The Node). The environment wins
@@ -12,7 +11,8 @@ export function relaySettings(root: Pick<DataRoot, 'relay'>): RelaySettings | un
   if (!settings) return undefined
   if (!settings.url || !settings.credential)
     throw new Error('Set both ACORN_RELAY_URL and ACORN_RELAY_CREDENTIAL, or neither.')
-  if (!relayRouteSchema.shape.url.safeParse(settings.url).success)
+  // The same rule as relayRouteSchema's url, without loading the relay protocol on every boot.
+  if (!/^wss?:\/\/[^/]/.test(settings.url) || !URL.canParse(settings.url))
     throw new Error(`The relay URL ${settings.url} must start with wss:// or ws://.`)
   return { url: settings.url, credential: settings.credential }
 }

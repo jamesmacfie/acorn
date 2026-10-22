@@ -11,7 +11,6 @@ import { resolveDatabasePath } from '../storage/paths'
 import { configuredPort, devDataDir } from './listenerConfig'
 import { advertisedHosts } from './advertise'
 import { relaySettings } from './relaySettings'
-import { relayHost } from '@acorn/protocol/relay.ts'
 import { ensureCert } from './tls'
 import { attachWsHub, disposeWsHub } from './wsHub'
 import type { RelayTunnel } from './relayTunnel'
@@ -183,11 +182,13 @@ export function startListener(
       // Relayed clients name the Node by its route, which is its ID, and no port (docs/relay.md). The
       // tunnel loads only here, so a Node with no relay settings runs none of its code.
       if (relay) {
-        allowedHosts.add(relayHost(root.nodeId))
         const https = server as unknown as import('node:https').Server
         relayTunnels.set(
           server,
-          import('./relayTunnel').then(({ startRelayTunnel }) => startRelayTunnel(https, relay, root.nodeId)),
+          import('./relayTunnel').then(({ relayHost, startRelayTunnel }) => {
+            allowedHosts.add(relayHost(root.nodeId))
+            return startRelayTunnel(https, relay, root.nodeId)
+          }),
         )
       }
       root.recordPort(address.port)

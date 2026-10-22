@@ -12,7 +12,10 @@ import { mintInternalToken } from '../auth/internalTokens'
 import { startRelayTunnel } from './relayTunnel'
 
 // The tunnel dials out, so here it only records whether the listener started it.
-vi.mock('./relayTunnel', () => ({ startRelayTunnel: vi.fn(() => ({ close() {} })) }))
+vi.mock('./relayTunnel', async () => ({
+  relayHost: (await import('@acorn/protocol/relay.ts')).relayHost,
+  startRelayTunnel: vi.fn(() => ({ close() {} })),
+}))
 
 // The listener's transport contract, asserted against a real socket: it speaks TLS with the
 // certificate it reports, that certificate validates for 127.0.0.1 (no `rejectUnauthorized: false`
@@ -137,7 +140,7 @@ describe('the loopback TLS listener', () => {
     process.env.ACORN_RELAY_CREDENTIAL = 'relay-credential'
     try {
       const relayed = await start()
-      expect((await probe(relayed, '/v1/node', relayName(), {}, true)).status).toBe(200)
+      // The relay name is allowed once the tunnel's module loads, just before the tunnel starts.
       await vi.waitFor(() =>
         expect(startRelayTunnel).toHaveBeenCalledWith(
           relayed.server,
@@ -145,6 +148,7 @@ describe('the loopback TLS listener', () => {
           root!.nodeId,
         ),
       )
+      expect((await probe(relayed, '/v1/node', relayName(), {}, true)).status).toBe(200)
     } finally {
       delete process.env.ACORN_RELAY_URL
       delete process.env.ACORN_RELAY_CREDENTIAL
