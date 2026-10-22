@@ -74,6 +74,13 @@ async function connectedNode(login: string) {
   return { accessToken, nodeId, credential: registered.credential, control, ticket }
 }
 
+it('does not start when it can’t read the revoked credentials, because it would take a revoked one', async () => {
+  const gone = await startAccountStub()
+  const url = gone.url
+  await gone.close()
+  await expect(accountAuth({ url })).rejects.toThrow()
+})
+
 describe('a relay that checks an account service', () => {
   it('lets the account that owns a Node open a stream to it', async () => {
     const owner = await connectedNode('owner')

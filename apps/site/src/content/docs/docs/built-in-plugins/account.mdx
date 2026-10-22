@@ -1,0 +1,45 @@
+---
+title: Account
+description: Sign in to an account service, turn on remote access for a Node, and what the account can and can't do.
+sources:
+  - docs/account-api.md
+  - docs/relay/accounts.md
+  - plugins/account/src/client/index.ts
+  - plugins/account/src/client/AccountSettings.tsx
+  - plugins/account/src/node/index.ts
+  - plugins/account/src/server/routes.ts
+  - plugins/account/src/server/remoteAccess.ts
+checked: ''
+---
+
+import PluginFacts from '../../../../components/PluginFacts.astro'
+
+The Account plugin signs you in to an account service and, when you turn on remote access, registers
+your Node there. A client on another network can then reach the Node through a relay, without a VPN or
+an open port.
+
+<PluginFacts id="account">
+  <Fragment slot="adds">**Settings** > **Machines** > **Account**, with **Sign in**, **Sign out**, and the **Remote access** switch.</Fragment>
+  <Fragment slot="needs">A build of acorn that has an account service to talk to. A build with none says so on the page and offers no sign-in.</Fragment>
+  <Fragment slot="reach">The account service, and the relay it names once you turn on remote access. Nothing is contacted until you sign in.</Fragment>
+</PluginFacts>
+
+## Sign in
+
+Open **Settings** > **Machines** > **Account** and click **Sign in**. The page shows an address and a
+code. Open the address in a browser, sign in with GitHub, and approve the code. The terminal client
+prints the same address and code.
+
+You sign in on the Node whose settings are open. The sign-in belongs to that Node and its computer, and
+it ends when you click **Sign out**.
+
+## Turn on remote access
+
+Turn on **Remote access** to register this Node with your account. The Node connects to a relay, and the
+page says which one and since when. Turning it off ends the connection and every stream through it at
+once, and removes the Node from your account. Signing out turns it off first.
+
+Remote access doesn't let anyone in. A client still pairs with a code and uses its own device
+credential, and the account service can't approve a pairing or read what crosses the relay.
+
+If the Node's environment or `node.json` already names a relay, the switch is off and says why.

@@ -24,6 +24,7 @@ import {
 import { EventViewers } from './eventViewers'
 import { BrokerFetch } from './brokerFetch'
 import { openRelayStream, relayCredentialFor, RelayAgent, type OpenRelayStream } from './relaySocket'
+import type { RelayRoute } from '@acorn/protocol/relay.ts'
 import { RelayTickets, type Ticket } from './relayTickets'
 import { emitEvent, telemetryEnabled } from '@acorn/node-core/server/telemetry'
 import { createLogger } from '@acorn/node-core/server/telemetry'
@@ -147,7 +148,7 @@ export class NodeBroker {
         ? new RelayAgent({ keepAlive: true, maxSockets, ...this.pinning(node) }, async () =>
             this.openRelayStream(
               relay,
-              await relayCredentialFor(node.relayCredential, relay.route, (nodeId) => this.tickets.ticket(nodeId)),
+              await relayCredentialFor(node.relayCredential, relay, (route) => this.tickets.ticket(route)),
             ),
           )
         : node.endpoint.startsWith('https:')
@@ -178,8 +179,8 @@ export class NodeBroker {
 
   // A ticket for a Node reached through the relay with this client's account, for the one stream that
   // needs it. Pairing asks for one before the Node is in the fleet.
-  relayTicket(nodeId: string): Promise<string> {
-    return this.tickets.ticket(nodeId)
+  relayTicket(relay: RelayRoute): Promise<string> {
+    return this.tickets.ticket(relay)
   }
 
   // A ticket for a relayed Node, asked of the Node on this computer, whose account plugin holds the

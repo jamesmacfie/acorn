@@ -172,7 +172,7 @@ describe('remote access between two Nodes on one account', () => {
     const { code: pairingCode } = JSON.parse(new TextDecoder().decode(started.body)) as { code: string }
 
     const address = `ws://127.0.0.1:${relay.port}/${home.handshake.nodeId}`
-    const probe = await probeNode(address, { relayTicket: (nodeId) => away.broker.relayTicket(nodeId) })
+    const probe = await probeNode(address, { relayTicket: (relay) => away.broker.relayTicket(relay) })
     expect(probe.fingerprint).toBe(home.handshake.fingerprint)
     const result = await pairWithNode(probe, { code: pairingCode, deviceName: 'the other computer' })
     const record = pairedNode(probe, result, { label: 'Home', local: false })

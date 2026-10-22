@@ -44,16 +44,22 @@ export class RelayAgent extends HttpsAgent {
 
 // What a stream presents to the relay: the credential typed into the address, as in self-hosted mode,
 // or else a ticket for the account.
+// A ticket doesn't go over plain `ws://` to another computer.
+const LOOPBACK = new Set(['127.0.0.1', 'localhost', '[::1]'])
+
 export const relayCredentialFor = (
   credential: string | undefined,
-  route: string,
+  relay: RelayRoute,
   ticketFor: RelayTicketFor | undefined,
-): Promise<string> =>
-  credential !== undefined
-    ? Promise.resolve(credential)
-    : ticketFor
-      ? ticketFor(route)
-      : Promise.reject(new Error('This relay address has no credential, and nothing here can get a ticket for it.'))
+): Promise<string> => {
+  if (credential !== undefined) return Promise.resolve(credential)
+  if (!ticketFor)
+    return Promise.reject(new Error('This relay address has no credential, and nothing here can get a ticket for it.'))
+  const { protocol, hostname } = new URL(relay.url)
+  return protocol === 'ws:' && !LOOPBACK.has(hostname)
+    ? Promise.reject(new Error('An account ticket needs a wss:// relay address, so it stays private.'))
+    : ticketFor(relay)
+}
 
 // The relay answers the upgrade only once the Node has opened its end, so an open WebSocket is a stream
 // ready to carry the TLS handshake (apps/relay/PROTOCOL.md § Open a stream).

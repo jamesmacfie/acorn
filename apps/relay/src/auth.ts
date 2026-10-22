@@ -81,19 +81,24 @@ export async function accountAuth(options: AccountAuthOptions): Promise<RelayAut
   }
 
   const poll = async (): Promise<void> => {
-    try {
-      const { credentials } = revokedCredentialsSchema.parse(await get(accountPaths.revoked))
-      for (const id of credentials) {
-        if (revoked.has(id)) continue
-        revoked.add(id)
-        for (const listener of listeners) listener(id)
-      }
-    } catch (error) {
-      log(`couldn't read the revoked credentials: ${error instanceof Error ? error.message : error}`)
+    const { credentials } = revokedCredentialsSchema.parse(await get(accountPaths.revoked))
+    for (const id of credentials) {
+      if (revoked.has(id)) continue
+      revoked.add(id)
+      for (const listener of listeners) listener(id)
     }
   }
+  // A relay that can't read the list at the start doesn't start, because it would take a revoked
+  // credential. After that, an outage leaves the last list in force and is logged, so Nodes that reconnect
+  // while the service is down still get in.
   await poll()
-  const timer = setInterval(() => void poll(), options.revocationPollMs ?? 10_000)
+  const timer = setInterval(
+    () =>
+      void poll().catch((error: unknown) =>
+        log(`couldn't read the revoked credentials: ${error instanceof Error ? error.message : error}`),
+      ),
+    options.revocationPollMs ?? 10_000,
+  )
   timer.unref()
 
   return {

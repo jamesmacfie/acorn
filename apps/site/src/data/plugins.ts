@@ -32,6 +32,14 @@ export const SHIPS_AS = { compiled: 'Part of the app', package: 'Installed packa
 const both = 'Desktop and terminal'
 
 export const PLUGINS = {
+  account: {
+    name: 'Account',
+    sentence: 'Signs in to an account service, and turns on remote access so another network can reach this Node.',
+    icon: 'user-round',
+    ships: 'compiled',
+    worksIn: both,
+    docs: '/docs/built-in-plugins/account/',
+  },
   agents: {
     name: 'Agents',
     sentence:

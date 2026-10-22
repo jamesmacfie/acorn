@@ -55,6 +55,7 @@
       "workflows"
     ],
     "settingsPages": [
+      "account",
       "agent-defaults",
       "custom-agents",
       "agent-mcp-servers",
@@ -188,6 +189,11 @@
     ]
   },
   "owned": {
+    "account": {
+      "settingsPages": [
+        "account"
+      ]
+    },
     "bitbucket": {
       "panes": [
         "bitbucket-pr"

@@ -139,9 +139,7 @@ const relayAgent = (
   ticketFor: RelayTicketFor | undefined,
   options: HttpsAgentOptions,
 ): RelayAgent =>
-  new RelayAgent(options, async () =>
-    openRelayStream(relay, await relayCredentialFor(credential, relay.route, ticketFor)),
-  )
+  new RelayAgent(options, async () => openRelayStream(relay, await relayCredentialFor(credential, relay, ticketFor)))
 
 // Step 3: spend the owner's pairing code, this time over a pinned connection. The fingerprint they
 // just confirmed is now the identity, so the code cannot be handed to an impostor.

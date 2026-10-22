@@ -22,8 +22,10 @@ route. Either mismatch answers `401`.
 
 The relay reads the service's keys when it starts and again when it meets a key it doesn't know, at most
 every ten seconds. It polls the list of revoked credentials every ten seconds. A Node that holds a
-revoked credential is closed with code 4001, and its streams close with it. A relay that can't reach the
-service keeps the keys and the list it has and logs the failure.
+revoked credential is closed with code 4001, and its streams close with it. A relay that can't read the
+keys and the list when it starts doesn't start, because it would take a revoked credential. After that, an
+outage leaves the last list in force and is logged, so a Node that reconnects while the service is down
+still gets in.
 
 A stream outlives nothing: when a Node leaves the relay, whether it closed its connection, was replaced,
 or was revoked, every stream through it closes, and its clients lose the Node at once.
@@ -44,6 +46,10 @@ extension's **Connect to another Node** screen don't yet, and still need the cre
 when the relay is in self-hosted mode. `NodeBroker` takes the route to ask through
 `relayTicketRoute`, because a library can't name a plugin's route, and each app passes
 `ACCOUNT_TICKET_ROUTE` from the plugin's contract.
+
+A ticket goes only to the relay the account service lists for the Node. An address that names another
+relay is refused, and so is a `ws://` address for another computer, because the ticket would cross the
+network in the clear. A relay on this computer can use `ws://`.
 
 A fleet record for a Node reached with tickets keeps `relay: { url, route }` and no credential.
 

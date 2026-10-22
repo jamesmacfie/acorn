@@ -50,6 +50,11 @@ approval), and tests. It passes the same conformance suite.
   removed or registers again, as [accounts](./accounts.md) says. So a relay can check it with no call,
   the service publishes revoked credential IDs at `GET /relay/revoked`, and a relay polls it every ten
   seconds. That's how **Remove** on the website drops a Node "within seconds".
+- **A relay that can't read the revoked list at its start doesn't start.** Later outages leave the last
+  list in force. A review flagged the first as failing open, and the second is a choice: a Node that
+  reconnects during an outage still gets in.
+- **A ticket goes only to the relay the account lists for the Node, and never over `ws://` to another
+  computer.** The same review found that a mistyped or hostile address could collect a five-minute ticket.
 - **An owner mismatch is a `401`.** A ticket for a Node another account owns answers `401`, as a forged
   one does.
 - **Streams close with their Node's registration.** Checkpoint 10 found that turning remote access off

@@ -871,7 +871,9 @@ describe('architecture boundaries', () => {
       // so the Claude harness can let an agent read the folder where a cut tool result's full text goes.
       // `server/auth/pairingCodes.ts`, so the mobile gateway's sign-in code keeps the Node's code rules
       // without loading the auth barrel's database modules.
-      '@acorn/node-core': 69,
+      // Includes `server/storage/nodeRelay.ts`, the relay and owner record the account plugin's lazy routes read,
+      // which stays out of the Node's static graph that way.
+      '@acorn/node-core': 70,
       '@acorn/custody': 10,
       '@acorn/dashboards-core': 18, // Shared SQL/in-memory summary and time-bucket semantics, the plan's labels, its outline, the plan-writing guide the studio and panel_guide share, and the heatmap's cells HeatmapView draws.
       // The document model, and the store a code host's Node half keeps documents in.

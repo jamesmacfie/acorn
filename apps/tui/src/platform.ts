@@ -119,7 +119,7 @@ export function installPlatform(opened: OpenedNode, quit: () => void): Platform 
     // Node is a relative URL with no origin to be relative to.
     fleetList: async () => ({ nodes: fleet.list().map(toNodeRecord), statuses: [...statuses.values()] }),
     nodeProbe: async (endpoint: string): Promise<NodeProbeResult> => {
-      const probe = await probeNode(endpoint, { relayTicket: (nodeId) => broker.relayTicket(nodeId) })
+      const probe = await probeNode(endpoint, { relayTicket: (relay) => broker.relayTicket(relay) })
       pending = probe
       return publicProbe(probe)
     },

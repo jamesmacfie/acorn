@@ -18,8 +18,11 @@ sources:
   - packages/client-core/src/features/settings/StorageSettings.tsx
   - plugins/agents/src/shared/sessionDefaults.ts
   - plugins/sentry-telemetry/acorn-plugin.config.mjs
+  - plugins/account/src/client/AccountSettings.tsx
+  - docs/account-api.md
 covers:
   - nodes
+  - account
   - security
   - audit
   - telemetry
@@ -51,6 +54,16 @@ remote Node](/docs/nodes/pair-a-device-or-a-remote-node/)).
 
 Unpair and revoke are labeled differently on purpose: revoking your only device on a remote Node can
 lock you out of it.
+
+## Account
+
+Signs this Node in to an account service, and turns on remote access ([Account](/docs/built-in-plugins/account/)).
+
+| Setting | What it changes | Stored on | Default |
+| --- | --- | --- | --- |
+| **Sign in** | Shows a code to approve in a browser. Hidden once someone is signed in, and when this build has no account service. | Node | Signed out |
+| **Sign out** | Ends the sign-in on this Node, and turns remote access off first. | Node | |
+| **Remote access** | Registers this Node with the account and connects it to a relay, so a client on another network can reach it. Off while nobody is signed in. | Node | Off |
 
 ## Security and backup
 

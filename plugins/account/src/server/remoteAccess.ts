@@ -7,7 +7,7 @@ import { accountUrl } from './config'
 import { ACCOUNT_PROVIDER } from './provider'
 
 // Remote access: this Node registered with its owner's account, dialing the relay the account service
-// named (docs/account-api.md § Remote access). The relay URL, the Node's relay credential, and the
+// named (docs/account-api.md § The sign-in plugin). The relay URL, the Node's relay credential, and the
 // owner account are recorded in node.json, where the listener reads relay settings at every boot, so a
 // Node that restarts is still reachable with no account code running.
 
