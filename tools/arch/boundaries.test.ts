@@ -306,6 +306,10 @@ describe('architecture boundaries', () => {
       ],
       // The browser extension's native bridge relays managed agent sessions.
       ['apps/cli/src/browser/agents.ts -> plugins/agents/src/contract/wire.ts', 'agent session shapes it relays'],
+      // The route that issues relay tickets, which custody can't name because a library names no plugin's
+      // route, so the app that has the account plugin passes it in.
+      ['apps/desktop/src/helper/helperMain.ts -> plugins/account/src/contract/routes.ts', 'the relay ticket route'],
+      ['apps/tui/src/platform.ts -> plugins/account/src/contract/routes.ts', 'the relay ticket route'],
       [
         'apps/cli/src/browser/agents.ts -> plugins/agents/src/contract/appApproval.ts',
         'app approval wording and targets',
@@ -848,8 +852,9 @@ describe('architecture boundaries', () => {
       // card, and the native host share without the Node loading them at boot, the record change rules
       // that workflow loops, record triggers, and their preview share, the starter trigger check and
       // event feed description the Node and the plugin SDK share, and the relay protocol, which the relay,
-      // the Node's tunnel, and custody's socket factory share without the broker contract.
-      '@acorn/protocol': 96,
+      // the Node's tunnel, and custody's socket factory share without the broker contract, and the account API's
+      // types and signed token format, which the sign-in plugin, the relay, and the hosted service share.
+      '@acorn/protocol': 98,
       // client-core publishes narrow entrypoints where a consumer can't take a barrel that pulls in
       // renderer-only modules. Pure leaves the terminal, logic tests or remote trees need: model-provider
       // error guidance, `kit/lib/savedSignal`, `kit/lib/formatChord`, `kit/lib/ansi`, and the address
@@ -974,6 +979,12 @@ describe('architecture boundaries', () => {
   it('protocol modules named for a plugin are an enumerated, shrinking set', () => {
     // A plugin's types can accumulate here. Each survivor has a reason:
     const PLUGIN_NAMED_BASELINE = [
+      // The account API is what the relay, the sign-in plugin, and the hosted service say to each other
+      // (docs/account-api.md), and the Node's identity file stores its keys. It isn't the `account`
+      // plugin's wire, which is the plugin's own routes.
+      'account.ts',
+      'accountKeys.ts',
+      'accountToken.ts',
       // `NoteLocation` addresses a task, workspace or global scope, which is core's own scheme.
       'notes.ts',
     ]
@@ -1019,6 +1030,9 @@ describe('architecture boundaries', () => {
       ['packages/change-request-ui/src/views/ChangeRequestDiff.tsx', "'editor' is the pane a diff line opens in"],
       ['packages/change-request-ui/src/views/detailModel.ts', "'linear' is the provider of the linked tickets"],
       ['packages/protocol/src/data/dataSources.ts', 'preview is a query mode, not the preview plugin'],
+      ['packages/node-core/src/server/db/schema.ts', "'account' is the provider account column of a connection row"],
+      ['packages/dashboards-core/src/plan.ts', "'account' is a field name in a data plan"],
+      ['packages/client-core/src/features/dashboards/EquivalenceForm.tsx', "'account' is a field name in a data plan"],
       ['packages/plugin-types/src/contracts/data.ts', 'preview is a published query mode, not the preview plugin'],
       ['packages/plugin-types/src/contracts/coreProjects.ts', "'terminal' is a project setup-script trigger"],
       ['packages/plugin-types/src/contracts/agents.ts', "'context' is a review-input provenance kind"],

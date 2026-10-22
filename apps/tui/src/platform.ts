@@ -2,6 +2,7 @@ import { NodeBroker } from '@acorn/custody/broker'
 import { DeviceConfigStore } from '@acorn/custody/config'
 import { pairedNode, toBrokerNode, toNodeRecord } from '@acorn/custody/broker'
 import { listenForOauthCallback } from '@acorn/custody/oauthCallback'
+import { ACCOUNT_TICKET_ROUTE } from '@acorn/plugin-account/contract/routes.ts'
 import { probeNode, pairWithNode, publicProbe } from '@acorn/custody/broker/nodePairing.ts'
 import type { NodePairRequest, NodeProbeResult, NodeRecord, NodeStatus } from '@acorn/protocol/broker.ts'
 import type { OpenedNode } from './node/open'
@@ -44,21 +45,24 @@ export function installPlatform(opened: OpenedNode, quit: () => void): Platform 
   const statusHandlers: ((status: NodeStatus) => void)[] = []
   const statuses = new Map<string, NodeStatus>()
 
-  const broker = new NodeBroker({
-    frame: (nodeId, frame) => {
-      for (const handler of frameHandlers) handler(nodeId, frame)
+  const broker = new NodeBroker(
+    {
+      frame: (nodeId, frame) => {
+        for (const handler of frameHandlers) handler(nodeId, frame)
+      },
+      // Terminal output, as the one binary frame (@acorn/protocol/ws.ts § The one binary frame). The
+      // desktop tags the node id around this because it has a process boundary to cross; here the
+      // broker is in this process, so the frame the node sent is handed over as it stands.
+      bytes: (nodeId, frame) => {
+        for (const handler of byteHandlers) handler(nodeId, frame)
+      },
+      status: (status) => {
+        statuses.set(status.nodeId, status)
+        for (const handler of statusHandlers) handler(status)
+      },
     },
-    // Terminal output, as the one binary frame (@acorn/protocol/ws.ts § The one binary frame). The
-    // desktop tags the node id around this because it has a process boundary to cross; here the
-    // broker is in this process, so the frame the node sent is handed over as it stands.
-    bytes: (nodeId, frame) => {
-      for (const handler of byteHandlers) handler(nodeId, frame)
-    },
-    status: (status) => {
-      statuses.set(status.nodeId, status)
-      for (const handler of statusHandlers) handler(status)
-    },
-  })
+    { relayTicketRoute: ACCOUNT_TICKET_ROUTE },
+  )
 
   // Same three lines as the desktop helper's `connect` (apps/desktop/src/helper/helperServer.ts): the
   // record the renderer sees, plus the two things it never does.
@@ -115,7 +119,7 @@ export function installPlatform(opened: OpenedNode, quit: () => void): Platform 
     // Node is a relative URL with no origin to be relative to.
     fleetList: async () => ({ nodes: fleet.list().map(toNodeRecord), statuses: [...statuses.values()] }),
     nodeProbe: async (endpoint: string): Promise<NodeProbeResult> => {
-      const probe = await probeNode(endpoint)
+      const probe = await probeNode(endpoint, { relayTicket: (nodeId) => broker.relayTicket(nodeId) })
       pending = probe
       return publicProbe(probe)
     },

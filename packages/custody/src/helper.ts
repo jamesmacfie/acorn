@@ -54,6 +54,9 @@ export type HelperOptions = {
   // Hosts multiplexing renderer sockets request the advertised viewer codec. In-process hosts keep
   // raw transport by default, including the terminal client.
   viewerMultiplexing?: boolean
+  // The route on the local Node that issues relay tickets, for reaching a Node through the account
+  // (`NodeBroker`'s option of the same name). The app that has the account plugin names it.
+  relayTicketRoute?: string
   // A restart or crash recovery replaced the node the renderer was talking to. Its endpoint,
   // certificate, and token are all new, so whatever is rendering has to start over.
   onNodeReplaced?(): void
@@ -131,7 +134,10 @@ export function createHelper(options: HelperOptions): Helper {
     compileCacheRoot,
   )
 
-  const broker = new NodeBroker(options.push, { viewerMultiplexing: options.viewerMultiplexing })
+  const broker = new NodeBroker(options.push, {
+    viewerMultiplexing: options.viewerMultiplexing,
+    relayTicketRoute: options.relayTicketRoute,
+  })
   const fleet = new FleetStore(userDataDir, tokens)
 
   // Third-party plugin bundles a node has served, and this device's decisions about running them. See

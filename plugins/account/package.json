@@ -1,0 +1,33 @@
+{
+  "name": "@acorn/plugin-account",
+  "version": "1.0.0",
+  "description": "Signs a person in to an account service, and registers the Node there so its relay can be reached from another network.",
+  "private": true,
+  "type": "module",
+  "exports": {
+    "./node/index.ts": "./src/node/index.ts",
+    "./client/index.ts": "./src/client/index.ts",
+    "./contract/*": "./src/contract/*"
+  },
+  "scripts": {
+    "lint": "tsc --noEmit",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@acorn/plugin-api": "workspace:*",
+    "@acorn/protocol": "workspace:*",
+    "@tanstack/solid-query": "^5.101.0",
+    "hono": "catalog:",
+    "solid-js": "catalog:",
+    "zod": "catalog:"
+  },
+  "devDependencies": {
+    "@acorn/client-core": "workspace:*",
+    "@acorn/node-core": "workspace:*",
+    "@types/node": "^26.0.0",
+    "typescript": "^6.0.3",
+    "vite": "^8.0.16",
+    "vite-plugin-solid": "^2.11.12",
+    "vitest": "^4.1.11"
+  }
+}

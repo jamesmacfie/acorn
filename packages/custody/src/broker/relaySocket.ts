@@ -2,6 +2,7 @@ import { Agent as HttpsAgent, type AgentOptions } from 'node:https'
 import type { ClientRequestArgs } from 'node:http'
 import type { Duplex } from 'node:stream'
 import { createWebSocketStream, WebSocket } from 'ws'
+import type { RelayTicketFor } from './relayTickets'
 import {
   RELAY_MAX_MESSAGE_BYTES,
   RELAY_TLS_STREAM,
@@ -41,6 +42,19 @@ export class RelayAgent extends HttpsAgent {
   }
 }
 
+// What a stream presents to the relay: the credential typed into the address, as in self-hosted mode,
+// or else a ticket for the account.
+export const relayCredentialFor = (
+  credential: string | undefined,
+  route: string,
+  ticketFor: RelayTicketFor | undefined,
+): Promise<string> =>
+  credential !== undefined
+    ? Promise.resolve(credential)
+    : ticketFor
+      ? ticketFor(route)
+      : Promise.reject(new Error('This relay address has no credential, and nothing here can get a ticket for it.'))
+
 // The relay answers the upgrade only once the Node has opened its end, so an open WebSocket is a stream
 // ready to carry the TLS handshake (apps/relay/PROTOCOL.md § Open a stream).
 export const openRelayStream: OpenRelayStream = (relay, credential) =>
@@ -63,7 +77,7 @@ export const openRelayStream: OpenRelayStream = (relay, credential) =>
 const OPEN_TIMEOUT_MS = 15_000
 
 const refusals: Record<number, string> = {
-  401: 'The relay refused its credential. Check the credential in the relay address.',
+  401: 'The relay refused the credential or ticket. Check the credential in the relay address, or sign in to the account that owns the Node.',
   404: "The Node isn't connected to its relay.",
   502: 'The Node refused the relay stream.',
   503: 'The Node has too many relay streams open.',
@@ -72,7 +86,8 @@ const refusals: Record<number, string> = {
 
 // What a person types to add a Node: `https://host:port` for a direct one, or a relay route for one
 // reached through a relay, `wss://<credential>@relay.example.com/<route>`. The credential comes off the
-// address here and is kept apart from it from then on.
+// address here and is kept apart from it from then on. A route with no credential,
+// `wss://relay.example.com/<route>`, is reached with a ticket from the person's account.
 export type NodeAddress = { endpoint: string; relay?: RelayRoute; relayCredential?: string }
 
 export function parseNodeAddress(address: string): NodeAddress {
@@ -91,11 +106,9 @@ export function parseNodeAddress(address: string): NodeAddress {
   if (!relayRouteIdSchema.safeParse(route).success || url.search || url.hash || url.password)
     throw new Error('A relay address ends with the Node ID, as in wss://<credential>@relay.example.com/<node ID>.')
   const relayCredential = decodeURIComponent(url.username)
-  if (!relayCredential)
-    throw new Error('Put the relay credential before the relay host: wss://<credential>@relay.example.com/<node ID>.')
   return {
     endpoint: `https://${relayHost(route)}`,
     relay: { url: `${url.protocol}//${url.host}${path.map((segment) => `/${segment}`).join('')}`, route },
-    relayCredential,
+    ...(relayCredential ? { relayCredential } : {}),
   }
 }

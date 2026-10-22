@@ -1,3 +1,4 @@
+import { randomUUID } from 'node:crypto'
 import { Agent as HttpAgent } from 'node:http'
 import { Agent as HttpsAgent } from 'node:https'
 import { WebSocket } from 'ws'
@@ -22,7 +23,8 @@ import {
 } from '@acorn/protocol/broker.ts'
 import { EventViewers } from './eventViewers'
 import { BrokerFetch } from './brokerFetch'
-import { openRelayStream, RelayAgent, type OpenRelayStream } from './relaySocket'
+import { openRelayStream, relayCredentialFor, RelayAgent, type OpenRelayStream } from './relaySocket'
+import { RelayTickets, type Ticket } from './relayTickets'
 import { emitEvent, telemetryEnabled } from '@acorn/node-core/server/telemetry'
 import { createLogger } from '@acorn/node-core/server/telemetry'
 
@@ -112,17 +114,27 @@ export class NodeBroker {
   private readonly pingIntervalMs: number
   private readonly viewerMultiplexing: boolean
   private readonly openRelayStream: OpenRelayStream
+  private readonly tickets: RelayTickets
 
   // The heartbeat cadence is injectable so the interval runs for real in tests and the assertion is
   // that the socket died, not that a timer was scheduled. The relay stream is, so a test can stand
   // an in-memory pair in for a relay.
   constructor(
     private readonly events: BrokerEvents,
-    options: { pingIntervalMs?: number; viewerMultiplexing?: boolean; openRelayStream?: OpenRelayStream } = {},
+    options: {
+      pingIntervalMs?: number
+      viewerMultiplexing?: boolean
+      openRelayStream?: OpenRelayStream
+      // The route on this broker's local Node that issues relay tickets, which an app names because a
+      // library can't name a plugin's route. A relayed Node whose address has no credential gets a
+      // ticket there. The local Node's account plugin holds the sign-in.
+      relayTicketRoute?: string
+    } = {},
   ) {
     this.pingIntervalMs = options.pingIntervalMs ?? PING_INTERVAL_MS
     this.viewerMultiplexing = options.viewerMultiplexing ?? false
     this.openRelayStream = options.openRelayStream ?? openRelayStream
+    this.tickets = new RelayTickets((nodeId) => this.ticketFromLocalNode(options.relayTicketRoute, nodeId))
   }
 
   // Add or replace a node. Replacing tears the old connection down first, so a re-pair with a new
@@ -132,8 +144,11 @@ export class NodeBroker {
     const { relay } = node
     const agentWith = (maxSockets: number) =>
       relay
-        ? new RelayAgent({ keepAlive: true, maxSockets, ...this.pinning(node) }, () =>
-            this.openRelayStream(relay, node.relayCredential ?? ''),
+        ? new RelayAgent({ keepAlive: true, maxSockets, ...this.pinning(node) }, async () =>
+            this.openRelayStream(
+              relay,
+              await relayCredentialFor(node.relayCredential, relay.route, (nodeId) => this.tickets.ticket(nodeId)),
+            ),
           )
         : node.endpoint.startsWith('https:')
           ? new HttpsAgent({ keepAlive: true, maxSockets, ...this.pinning(node) })
@@ -159,6 +174,29 @@ export class NodeBroker {
     }
     this.connections.set(node.nodeId, connection)
     void this.openConnection(connection)
+  }
+
+  // A ticket for a Node reached through the relay with this client's account, for the one stream that
+  // needs it. Pairing asks for one before the Node is in the fleet.
+  relayTicket(nodeId: string): Promise<string> {
+    return this.tickets.ticket(nodeId)
+  }
+
+  // A ticket for a relayed Node, asked of the Node on this computer, whose account plugin holds the
+  // sign-in. The ticket goes to the relay and no further.
+  private async ticketFromLocalNode(route: string | undefined, nodeId: string): Promise<Ticket> {
+    const local = [...this.connections.values()].find((connection) => connection.node.local)
+    if (!route || !local)
+      throw new Error('Reaching a Node through your account needs this computer’s own Node, signed in to it.')
+    const response = await this.fetch(local.node.nodeId, {
+      requestId: randomUUID(),
+      path: route,
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: { kind: 'bytes', bytes: new TextEncoder().encode(JSON.stringify({ nodeId })) },
+    })
+    // Loaded here, so a client that never reaches a Node through an account doesn't carry the account API.
+    return (await import('./ticketResponse')).ticketResponse(response.status, response.body)
   }
 
   // The version gate runs here rather than at pairing, because pairing checks once and a node

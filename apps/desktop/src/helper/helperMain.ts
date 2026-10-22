@@ -4,6 +4,7 @@ import { z } from 'zod'
 import { ACORN_BASELINE } from '@acorn/protocol/baseline.ts'
 import type { NodeStatus } from '@acorn/protocol/broker.ts'
 import { coreNodeReachRoute, type NodeReach } from '@acorn/protocol/api.ts'
+import { ACCOUNT_TICKET_ROUTE } from '@acorn/plugin-account/contract/routes.ts'
 import { createHelper, nodeKeyCustody, serviceEnvironment, type Helper } from '@acorn/custody/runtime'
 import { helperMark } from '@acorn/custody/runtime'
 import type { TokenCipher } from '@acorn/custody/custody/deviceTokenStore.ts'
@@ -154,6 +155,7 @@ async function boot(handshake: Handshake): Promise<{ helper: Helper; server: Hel
     nodeKeys: nodeKeyCustody(handshake.dataDir, tokenCipher, process.env.SESSION_ENC_KEY?.trim() || undefined),
     serviceEnv: serviceEnvironment(process.env, fromEnvFiles),
     viewerMultiplexing: true,
+    relayTicketRoute: ACCOUNT_TICKET_ROUTE,
     // Looked up rather than captured, because the listener does not exist yet and there may be no
     // renderer attached when a frame arrives.
     push: {

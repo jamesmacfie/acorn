@@ -1,4 +1,5 @@
 import type { DataRoot } from '../storage/dataRoot'
+import type { RelayState } from './relayTunnel'
 
 // Which relay this Node dials out to, if any (docs/relay.md § The Node). The environment wins
 // over node.json, as it does for the advertised host, and names both values or neither.
@@ -15,4 +16,11 @@ export function relaySettings(root: Pick<DataRoot, 'relay'>): RelaySettings | un
   if (!/^wss?:\/\/[^/]/.test(settings.url) || !URL.canParse(settings.url))
     throw new Error(`The relay URL ${settings.url} must start with wss:// or ws://.`)
   return { url: settings.url, credential: settings.credential }
+}
+
+// What the listener lets the account plugin do to a running Node's tunnel. `apply` waits until the
+// change has happened. `state` is undefined while no tunnel runs.
+export type RelayControl = {
+  apply(settings: RelaySettings | undefined): Promise<void>
+  state(): RelayState | undefined
 }

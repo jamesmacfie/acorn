@@ -1,4 +1,6 @@
 export { testGate } from './auth.ts'
+export { startAccountStub } from './accountStub.ts'
+export type { AccountStub } from './accountStub.ts'
 export { startControlPlaneStub } from './controlPlaneStub.ts'
 export type { ControlPlaneStub } from './controlPlaneStub.ts'
 export { makeTestCoreServices, makeTestDb, makeTestPluginDb, testCoreSeams, testEnv, testSecretEnv } from './db.ts'

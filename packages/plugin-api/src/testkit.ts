@@ -26,6 +26,9 @@ export type { TestDb, TestPluginDb } from '@acorn/node-core/testkit'
 // `.use('/api/*', ...testGate(principal))`.
 export { testGate } from '@acorn/node-core/testkit'
 export { seedProviderConnection } from '@acorn/node-core/testkit'
+// The account API's stand-in (docs/account-api.md § The stand-in), for a test of anything that signs in.
+export { startAccountStub } from '@acorn/node-core/testkit'
+export type { AccountStub } from '@acorn/node-core/testkit'
 // Core's tables, for seeding fixtures. See the second rule at the top of this file.
 export { schema } from '@acorn/node-core/server/db/index.ts'
 export type { AppDatabase } from '@acorn/node-core/server/db/index.ts'

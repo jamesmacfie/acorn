@@ -1,4 +1,4 @@
-import { randomBytes, timingSafeEqual } from 'node:crypto'
+import { randomBytes } from 'node:crypto'
 import { createServer as createHttpServer, STATUS_CODES, type IncomingMessage } from 'node:http'
 import { createServer as createHttpsServer } from 'node:https'
 import type { AddressInfo } from 'node:net'
@@ -8,21 +8,24 @@ import {
   RELAY_MAX_MESSAGE_BYTES,
   RELAY_PING_INTERVAL_MS,
   RELAY_REPLACED,
+  RELAY_REVOKED,
   relayControlMessageSchema,
   relayRouteIdSchema,
   relayStreamIdSchema,
   relayStreamKindSchema,
 } from '@acorn/protocol/relay.ts'
+import { staticAuth, type NodeGrant, type RelayAuth } from './auth'
 
-// A relay in self-hosted mode: one static credential, held by the owner's Nodes and clients alike.
-// It joins a client's stream to a Node's and forwards the bytes without reading them. PROTOCOL.md
-// beside this package is the wire format.
+// It joins a client's stream to a Node's and forwards the bytes without reading them. Who may do
+// that is `RelayAuth`: one static credential in self-hosted mode, or an account service's tickets and
+// Node credentials. PROTOCOL.md beside this package is the wire format.
 
 const ACCEPT_TIMEOUT_MS = 10_000
 const MAX_STREAMS_PER_ROUTE = 256
 
 export type RelayOptions = {
-  credential: string
+  /** Who may connect: a static credential, or an account service's keys. */
+  auth: RelayAuth | string
   port?: number
   host?: string
   // Serve wss:// directly. Without it the relay speaks ws://, for a proxy that terminates TLS.
@@ -36,21 +39,17 @@ export type Relay = { port: number; close(): Promise<void> }
 
 // A client's upgrade, held until the Node opens its end of the stream.
 type Waiting = { join(node: WebSocket): void; refuse(status: number): void }
-type Registration = { control: WebSocket; waiting: Map<string, Waiting> }
+// `streams` holds both ends of every stream joined through this registration, so they close with it.
+type Registration = { control: WebSocket; waiting: Map<string, Waiting>; grant: NodeGrant; streams: Set<WebSocket> }
 
 export async function startRelay(options: RelayOptions): Promise<Relay> {
   const log = options.log ?? (() => {})
   const acceptTimeoutMs = options.acceptTimeoutMs ?? ACCEPT_TIMEOUT_MS
-  const credential = Buffer.from(`Bearer ${options.credential}`)
+  const auth = typeof options.auth === 'string' ? staticAuth(options.auth) : options.auth
   const registrations = new Map<string, Registration>()
   const streamCounts = new Map<string, number>()
   const wss = new WebSocketServer({ noServer: true, maxPayload: RELAY_MAX_MESSAGE_BYTES, perMessageDeflate: false })
   const server = options.tls ? createHttpsServer(options.tls) : createHttpServer()
-
-  const authorized = (request: IncomingMessage): boolean => {
-    const presented = Buffer.from(request.headers.authorization ?? '')
-    return presented.length === credential.length && timingSafeEqual(presented, credential)
-  }
 
   // Every upgrade goes through here, so every connection is pinged and none can throw an unhandled
   // 'error', such as an oversized message, at the process.
@@ -69,14 +68,14 @@ export async function startRelay(options: RelayOptions): Promise<Relay> {
     else streamCounts.delete(route)
   }
 
-  function register(route: string, request: IncomingMessage, socket: Duplex, head: Buffer): void {
+  function register(route: string, grant: NodeGrant, request: IncomingMessage, socket: Duplex, head: Buffer): void {
     upgrade(request, socket, head, (control) => {
       const previous = registrations.get(route)
       if (previous) {
         log(`route ${route} replaced by a newer connection`)
         previous.control.close(RELAY_REPLACED, 'replaced')
       }
-      const registration: Registration = { control, waiting: new Map() }
+      const registration: Registration = { control, waiting: new Map(), grant, streams: new Set() }
       registrations.set(route, registration)
       log(`route ${route} connected`)
       control.on('message', (data, isBinary) => {
@@ -90,13 +89,25 @@ export async function startRelay(options: RelayOptions): Promise<Relay> {
           log(`route ${route} disconnected`)
         }
         for (const waiting of registration.waiting.values()) waiting.refuse(502)
+        // A stream outlives nothing: with its Node gone from the relay, whether it left, was replaced, or
+        // was revoked, the clients on it lose the Node too.
+        for (const stream of registration.streams) stream.close(1001)
       })
     })
   }
 
-  function connect(route: string, kind: string, request: IncomingMessage, socket: Duplex, head: Buffer): void {
+  function connect(
+    route: string,
+    account: string | undefined,
+    kind: string,
+    request: IncomingMessage,
+    socket: Duplex,
+    head: Buffer,
+  ): void {
     const registration = registrations.get(route)
     if (!registration) return answer(socket, 404)
+    // A ticket names the account it was issued to, and only that account's Node takes its streams.
+    if (account !== undefined && registration.grant.owner !== account) return answer(socket, 401)
     if ((streamCounts.get(route) ?? 0) >= MAX_STREAMS_PER_ROUTE) return answer(socket, 503)
     const id = randomBytes(16).toString('hex')
     countStream(route, 1)
@@ -132,21 +143,31 @@ export async function startRelay(options: RelayOptions): Promise<Relay> {
         upgrade(request, socket, head, (upgraded) => {
           client = upgraded
           socket.off('close', abandoned)
-          join(route, upgraded, node)
+          join(route, registration, upgraded, node)
         })
       },
     })
     registration.control.send(JSON.stringify({ type: 'stream', id, kind }))
   }
 
-  function accept(route: string, id: string, request: IncomingMessage, socket: Duplex, head: Buffer): void {
-    const waiting = registrations.get(route)?.waiting.get(id)
+  function accept(
+    route: string,
+    grant: NodeGrant,
+    id: string,
+    request: IncomingMessage,
+    socket: Duplex,
+    head: Buffer,
+  ): void {
+    const registration = registrations.get(route)
+    // The stream is offered to the connection that registered, so only its credential may answer.
+    if (registration && registration.grant.credentialId !== grant.credentialId) return answer(socket, 401)
+    const waiting = registration?.waiting.get(id)
     if (!waiting) return answer(socket, 404)
     upgrade(request, socket, head, (node) => waiting.join(node))
   }
 
   // Bytes go across unchanged, with backpressure, and either end closing closes the other.
-  function join(route: string, client: WebSocket, node: WebSocket): void {
+  function join(route: string, registration: Registration, client: WebSocket, node: WebSocket): void {
     let open = true
     const close = (code: number): void => {
       client.close(code)
@@ -158,6 +179,8 @@ export async function startRelay(options: RelayOptions): Promise<Relay> {
       countStream(route, -1)
     }
     for (const end of [client, node]) {
+      registration.streams.add(end)
+      end.once('close', () => registration.streams.delete(end))
       end.once('close', release)
       end.on('message', (_data, isBinary) => {
         if (!isBinary) close(1003)
@@ -170,7 +193,7 @@ export async function startRelay(options: RelayOptions): Promise<Relay> {
   }
 
   server.on('request', (_request, response) => response.writeHead(426, { connection: 'close' }).end())
-  server.on('upgrade', (request: IncomingMessage, socket: Duplex, head: Buffer) => {
+  server.on('upgrade', async (request: IncomingMessage, socket: Duplex, head: Buffer) => {
     socket.on('error', () => socket.destroy())
     const url = new URL(request.url ?? '/', 'http://relay')
     const nodeMatch = /^\/v1\/nodes\/([^/]+)$/.exec(url.pathname)
@@ -179,16 +202,25 @@ export async function startRelay(options: RelayOptions): Promise<Relay> {
     const route = (nodeMatch ?? acceptMatch ?? connectMatch)?.[1] ?? ''
     if (!nodeMatch && !acceptMatch && !connectMatch) return answer(socket, 404)
     if (!relayRouteIdSchema.safeParse(route).success) return answer(socket, 400)
-    if (!authorized(request)) return answer(socket, 401)
-    if (nodeMatch) return register(route, request, socket, head)
-    if (acceptMatch) {
-      const id = acceptMatch[2]!
-      if (!relayStreamIdSchema.safeParse(id).success) return answer(socket, 400)
-      return accept(route, id, request, socket, head)
-    }
     const kind = url.searchParams.get('kind') ?? ''
-    if (!relayStreamKindSchema.safeParse(kind).success) return answer(socket, 400)
-    connect(route, kind, request, socket, head)
+    if (connectMatch && !relayStreamKindSchema.safeParse(kind).success) return answer(socket, 400)
+    if (acceptMatch && !relayStreamIdSchema.safeParse(acceptMatch[2]).success) return answer(socket, 400)
+    // The account service's keys decide, which can take a moment, and a failure to check is a refusal.
+    const refused = (): null => null
+    if (connectMatch) {
+      const grant = await auth.client(request, route).catch(refused)
+      return grant ? connect(route, grant.account, kind, request, socket, head) : answer(socket, 401)
+    }
+    const grant = await auth.node(request, route).catch(refused)
+    if (!grant) return answer(socket, 401)
+    if (acceptMatch) return accept(route, grant, acceptMatch[2]!, request, socket, head)
+    register(route, grant, request, socket, head)
+  })
+
+  // A credential the account service revoked has no more business here than a closed account.
+  auth.watch?.((credentialId) => {
+    for (const registration of registrations.values())
+      if (registration.grant.credentialId === credentialId) registration.control.close(RELAY_REVOKED, 'revoked')
   })
 
   // A connection that didn't answer the last ping is gone, whatever its socket thinks.
@@ -213,6 +245,7 @@ export async function startRelay(options: RelayOptions): Promise<Relay> {
     close: () =>
       new Promise((resolve) => {
         clearInterval(heartbeat)
+        auth.close?.()
         for (const registration of registrations.values())
           for (const waiting of registration.waiting.values()) waiting.refuse(503)
         for (const ws of wss.clients) ws.terminate()

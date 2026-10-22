@@ -9,7 +9,7 @@ A compiled plugin is registered in the Node or desktop composition, ships inside
 the shell's own realm, and is trusted like the rest of the app. Being in the binary isn't a privilege.
 What makes a plugin first-party is using something a loaded plugin can't be given.
 
-The compiled plugins are agents, browser, context, docker, editor, git, github, memory, notes,
+The compiled plugins are account, agents, browser, context, docker, editor, git, github, memory, notes,
 onboarding, preview, terminal, and workflows. agent-cost, database, http, linear, model-providers,
 rollbar, and sentry-telemetry ship as loaded packages, and nodes-file is a loaded package that isn't
 bundled. All of them live in `plugins/` as source.
@@ -40,6 +40,9 @@ Every row in the tables below cites one or more of these reasons:
   `apps/node/src/composition/plugins.ts`. A loaded plugin is handed only its context. agents, notes,
   terminal, and workflows take a dependency bag, and agents, memory, and notes take the data root for
   files they write outside SQLite. None of them is here only for F.
+- **H. Node internals a loaded plugin isn't given.** The listener's relay control, the identity
+  file, and the core connection store belong to the host, and nothing in `NodePluginContext` reaches
+  them.
 - **G. A native dependency.** A loaded package is one bundled entrypoint with no `node_modules`, so a
   module with native parts can't travel with it. `playwright-core` and `node-pty` are the cases.
 
@@ -55,6 +58,7 @@ plugins.
 | --- | --- | --- |
 | **terminal** | Owns the PTY stream handlers and a WebSocket channel prefix, and carries `node-pty`. It's required, publishes capabilities four other plugins consume and `TERMINAL_RUNTIME`, whose tmux reconcile the composition root runs, handles the `core:worktree-created` hook, contributes two component slots and the `terminal:command` and `terminal:run-target` workflow step kinds, and is the most privileged plugin | A, B, D, F, G |
 | **agents** | Required. Publishes `MANAGED_AGENTS`, `AGENTS_RUNTIME`, `AGENTS_SESSION_EXECUTE`, `AGENT_USAGE`, and the harness registry, and owns the managed-agent session model that core's context assembler and the transcript both read | D, E, F |
+| **account** | Signs a person in to an account service and turns remote access on and off. It starts and stops the Node's relay tunnel through the listener's control, writes the relay and owner to `node.json`, and stores its tokens through core's connection store, none of which a loaded plugin can reach. It isn't required, and its code stays off the Node's boot path | H |
 | **docker** | Owns a WebSocket channel prefix for container log and event streams. Its footer badge is a component contribution | A, B |
 | **memory** | Required. Publishes `KNOWLEDGE` and `MEMORY_KNOWLEDGE`, and contributes task-context sections core's assembler depends on | D, F |
 | **notes** | Required. Publishes `NOTES_STORE` and `NOTES_SEED_TASK`, consumed by two other plugins, and contributes a context section | D, F |
@@ -107,6 +111,9 @@ import missing from its list and on a listed import that's gone. Add the reason 
   `appShowCall`, so the sidebar names an agent's app as the desktop's app card does.
 - **CLI and workflows.** The built-in `workflow` commands read the run, step, and definition shapes from
   `wire.ts`. The native bridge (`browser/bridge.ts` and `browser/workflows.ts`) relays the same shapes.
+- **Desktop and terminal client, and account.** The desktop helper (`helperMain.ts`) and the terminal
+  client (`platform.ts`) read the relay ticket route from account's `routes.ts`, so custody asks the
+  local Node for a ticket. Custody is a library and names no plugin's route, so each app passes it in.
 - **Desktop and terminal.** `TaskView.tsx` opens a terminal profile through `sessionsClient`, the create
   and list half of terminal's client, so the shell can't write to, attach to, or kill a session.
 - **Extension and agents.** The sidebar draws a session's state with `runtimeState`, marks the Agents

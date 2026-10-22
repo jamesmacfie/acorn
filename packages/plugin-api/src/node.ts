@@ -153,6 +153,8 @@ export { isDir, rendererBaseCheckout, taskContext } from '@acorn/node-core/serve
 export type { LayoutRecipe, RunTarget } from '@acorn/node-core/server/runConfig.ts'
 export { isRepoConfigTrustError } from '@acorn/node-core/server/repoConfigTrust.ts'
 export { TEARDOWN_TIMEOUT_MS } from '@acorn/node-core/server/storage'
+// The relay and owner account node.json records for remote access (docs/account-api.md § The sign-in plugin).
+export { readNodeRelay, recordNodeRelay } from '@acorn/node-core/server/storage/nodeRelay.ts'
 export { mirrorFootprintCapability } from '@acorn/node-core/server/storage'
 export { TASK_CREATED, TASK_SESSIONS } from '@acorn/node-core/server/routes'
 export type { TaskCreatedHook, TaskSessionsBridge } from '@acorn/node-core/server/routes'
@@ -228,7 +230,7 @@ export type {
 } from '@acorn/node-core/server/integrations'
 export { encodeCached, isRecord, parseCached, parseJson } from '@acorn/node-core/server/integrations'
 export { connectionHasCapability } from '@acorn/node-core/server/integrations'
-export { connectProvider } from '@acorn/node-core/server/integrations'
+export { connectProvider, disconnectConnection, listProviderConnections } from '@acorn/node-core/server/integrations'
 export type { StoredConnection } from '@acorn/node-core/server/integrations'
 export { providerCredential, refreshProviderCredential } from '@acorn/node-core/server/integrations'
 export { providerError } from '@acorn/node-core/server/integrations'

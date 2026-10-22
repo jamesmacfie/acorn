@@ -32,6 +32,7 @@ import { ensureSessionKey } from './sessionKey'
 export { checkSessionKey, nodeKeyCustody } from './sessionKey'
 import type { NodeKeys } from '@acorn/protocol/serviceProtocol.ts'
 import { ensureCert } from './transport/tls'
+import type { RelayControl } from './transport/relaySettings'
 import { chargeInterruptedModelCalls } from './modelProviders/grantSchema'
 
 // The runtime object the routes read via c.env (typed as the global Env in env.d.ts). Built once
@@ -64,6 +65,8 @@ export type RuntimeBindings = {
   // The hosts this Node answers on besides loopback, read once at boot (server/transport/advertise.ts).
   // The listener binds with them and GET /v1/core/node/reach compares node.json against them.
   ADVERTISED_HOSTS: readonly string[]
+  // The Node's relay tunnel, which the listener sets once it's bound (server/transport/listener.ts).
+  RELAY?: RelayControl
   BLOBS: BlobCache
   SESSION_ENC_KEY: string
   // Use-scoped credential access (server/core/secrets.ts), rather than the raw SESSION_ENC_KEY. It is

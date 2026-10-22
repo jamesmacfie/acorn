@@ -1,6 +1,7 @@
 {
   "full": {
     "routes": [
+      "account",
       "agents",
       "agents",
       "agents",
@@ -134,6 +135,7 @@
       "plugin-authoring"
     ],
     "connectionProviders": [
+      "account",
       "bitbucket",
       "github",
       "gitlab"
@@ -213,6 +215,14 @@
     ]
   },
   "owned": {
+    "account": {
+      "routes": [
+        "account"
+      ],
+      "connectionProviders": [
+        "account"
+      ]
+    },
     "browser": {
       "routes": [
         "browser/captures"

@@ -20,6 +20,7 @@
   },
   "dependencies": {
     "@acorn/node-core": "workspace:*",
+    "@acorn/plugin-account": "workspace:*",
     "@acorn/plugin-agents": "workspace:*",
     "@acorn/plugin-bitbucket": "workspace:*",
     "@acorn/plugin-browser": "workspace:*",

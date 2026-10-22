@@ -1,0 +1,391 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$defs": {
+    "DeviceCodeRequest": {
+      "type": "object",
+      "properties": {
+        "deviceName": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 100
+        }
+      },
+      "additionalProperties": false
+    },
+    "DeviceCodeResponse": {
+      "type": "object",
+      "properties": {
+        "deviceCode": {
+          "type": "string",
+          "minLength": 1
+        },
+        "userCode": {
+          "type": "string",
+          "minLength": 1
+        },
+        "verificationUri": {
+          "type": "string",
+          "format": "uri"
+        },
+        "expiresIn": {
+          "type": "integer",
+          "exclusiveMinimum": 0,
+          "maximum": 9007199254740991
+        },
+        "interval": {
+          "type": "integer",
+          "exclusiveMinimum": 0,
+          "maximum": 9007199254740991
+        }
+      },
+      "required": [
+        "deviceCode",
+        "userCode",
+        "verificationUri",
+        "expiresIn",
+        "interval"
+      ],
+      "additionalProperties": false
+    },
+    "TokenRequest": {
+      "oneOf": [
+        {
+          "type": "object",
+          "properties": {
+            "grantType": {
+              "type": "string",
+              "const": "urn:ietf:params:oauth:grant-type:device_code"
+            },
+            "deviceCode": {
+              "type": "string",
+              "minLength": 1
+            }
+          },
+          "required": [
+            "grantType",
+            "deviceCode"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "grantType": {
+              "type": "string",
+              "const": "refresh_token"
+            },
+            "refreshToken": {
+              "type": "string",
+              "minLength": 1
+            }
+          },
+          "required": [
+            "grantType",
+            "refreshToken"
+          ],
+          "additionalProperties": false
+        }
+      ]
+    },
+    "TokenResponse": {
+      "type": "object",
+      "properties": {
+        "accessToken": {
+          "type": "string",
+          "minLength": 1
+        },
+        "refreshToken": {
+          "type": "string",
+          "minLength": 1
+        },
+        "expiresIn": {
+          "type": "integer",
+          "exclusiveMinimum": 0,
+          "maximum": 9007199254740991
+        },
+        "account": {
+          "type": "object",
+          "properties": {
+            "id": {
+              "type": "string",
+              "minLength": 1
+            },
+            "name": {
+              "type": "string",
+              "minLength": 1
+            }
+          },
+          "required": [
+            "id",
+            "name"
+          ],
+          "additionalProperties": false
+        }
+      },
+      "required": [
+        "accessToken",
+        "refreshToken",
+        "expiresIn",
+        "account"
+      ],
+      "additionalProperties": false
+    },
+    "Account": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "name": {
+          "type": "string",
+          "minLength": 1
+        }
+      },
+      "required": [
+        "id",
+        "name"
+      ],
+      "additionalProperties": false
+    },
+    "Keys": {
+      "type": "object",
+      "properties": {
+        "keys": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "kty": {
+                "type": "string",
+                "const": "OKP"
+              },
+              "crv": {
+                "type": "string",
+                "const": "Ed25519"
+              },
+              "x": {
+                "type": "string",
+                "minLength": 1
+              },
+              "kid": {
+                "type": "string",
+                "minLength": 1
+              }
+            },
+            "required": [
+              "kty",
+              "crv",
+              "x",
+              "kid"
+            ],
+            "additionalProperties": false
+          }
+        }
+      },
+      "required": [
+        "keys"
+      ],
+      "additionalProperties": false
+    },
+    "RegisterNodeRequest": {
+      "type": "object",
+      "properties": {
+        "label": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 100
+        },
+        "fingerprint": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        }
+      },
+      "required": [
+        "label",
+        "fingerprint"
+      ],
+      "additionalProperties": false
+    },
+    "RegisterNodeResponse": {
+      "type": "object",
+      "properties": {
+        "relay": {
+          "type": "object",
+          "properties": {
+            "url": {
+              "type": "string",
+              "format": "uri"
+            },
+            "credential": {
+              "type": "string",
+              "minLength": 1
+            }
+          },
+          "required": [
+            "url",
+            "credential"
+          ],
+          "additionalProperties": false
+        },
+        "keys": {
+          "type": "object",
+          "properties": {
+            "keys": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "kty": {
+                    "type": "string",
+                    "const": "OKP"
+                  },
+                  "crv": {
+                    "type": "string",
+                    "const": "Ed25519"
+                  },
+                  "x": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "kid": {
+                    "type": "string",
+                    "minLength": 1
+                  }
+                },
+                "required": [
+                  "kty",
+                  "crv",
+                  "x",
+                  "kid"
+                ],
+                "additionalProperties": false
+              }
+            }
+          },
+          "required": [
+            "keys"
+          ],
+          "additionalProperties": false
+        }
+      },
+      "required": [
+        "relay",
+        "keys"
+      ],
+      "additionalProperties": false
+    },
+    "TicketRequest": {
+      "type": "object",
+      "properties": {
+        "nodeId": {
+          "type": "string",
+          "format": "uuid",
+          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+        }
+      },
+      "required": [
+        "nodeId"
+      ],
+      "additionalProperties": false
+    },
+    "TicketResponse": {
+      "type": "object",
+      "properties": {
+        "ticket": {
+          "type": "string",
+          "minLength": 1
+        },
+        "expiresAt": {
+          "type": "integer",
+          "minimum": -9007199254740991,
+          "maximum": 9007199254740991
+        },
+        "relayUrl": {
+          "type": "string",
+          "format": "uri"
+        }
+      },
+      "required": [
+        "ticket",
+        "expiresAt",
+        "relayUrl"
+      ],
+      "additionalProperties": false
+    },
+    "AssertionRequest": {
+      "type": "object",
+      "properties": {
+        "nodeId": {
+          "type": "string",
+          "format": "uuid",
+          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+        }
+      },
+      "required": [
+        "nodeId"
+      ],
+      "additionalProperties": false
+    },
+    "AssertionResponse": {
+      "type": "object",
+      "properties": {
+        "assertion": {
+          "type": "string",
+          "minLength": 1
+        },
+        "expiresAt": {
+          "type": "integer",
+          "minimum": -9007199254740991,
+          "maximum": 9007199254740991
+        }
+      },
+      "required": [
+        "assertion",
+        "expiresAt"
+      ],
+      "additionalProperties": false
+    },
+    "RevokedCredentials": {
+      "type": "object",
+      "properties": {
+        "credentials": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      },
+      "required": [
+        "credentials"
+      ],
+      "additionalProperties": false
+    },
+    "Error": {
+      "type": "object",
+      "properties": {
+        "error": {
+          "type": "string",
+          "enum": [
+            "authorization_pending",
+            "slow_down",
+            "expired_token",
+            "access_denied",
+            "invalid_grant",
+            "invalid_request",
+            "invalid_token",
+            "not_found",
+            "conflict"
+          ]
+        },
+        "message": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "error"
+      ],
+      "additionalProperties": false
+    }
+  }
+}

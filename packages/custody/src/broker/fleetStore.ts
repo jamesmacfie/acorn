@@ -69,7 +69,9 @@ export const pairedNode = (
   certPem: probe.certPem,
   deviceId: result.device.id,
   local: node.local,
-  ...(probe.relay ? { relay: probe.relay, relayCredential: probe.relayCredential } : {}),
+  ...(probe.relay
+    ? { relay: probe.relay, ...(probe.relayCredential ? { relayCredential: probe.relayCredential } : {}) }
+    : {}),
 })
 
 // The bundled local node's token predates its nodeId. See docs/shell.md, "Fleet membership".

@@ -29,14 +29,23 @@ Authorization: Bearer <credential>
 ```
 
 In self-hosted mode, the relay has one static credential, and Nodes and clients present the same one.
-The relay compares it in constant time. A browser can't set this header, so a later version adds a
-second way to carry the credential for browser streams.
+The relay compares it in constant time.
+
+In account mode, the relay checks what an account service signed. A Node presents a relay credential
+and a client presents a ticket, both signed tokens that name the route (`node` claim) and the account.
+A client's ticket opens a stream only when its account owns the Node registered on the route. The token
+format is in [the account API](../../docs/account-api.md#signed-tokens). The relay polls the service's
+list of revoked credentials, and closes a Node that holds one with code 4001, `revoked`.
+
+A browser can't set this header, so a later version adds a second way to carry the credential for
+browser streams.
 
 ## Register a Node
 
 The Node opens its control connection. If another connection holds the same route, the relay closes
 the older one with code 4000, `replaced`, and the newer one takes the route. A Node whose control
-connection closes with 4000 has been replaced. It stops reconnecting and tells its operator.
+connection closes with 4000 has been replaced. It stops reconnecting and tells its operator. A Node
+closed with 4001 has had its credential revoked, and stops the same way.
 
 ## Open a stream
 
@@ -58,7 +67,7 @@ open the stream:
 | Status | Meaning |
 | --- | --- |
 | 400 | The path, route, or kind is malformed. |
-| 401 | The credential is missing or wrong. |
+| 401 | The credential or ticket is missing, wrong, expired, or doesn't name this route or its owner. |
 | 404 | No Node holds that route. |
 | 502 | The Node refused the stream. |
 | 503 | The route already has the maximum number of open and waiting streams. |
@@ -82,7 +91,8 @@ Once joined, each binary message on one end is sent unchanged as a binary messag
 order. Message boundaries carry no meaning, so a reader treats the stream as bytes. A text message
 on a stream connection is a protocol error, and the relay closes both ends with code 1003.
 
-Either end closes the stream by closing its WebSocket. The relay then closes the other end. A stream
+Either end closes the stream by closing its WebSocket. The relay then closes the other end. When a
+Node's control connection closes, the relay closes every stream joined through it with code 1001. A stream
 doesn't half-close. TLS ends with its own `close_notify` first.
 
 ## Keep connections alive

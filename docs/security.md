@@ -73,9 +73,9 @@ Deleting a workspace removes its datasets. Row and byte caps plus retention boun
 - **A phone's browser** reaches one Node through the mobile gateway, a process on the Node's
   computer that holds the device token and the pin and gives the phone a session cookie. The phone
   has owner power minus a short route denylist ([mobile gateway](./security/mobile-gateway.md)).
-- **A relay** joins a client to a Node that dialed out to it, and forwards the client's TLS to the
-  Node without a key to read it. The client still pins the Node's certificate, a relayed caller is
-  never a loopback one, and the relay's credential reaches the relay, not the Node ([the relay](./relay.md)).
+- **A relay** forwards a client's TLS to a Node that dialed out to it, with no key to read it. The
+  client pins the Node's certificate, a relayed caller is never loopback, and the relay's credential
+  reaches the relay, not the Node ([relay](./relay.md), [accounts](./security/control-plane.md#the-account-service)).
 - **The terminal client** collapses the shell and helper into one process. UI code and the broker share
   a realm, so what the desktop holds as a process boundary this holds as a module boundary. The device
   token lives in the broker's module, the plugin cache and acknowledgements in one custody module, and

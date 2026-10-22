@@ -23,6 +23,7 @@
     "@acorn/custody": "workspace:*",
     "@acorn/diff-document": "workspace:*",
     "@acorn/node-core": "workspace:*",
+    "@acorn/plugin-account": "workspace:*",
     "@acorn/plugin-agents": "workspace:*",
     "@acorn/plugin-api": "workspace:*",
     "@acorn/plugin-bitbucket": "workspace:*",

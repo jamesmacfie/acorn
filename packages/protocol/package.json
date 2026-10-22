@@ -41,6 +41,8 @@
     "./dataValues.ts": "./src/data/values/dataValues.ts",
     "./deviceConfig.ts": "./src/device/deviceConfig.ts",
     "./documentSurface.ts": "./src/content/documentSurface.ts",
+    "./account.ts": "./src/device/account.ts",
+    "./accountToken.ts": "./src/device/accountToken.ts",
     "./enrollment.ts": "./src/device/enrollment.ts",
     "./errors.ts": "./src/transport/errors.ts",
     "./extensionPoints.ts": "./src/chrome/extensionPoints.ts",

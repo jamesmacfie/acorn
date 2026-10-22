@@ -4,6 +4,7 @@ import {
   RELAY_MAX_MESSAGE_BYTES,
   RELAY_PING_INTERVAL_MS,
   RELAY_REPLACED,
+  RELAY_REVOKED,
   RELAY_TLS_STREAM,
   relayControlMessageSchema,
   relayHost,
@@ -20,22 +21,34 @@ const JITTER = 0.2
 // Control messages are a few dozen bytes.
 const MAX_CONTROL_MESSAGE_BYTES = 64 * 1024
 
-export type RelayTunnel = { close(): void }
-
-// Re-exported so the listener adds the relay Host only once this module loads, keeping the relay
-// protocol off a boot with no relay settings.
-export { relayHost }
+// Whether the control connection is open now, and since when.
+export type RelayState = { connected: boolean; since?: number }
+export type RelayTunnel = { close(): void; state(): RelayState }
 
 // The Node's outbound connection to its relay (docs/relay.md). Each stream the relay offers becomes
 // one more connection to this Node's HTTPS server, entered by `emit('connection')`, so TLS, the Host
 // guard, auth, and the WebSocket upgrade run on it unchanged. A relayed socket has no peer address,
 // so a route that trusts loopback callers treats it as remote.
-export function startRelayTunnel(server: Server, settings: RelaySettings, route: string): RelayTunnel {
+//
+// The relay Host joins `allowedHosts` for as long as the tunnel runs, so a Node with no tunnel answers
+// to no such name. This module loads only when there are settings, which keeps the relay protocol off
+// a boot with none.
+export function startRelayTunnel(
+  server: Server,
+  settings: RelaySettings,
+  route: string,
+  allowedHosts: Set<string>,
+): RelayTunnel {
+  const host = relayHost(route)
+  allowedHosts.add(host)
   const headers = { authorization: `Bearer ${settings.credential}` }
   let control: WebSocket | null = null
   let reconnect: NodeJS.Timeout | null = null
   let attempt = 0
   let closed = false
+  let connectedSince: number | undefined
+  // The streams this tunnel opened, so closing it ends them too and no connection outlives it.
+  const streams = new Set<WebSocket>()
   // A relay that stays down fails the same way every 30 seconds. One line says so.
   let lastFailure = ''
 
@@ -52,6 +65,8 @@ export function startRelayTunnel(server: Server, settings: RelaySettings, route:
       maxPayload: RELAY_MAX_MESSAGE_BYTES,
       perMessageDeflate: false,
     })
+    streams.add(stream)
+    stream.once('close', () => streams.delete(stream))
     stream.on('error', (error) => log.debug(`relay stream ${id} failed: ${error.message}`))
     stream.once('open', () => server.emit('connection', createWebSocketStream(stream)))
   }
@@ -68,6 +83,7 @@ export function startRelayTunnel(server: Server, settings: RelaySettings, route:
     ws.on('open', () => {
       attempt = 0
       lastFailure = ''
+      connectedSince = Date.now()
       log.info(`connected to relay ${settings.url} as ${route}`)
       // The relay pings too, but only this side's ping notices a relay that vanished without a close.
       ping = setInterval(() => {
@@ -89,10 +105,15 @@ export function startRelayTunnel(server: Server, settings: RelaySettings, route:
       clearInterval(ping)
       if (closed || control !== ws) return
       control = null
+      connectedSince = undefined
       if (code === RELAY_REPLACED) {
         log.error(
           `another Node took route ${route} at relay ${settings.url}. This Node stops dialing it until it restarts.`,
         )
+        return
+      }
+      if (code === RELAY_REVOKED) {
+        log.error(`relay ${settings.url} revoked this Node's credential. This Node stops dialing it.`)
         return
       }
       const delay = BACKOFF_MS[Math.min(attempt, BACKOFF_MS.length - 1)]! * (1 + (Math.random() * 2 - 1) * JITTER)
@@ -108,9 +129,12 @@ export function startRelayTunnel(server: Server, settings: RelaySettings, route:
   return {
     close() {
       closed = true
+      allowedHosts.delete(host)
       if (reconnect) clearTimeout(reconnect)
       control?.terminate()
+      for (const stream of streams) stream.terminate()
     },
+    state: () => ({ connected: connectedSince !== undefined, ...(connectedSince ? { since: connectedSince } : {}) }),
   }
 }
 

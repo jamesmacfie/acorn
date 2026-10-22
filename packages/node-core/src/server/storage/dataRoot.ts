@@ -141,7 +141,7 @@ function acquireLock(dir: string): () => void {
   return release
 }
 
-function readIdentity(path: string): NodeIdentity | null {
+export function readIdentity(path: string): NodeIdentity | null {
   try {
     const parsed = nodeIdentitySchema.safeParse(JSON.parse(readFileSync(path, 'utf8')))
     return parsed.success ? parsed.data : null
@@ -150,13 +150,13 @@ function readIdentity(path: string): NodeIdentity | null {
   }
 }
 
-const identityPathOf = (dir: string): string => join(dir, IDENTITY_FILE)
+export const identityPathOf = (dir: string): string => join(dir, IDENTITY_FILE)
 
 // Read-modify-write against the file, not against a field captured in memory. Two owners write
 // node.json, this process's DataRoot and the attachment functions below, which a route calls long
 // after the root was opened, so a writer that serialised its own cached copy would silently
 // drop whatever the other one had recorded.
-function updateIdentity(path: string, patch: Partial<NodeIdentity>): NodeIdentity {
+export function updateIdentity(path: string, patch: Partial<NodeIdentity>): NodeIdentity {
   const current = readIdentity(path)
   if (!current) throw new Error(`${path} is unreadable or malformed; refusing to overwrite this node's identity.`)
   const next = { ...current, ...patch }

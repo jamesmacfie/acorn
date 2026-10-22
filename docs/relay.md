@@ -55,7 +55,8 @@ internal child token isn't accepted through it.
 The tunnel reconnects after 1, 2, 4, 8, 16, and then every 30 seconds, with jitter, and it logs a
 repeated failure once. When another connection takes its route, the relay closes the tunnel with code
 4000. The Node logs an error and stops dialing until it restarts, so two Nodes holding one route don't
-take it from each other forever.
+take it from each other forever. Code 4001 means the account service revoked the Node's credential, and
+the Node stops dialing the same way.
 
 A standalone Node prints its relay address under **Through relay** in its banner, with `CREDENTIAL`
 in place of the credential, because the banner often lands in a service log.
@@ -85,6 +86,12 @@ The broker builds a `RelayAgent` for a node with a relay route. Its pooling, kee
 and reconnect are the ones a direct node gets. A relay that refuses the stream, or a Node that isn't
 connected to it, reads as `offline` with `unreachable`.
 
+## Accounts
+
+A relay can check an account service's signed tickets and Node credentials instead of one static
+credential, and a person turns on **Remote access** for a Node from **Settings → Account**.
+[Relays and accounts](./relay/accounts.md) covers who may connect, tickets, and remote access.
+
 ## Run your own relay
 
 Self-hosted mode has one owner per relay. The relay, your Nodes, and your clients share one static
@@ -97,7 +104,8 @@ pnpm --filter @acorn/relay start
 
 | Variable | What it sets | Default |
 | --- | --- | --- |
-| `ACORN_RELAY_CREDENTIAL` | The credential, at least 16 characters. Required. | None |
+| `ACORN_RELAY_CREDENTIAL` | The credential, at least 16 characters. Required unless `ACORN_RELAY_ACCOUNT_URL` is set. | None |
+| `ACORN_RELAY_ACCOUNT_URL` | An account service to check tickets and credentials against, in place of a static credential. | None |
 | `ACORN_RELAY_PORT` | The port. | `8443` |
 | `ACORN_RELAY_HOST` | The address to bind. | `0.0.0.0` |
 | `ACORN_RELAY_TLS_CERT` and `ACORN_RELAY_TLS_KEY` | PEM files, to serve `wss://` directly. | Unset, which serves `ws://`. |
@@ -112,7 +120,7 @@ The relay knows routes, stream IDs and kinds, connection times, and byte counts.
 key to any Node's TLS, so it can't read routes, bodies, tokens, or terminal output. A relay breach
 gives away who connected when, not what they did.
 
-A holder of the credential can register any route. That can take a route from your Node, which is a
+In self-hosted mode, a holder of the credential can register any route. That can take a route from your Node, which is a
 denial of service, but not an impersonation: the client pins the Node's certificate, and a different
 Node fails the pin as `identity_mismatch`. A first pairing is as safe as the owner's comparison of the
 identity words.

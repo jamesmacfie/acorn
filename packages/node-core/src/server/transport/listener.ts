@@ -10,7 +10,7 @@ import { type DataRoot } from '../storage/dataRoot'
 import { resolveDatabasePath } from '../storage/paths'
 import { configuredPort, devDataDir } from './listenerConfig'
 import { advertisedHosts } from './advertise'
-import { relaySettings } from './relaySettings'
+import { relaySettings, type RelayControl } from './relaySettings'
 import { ensureCert } from './tls'
 import { attachWsHub, disposeWsHub } from './wsHub'
 import type { RelayTunnel } from './relayTunnel'
@@ -26,9 +26,8 @@ const nodeLog = createLogger('node')
 // application-data root instead.
 export { devDataDir }
 
-// Each listener's relay tunnel, if it has relay settings, so closeListener can stop it. A promise,
-// because the tunnel's module loads on demand and the listener may close before it arrives.
-const relayTunnels = new WeakMap<object, Promise<RelayTunnel>>()
+// Each listener's relay control, so closeListener can stop its tunnel.
+const relayControls = new WeakMap<object, RelayControl>()
 
 // What the listener bound, plus the certificate identity it bound it with. The endpoint is reported after
 // the kernel chooses a port; the fingerprint and certificate let the broker pin that endpoint.
@@ -180,17 +179,12 @@ export function startListener(
       allowedHosts.add(`127.0.0.1:${address.port}`)
       for (const host of advertised) allowedHosts.add(`${host}:${address.port}`)
       // Relayed clients name the Node by its route, which is its ID, and no port (docs/relay.md). The
-      // tunnel loads only here, so a Node with no relay settings runs none of its code.
-      if (relay) {
-        const https = server as unknown as import('node:https').Server
-        relayTunnels.set(
-          server,
-          import('./relayTunnel').then(({ relayHost, startRelayTunnel }) => {
-            allowedHosts.add(relayHost(root.nodeId))
-            return startRelayTunnel(https, relay, root.nodeId)
-          }),
-        )
-      }
+      // tunnel loads only when there are settings, so a Node with none runs none of its code. The
+      // account plugin turns remote access on and off through the same control.
+      const control = relayControl(server as unknown as import('node:https').Server, allowedHosts, root.nodeId)
+      relayControls.set(server, control)
+      runtime.RELAY = control
+      if (relay) void control.apply(relay)
       root.recordPort(address.port)
       log.info(`listening on https://127.0.0.1:${address.port}`)
       for (const host of advertised) log.info(`also answering to https://${host}:${address.port}`)
@@ -211,6 +205,22 @@ export function startListener(
   })
 }
 
+// Start and stop this listener's relay tunnel. Changes run one at a time, because the tunnel's module
+// loads on demand and a quick off-then-on mustn't leave two tunnels holding one route.
+function relayControl(server: import('node:https').Server, allowedHosts: Set<string>, nodeId: string): RelayControl {
+  let tunnel: RelayTunnel | undefined
+  let queue = Promise.resolve()
+  return {
+    apply: (settings) =>
+      (queue = queue.then(async () => {
+        tunnel?.close()
+        tunnel = undefined
+        if (settings) tunnel = (await import('./relayTunnel')).startRelayTunnel(server, settings, nodeId, allowedHosts)
+      })),
+    state: () => tunnel?.state(),
+  }
+}
+
 // Stop accepting, then reap every socket this listener still owns. Both composition roots call it as the
 // first teardown step, and it lives here rather than in either of them because it is the only place that
 // knows what `startListener` attached: an upgrade handler with its own socket set, which `server.close()`
@@ -219,7 +229,7 @@ export function startListener(
 export function closeListener(server: ServerType | null): Promise<void> {
   if (!server) return Promise.resolve()
   const httpServer = server as unknown as import('node:http').Server
-  void relayTunnels.get(server)?.then((tunnel) => tunnel.close())
+  void relayControls.get(server)?.apply(undefined)
   disposeWsHub(httpServer)
   return new Promise((resolve) => {
     server.close(() => resolve())

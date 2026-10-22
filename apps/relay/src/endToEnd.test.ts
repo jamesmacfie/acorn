@@ -88,7 +88,7 @@ const address = (): string => `ws://${CREDENTIAL}@127.0.0.1:${relayPort}/${node.
 const json = (body: Uint8Array): unknown => JSON.parse(new TextDecoder().decode(body))
 
 beforeAll(async () => {
-  relay = await startRelay({ credential: CREDENTIAL })
+  relay = await startRelay({ auth: CREDENTIAL })
   relayPort = relay.port
   proxy = await recordingProxy(() => relayPort)
   delete process.env.ACORN_PORT
@@ -155,7 +155,7 @@ describe('a Node behind a relay', () => {
     await waitFor(() => statuses.at(-1)?.state === 'online', 'the event socket')
     await relay.close()
     await waitFor(() => statuses.at(-1)?.state !== 'online', 'the client to notice')
-    relay = await startRelay({ credential: CREDENTIAL, port: relayPort })
+    relay = await startRelay({ auth: CREDENTIAL, port: relayPort })
     await waitFor(() => statuses.at(-1)?.state === 'online', 'the client to come back')
     const response = await connected.fetch(paired.nodeId, { requestId: 'after', path: '/v1/node' })
     expect(json(response.body)).toMatchObject({ nodeId: paired.nodeId })

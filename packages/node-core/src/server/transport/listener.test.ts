@@ -11,11 +11,17 @@ import { disposeWsHub } from './wsHub'
 import { mintInternalToken } from '../auth/internalTokens'
 import { startRelayTunnel } from './relayTunnel'
 
-// The tunnel dials out, so here it only records whether the listener started it.
-vi.mock('./relayTunnel', async () => ({
-  relayHost: (await import('@acorn/protocol/relay.ts')).relayHost,
-  startRelayTunnel: vi.fn(() => ({ close() {} })),
-}))
+// The tunnel dials out, so here it only records whether the listener started it, and keeps the relay
+// name allowed for as long as it runs, as the real one does.
+vi.mock('./relayTunnel', async () => {
+  const { relayHost } = await import('@acorn/protocol/relay.ts')
+  return {
+    startRelayTunnel: vi.fn((_server: unknown, _settings: unknown, route: string, hosts: Set<string>) => {
+      hosts.add(relayHost(route))
+      return { close: () => hosts.delete(relayHost(route)), state: () => ({ connected: false }) }
+    }),
+  }
+})
 
 // The listener's transport contract, asserted against a real socket: it speaks TLS with the
 // certificate it reports, that certificate validates for 127.0.0.1 (no `rejectUnauthorized: false`
@@ -140,12 +146,13 @@ describe('the loopback TLS listener', () => {
     process.env.ACORN_RELAY_CREDENTIAL = 'relay-credential'
     try {
       const relayed = await start()
-      // The relay name is allowed once the tunnel's module loads, just before the tunnel starts.
+      // The relay name is allowed once the tunnel's module loads, as the tunnel starts.
       await vi.waitFor(() =>
         expect(startRelayTunnel).toHaveBeenCalledWith(
           relayed.server,
           { url: 'ws://127.0.0.1:9', credential: 'relay-credential' },
           root!.nodeId,
+          expect.any(Set),
         ),
       )
       expect((await probe(relayed, '/v1/node', relayName(), {}, true)).status).toBe(200)
@@ -153,6 +160,23 @@ describe('the loopback TLS listener', () => {
       delete process.env.ACORN_RELAY_URL
       delete process.env.ACORN_RELAY_CREDENTIAL
     }
+  }, 30_000)
+
+  // Remote access turns the tunnel on and off while the Node runs (docs/relay/accounts.md § Remote access).
+  it('starts and stops its tunnel when told to, and stops answering to the relay name', async () => {
+    const relayName = `${root!.nodeId}.relay.acorn`
+    const runtime = makeRuntime(root!)
+    opened.push(runtime.DB)
+    listener = await startListener(runtime, root!)
+    expect(runtime.RELAY!.state()).toBeUndefined()
+
+    await runtime.RELAY!.apply({ url: 'ws://127.0.0.1:9', credential: 'relay-credential' })
+    expect(runtime.RELAY!.state()).toEqual({ connected: false })
+    expect((await probe(listener, '/v1/node', relayName, {}, true)).status).toBe(200)
+
+    await runtime.RELAY!.apply(undefined)
+    expect(runtime.RELAY!.state()).toBeUndefined()
+    expect((await probe(listener, '/v1/node', relayName, {}, true)).status).toBe(403)
   }, 30_000)
 
   it('authenticates an internal token using the adapter socket peer', async () => {

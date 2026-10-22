@@ -17,6 +17,7 @@
     "db:migrate": "pnpm --filter @acorn/node-core db:migrate",
     "db:reset": "node scripts/db-reset.mjs",
     "dev": "turbo run dev",
+    "dev:account": "node --import tsx scripts/dev-account.mts",
     "dev:agent": "pnpm --filter @acorn/desktop dev:agent",
     "dev:agent:smoke": "pnpm --filter @acorn/desktop dev:agent:smoke",
     "dev:agent:ui": "pnpm --filter @acorn/desktop dev:agent:ui",

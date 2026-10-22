@@ -47,6 +47,7 @@ the whole plugin system in one page.
 | [state-ownership/scope-rules.md](./state-ownership/scope-rules.md) | Where client state is stored: the scope table, the three mechanisms, eviction, and drafts. |
 | [state-ownership/reading-places.md](./state-ownership/reading-places.md) | List, timeline, and diff reading places, heights, and parsed rows. |
 | [caching.md](./caching.md) | The client cache, its keys, and the serve-then-revalidate policy. |
+| [account-api.md](./account-api.md) | The account API: sign-in, Nodes, relay credentials, tickets, and assertions, its schemas, the stand-in, and the sign-in plugin. |
 | [authentication.md](./authentication.md) | Device pairing, tokens, principals, and the internal-call scopes. |
 | [security.md](./security.md) | The trust boundaries, what is out of scope, and which page owns each control. |
 | [security/security-diagnostics.md](./security/security-diagnostics.md) | Passive, device-only Node security evidence, scope, and limits. |
@@ -240,6 +241,7 @@ Start with the plugin map, then follow the authoring guide or API reference.
 | [node-distribution/install.md](./node-distribution/install.md) | The archive installers, where they put the Node, starting it at login with `acorn node service`, upgrades, and removal. |
 | [node-distribution/keep-awake.md](./node-distribution/keep-awake.md) | How a Node keeps its computer awake while agents work or workflows run, the inhibitor on each platform, and the setting. |
 | [node-distribution/reaching.md](./node-distribution/reaching.md) | How a person chooses the addresses a Node answers other machines on, and why the port stays fixed. |
+| [relay/accounts.md](./relay/accounts.md) | How a relay checks an account service, how a client gets a ticket, and what Remote access does on a Node. |
 | [relay.md](./relay.md) | The relay: reaching a Node with no public address, the Node's tunnel, relay addresses in clients, and running your own relay. |
 | [release-notes.md](./release-notes.md) | What is in the current release. |
 

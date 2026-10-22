@@ -1,5 +1,6 @@
 import { z } from 'zod'
 import { ACORN_BASELINE } from '../baseline.ts'
+import { accountKeysSchema } from './accountKeys.ts'
 
 // The current wire protocol version, and the whole of the client to node compatibility contract. See
 // docs/api-reference/versioning.md § Versioning.
@@ -59,6 +60,10 @@ export const nodeIdentitySchema = z.object({
   // The relay this Node dials out to, and the credential it proves itself with (docs/relay.md). Set
   // by hand; ACORN_RELAY_URL and ACORN_RELAY_CREDENTIAL win over it. Absent means no relay code runs.
   relay: z.strictObject({ url: z.string().url(), credential: z.string().min(1) }).optional(),
+  // The account that owns this Node, recorded when it was registered for remote access, with the keys
+  // that account's service signs with (docs/account-api.md). It's no grant: the Node uses it only to
+  // check that an assertion names its owner.
+  owner: z.strictObject({ accountId: z.string().min(1), keys: accountKeysSchema }).optional(),
 })
 
 export type NodeIdentity = z.infer<typeof nodeIdentitySchema>

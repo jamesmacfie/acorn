@@ -11,7 +11,7 @@ const sockets: WebSocket[] = []
 let relay: Relay
 
 beforeEach(async () => {
-  relay = await startRelay({ credential: CREDENTIAL, acceptTimeoutMs: 300 })
+  relay = await startRelay({ auth: CREDENTIAL, acceptTimeoutMs: 300 })
 })
 
 afterEach(async () => {
@@ -109,6 +109,15 @@ describe('the relay', () => {
     expect((await replaced)[0]).toBe(RELAY_REPLACED)
     expect(await upgradeStatus(open(relayUrls.connect(url(), ROUTE, 'tls')))).toBe(101)
     expect(newer.offers).toHaveLength(1)
+  })
+
+  it('closes the streams of a Node that leaves, so its clients lose it at once', async () => {
+    const node = await registerNode()
+    const client = open(relayUrls.connect(url(), ROUTE, 'tls'))
+    await upgradeStatus(client)
+    const lost = next<[number]>(client, 'close')
+    node.control.close()
+    expect((await lost)[0]).toBe(1001)
   })
 
   it('closes both ends of a stream that carries text', async () => {

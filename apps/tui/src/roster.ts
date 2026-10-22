@@ -1,3 +1,4 @@
+import { accountClientPlugin } from '@acorn/plugin-account/client/index.ts'
 import { agentsClientPlugin } from '@acorn/plugin-agents/client/index.ts'
 import { bitbucketClientPlugin } from '@acorn/plugin-bitbucket/client/index.ts'
 import { contextClientPlugin } from '@acorn/plugin-context/client/index.ts'
@@ -16,14 +17,14 @@ import { workflowsClientPlugin } from '@acorn/plugin-workflows/client/index.ts'
 import { initClientPlugins } from '@acorn/client-core/host/registries/extensionPoints'
 
 // The roster: one line per plugin, through the registry rather than by importing each contribution,
-// because that is where a pane comes from on the desktop too. It is the same fifteen the desktop
+// because that is where a pane comes from on the desktop too. It is the same sixteen the desktop
 // registers (docs/tui/plugin-losses.md § What a plugin loses here). A loaded plugin is not on this
 // list: it arrives from a node as a bundle, and the client runtime's `watchPluginChanges` finds it
 // once a node is reachable.
 //
 // ## Why this is its own module, imported after the first frame
 //
-// These imports pull in every pane, source and query module in fifteen plugins. `main.tsx` awaits
+// These imports pull in every pane, source and query module in sixteen plugins. `main.tsx` awaits
 // `App` before it creates a renderer, so holding them in `App.tsx` would evaluate all of that before
 // a cell is drawn. ../scripts/check-startup-graph.mjs fails the build if the roster reaches the
 // startup graph.
@@ -35,6 +36,7 @@ import { initClientPlugins } from '@acorn/client-core/host/registries/extensionP
 // — the layout table above all, which a pane needs before it can draw at all.
 export function installRoster(): void {
   initClientPlugins([
+    accountClientPlugin,
     agentsClientPlugin,
     bitbucketClientPlugin,
     contextClientPlugin,

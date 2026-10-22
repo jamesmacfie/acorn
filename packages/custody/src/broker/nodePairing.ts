@@ -11,7 +11,8 @@ import type { NodeProbeResult } from '@acorn/protocol/broker.ts'
 import { nodeAddress, type RelayRoute } from '@acorn/protocol/relay.ts'
 import { normalizeFingerprint, pinnedTlsOptions } from './nodeBroker'
 import { nodeRequest, readBoundedResponse } from './nodeRequest'
-import { openRelayStream, parseNodeAddress, RelayAgent, type NodeAddress } from './relaySocket'
+import { openRelayStream, parseNodeAddress, relayCredentialFor, RelayAgent, type NodeAddress } from './relaySocket'
+import type { RelayTicketFor } from './relayTickets'
 
 // The requests that turn a URL into a fleet member. See docs/api-reference.md, "Pairing".
 //
@@ -42,12 +43,14 @@ const MAX_PAIR_RESPONSE_BYTES = 64 * 1024
 // No token is sent and nothing is remembered, so an unverified request here grants nothing.
 //
 // The address is what a person typed, a direct endpoint or a relay route, or a remembered node. A relay
-// route's credential travels on in the result, for pairing, and never into a message.
-export type NodeProbe = NodeProbeResult & { certPem: string; relayCredential?: string }
+// route's credential, or the way to get its ticket, travels on in the result, for pairing, and never into a
+// message.
+export type NodeProbe = NodeProbeResult & { certPem: string; relayCredential?: string; relayTicket?: RelayTicketFor }
 
 export async function probeNode(
   address: string | NodeAddress,
-  options: { timeoutMs?: number } = {},
+  // `relayTicket` is how to get the ticket a relayed Node's address without a credential needs.
+  options: { timeoutMs?: number; relayTicket?: RelayTicketFor } = {},
 ): Promise<NodeProbe> {
   const target = typeof address === 'string' ? parseNodeAddress(address) : address
   const url = new URL('/v1/node', target.endpoint)
@@ -58,7 +61,7 @@ export async function probeNode(
     url,
     endpoint,
     Math.min(options.timeoutMs ?? PROBE_TIMEOUT_MS, PROBE_TIMEOUT_MS),
-    target.relay && relayAgent(target.relay, target.relayCredential, {}),
+    target.relay && relayAgent(target.relay, target.relayCredential, options.relayTicket, {}),
   )
   const payload: unknown = JSON.parse(body)
   const parsedInfo = nodeInfoSchema.safeParse(payload)
@@ -98,7 +101,13 @@ export async function probeNode(
     baseline: info.baseline,
     compatible: info.protocolVersion === NODE_PROTOCOL_VERSION,
     certPem,
-    ...(target.relay ? { relay: target.relay, relayCredential: target.relayCredential } : {}),
+    ...(target.relay
+      ? {
+          relay: target.relay,
+          ...(target.relayCredential ? { relayCredential: target.relayCredential } : {}),
+          ...(options.relayTicket ? { relayTicket: options.relayTicket } : {}),
+        }
+      : {}),
   }
 }
 
@@ -120,11 +129,19 @@ type PinnedProbe = {
   compatible?: boolean
   relay?: RelayRoute
   relayCredential?: string
+  relayTicket?: RelayTicketFor
 }
 
 // The agent for a relayed Node: its connections are relay streams (./relaySocket.ts).
-const relayAgent = (relay: RelayRoute, credential: string | undefined, options: HttpsAgentOptions): RelayAgent =>
-  new RelayAgent(options, () => openRelayStream(relay, credential ?? ''))
+const relayAgent = (
+  relay: RelayRoute,
+  credential: string | undefined,
+  ticketFor: RelayTicketFor | undefined,
+  options: HttpsAgentOptions,
+): RelayAgent =>
+  new RelayAgent(options, async () =>
+    openRelayStream(relay, await relayCredentialFor(credential, relay.route, ticketFor)),
+  )
 
 // Step 3: spend the owner's pairing code, this time over a pinned connection. The fingerprint they
 // just confirmed is now the identity, so the code cannot be handed to an impostor.
@@ -188,7 +205,9 @@ async function pinnedPost(
   if (probe.baseline !== ACORN_BASELINE || probe.compatible === false)
     throw new Error(`Node baseline or protocol does not match ${ACORN_BASELINE}; pairing was refused.`)
   const pinned = pinnedTlsOptions(probe.fingerprint, probe.certPem)
-  const agent = probe.relay ? relayAgent(probe.relay, probe.relayCredential, pinned) : new HttpsAgent(pinned)
+  const agent = probe.relay
+    ? relayAgent(probe.relay, probe.relayCredential, probe.relayTicket, pinned)
+    : new HttpsAgent(pinned)
   try {
     const response = await nodeRequest({
       url: new URL(path, probe.endpoint),

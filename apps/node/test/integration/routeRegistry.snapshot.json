@@ -61,6 +61,7 @@
     "ALL /v1/p/:plugin/*",
     "ALL /v1/p/:plugin/tasks/:id",
     "ALL /v1/p/:plugin/tasks/:id/*",
+    "ALL /v1/p/account/*",
     "ALL /v1/p/agents/*",
     "ALL /v1/p/agents/*",
     "ALL /v1/p/agents/*",

@@ -88,6 +88,9 @@
     "**/*.test-d.ts": ["exports", "types"],
     // `acorn-plugin.config.mjs` names the factory as a string (`factory: 'httpPlugin'`).
     "plugins/{database,http,linear,model-providers,nodes-file,rollbar,sentry-telemetry}/src/node/index.ts": ["exports"],
+    // The account API's published contract. The hosted account service, which lives in another
+    // repository, imports its names, so a name nothing here imports is still in use.
+    "packages/protocol/src/device/account.ts": ["exports", "types"],
     // Starlight imports the route middleware's `onRequest` by path.
     "apps/site/src/routeData.ts": ["exports"],
     // JSX runtimes. Solid's compiler emits calls to these names, set by `moduleName` in the build.

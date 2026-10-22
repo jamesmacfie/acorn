@@ -221,7 +221,7 @@ export function startHelperServer(
     'fleet-list': () => ({ nodes: helper.fleet.list().map(toNodeRecord), statuses: helper.broker.statuses() }),
     'node-probe': async (raw): Promise<NodeProbeResult> => {
       const { endpoint } = nodeProbeRequestSchema.parse(raw)
-      const probe = await probeNode(endpoint)
+      const probe = await probeNode(endpoint, { relayTicket: (nodeId) => helper.broker.relayTicket(nodeId) })
       pending = probe
       return publicProbe(probe)
     },

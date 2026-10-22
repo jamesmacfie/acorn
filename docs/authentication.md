@@ -173,6 +173,14 @@ encrypted `integrations` row, and never appears in an answer or renderer state.
 The flow uses acorn's public client ID unless `GITHUB_CLIENT_ID` overrides it, with no client secret or
 callback URL ([connecting](./github-integration.md#connecting)).
 
+## Accounts
+
+A Node has no account and runs no account code until someone signs in. **Settings → Account** runs the
+device flow against an account service on the local Node, and the tokens are an encrypted `account`
+connection, as GitHub's is ([the account API](./account-api.md#the-sign-in-plugin)). **Remote access**
+records the account as the Node's owner in `node.json`. That isn't a grant: a device token still decides
+who may use a Node, and signing out revokes none.
+
 ## WebSocket authentication
 
 `/v1/events` checks the exact Node `Host` and a device bearer or internal token before the upgrade

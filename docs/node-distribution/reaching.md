@@ -7,7 +7,9 @@ answers other machines only on hosts a person on its own computer chose. This pa
 
 There are three ways in from another machine: advertise the Node on a network you trust, below, open
 an SSH tunnel to a private Node, or reach it through [a relay](../relay.md). A relay needs no inbound
-port and no shared network, because the Node dials out to it.
+port and no shared network, because the Node dials out to it. On a local Node, turn on **Remote access**
+in **Settings → Account**, and the Node dials a relay your account names ([relays and
+accounts](../relay/accounts.md)).
 
 ## Choose the hosts
 

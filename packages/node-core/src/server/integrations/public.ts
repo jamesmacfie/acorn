@@ -2,7 +2,13 @@ export { providerRequestScheduler } from './budgetRuntime.ts'
 export { encodeCached, isRecord, parseCached, parseJson } from './codec.ts'
 export { connectionHasCapability } from './connectionCapabilities.ts'
 export { connectionProviderRegistry } from './connectionProviders/registry.ts'
-export { connectProvider, rotateConnection, testConnection } from './connections.ts'
+export {
+  connectProvider,
+  disconnectConnection,
+  listProviderConnections,
+  rotateConnection,
+  testConnection,
+} from './connections.ts'
 export type { StoredConnection } from './connections.ts'
 export { providerCredential, refreshProviderCredential } from './credential.ts'
 export type { ExternalItemStore } from './itemStore.ts'

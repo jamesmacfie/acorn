@@ -145,11 +145,11 @@ describe('assembled routes', () => {
   })
 
   it('registers every built-in provider from its own plugin, in both registries', () => {
-    // Three: bitbucket, github and gitlab are the compiled providers. linear, openai and anthropic all come
-    // from loaded packages, and this suite assembles the compiled list only, so their absence is the
+    // Four: account, bitbucket, github and gitlab are the compiled providers, and account is a connection
+    // with nothing mirrored. linear, openai and anthropic all come from loaded packages, and this suite assembles the compiled list only, so their absence is the
     // assertion; any of them appearing would mean something in the binary had started registering a
     // provider again.
-    const expected = ['bitbucket', 'github', 'gitlab']
+    const expected = ['account', 'bitbucket', 'github', 'gitlab']
     expect(
       connectionProviderRegistry
         .list()
@@ -157,14 +157,14 @@ describe('assembled routes', () => {
         .sort(),
     ).toEqual(expected)
     // The integration registry holds only providers with mirrored resources (docs/integrations/contributions.md §
-    // Connection and integration contributions). All three register in it, so the two lists coincide. They are
-    // asserted separately because a connection provider need not be an integration one.
+    // Connection and integration contributions). Bitbucket, github and gitlab register in it, and account
+    // doesn't, so the lists differ by that one.
     expect(
       integrationProviderRegistry
         .list()
         .map((p) => p.id)
         .sort(),
-    ).toEqual(expected)
+    ).toEqual(['bitbucket', 'github', 'gitlab'])
     expect(
       modelProviderRegistry
         .list()

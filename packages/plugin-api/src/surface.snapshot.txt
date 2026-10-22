@@ -345,6 +345,7 @@ node: defaultBudgets
 node: deliverableSkills
 node: describeError
 node: describeSecretRefusal
+node: disconnectConnection
 node: encodeCached
 node: encodeFileGuardPolicy
 node: envFlags
@@ -366,6 +367,7 @@ node: lazyFetch
 node: lazyRouter
 node: lineDelimitedJsonAdapter
 node: listProfiles
+node: listProviderConnections
 node: lowerPriority
 node: mayActOnTask
 node: mirrorFootprintCapability
@@ -382,6 +384,8 @@ node: providerRequestScheduler
 node: publicConnectionProvider
 node: publicProvider
 node: readConfigFileSync
+node: readNodeRelay
+node: recordNodeRelay
 node: recordSkillDelivery
 node: redactSecretText
 node: refreshProviderCredential
@@ -439,6 +443,7 @@ testkit/client: setActiveTaskId
 testkit/client: setFocusedPane
 testkit/client: setProjectsLookup
 testkit/ws-client: _resetWsClient
+testkit: AccountStub
 testkit: AppDatabase
 testkit: AppEnv
 testkit: BridgeError
@@ -490,6 +495,7 @@ testkit: setRunBridge
 testkit: settleBackground
 testkit: skillDeliveries
 testkit: skillStateStore
+testkit: startAccountStub
 testkit: testConnection
 testkit: testCoreSeams
 testkit: testEnv

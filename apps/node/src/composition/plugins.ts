@@ -2,6 +2,7 @@
 // CoreServices, tools, providers, context sections, storage, and lifecycle hooks through
 // NodePluginContext.
 import type { NodePlugin } from '@acorn/node-core/server/pluginHost'
+import { accountPlugin } from '@acorn/plugin-account/node/index.ts'
 import { agentsPlugin, type AgentsPluginDeps } from '@acorn/plugin-agents/node/index.ts'
 import { bitbucketPlugin } from '@acorn/plugin-bitbucket/node/index.ts'
 import { browserPlugin } from '@acorn/plugin-browser/node/index.ts'
@@ -35,6 +36,7 @@ export type NodePluginDeps = {
 // `migrationsModule`. Cross-plugin dependencies resolve through the capability and provider
 // registries at call time, and array order is not a feature contract.
 export const nodePlugins = (dataDir: string, deps: NodePluginDeps): NodePlugin[] => [
+  accountPlugin(),
   agentsPlugin(dataDir, deps.agents),
   browserPlugin(),
   bitbucketPlugin(),

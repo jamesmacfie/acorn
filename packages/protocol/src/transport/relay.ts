@@ -53,3 +53,5 @@ export const RELAY_MAX_MESSAGE_BYTES = 1024 * 1024
 export const RELAY_PING_INTERVAL_MS = 30_000
 // The close code a relay sends a Node whose route another connection took.
 export const RELAY_REPLACED = 4000
+// The close code a relay sends a Node whose relay credential the account service revoked.
+export const RELAY_REVOKED = 4001

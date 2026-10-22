@@ -40,6 +40,31 @@ decision, and a list acorn ships would be theatre over a choice it can't see. Th
 plain `http` is refused for anything but loopback, because a durable credential must not cross a
 network in the clear.
 
+## The account service
+
+An [account service](../account-api.md) is a different party from a control plane. A person chooses to
+sign in to it, and it provisions nothing and holds no device token. Turning on remote access gives it a
+Node's ID, a label, and the Node's certificate fingerprint, and nothing about what the Node does.
+
+**It can send a client to a Node and raise a pairing request, so a breach could send you to an
+impostor.** It signs relay tickets for any Node it lists and account assertions for any account. What
+it can't do is approve a pairing, read relayed traffic, or get a device token. A relay forwards TLS the
+client pins, so an impostor Node fails the pin as `identity_mismatch` unless the person pairs with it
+after comparing the wrong identity words. Four things bound that:
+
+- **Pairing is still a person's act.** A new device needs a code from a paired device or an approval
+  on the Node's own computer.
+- **The owner record isn't a grant.** `node.json` names the owner account and the service's keys, and
+  nothing in a Node lets an account in.
+- **Tokens are short.** A ticket lasts five minutes and an assertion two. A relay credential lasts
+  until the Node is removed or registers again, and removing the Node on the account website revokes it
+  within seconds.
+- **The service stores no task content.** Its tables hold accounts, Node labels, fingerprints, and relay
+  routes.
+
+Signing out deletes the connection on that Node and turns remote access off first. It doesn't revoke
+a device token, because device tokens don't depend on the account.
+
 ## Node providers
 
 A plugin-contributed node provider vouches for a Node's fingerprint. The desktop host probes that
