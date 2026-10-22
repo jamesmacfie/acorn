@@ -12,7 +12,7 @@ import type {
 } from '@acorn/protocol/api.ts'
 import { pluginPermissionsSchema } from '@acorn/protocol/plugin/contract.ts'
 import { cadenceSchema } from '@acorn/protocol/schedules.ts'
-import type { PluginAck, PluginDevGrant } from './pluginTrustStore'
+import type { PluginAck, PluginDevGrant } from './trustStore'
 import { pluginCustomAgentGrantSchema, pluginExtensionGrantSchema } from './grantSchemas'
 import { bundleSourceSchema } from '@acorn/protocol/plugin/bundles.ts'
 
@@ -36,7 +36,7 @@ export const removeSchema = z.strictObject({ pluginId: z.string().min(1) })
 // bytes the host hashed, and `display` is only rendered back to the owner in a later permission diff.
 // Nothing here grants anything.
 
-// Enter or leave development mode for one plugin on one node. See ./pluginTrustStore.ts. One channel
+// Enter or leave development mode for one plugin on one node. See ./trustStore.ts. One channel
 // for both directions, because they are one switch and revoking must never be harder than granting.
 export const devGrantSchema = z.strictObject({
   pluginId: z.string().min(1),

@@ -1,5 +1,7 @@
 import { createSignal } from 'solid-js'
+import { sandboxDomain } from '@acorn/client-core/host/tree/sandboxDomain.ts'
 import { bodyForFetch } from '@acorn/client-core/infra/node/fetchBody.ts'
+import type { PluginCustody } from '@acorn/client-core/infra/platform'
 import type {
   NodeFetchBody,
   NodeFetchRequest,
@@ -12,14 +14,17 @@ import { relayHost } from '@acorn/protocol/relay.ts'
 import type { WsClientFrame, WsSendOptions } from '@acorn/protocol/ws.ts'
 import { createNodeLink, type NodeLink } from './nodeLink'
 import { forgetPaired, pairedNodes, readToken, renamePaired, type PairedNode } from './pairedNodes'
+import type { PhonePluginCustody } from './pluginCustody'
 
 // The platform seam, from a phone's browser, through the account and an encrypted channel
 // (docs/relay/phone-channel.md).
 //
-// Two groups: `transport` and `fleet`. Each Node the phone is paired with gets a channel through the relay
-// when something needs it, a device token only this module can read, and its own query cache in
-// client-core. Events come over the channel of the Node on screen. Every other group is absent, and
-// client-core hides what needs one: no loaded plugins, and the page's own notifications and file inputs.
+// Three groups: `transport`, `fleet`, and `plugins`. Each Node the phone is paired with gets a channel through
+// the relay when something needs it, a device token only this module can read, and its own query cache in
+// client-core. Events come over the channel of the Node on screen. `plugins` is there only when the build
+// names a sandbox domain, because a bundle this phone accepts has nowhere else to run
+// (docs/mobile/plugin-custody.md). Every other group is absent, and client-core hides what needs one: the
+// page's own notifications and file inputs.
 //
 // It imports nothing that reads the seam, because `main.tsx` installs it before the app loads.
 
@@ -114,33 +119,50 @@ export function installPlatform(): void {
     if (document.visibilityState === 'visible' && interest) links.get(interest)?.restart()
   })
 
+  const nodeFetch = async (nodeId: string, request: NodeFetchRequest): Promise<NodeFetchResponse> => {
+    const controller = new AbortController()
+    requests.set(request.requestId, controller)
+    const timeoutMs = request.timeoutMs ?? DEFAULT_TIMEOUT_MS
+    let timedOut = false
+    const timer = setTimeout(() => ((timedOut = true), controller.abort()), timeoutMs)
+    try {
+      const { bytes, contentType } = await encodeBody(request.body)
+      const headers = { ...request.headers }
+      if (contentType && !Object.keys(headers).some((name) => name.toLowerCase() === 'content-type'))
+        headers['content-type'] = contentType
+      const answer = await linkFor(nodeId).request(
+        { method: request.method ?? 'GET', path: request.path, headers, ...(bytes ? { body: bytes } : {}) },
+        controller.signal,
+      )
+      // A view of an ArrayBuffer, which the channel's type doesn't say.
+      return { ...answer, body: answer.body as Uint8Array<ArrayBuffer> }
+    } catch (error) {
+      if (timedOut)
+        throw Object.assign(new Error(`The node did not answer within ${timeoutMs}ms`), { name: 'TimeoutError' })
+      throw error
+    } finally {
+      clearTimeout(timer)
+      requests.delete(request.requestId)
+    }
+  }
+
+  // Loaded with the first thing that asks, after the first frame (./pluginCustody.ts). The bundle fetch
+  // goes over the same channel as every other request to the Node.
+  let custody: Promise<PhonePluginCustody> | undefined
+  const openCustody = (): Promise<PhonePluginCustody> =>
+    (custody ??= import('./pluginCustody').then((module) => module.openPluginCustody({ fetch: nodeFetch })))
+  const plugins: PluginCustody = {
+    state: async () => (await openCustody()).custody.state(),
+    cachePut: async (request) => (await openCustody()).custody.cachePut(request),
+    install: async (request) => (await openCustody()).custody.install(request),
+    remove: async (request) => (await openCustody()).custody.remove(request),
+    trustRecord: async (request) => (await openCustody()).custody.trustRecord(request),
+    trustForget: async (request) => (await openCustody()).custody.trustForget(request),
+    devGrant: async (request) => (await openCustody()).custody.devGrant(request),
+  }
+
   const acorn = {
-    nodeFetch: async (nodeId: string, request: NodeFetchRequest): Promise<NodeFetchResponse> => {
-      const controller = new AbortController()
-      requests.set(request.requestId, controller)
-      const timeoutMs = request.timeoutMs ?? DEFAULT_TIMEOUT_MS
-      let timedOut = false
-      const timer = setTimeout(() => ((timedOut = true), controller.abort()), timeoutMs)
-      try {
-        const { bytes, contentType } = await encodeBody(request.body)
-        const headers = { ...request.headers }
-        if (contentType && !Object.keys(headers).some((name) => name.toLowerCase() === 'content-type'))
-          headers['content-type'] = contentType
-        const answer = await linkFor(nodeId).request(
-          { method: request.method ?? 'GET', path: request.path, headers, ...(bytes ? { body: bytes } : {}) },
-          controller.signal,
-        )
-        // A view of an ArrayBuffer, which the channel's type doesn't say.
-        return { ...answer, body: answer.body as Uint8Array<ArrayBuffer> }
-      } catch (error) {
-        if (timedOut)
-          throw Object.assign(new Error(`The node did not answer within ${timeoutMs}ms`), { name: 'TimeoutError' })
-        throw error
-      } finally {
-        clearTimeout(timer)
-        requests.delete(request.requestId)
-      }
-    },
+    nodeFetch,
     nodeAbort: (requestId: string) => requests.get(requestId)?.abort(),
     nodeSend: (nodeId: string, frame: WsClientFrame, _options?: WsSendOptions) =>
       linkFor(nodeId).sendFrame(JSON.stringify(frame)),
@@ -179,11 +201,13 @@ export function installPlatform(): void {
       links.delete(nodeId)
       latest.delete(nodeId)
       await forgetPaired(nodeId)
+      if (sandboxDomain()) await (await openCustody()).forgetNode(nodeId)
       await refreshKnown()
       setPairedVersion((version) => version + 1)
     },
     nodeRestartLocal: () => Promise.reject(new Error(LEAVE_FLEET_ALONE)),
     nodeReconnect: (nodeId: string) => links.get(nodeId)?.reconnectNow(),
+    ...(sandboxDomain() ? { plugins } : {}),
   }
   // The seam reads this global and nothing else may name it (tools/arch/boundaries.test.ts).
   ;(globalThis as { acorn?: unknown }).acorn = acorn

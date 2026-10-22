@@ -363,6 +363,9 @@ importers:
       '@acorn/channel':
         specifier: workspace:*
         version: link:../../packages/channel
+      '@acorn/custody':
+        specifier: workspace:*
+        version: link:../../packages/custody
       '@acorn/protocol':
         specifier: workspace:*
         version: link:../../packages/protocol

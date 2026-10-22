@@ -2,6 +2,7 @@ import { randomBytes } from 'node:crypto'
 import { request as httpRequest, type Agent as HttpAgent, type ClientRequest, type IncomingMessage } from 'node:http'
 import { request as httpsRequest, type Agent as HttpsAgent } from 'node:https'
 import type { NodeFetchBody, NodeFetchResponse } from '@acorn/protocol/broker.ts'
+import { NodeResponseTooLargeError } from '../rules/responseTooLarge'
 
 // One HTTP round trip to a node, over node:http(s) rather than global fetch.
 //
@@ -28,12 +29,7 @@ export type NodeRequestOptions = {
 // over its process boundary, so an unbounded response from a paired Node must never reach that path.
 const MAX_NODE_RESPONSE_BYTES = 64 * 1024 * 1024
 
-export class NodeResponseTooLargeError extends Error {
-  constructor(readonly maxBytes: number) {
-    super(`The node response exceeds the ${maxBytes} byte limit.`)
-    this.name = 'NodeResponseTooLargeError'
-  }
-}
+export { NodeResponseTooLargeError }
 
 // Shared by the pinned transport and the unverified probe. Content-Length is an early rejection,
 // not an authority: chunked and dishonest responses are counted before each chunk is retained.

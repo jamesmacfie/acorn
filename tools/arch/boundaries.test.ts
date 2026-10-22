@@ -856,7 +856,7 @@ describe('architecture boundaries', () => {
       // page, the model picker popover, `features/editor/documentCustody`, `ContributionBoundary`, and
       // `LinkPreviewHost` (docs/frontend/startup-budget.md). The token and style pack stylesheets, which
       // the browser extension loads without the app's own stylesheet.
-      '@acorn/client-core': 213, // Includes the fleet actions the phone's Nodes screen forgets a Node with, the pairing request model the desktop's dialog and the terminal client share, the agent panel card the agents plugin draws, the capability keys agents and workflows provide for a kept dashboard panel, the card frame and plan panel an app card draws with, the run panel and panel view host the extension sidebar draws a panel's run with, the desktop's panel view host, the registry of dashboard cells a plugin draws, with its Add to dashboard, the no-projects surface, workspace rail, device preference reader, SelectionActions, the Markdown fence model and view, the four stylesheets the extension sidebar loads, TreeHost for the site's component pages, the anchored popover and focus restore the sidebar's Go to task draws on, Artwork for the plugin API's components barrel, the Inter font file the site preloads, the Performance settings page, the trigger dialog's suggested triggers, the request body the mobile shell's transport sends before the seam exists, the draft form the phone loads when **New task** is pressed, and the workspace tile the phone's list of workspaces draws.
+      '@acorn/client-core': 214, // Includes the check for the phone's sandbox domain, which its first screen asks before the tree host loads, the fleet actions the phone's Nodes screen forgets a Node with, the pairing request model the desktop's dialog and the terminal client share, the agent panel card the agents plugin draws, the capability keys agents and workflows provide for a kept dashboard panel, the card frame and plan panel an app card draws with, the run panel and panel view host the extension sidebar draws a panel's run with, the desktop's panel view host, the registry of dashboard cells a plugin draws, with its Add to dashboard, the no-projects surface, workspace rail, device preference reader, SelectionActions, the Markdown fence model and view, the four stylesheets the extension sidebar loads, TreeHost for the site's component pages, the anchored popover and focus restore the sidebar's Go to task draws on, Artwork for the plugin API's components barrel, the Inter font file the site preloads, the Performance settings page, the trigger dialog's suggested triggers, the request body the mobile shell's transport sends before the seam exists, the draft form the phone loads when **New task** is pressed, and the workspace tile the phone's list of workspaces draws.
       // Includes `mcp/fileGuard`, the read block's file guard, a build entry like `mcp/loopHook`
       // (docs/managed-agents/read-block.md). The manifest parser and the core facet list, which the
       // public site's plugin reference reads to check its examples and list the grants. `mcp/toolOutputDir`,
@@ -1198,13 +1198,14 @@ describe('architecture boundaries', () => {
     // Core seams are not reachable around (docs/architecture/packages.md § Package boundaries).
     // client-core/host/plugins/host.ts is the one door on the renderer side, speaking hashes and
     // decisions only.
-    // Two hosts, one store each. `apps/desktop` reaches it from its helper, `apps/tui` from its own
+    // Three hosts, one store each. `apps/desktop` reaches it from its helper, `apps/tui` from its own
     // custody module, which is the only file in that package that names either class
-    // (the rule below holds it there).
-    const PLUGIN_STORE_OK = new Set(['packages/custody', 'apps/desktop', 'apps/tui'])
+    // (the rule below holds it there), and `apps/mobile` keeps the rules' own classes in the page, since
+    // a phone's browser has no second process (docs/mobile/plugin-custody.md).
+    const PLUGIN_STORE_OK = new Set(['packages/custody', 'apps/desktop', 'apps/tui', 'apps/mobile'])
     const offenders = PACKAGES.flatMap((p) =>
       walk(p.src)
-        .filter((f) => /\b(?:PluginCache|PluginTrustStore)\b/.test(readFileSync(f, 'utf8')))
+        .filter((f) => /\b(?:PluginCache|PluginTrustStore|BundleCache|TrustStore)\b/.test(readFileSync(f, 'utf8')))
         .map(() => relative(ROOT, p.dir)),
     )
     expect([...new Set(offenders)].filter((p) => !PLUGIN_STORE_OK.has(p)).sort()).toEqual([])
@@ -1350,13 +1351,35 @@ describe('architecture boundaries', () => {
   it('the phone’s web app holds no custody and no Node code', () => {
     // A phone's browser keeps its device token under a key it won't hand over, in the one module that
     // reads it (docs/relay/phone-channel.md). Custody and the Node's own code are for processes that run
-    // on a computer, and none of it belongs in what the browser loads.
+    // on a computer, and none of it belongs in what the browser loads. The one exception is the custody
+    // rules, which have no host in them (the rule below), so the phone makes the decisions a computer does.
     const importers = EDGES.filter((e) => e.fromPkg.name === '@acorn/mobile' && !isTestCode(e.fromFile))
       .filter((e) => ['@acorn/custody', '@acorn/node-core'].includes(e.target.pkg?.name ?? ''))
+      .filter((e) => e.spec !== '@acorn/custody/rules')
       .map((e) => `${rel(e.fromFile)}: ${e.spec}`)
     expect(importers).toEqual([])
-    // Anti-vacuity: the phone must still be what opens the channel.
+    // Anti-vacuity: the phone must still be what opens the channel, and what keeps plugin bundles.
     expect(EDGES.some((e) => e.fromPkg.name === '@acorn/mobile' && e.target.pkg?.name === '@acorn/channel')).toBe(true)
+    expect(EDGES.some((e) => e.fromPkg.name === '@acorn/mobile' && e.spec === '@acorn/custody/rules')).toBe(true)
+  })
+
+  it('the custody rules reach no host, so a computer and a phone run the same ones', () => {
+    // `packages/custody/src/rules/` decides what a plugin bundle is worth and how consent is recorded
+    // (docs/security/plugin-bundles.md). A phone's browser loads it, so it can't import `node:`, a Node
+    // package, or the rest of custody, which are all for a computer. Storage, hashing, and the logger
+    // arrive as arguments.
+    const offenders = EDGES.filter(
+      (e) => /\/packages\/custody\/src\/rules\//.test(e.fromFile) && !isTestCode(e.fromFile),
+    )
+      .filter(
+        (e) =>
+          e.spec.startsWith('node:') ||
+          e.target.pkg?.name === '@acorn/node-core' ||
+          (e.target.pkg?.name === '@acorn/custody' && !/\/packages\/custody\/src\/rules\//.test(e.target.file ?? '')),
+      )
+      .map((e) => `${rel(e.fromFile)}: ${e.spec}`)
+    expect(offenders).toEqual([])
+    expect(EDGES.some((e) => /\/packages\/custody\/src\/rules\//.test(e.fromFile))).toBe(true)
   })
 
   it('the channel library reaches the network only through a socket it is handed', () => {

@@ -32,16 +32,7 @@ import {
   type HelperRequest,
   type WireFetchRequest,
 } from '../shell/wire'
-import {
-  decisionSchema,
-  devGrantSchema,
-  disclosureSchema,
-  NO_DISCLOSURE,
-  installSchema,
-  removeSchema,
-  putSchema,
-  type PluginsState,
-} from '@acorn/custody/plugins'
+import { installSchema, pluginDecisions, removeSchema } from '@acorn/custody/plugins'
 import { createLogger, describeError } from '@acorn/node-core/server/telemetry'
 
 import { createRendererWatchdog } from './rendererWatchdog'
@@ -180,6 +171,8 @@ export function startHelperServer(
   // listener lives here and the renderer waits on its result by id.
   const oauthListeners = new Map<string, OauthCallbackListener>()
   const oauthListenerId = (raw: unknown): string => z.strictObject({ id: z.uuid() }).parse(raw).id
+
+  const decisions = pluginDecisions(helper.pluginCache, helper.pluginTrust, log)
 
   const handlers: Record<HelperMethod, (params: unknown, owner: RendererConnection) => unknown | Promise<unknown>> = {
     'config-read': () => helper.config.read(),
@@ -382,34 +375,8 @@ export function startHelperServer(
       connect(nodeId)
     },
     'node-restart-local': () => helper.restartLocalNode(),
-    'plugins-state': (): PluginsState => ({
-      // Projected rather than passed through: `nodeIds` and the eviction timestamps are the helper's
-      // bookkeeping, and a field added to the cache entry must not reach the renderer by default.
-      cached: Object.fromEntries(
-        Object.entries(helper.pluginCache.list()).map(([hash, entry]) => [
-          hash,
-          {
-            pluginId: entry.pluginId,
-            version: entry.version,
-            bytes: entry.bytes,
-            source:
-              entry.source ?? (entry.nodeIds[0] ? { kind: 'node' as const, nodeId: entry.nodeIds[0] } : undefined),
-            nodeIds: entry.nodeIds,
-            installSource: entry.installSource,
-            sourceLabel: entry.sourceLabel,
-            manifest: entry.manifest,
-          },
-        ]),
-      ),
-      acks: helper.pluginTrust.list(),
-      devGrants: helper.pluginTrust.listDevGrants(),
-    }),
-    'plugins-cache-put': async (raw) => {
-      const { nodeId, pluginId, hash, version } = putSchema.parse(raw)
-      const result = await helper.pluginCache.putFromNode(nodeId, pluginId, { hash, version })
-      if ('hash' in result) helper.pluginTrust.recordDevAccept({ pluginId, nodeId, hash: result.hash, version })
-      return result
-    },
+    'plugins-state': decisions.state,
+    'plugins-cache-put': decisions.cachePut,
     'plugins-install': async (raw) => {
       const { source, expectedPluginId } = installSchema.parse(raw)
       const result = await helper.pluginCache.putFromSource(source, 'desktop', expectedPluginId)
@@ -428,46 +395,9 @@ export function startHelperServer(
       helper.pluginCache.removeDevice(pluginId)
       helper.pluginTrust.forgetDevGrant(pluginId, { kind: 'device' })
     },
-    'plugins-dev-grant': (raw): void => {
-      const { pluginId, nodeId, source, path, grant } = devGrantSchema.parse(raw)
-      if (!grant) return helper.pluginTrust.revokeDev(pluginId, source ?? nodeId)
-      helper.pluginTrust.grantDev({
-        pluginId,
-        nodeId,
-        source: source ?? { kind: 'node', nodeId },
-        ...(path ? { path } : {}),
-        grantedAt: Date.now(),
-      })
-      if (source?.kind === 'device') {
-        for (const [hash, entry] of Object.entries(helper.pluginCache.list())) {
-          if (entry.pluginId === pluginId && entry.source?.kind === 'device') {
-            helper.pluginTrust.recordDevAccept({ pluginId, nodeId: '', source, hash, version: entry.version })
-          }
-        }
-      }
-    },
-    'plugins-trust-record': (raw): void => {
-      const decision = decisionSchema.parse(raw)
-      if (!helper.pluginCache.has(decision.hash))
-        throw new Error(`No cached bundle for ${decision.pluginId}@${decision.hash.slice(0, 12)}`)
-      const disclosure = disclosureSchema.safeParse(raw)
-      if (disclosure.success)
-        return helper.pluginTrust.record({ ...decision, ...disclosure.data, decidedAt: Date.now() })
-      log.warn(
-        `the disclosure recorded with ${decision.decision} for ${decision.pluginId} could not be parsed; storing a partial record: ${disclosure.error.message}`,
-        { 'plugin.id': decision.pluginId },
-      )
-      helper.pluginTrust.record({ ...decision, ...NO_DISCLOSURE, partial: true, decidedAt: Date.now() })
-    },
-    'plugins-trust-forget': (raw): void => {
-      const { pluginId, hash } = z
-        .object({
-          pluginId: z.string().min(1),
-          hash: z.string().regex(/^[0-9a-f]{64}$/),
-        })
-        .parse(raw)
-      helper.pluginTrust.forgetDecision(pluginId, hash)
-    },
+    'plugins-dev-grant': decisions.devGrant,
+    'plugins-trust-record': decisions.trustRecord,
+    'plugins-trust-forget': decisions.trustForget,
   }
 
   const serve = async (socket: WebSocket, raw: unknown): Promise<void> => {

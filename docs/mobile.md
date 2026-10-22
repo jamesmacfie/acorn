@@ -161,7 +161,10 @@ phone](./mobile/agent-pane.md) covers how the shared Agents pane draws here.
 - The terminal pane has no layout recipes or run targets, and its key row has no Alt and no Ctrl with
   an arrow ([the phone's terminal pane](./terminal/client.md#the-phones-terminal-pane)).
 - With the keyboard up the composer is tall and the transcript nearly disappears.
-- Loaded plugins don't run, because the browser has no plugin custody.
+- A loaded plugin runs only when the build names a sandbox domain, and only a pane that lists `mobile` in its
+  `formFactor` shows. The phone keeps and trusts bundles, but it installs none, and it asks only about bundles. What a
+  plugin reads and the skills it supplies are approved on the desktop
+  ([the phone's plugin custody](./mobile/plugin-custody.md)).
 - Telemetry stays off, because nothing on the phone switches it on.
 - The phone tells the plugin distribution it's the desktop app, because it draws the desktop's DOM
   plugin halves.

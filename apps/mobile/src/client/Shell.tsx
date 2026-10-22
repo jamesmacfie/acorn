@@ -17,6 +17,7 @@ import {
 import { clientFor, nodeState, refreshFleet } from '@acorn/client-core/infra/node/fleet.ts'
 import { applyAppearance } from '@acorn/client-core/infra/persistence'
 import { QueryCacheProvider } from '@acorn/client-core/infra/persistence/QueryCacheProvider.tsx'
+import { sandboxDomain } from '@acorn/client-core/host/tree/sandboxDomain.ts'
 import { claimNarrowBack } from '@acorn/client-core/kit/lib'
 import { prefsOptions, projectsKey, tasksKey, type Project, type Task } from '@acorn/client-core/infra/queries.ts'
 import { Alert, Button, EmptyState } from '@acorn/client-core/kit/components/primitives.tsx'
@@ -34,6 +35,8 @@ import { Workspaces } from './Workspaces'
 const Nodes = lazy(() => import('./Nodes').then((module) => ({ default: module.Nodes })))
 const SignIn = lazy(() => import('./SignIn').then((module) => ({ default: module.SignIn })))
 const PairingRequestDialog = lazy(() => import('@acorn/client-core/host/trust/PairingRequestDialog.tsx'))
+// The desktop's trust prompt for a plugin's bundle, which a phone shows when it can keep one.
+const PluginTrustDialog = lazy(() => import('@acorn/client-core/host/trust/PluginTrustDialog.tsx'))
 
 // The phone's screens: sign-in while the account says this phone has no session, the Nodes screen while
 // it is paired with none, and then the routes. The routes draw only once a Node is selected, and the
@@ -136,6 +139,9 @@ function Frame(props: ParentProps) {
       </Show>
       <WaitingProvider>{props.children}</WaitingProvider>
       <PairingRequestDialog />
+      <Show when={sandboxDomain()}>
+        <PluginTrustDialog bundlesOnly />
+      </Show>
       <ToastHost />
     </div>
   )

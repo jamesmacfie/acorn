@@ -142,6 +142,7 @@
     "./host/registries/sources/SourceSurface.tsx": "./src/host/registries/sources/SourceSurface.tsx",
     "./host/tree": "./src/host/tree/public.ts",
     "./host/tree/RemoteTree.tsx": "./src/host/tree/RemoteTree.tsx",
+    "./host/tree/sandboxDomain.ts": "./src/host/tree/sandboxDomain.ts",
     "./host/tree/arbitration.ts": "./src/host/tree/arbitration.ts",
     "./host/tree/Slot.tsx": "./src/host/tree/Slot.tsx",
     "./host/tree/TreeHost.tsx": "./src/host/tree/TreeHost.tsx",

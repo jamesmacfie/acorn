@@ -16,8 +16,9 @@ vi.mock('../../infra/node/apiClient', () => ({
   writeJson: vi.fn(async () => ({ ok: true })),
 }))
 
-const { _resetPluginDistribution, _seedPluginDistribution } = await import('../plugins/distribution')
+const { _resetPluginDistribution, _seedPendingTrust, _seedPluginDistribution } = await import('../plugins/distribution')
 const { writeJson } = await import('../../infra/node/apiClient')
+const { recordPluginTrust } = await import('../plugins/host')
 const { default: PluginTrustDialog } = await import('./PluginTrustDialog')
 
 const NODE_ONLY: NodePluginRow = {
@@ -81,6 +82,7 @@ afterEach(() => {
   dispose?.()
   _resetPluginDistribution()
   vi.mocked(writeJson).mockClear()
+  vi.mocked(recordPluginTrust).mockClear()
 })
 
 const dialog = () => document.querySelector<HTMLElement>('.plugin-trust-dialog')
@@ -111,5 +113,41 @@ describe('PluginTrustDialog for what a plugin reads', () => {
         },
       },
     })
+  })
+})
+
+// A phone's device may not write to the Node's plugin routes, so it asks about bundles and leaves
+// what a plugin reads to the desktop.
+describe('PluginTrustDialog on a phone', () => {
+  const WITH_BUNDLE: NodePluginRow = {
+    ...NODE_ONLY,
+    installed: { ...NODE_ONLY.installed!, client: { hash: 'a'.repeat(64), bytes: 10 } },
+  }
+  const bundleRequest = {
+    row: WITH_BUNDLE,
+    hash: 'a'.repeat(64),
+    nodeId: 'node-a',
+    sourceNodeIds: ['node-a'],
+    relation: 'installed' as const,
+    source: { kind: 'node' as const, nodeId: 'node-a' },
+  }
+
+  it('skips a plugin that has no bundle to ask about', async () => {
+    _seedPluginDistribution([['node-a', [NODE_ONLY]]])
+    dispose = render(() => <PluginTrustDialog bundlesOnly />, document.body.appendChild(document.createElement('div')))
+    await Promise.resolve()
+    expect(dialog()).toBeNull()
+  })
+
+  it('records the decision about the bundle and writes nothing to the Node', async () => {
+    _seedPendingTrust([{ ...bundleRequest, row: WITH_BUNDLE }])
+    dispose = render(() => <PluginTrustDialog bundlesOnly />, document.body.appendChild(document.createElement('div')))
+    await vi.waitFor(() => expect(dialog()).not.toBeNull())
+    press('Accept plugin')
+    await vi.waitFor(() => expect(recordPluginTrust).toHaveBeenCalled())
+    expect(recordPluginTrust).toHaveBeenCalledWith(
+      expect.objectContaining({ pluginId: 'readiness', hash: 'a'.repeat(64), decision: 'accepted' }),
+    )
+    expect(writeJson).not.toHaveBeenCalled()
   })
 })

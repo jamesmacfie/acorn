@@ -1,21 +1,17 @@
 import { join } from 'node:path'
-import { z } from 'zod'
 import { PluginCache, type BundleFetcher } from '@acorn/custody/plugins'
 import { PluginTrustStore } from '@acorn/custody/plugins'
-import {
-  decisionSchema,
-  devGrantSchema,
-  disclosureSchema,
-  NO_DISCLOSURE,
-  putSchema,
-  installSchema,
-  removeSchema,
-} from '@acorn/custody/plugins'
+import { installSchema, pluginDecisions, removeSchema, type RulesLog } from '@acorn/custody/plugins'
 import type { PluginCustody } from '@acorn/client-core/infra/platform'
 import { configDir } from '../node/paths'
 import { createLogger } from '@acorn/client-core/infra/telemetry'
 
 const log = createLogger('plugins')
+// The custody rules log a message and its attributes. This logger takes a detail between the two.
+const rulesLog: RulesLog = {
+  warn: (message, attributes) => log.warn(message, undefined, attributes),
+  error: (message, attributes) => log.error(message, undefined, attributes),
+}
 
 // Custody of third-party plugin bundles, from a terminal (docs/tui/plugins.md § Custody).
 //
@@ -40,7 +36,7 @@ export const forgetNodePluginProvenance = (nodeId: string): void => {
   cache?.forgetNode(nodeId)
 }
 
-/** Build the four members of the `plugins` seam group. Called once, by the composition root. */
+/** Build the members of the `plugins` seam group. Called once, by the composition root. */
 export function createPluginCustody(broker: BundleFetcher): PluginCustody {
   cache = new PluginCache(pluginsDir(), broker)
   trust = new PluginTrustStore(pluginsDir())
@@ -51,35 +47,9 @@ export function createPluginCustody(broker: BundleFetcher): PluginCustody {
   bundles.sweep()
 
   return {
-    // Projected rather than passed through, exactly as the helper projects it: `nodeIds` and the
-    // eviction timestamps are bookkeeping, and a field added to a cache entry must not reach the
-    // renderer by default.
-    state: async () => ({
-      cached: Object.fromEntries(
-        Object.entries(bundles.list()).map(([hash, entry]) => [
-          hash,
-          {
-            pluginId: entry.pluginId,
-            version: entry.version,
-            bytes: entry.bytes,
-            source:
-              entry.source ?? (entry.nodeIds[0] ? { kind: 'node' as const, nodeId: entry.nodeIds[0] } : undefined),
-            nodeIds: entry.nodeIds,
-            installSource: entry.installSource,
-            sourceLabel: entry.sourceLabel,
-            manifest: entry.manifest,
-          },
-        ]),
-      ),
-      acks: store.list(),
-      devGrants: store.listDevGrants(),
-    }),
-    cachePut: async (raw) => {
-      const { nodeId, pluginId, hash, version } = putSchema.parse(raw)
-      const result = await bundles.putFromNode(nodeId, pluginId, { hash, version })
-      if ('hash' in result) store.recordDevAccept({ pluginId, nodeId, hash: result.hash, version })
-      return result
-    },
+    // What a node's bundle is worth and how consent is recorded is `@acorn/custody`'s own, shared with
+    // the desktop and the phone. What is left here is what a terminal can do for itself.
+    ...pluginDecisions(bundles, store, rulesLog),
     install: async (raw) => {
       const { source, expectedPluginId } = installSchema.parse(raw)
       const result = await bundles.putFromSource(source, 'terminal', expectedPluginId)
@@ -97,51 +67,6 @@ export function createPluginCustody(broker: BundleFetcher): PluginCustody {
       const { pluginId } = removeSchema.parse(raw)
       bundles.removeDevice(pluginId)
       store.forgetDevGrant(pluginId, { kind: 'device' })
-    },
-    trustRecord: async (raw) => {
-      const decision = decisionSchema.parse(raw)
-      if (!bundles.has(decision.hash))
-        throw new Error(`No cached bundle for ${decision.pluginId}@${decision.hash.slice(0, 12)}`)
-      const disclosure = disclosureSchema.safeParse(raw)
-      if (disclosure.success) return store.record({ ...decision, ...disclosure.data, decidedAt: Date.now() })
-      // A node running a newer manifest schema than this build. The decision is exact and the snapshot
-      // is not, so it is recorded `partial` and never becomes the baseline of a later "what changed"
-      // diff (docs/security/plugin-install.md § The dev grant).
-      log.warn(
-        `the disclosure recorded with ${decision.decision} for ${decision.pluginId} could not be parsed; storing a partial record`,
-        undefined,
-        { 'plugin.id': decision.pluginId },
-      )
-      store.record({ ...decision, ...NO_DISCLOSURE, partial: true, decidedAt: Date.now() })
-    },
-    trustForget: async (raw) => {
-      const { pluginId, hash } = z
-        .object({
-          pluginId: z.string().min(1),
-          hash: z.string().regex(/^[0-9a-f]{64}$/),
-        })
-        .parse(raw)
-      store.forgetDecision(pluginId, hash)
-    },
-    devGrant: async (raw) => {
-      const { pluginId, nodeId, source, path, grant } = devGrantSchema.parse(raw)
-      if (!grant) return store.revokeDev(pluginId, source ?? nodeId)
-      // `{ path }` is a device-provenance install: a person at a terminal installing a plugin is
-      // installing it here (docs/tui/plugins.md § Custody).
-      store.grantDev({
-        pluginId,
-        nodeId,
-        source: source ?? { kind: 'node', nodeId },
-        ...(path ? { path } : {}),
-        grantedAt: Date.now(),
-      })
-      if (source?.kind === 'device') {
-        for (const [hash, entry] of Object.entries(bundles.list())) {
-          if (entry.pluginId === pluginId && entry.source?.kind === 'device') {
-            store.recordDevAccept({ pluginId, nodeId: '', source, hash, version: entry.version })
-          }
-        }
-      }
     },
   }
 }

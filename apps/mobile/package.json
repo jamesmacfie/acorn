@@ -12,6 +12,7 @@
   },
   "dependencies": {
     "@acorn/channel": "workspace:*",
+    "@acorn/custody": "workspace:*",
     "@acorn/protocol": "workspace:*",
     "idb-keyval": "^6.2.5",
     "zod": "catalog:"

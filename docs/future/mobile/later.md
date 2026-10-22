@@ -17,12 +17,6 @@ delivers web push only to an app installed to the home screen. The Node owns the
 each phone is its own device there once [remote access phase 4](../remote-access/04-phone.md)
 ships.
 
-## Run loaded plugins on a phone
-
-The first release runs built-in plugins only. [Plugins on the phone](../mobile-plugin/README.md)
-plans the rest, decided October 23, 2026: browser custody, an origin of its own for each bundle,
-trees before frames, the terminal, and Preview through the Node.
-
 ## Reuse the narrow mode in the browser extension
 
 The extension's sidebar is about as wide as a phone, and it draws its own screens instead of plugin

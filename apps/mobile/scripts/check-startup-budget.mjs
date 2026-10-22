@@ -12,7 +12,7 @@ import { basename, resolve } from 'node:path'
 
 const dist = resolve(import.meta.dirname, '../dist')
 
-// About 2.5% above the measurement of 506,975 B of scripts and 126,786 B of styles on October 22, 2026.
+// About 2% above the measurement of 510,863 B of scripts and 126,786 B of styles on October 23, 2026.
 // The scripts limit rose from 507,000 B for the account and channel code the first screen needs: the
 // token store, the Node links, and the platform's channel plumbing. The handshake's libraries (about
 // 200 KB) load after the first frame. A change that needs more raises the limit in the same commit and says

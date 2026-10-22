@@ -60,7 +60,7 @@ a folder git ignores. They aren't committed.
 - **`app: 'desktop'`.** `PluginClient` is `'desktop'` or `'terminal'`, and the value only decides
   which loaded plugins run. The phone draws the desktop's DOM plugin halves and runs no loaded plugin.
   A `'mobile'` value changes the manifest contract, so it waits for
-  [loaded plugins on a phone](./later.md#run-loaded-plugins-on-a-phone).
+  [plugins on the phone](../mobile-plugin/README.md).
 - **Telemetry stays off.** The desktop and the terminal turn it on from the Node's preference. The
   phone doesn't.
 - **Only `/t/:taskId` picks a pane,** once the plugins have registered and the Node has listed its

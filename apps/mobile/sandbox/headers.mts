@@ -1,5 +1,5 @@
-// The headers every response on the sandbox domain carries. `build-sandbox.mjs` writes them to
-// `dist-sandbox/headers.json` for the host that serves the folder, and `pnpm dev:mobile` sends them itself.
+// The headers every response on the sandbox domain carries. `build-sandbox.mjs` writes them to a
+// `headers.json` beside the files it builds, for the host that serves the folder, and `pnpm dev:mobile` sends them itself.
 //
 // The relay page and the Worker it starts have no network. A Worker made from a `blob:` URL takes its
 // creator's policy, so `connect-src 'none'` here is also the bundle's, and `script-src 'self'` refuses a

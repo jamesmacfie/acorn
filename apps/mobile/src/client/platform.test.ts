@@ -7,10 +7,11 @@ import type { NodeStatus } from '@acorn/protocol/broker.ts'
 // (apps/tui/src/platform.test.ts). The list below is the decision: a group added to the seam fails
 // here until it is named as implemented or left out.
 const IMPLEMENTED: SeamGroup[] = ['transport', 'fleet']
+// There only when the build names a sandbox domain, for the plugin code it keeps to run on.
+const WITH_A_SANDBOX: SeamGroup[] = ['plugins']
 const LEFT_OUT: SeamGroup[] = [
   'desktop',
   'pairing',
-  'plugins',
   'config',
   'desktopExtras',
   'cli',
@@ -128,7 +129,58 @@ afterEach(() => {
 describe('the phone satisfies the platform seam', () => {
   it('implements the groups it claims, completely, and nothing else', () => {
     expect(seamProblems(IMPLEMENTED)).toEqual([])
-    expect([...IMPLEMENTED, ...LEFT_OUT].sort()).toEqual([...SEAM_GROUPS].sort())
+    expect([...IMPLEMENTED, ...WITH_A_SANDBOX, ...LEFT_OUT].sort()).toEqual([...SEAM_GROUPS].sort())
+  })
+})
+
+// What the plugin group asks of the rest of the phone. The rules and the storage have their own tests
+// (./pluginCustody.test.ts), so the custody module is replaced here.
+const custody = vi.hoisted(() => ({
+  fetchers: [] as { fetch: (nodeId: string, request: unknown) => Promise<unknown> }[],
+}))
+vi.mock('./pluginCustody', () => ({
+  openPluginCustody: async (fetcher: (typeof custody.fetchers)[number]) => {
+    custody.fetchers.push(fetcher)
+    return {
+      custody: { state: async () => ({ cached: {}, acks: [], devGrants: [] }) },
+      forgetNode: async () => {},
+    }
+  },
+}))
+
+describe('the phone’s plugin group', () => {
+  async function installWithSandbox(domain: string | null) {
+    vi.stubGlobal('__ACORN_SANDBOX_DOMAIN__', domain)
+    delete (globalThis as { acorn?: unknown }).acorn
+    vi.resetModules()
+    ;(await import('./platform')).installPlatform()
+    const installed = (globalThis as unknown as { acorn: Acorn & { plugins?: { state(): Promise<unknown> } } }).acorn
+    await installed.fleetList()
+    return installed
+  }
+
+  it('is absent when the build names no sandbox domain, so no prompt is asked for code that can’t run', async () => {
+    expect((await installWithSandbox(null)).plugins).toBeUndefined()
+    expect(seamProblems(IMPLEMENTED)).toEqual([])
+  })
+
+  it('satisfies the seam when there is one, loading custody only when something asks', async () => {
+    custody.fetchers.length = 0
+    const { plugins } = await installWithSandbox('sandbox.test')
+    expect(seamProblems([...IMPLEMENTED, ...WITH_A_SANDBOX])).toEqual([])
+    expect(custody.fetchers).toEqual([])
+    await expect(plugins!.state()).resolves.toEqual({ cached: {}, acks: [], devGrants: [] })
+    await plugins!.state()
+    expect(custody.fetchers).toHaveLength(1)
+  })
+
+  it('fetches bundles over the channel of the Node that offers them', async () => {
+    custody.fetchers.length = 0
+    const { plugins } = await installWithSandbox('sandbox.test')
+    await plugins!.state()
+    await custody.fetchers[0]!.fetch('node-2', { requestId: 'bundle', path: '/v1/core/plugins/runn/bundles/abc' })
+    expect(opened.map((channel) => channel.nodeId)).toEqual(['node-2'])
+    expect(opened[0]!.client.sent[0]).toMatchObject({ method: 'GET', path: '/v1/core/plugins/runn/bundles/abc' })
   })
 })
 

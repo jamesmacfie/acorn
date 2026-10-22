@@ -1,7 +1,7 @@
 # Third-party plugin bundles
 
 This page covers how a device decides whether to run a plugin's client bundle: hash-bound consent,
-custody on the desktop and in the terminal, and the threats that closes. Read it before you change
+custody on the desktop, in the terminal, and on the phone, and the threats that closes. Read it before you change
 how bundles are fetched, cached, or trusted. It's part of [plugin security](./node-plugin-security.md).
 
 ## Where bundles come from
@@ -38,6 +38,12 @@ The terminal client has no helper, so it uses the same two stores itself, `@acor
 `PluginCache` and `PluginTrustStore`, pointed at `$XDG_CONFIG_HOME/acorn/plugins/`. Same schemas, same
 `(pluginId, hash)` key, same refusal on a mismatch, and the same `0700` directory and `0600` files.
 `apps/tui/src/plugins/custody.ts` is the only file in that package allowed to name either class.
+
+The phone's browser keeps its bundles and decisions in IndexedDB, under the same rules. `@acorn/custody/rules` holds
+the decisions, with no `node:` import, and each host gives it storage, a hash function, and a logger. The phone hashes
+with Web Crypto, and a bundle that arrives with the wrong hash is refused as on a computer. The phone's page is the only
+process, so unlike the desktop it reads a bundle's bytes. It posts them to a sandbox page that checks them again against
+its own host name ([the phone's plugin custody](../mobile/plugin-custody.md)).
 
 ## Consent is per device and per bundle
 

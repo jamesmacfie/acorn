@@ -6,9 +6,7 @@
 // checks them against its own host name before it starts them.
 import { PLUGIN_BRIDGE_VERSION } from '@acorn/protocol/plugin/bridge.ts'
 import { bundleLabel } from './bundleLabel'
-
-/** The phone build's sandbox domain, with its port when it has one. Unset everywhere else. */
-declare const __ACORN_SANDBOX_DOMAIN__: string | null | undefined
+import { sandboxDomain } from './sandboxDomain'
 
 export type TreeSandbox = {
   postMessage(
@@ -32,7 +30,7 @@ export const setTreeBundleSource = (source: TreeBundleSource | null): void => {
 
 /** The bundle's origin on the sandbox domain when the renderer is the phone app, otherwise null. */
 const phoneRelayOrigin = (hash: string, rendererOrigin: string | undefined): string | null => {
-  const domain = typeof __ACORN_SANDBOX_DOMAIN__ === 'string' ? __ACORN_SANDBOX_DOMAIN__ : null
+  const domain = sandboxDomain()
   if (!domain || !rendererOrigin || DESKTOP_RENDERERS.includes(rendererOrigin)) return null
   // Only a name on this machine may be plain http. A browser treats it as a secure context.
   const secure = !/^([^:]+\.)?localhost(:\d+)?$/.test(domain)

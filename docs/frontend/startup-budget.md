@@ -57,7 +57,7 @@ components and diff code into the closure.
 `apps/mobile/scripts/check-startup-budget.mjs` runs from `@acorn/mobile`'s `build`. It reads Vite's
 manifest in `apps/mobile/dist/.vite` and sums the entry's static closure, plus `src/client/start.tsx`,
 which `main.tsx` awaits before it draws. The ceilings are 520,000 B of scripts and 128,000 B of styles,
-about 3% above the 506,975 B and 126,786 B measured on October 22, 2026, after the account and channel code. The
+about 2% above the 510,863 B and 126,786 B measured on October 23, 2026, after the account and channel code and the hook-up for plugin custody (the custody code itself loads after the first frame). The
 handshake's libraries, about 200 KB, load after the first frame. The draft form behind **New task** loads when the button is pressed. It fails under 100,000 B of
 scripts, on a chunk named in the renderer's denylist, and when the built-in plugins in
 `src/client/plugins.ts` load with the first screen.

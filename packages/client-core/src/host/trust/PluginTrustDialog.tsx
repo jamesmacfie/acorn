@@ -27,11 +27,15 @@ import { HelpMark } from '../../kit/components/content/HelpMark'
 // never be rendered as one list: a strong claim must not lend credibility to a weaker one sitting next
 // to it.
 
-export default function PluginTrustDialog() {
+// A phone asks about bundles only (`bundlesOnly`): what a plugin reads and the skills it supplies are
+// approved on the Node, and a phone's device may not write there, so asking would only fail. Those
+// answers stay with the desktop.
+export default function PluginTrustDialog(props: { bundlesOnly?: boolean }) {
   const [saving, setSaving] = createSignal(false)
   const [error, setError] = createSignal('')
 
-  const request = (): PluginTrustRequest | undefined => pendingTrust()[0]
+  const request = (): PluginTrustRequest | undefined =>
+    props.bundlesOnly ? pendingTrust().find((pending) => pending.hash) : pendingTrust()[0]
   const nodeLabel = (nodeId: string) => nodes().find((node) => node.nodeId === nodeId)?.label ?? nodeId
 
   const tiers = createMemo(() => trustTiers(request()))
@@ -81,7 +85,7 @@ export default function PluginTrustDialog() {
     try {
       // Inputs first: their answer re-reads the node's roster, so the bundle's answer lands on a queue
       // that no longer asks about them.
-      await recordNodeDecision(current, decision)
+      if (!props.bundlesOnly) await recordNodeDecision(current, decision)
       if (current.hash) await recordTrustDecision(current, decision)
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Could not record the decision.')
