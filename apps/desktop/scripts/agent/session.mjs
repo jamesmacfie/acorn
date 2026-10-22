@@ -81,7 +81,7 @@ async function installReplayHarness(dataDir) {
   await Promise.all(['replay-agent.mjs', 'replay-fixtures.mjs'].map((name) =>
     copyFile(join(import.meta.dirname, name), join(target, name))))
   await writeFile(join(target, 'acorn-plugin.json'), JSON.stringify({
-    id: 'streaming-replay', name: 'Streaming replay', version: '1.0.0', baseline: 'acorn-1', apiVersion: '6',
+    id: 'streaming-replay', name: 'Streaming replay', version: '1.0.0', baseline: 'acorn-1', apiVersion: '5',
     contributions: { harnesses: [{ id: 'replay', label: 'Replay', spawn: { entry: './replay-agent.mjs' } }] },
   }))
 }

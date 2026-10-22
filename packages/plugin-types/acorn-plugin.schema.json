@@ -1,7 +1,7 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://acorn.sh/schemas/acorn-plugin.schema.json",
-  "title": "acorn plugin manifest (plugin API major 6)",
+  "title": "acorn plugin manifest (plugin API major 5)",
   "type": "object",
   "properties": {
     "$schema": {
@@ -124,7 +124,7 @@
       "minLength": 1,
       "maxLength": 16,
       "pattern": "^\\d{1,4}(-\\d{1,4})?(\\s*\\|\\|\\s*\\d{1,4}(-\\d{1,4})?)*$",
-      "description": "The plugin API majors your plugin works with: one major such as `\"6\"`, a list such as `\"5 || 6\"`, or a span such as `\"5-6\"`. A range that leaves out acorn's major doesn't load."
+      "description": "The plugin API majors your plugin works with: one major such as `\"5\"`, a list such as `\"4 || 5\"`, or a span such as `\"4-5\"`. A range that leaves out acorn's major doesn't load."
     },
     "requires": {
       "description": "What your plugin needs from the rest of the Node before it can work.",

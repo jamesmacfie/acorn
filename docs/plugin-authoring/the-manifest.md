@@ -25,7 +25,7 @@ editor completes and checks the file.
 | `name` | Yes | The name people read, 1 to 120 characters. Settings, the shortcut sheet, and the tool list show it in place of the id. Trust prompts still show the id |
 | `version` | Yes | A free-form string, 1 to 64 characters. The installer's downgrade guard compares it |
 | `baseline` | Yes | Exactly `"acorn-1"`. Anything else is rejected before the plugin runs |
-| `apiVersion` | Yes | A range over plugin API majors that covers this Node's major, which is `"6"` (`packages/protocol/src/plugin/apiVersion.ts`). Write `"6"`, a list such as `"5 \|\| 6"`, or a span such as `"2-4"` |
+| `apiVersion` | Yes | A range over plugin API majors that covers this Node's major, which is `"5"` (`packages/protocol/src/plugin/apiVersion.ts`). Write `"5"`, a list such as `"4 \|\| 5"`, or a span such as `"2-4"` |
 | `icon`, `icons` | No | Your logo as `{ d, color? }`: one SVG path `d` string authored in a 24 by 24 box, and an optional six-digit hex color. `icons` is a map of up to 16. They register as `brand:<id>` and `brand:<id>/<key>`, and any contribution can name them as its `glyph` |
 | `node` | No | Relative path to the ESM entrypoint the Node imports. Leave it out for a client-only or descriptor-only plugin |
 | `client` | No | Relative path to the single client file. Leave it out for a plugin with only descriptors and document surfaces. It then has no bytes to trust and no trust prompt |
@@ -106,7 +106,7 @@ they're yours:
 | `id` | The plugin's directory name in `plugins/` | Write it, and match the `name` your node entrypoint exports |
 | `version` | Read from the plugin's `package.json` | Write it |
 | `baseline` | `ACORN_BASELINE` | `"acorn-1"` |
-| `apiVersion` | `PLUGIN_API_MAJOR` | `"6"`, or a range covering it |
+| `apiVersion` | `PLUGIN_API_MAJOR` | `"5"`, or a range covering it |
 | `node` | `./dist/node.js` | Your own path, such as `./node/index.js` |
 | `client` | `./dist/client.js`, when a client is declared | Your own path, such as `./client.js` |
 | `migrations` | `./migrations`, when the config declares a chain | Wherever your chain is |

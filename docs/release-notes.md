@@ -6,10 +6,10 @@ pairing response report the `acorn-1` baseline.
 
 ## Event feeds and suggested triggers
 
-Changed on October 21, 2026. Plugin API major 6 adds event feeds (`ctx.dataSources.append` and a
-`feed` entry in `contributions.dataSources`) and `starterTriggers` on a source's description. Nothing
-was removed, so a plugin that uses neither needs only a manifest range that covers major 6, such as
-`"5 || 6"`. One that uses either declares `"6"`, because a Node at major 5 can't read them.
+Changed on October 21, 2026. Event feeds (`ctx.dataSources.append` and a `feed` entry in
+`contributions.dataSources`) and `starterTriggers` on a source's description arrived under plugin API
+major 5. The major went to 6 for a day and came back to 5 on October 22, 2026, because nothing was
+removed. A plugin that declares `"6"` alone doesn't load. Declare `"5"`.
 [Plugin triggers](./plugin-authoring/triggers.md) walks through both.
 
 ## Browser rules removed

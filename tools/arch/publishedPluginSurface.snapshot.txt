@@ -1,4 +1,4 @@
-# loaded plugin API major: 6
+# loaded plugin API major: 5
 acorn-plugin-sdk/data: member DerivedQueryArgs.evaluationTime
 acorn-plugin-sdk/data: member DerivedQueryArgs.inputs
 acorn-plugin-sdk/data: member DerivedQueryArgs.mode

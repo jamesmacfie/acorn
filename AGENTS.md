@@ -23,6 +23,11 @@ Node API, protocol, broker, client cache, and UI. Keep the Node/shell and plugin
 the contribution and capability seams. When behavior or a contract changes, update the doc that
 owns it and add any new doc to `docs/README.md`.
 
+Raise `PLUGIN_API_MAJOR` (`packages/protocol/src/plugin/apiVersion.ts`) only for a breaking change
+to plugins: a removal or a shape change that stops an existing plugin from working. Every installed
+plugin that doesn't declare the new major stops loading. Adding a field, a feature, or a context
+method, or making a required field optional, keeps the major.
+
 ## Simplicity, readability, maintainability, and developer experience
 
 Treat these as requirements for every change, including fixes, features, tests, and refactors.

@@ -2,7 +2,7 @@
   "id": "json-diagnostics",
   "name": "JSON syntax check",
   "version": "1.0.0",
-  "apiVersion": "6",
+  "apiVersion": "5",
   "baseline": "acorn-1",
   "node": "./node.js",
   "contributions": {

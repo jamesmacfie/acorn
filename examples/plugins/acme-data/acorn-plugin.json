@@ -4,7 +4,7 @@
   "name": "Acme deploys",
   "version": "1.0.0",
   "baseline": "acorn-1",
-  "apiVersion": "6",
+  "apiVersion": "5",
   "node": "./node/index.js",
   "migrations": "./migrations",
   "emits": [{ "verb": "deploys-changed", "description": "A deploy was recorded or changed" }],

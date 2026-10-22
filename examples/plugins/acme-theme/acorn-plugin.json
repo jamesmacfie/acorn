@@ -4,7 +4,7 @@
   "name": "Acme theme",
   "version": "1.0.0",
   "baseline": "acorn-1",
-  "apiVersion": "6",
+  "apiVersion": "5",
   "icon": {
     "d": "M12 2 L22 20 H2 Z M12 8 L7 17 H17 Z",
     "color": "#c2410c"

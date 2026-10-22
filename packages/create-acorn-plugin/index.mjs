@@ -10,7 +10,7 @@ import { pathToFileURL } from 'node:url'
  * The plugin API major this scaffold writes into `apiVersion`. Hardcoded because this package is
  * published standalone and can't import the constant. The scaffold tests compare it with the host.
  */
-export const API_VERSION = '6'
+export const API_VERSION = '5'
 export const BASELINE = 'acorn-1'
 
 /**

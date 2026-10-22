@@ -4,7 +4,7 @@
   "name": "Acme release readiness",
   "version": "1.0.0",
   "baseline": "acorn-1",
-  "apiVersion": "6",
+  "apiVersion": "5",
   "node": "./dist/node.js",
   "permissions": {
     "api": [],

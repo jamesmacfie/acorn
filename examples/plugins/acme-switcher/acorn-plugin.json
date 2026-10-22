@@ -4,7 +4,7 @@
   "name": "Acme switcher",
   "version": "1.0.0",
   "baseline": "acorn-1",
-  "apiVersion": "6",
+  "apiVersion": "5",
   "client": "./client.js",
   "contributions": {
     "frames": [

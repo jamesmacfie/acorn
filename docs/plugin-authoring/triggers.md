@@ -49,9 +49,6 @@ field doesn't take, or a value outside a field's choices, and logs one line nami
 suggestion. `defineDerivedSource` takes `starterTriggers` too. `examples/plugins/acme-data` shows a
 hand-written source with one.
 
-A plugin that ships suggestions declares `"apiVersion": "6"`. A Node at major 5 fails a description
-that carries them, and the version makes it refuse the plugin with a reason instead.
-
 ## You watch something that has a current state
 
 Serve a source of the current state, such as one record per host with its load. **Starts matching**
