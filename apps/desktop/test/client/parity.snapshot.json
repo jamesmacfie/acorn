@@ -11,7 +11,8 @@
     "40 context meta+shift+x",
     "50 editor meta+shift+e",
     "75 docker -",
-    "80 preview meta+shift+b"
+    "80 preview meta+shift+b",
+    "90 terminal -"
   ],
   "sources": [
     "0 home",

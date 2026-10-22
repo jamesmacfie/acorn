@@ -34,7 +34,7 @@ const OVERRIDES = {
   'apps/desktop/src/client/TaskView.tsx escape': { description: 'Bring back the pane row', where: 'In a maximized pane' },
   'apps/tui/src/chrome/Shell.tsx w': { description: 'Switch workspace' },
   'apps/tui/src/chrome/Shell.tsx ;': { description: 'Switch to the last workspace' },
-  'plugins/terminal/src/client/TerminalPanel.tsx meta+shift+${index + 1}': { description: 'Focus that terminal in the drawer' },
+  'plugins/terminal/src/client/TerminalSessions.tsx meta+shift+${index + 1}': { description: 'Focus that terminal' },
   'plugins/git/src/client/changes/commands.ts meta+enter': { where: "In the Git pane's message box" },
   'plugins/git/src/client/changes/commands.ts meta+alt+enter': { where: "In the Git pane's message box" },
   // Registered in a loop that adds the category and scope.
