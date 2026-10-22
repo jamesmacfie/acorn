@@ -52,9 +52,10 @@ service" or "the account service" by what it does and which routes it answers, n
 repository, file paths, or internals. Someone who clones this repository must be able to follow every
 link and run every check.
 
-Until the hosted service has its own repository and docs, its design stays in this folder, under
-headings and steps that start with **Hosted service**. When it moves, those sections move with it,
-and what stays here is the account API contract and the open-side work.
+The hosted service has its own docs, kept with its code. Its infrastructure, deployment, and
+operation are described there. What stays here is the account API contract and the open-side work.
+Steps titled **Hosted service** in the phase files stay as the record of what each phase did.
+
 ## Environments
 
 | Environment | Purpose | Data |
@@ -63,23 +64,7 @@ and what stays here is the account API contract and the open-side work.
 | Staging | The people building acorn. A real GitHub OAuth app and one region. | Test accounts only. Reset whenever needed. |
 | Production | Everyone. One region for the account service, relays where people are. | Account data. Backed up and audited. |
 
-## Hosted service: infrastructure before production
-
-[Phase 5](./05-production.md) checks these off. Earlier phases create the staging version of
-each as they need it.
-
-- A domain, with DNS for the account website, the account API, and each regional relay.
-- Public TLS certificates for the website, the account API, and the relays. Nodes keep their own
-  self-signed, pinned certificates.
-- The account service's database, with point-in-time recovery. Decided October 22, 2026: SQLite on
-  the service's own disk, copied continuously to object storage, because one machine carries the
-  load. Several machines would need Postgres or a replicated SQLite such as Turso.
-- Secrets storage for the service: OAuth client secrets and the signing keys for tickets and
-  assertions.
-- Logs, metrics, and error reporting that never carry task content. The repository has a Sentry
-  plugin, `plugins/sentry-telemetry`.
-- CI that runs the account service and relay tests and deploys staging on merge, and production on
-  a tagged release.
+Decided October 22, 2026: production only, with no staging, while only allowlisted accounts use it.
 
 ## Service-to-service authentication
 
@@ -92,10 +77,8 @@ each as they need it.
 | Node | Relay | The Node's relay credential, or the static credential in self-hosted mode. |
 | Client | Node | A device token, inside pinned TLS or the phone's encrypted channel, as today. |
 
-## Hosted service: operating it
+## What an outage does
 
-- The relay is stateless apart from its in-memory routing table. The account service keeps its
-  database on its own disk, so it runs as one machine, and a deploy restarts it for a few seconds.
 - A relay restart drops every stream. Clients reconnect through the existing reconnect and refetch
   path, and agents on the Node keep running.
 - An account service outage stops new sign-ins, tickets, and assertions. Connections already open

@@ -1,7 +1,7 @@
 # Remote access: reach your own Node from anywhere
 
-Date: October 22, 2026. Status: phases 1 to 4 built October 22, 2026, except their hosted staging
-steps, which wait on a domain and a product name. Phase 5 isn't started. Each phase file's completion
+Date: October 22, 2026. Status: phases 1 to 4 built October 22, 2026. The hosted service went to
+production for allowlisted accounts the same day, without a staging step. Phase 5 isn't started. Each phase file's completion
 note records what landed. Where a file here disagrees with a shipped contract, the owning reference
 document wins.
 
@@ -100,8 +100,8 @@ use the account service and the relay from day one.
 
 - Steps whose titles start with **Hosted service** happen in the closed hosted service, not in this
   repository. Open-side steps and checkpoints run against the stand-in account service
-  ([services](./services.md#the-account-api-is-the-boundary)). When the hosted service has its own
-  docs, its steps move there.
+  ([services](./services.md#the-account-api-is-the-boundary)). The hosted service has its own docs, so
+  phase 5's hosted steps are planned there, and the earlier phases keep theirs as the record.
 - Each phase starts by writing its design section: exact endpoints, wire schemas, and which owning
   documents change. Put it at the top of the phase file, or in the owning document if the contract is
   shipping.
@@ -129,7 +129,7 @@ A skipped checkpoint is written down as skipped, with the reason.
   ([phase 4](./04-phone.md#open-questions)). The phone's channel library is decided: `@chainsafe/libp2p-noise`.
 - Whether remote access is free, part of a personal plan, or paid
   ([phase 5](./05-production.md#open-questions)).
-- The product name and domain ([phase 2](./02-accounts.md#open-questions)).
+- The product name. The domain in production is a working name ([phase 2](./02-accounts.md#open-questions)).
 - How a client finds the relay instance its Node is on once a region has more than one
   ([relay](./relay.md#scale-and-placement)).
 
