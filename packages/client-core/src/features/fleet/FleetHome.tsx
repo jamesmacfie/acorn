@@ -13,6 +13,7 @@ import './nodes.css'
 import { Alert, Badge, Button } from '../../kit/components/primitives'
 import { pluginLabel } from '../../host/plugins/pluginLabel'
 import { createWorkspaceWords } from '../workspaces/words'
+import { nodeAddress } from '@acorn/protocol/relay.ts'
 
 // Fleet home: the landing view once more than one node is paired, a card per node with connection
 // state, counts, last-refresh, and the two actions that matter from here.
@@ -100,7 +101,7 @@ export default function FleetHome() {
                   </Show>
                 </div>
                 <NodeChip nodeId={node.nodeId} query={{}} />
-                <div class="fleet-card-endpoint">{node.endpoint}</div>
+                <div class="fleet-card-endpoint">{nodeAddress(node)}</div>
                 <dl class="fleet-card-stats">
                   <div>
                     <dt>Tasks</dt>

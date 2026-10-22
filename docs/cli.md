@@ -24,7 +24,8 @@ source is `apps/cli/src/`, and `apps/cli/src/args.ts` holds the parser and the h
 
 The local Node uses `ACORN_DATA_DIR`, then the desktop app's data root when present, then the
 development root. `--node ID` selects a remembered Node, and an unambiguous label works too.
-`--node https://HOST:PORT` pairs interactively when that Node isn't remembered, so a script can't pair
+`--node https://HOST:PORT`, or `--node wss://CREDENTIAL@RELAY/NODE-ID` for a Node behind
+[a relay](./relay.md), pairs interactively when that Node isn't remembered, so a script can't pair
 for the first time. An unavailable Node, a missing token, a changed certificate, a rejected credential,
 or an incompatible protocol exits with a connection error, and a command never falls back to another
 Node. The terminal client's `--node` and `--task` switches still open that client when no command

@@ -34,6 +34,8 @@ export type DataRoot = {
   // prompt reappearing every boot (server/transport/advertise.ts).
   readonly advertiseHost: string | undefined
   recordAdvertiseHost(host: string): void
+  // The relay settings written by hand into node.json, if any. `relaySettings` reads them.
+  readonly relay: NodeIdentity['relay']
   release(): void
 }
 
@@ -268,6 +270,9 @@ export function openDataRoot(dir: string): DataRoot {
         // guard lets it through.
         if (host === identity.advertiseHost) return
         identity = updateIdentity(identityPath, { advertiseHost: host })
+      },
+      get relay() {
+        return identity.relay
       },
       release,
     }

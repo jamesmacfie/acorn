@@ -1,4 +1,4 @@
-import { Agent as HttpsAgent, request as httpsRequest } from 'node:https'
+import { Agent as HttpsAgent, request as httpsRequest, type AgentOptions as HttpsAgentOptions } from 'node:https'
 import { ACORN_BASELINE } from '@acorn/protocol/baseline.ts'
 import {
   NODE_PROTOCOL_VERSION,
@@ -8,8 +8,10 @@ import {
   type PairResult,
 } from '@acorn/protocol/node.ts'
 import type { NodeProbeResult } from '@acorn/protocol/broker.ts'
+import { nodeAddress, type RelayRoute } from '@acorn/protocol/relay.ts'
 import { normalizeFingerprint, pinnedTlsOptions } from './nodeBroker'
 import { nodeRequest, readBoundedResponse } from './nodeRequest'
+import { openRelayStream, parseNodeAddress, RelayAgent, type NodeAddress } from './relaySocket'
 
 // The requests that turn a URL into a fleet member. See docs/api-reference.md, "Pairing".
 //
@@ -38,16 +40,25 @@ const MAX_PAIR_RESPONSE_BYTES = 64 * 1024
 //     then broken.
 //
 // No token is sent and nothing is remembered, so an unverified request here grants nothing.
+//
+// The address is what a person typed, a direct endpoint or a relay route, or a remembered node. A relay
+// route's credential travels on in the result, for pairing, and never into a message.
+export type NodeProbe = NodeProbeResult & { certPem: string; relayCredential?: string }
+
 export async function probeNode(
-  endpoint: string,
+  address: string | NodeAddress,
   options: { timeoutMs?: number } = {},
-): Promise<NodeProbeResult & { certPem: string }> {
-  const url = new URL('/v1/node', endpoint)
+): Promise<NodeProbe> {
+  const target = typeof address === 'string' ? parseNodeAddress(address) : address
+  const url = new URL('/v1/node', target.endpoint)
   if (url.protocol !== 'https:') throw new Error('A node endpoint must be https — the pin is the identity.')
+  const endpoint = nodeAddress({ endpoint: url.origin, relay: target.relay })
 
   const { body, certPem, fingerprint } = await unverifiedGet(
     url,
+    endpoint,
     Math.min(options.timeoutMs ?? PROBE_TIMEOUT_MS, PROBE_TIMEOUT_MS),
+    target.relay && relayAgent(target.relay, target.relayCredential, {}),
   )
   const payload: unknown = JSON.parse(body)
   const parsedInfo = nodeInfoSchema.safeParse(payload)
@@ -87,8 +98,19 @@ export async function probeNode(
     baseline: info.baseline,
     compatible: info.protocolVersion === NODE_PROTOCOL_VERSION,
     certPem,
+    ...(target.relay ? { relay: target.relay, relayCredential: target.relayCredential } : {}),
   }
 }
+
+// What a renderer or the extension may see of a probe: never the certificate or a credential.
+export const publicProbe = ({ endpoint, fingerprint, protocolVersion, baseline, compatible, relay }: NodeProbe) => ({
+  endpoint,
+  fingerprint,
+  protocolVersion,
+  baseline,
+  compatible,
+  ...(relay ? { relay } : {}),
+})
 
 type PinnedProbe = {
   endpoint: string
@@ -96,7 +118,13 @@ type PinnedProbe = {
   certPem: string
   baseline?: string | null
   compatible?: boolean
+  relay?: RelayRoute
+  relayCredential?: string
 }
+
+// The agent for a relayed Node: its connections are relay streams (./relaySocket.ts).
+const relayAgent = (relay: RelayRoute, credential: string | undefined, options: HttpsAgentOptions): RelayAgent =>
+  new RelayAgent(options, () => openRelayStream(relay, credential ?? ''))
 
 // Step 3: spend the owner's pairing code, this time over a pinned connection. The fingerprint they
 // just confirmed is now the identity, so the code cannot be handed to an impostor.
@@ -159,7 +187,8 @@ async function pinnedPost(
 ): Promise<{ status: number; body: string }> {
   if (probe.baseline !== ACORN_BASELINE || probe.compatible === false)
     throw new Error(`Node baseline or protocol does not match ${ACORN_BASELINE}; pairing was refused.`)
-  const agent = new HttpsAgent(pinnedTlsOptions(probe.fingerprint, probe.certPem))
+  const pinned = pinnedTlsOptions(probe.fingerprint, probe.certPem)
+  const agent = probe.relay ? relayAgent(probe.relay, probe.relayCredential, pinned) : new HttpsAgent(pinned)
   try {
     const response = await nodeRequest({
       url: new URL(path, probe.endpoint),
@@ -179,19 +208,26 @@ async function pinnedPost(
 // A single GET with the certificate captured off the socket. Written out rather than routed through
 // nodeRequest because it needs the peer certificate, which only the raw request exposes, and because
 // `rejectUnauthorized: false` appears once in this codebase, here, next to the reason.
-function unverifiedGet(url: URL, timeoutMs: number): Promise<{ body: string; certPem: string; fingerprint: string }> {
+function unverifiedGet(
+  url: URL,
+  shown: string,
+  timeoutMs: number,
+  relay: RelayAgent | undefined,
+): Promise<{ body: string; certPem: string; fingerprint: string }> {
   return new Promise((resolve, reject) => {
     let settled = false
     const finish = (error: unknown, result?: { body: string; certPem: string; fingerprint: string }): void => {
       if (settled) return
       settled = true
       clearTimeout(deadline)
+      relay?.destroy()
       if (result) resolve(result)
       else reject(error)
     }
-    // `agent: false` gives every probe a fresh TLS handshake. Through the shared agent, a second probe
-    // of the same address resumes the cached session, and a resumed session exposes no certificate.
-    const req = httpsRequest(url, { method: 'GET', rejectUnauthorized: false, agent: false }, (res) => {
+    // A fresh agent, or `agent: false`, gives every probe a fresh TLS handshake. Through the shared
+    // agent, a second probe of the same address resumes the cached session, and a resumed session
+    // exposes no certificate.
+    const req = httpsRequest(url, { method: 'GET', rejectUnauthorized: false, agent: relay ?? false }, (res) => {
       if (settled) {
         res.destroy()
         return
@@ -204,7 +240,7 @@ function unverifiedGet(url: URL, timeoutMs: number): Promise<{ body: string; cer
       }
       void readBoundedResponse(res, MAX_NODE_PROBE_BYTES).then(
         (body) => {
-          if (res.statusCode !== 200) return finish(new Error(`${url.origin} answered ${res.statusCode} at /v1/node.`))
+          if (res.statusCode !== 200) return finish(new Error(`${shown} answered ${res.statusCode} at /v1/node.`))
           finish(null, {
             body: body.toString('utf8'),
             certPem: toPem(cert.raw),
@@ -216,7 +252,7 @@ function unverifiedGet(url: URL, timeoutMs: number): Promise<{ body: string; cer
     })
     // One deadline across connect, TLS, headers and body. Activity cannot extend it.
     const deadline = setTimeout(() => {
-      const error = new Error(`${url.origin} did not respond within the probe deadline.`)
+      const error = new Error(`${shown} did not respond within the probe deadline.`)
       finish(error)
       req.destroy(error)
     }, timeoutMs)

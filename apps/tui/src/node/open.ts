@@ -1,5 +1,6 @@
 import { FleetStore, type FleetNode } from '@acorn/custody/broker'
 import { LOCAL_TOKEN_SCOPE } from '@acorn/custody/custody/deviceTokenStore.ts'
+import { isNodeAddress } from '@acorn/protocol/relay.ts'
 import {
   custody,
   dataRootDir,
@@ -138,10 +139,10 @@ export async function openNode(
 async function remoteNode(target: string, fleet: FleetStore, allowPair: boolean): Promise<FleetNode> {
   const known = allowPair ? rememberedNode(fleet, target) : fleet.get(target)
   if (known) return known
-  if (!allowPair || !target.startsWith('https://')) {
+  if (!allowPair || !isNodeAddress(target)) {
     const names = fleet.list().map((node) => node.label)
     throw new Error(
-      `acorn knows no node called "${target}". Pair one with an https:// endpoint${names.length ? `, or name one of: ${names.join(', ')}` : ''}.`,
+      `acorn knows no node called "${target}". Pair one with an https:// endpoint or a wss:// relay address${names.length ? `, or name one of: ${names.join(', ')}` : ''}.`,
     )
   }
   return pairInteractively(target, fleet, { label: new URL(target).host, local: false })

@@ -2,6 +2,7 @@ import { For, Show, createResource, createSignal, onCleanup, onMount } from 'sol
 import type { NodeRecord } from '@acorn/protocol/broker.ts'
 import type { BridgeHandoff, BridgeNodes, BridgeTaskPage } from '@acorn/protocol/extensionBridge.ts'
 import type { ProjectSite, SiteAssociation } from '@acorn/protocol/siteAssociations.ts'
+import { nodeAddress } from '@acorn/protocol/relay.ts'
 import Icon from '@acorn/client-core/kit/components/content/Icon.tsx'
 import { Text } from '@acorn/client-core/kit/components/content'
 import { IconButton } from '@acorn/client-core/kit/components/inputs'
@@ -168,7 +169,7 @@ function Nodes(props: {
                   />
                 </Show>
                 <Text emphasis="mono" tone="muted">
-                  {node.endpoint}
+                  {nodeAddress(node)}
                 </Text>
               </Row>
             )
@@ -205,8 +206,8 @@ function NodeMenu(props: { node: NodeRecord; rename(): void; forget(): void }) {
           <Menu.Item
             context={context}
             leading={<Icon name="copy" />}
-            trailing={props.node.endpoint}
-            onSelect={() => void navigator.clipboard.writeText(props.node.endpoint).catch(() => {})}
+            trailing={nodeAddress(props.node)}
+            onSelect={() => void navigator.clipboard.writeText(nodeAddress(props.node)).catch(() => {})}
           >
             Copy address
           </Menu.Item>

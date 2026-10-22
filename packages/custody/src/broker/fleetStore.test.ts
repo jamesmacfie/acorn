@@ -4,7 +4,7 @@ import { rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { deviceTokens, type TokenCipher } from '../custody/deviceTokenStore'
-import { FleetStore, toNodeRecord } from './fleetStore'
+import { FleetStore, toBrokerNode, toNodeRecord } from './fleetStore'
 
 // A fake cipher, the shape a shell supplies (deviceTokenStore.ts): a reversible tag wrap so a written
 // token round-trips, with availability switchable to exercise the keychain-less path.
@@ -39,6 +39,23 @@ const remote = {
 } as const
 
 describe('FleetStore', () => {
+  // The file schema is strict, so a relay route the schema didn't know would empty the whole fleet.
+  it('keeps a relayed node across instances, and its credential only in custody', () => {
+    const relayed = {
+      ...remote,
+      endpoint: 'https://node-remote.relay.acorn',
+      relay: { url: 'wss://relay.example', route: 'node-remote' },
+      relayCredential: 'relay-secret',
+    }
+    store().remember(relayed, 'tok-remote')
+
+    const [node] = store().list()
+    expect(node).toEqual(relayed)
+    expect(toNodeRecord(node!)).toMatchObject({ relay: relayed.relay })
+    expect(JSON.stringify(toNodeRecord(node!))).not.toContain('relay-secret')
+    expect(toBrokerNode(node!, 'tok-remote')).toMatchObject({ relayCredential: 'relay-secret', token: 'tok-remote' })
+  })
+
   it('persists membership and the token across instances', () => {
     store().remember({ ...remote }, 'tok-remote')
 

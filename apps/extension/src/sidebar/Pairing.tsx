@@ -2,6 +2,7 @@ import { For, Match, Show, Switch, createEffect, createSignal, onCleanup, onMoun
 import type { NodeProbeResult, NodeRecord } from '@acorn/protocol/broker.ts'
 import type { BridgeHandoff, BridgeNodes, BridgeResults } from '@acorn/protocol/extensionBridge.ts'
 import { fingerprintPhrase, fingerprintWords } from '@acorn/protocol/fingerprintWords.ts'
+import { nodeAddress } from '@acorn/protocol/relay.ts'
 import { AcornArt } from '@acorn/client-core/kit/components/content/Acorn.tsx'
 import Icon from '@acorn/client-core/kit/components/content/Icon.tsx'
 import { Text } from '@acorn/client-core/kit/components/content'
@@ -277,7 +278,8 @@ function Identity(props: { probe: NodeProbeResult; matched(): void; cancel(): vo
         </Stack>
       }
     >
-      {new URL(props.probe.endpoint).host} shows these words in Settings › Nodes. Continue only if they match.
+      {props.probe.relay ? nodeAddress(props.probe) : hostOf(props.probe)} shows these words in Settings › Nodes.
+      Continue only if they match.
     </EmptyState>
   )
 }
@@ -290,7 +292,7 @@ const COLLECT_EVERY_MS = 1_000
 // paired app is watching. Another Node, or one that can't take an ask, goes straight to the code.
 // `node.pair` completes the probe the bridge kept, so nothing here names the Node again.
 function Code(props: { client: BridgeClient; probe: NodeProbeResult; local: boolean; paired(node: NodeRecord): void }) {
-  const host = new URL(props.probe.endpoint).host
+  const host = hostOf(props.probe)
   // The name this browser shows for the Node. Settings renames it.
   const label = props.local ? LOCAL_NAME : host
   const [code, setCode] = createSignal('')
@@ -465,8 +467,11 @@ function Waiting(props: { children: string }) {
   )
 }
 
+// A relayed Node is named by its relay, since its endpoint is a made-up name (docs/relay.md).
+const hostOf = (probe: NodeProbeResult): string => new URL(probe.relay?.url ?? probe.endpoint).host
+
 const incompatible = (probe: NodeProbeResult) =>
-  `${probe.endpoint} speaks Acorn protocol ${probe.protocolVersion}, which this bridge can't use. Update whichever side is older.`
+  `${nodeAddress(probe)} speaks Acorn protocol ${probe.protocolVersion}, which this bridge can't use. Update whichever side is older.`
 
 // One bridge call at a time, with its failure in the person's words.
 function action() {

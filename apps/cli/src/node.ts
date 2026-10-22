@@ -11,6 +11,7 @@ import {
   usableLocalToken,
 } from '@acorn/custody/local'
 import { NODE_PROTOCOL_VERSION } from '@acorn/protocol/node.ts'
+import { isNodeAddress } from '@acorn/protocol/relay.ts'
 import type { NodeFetchResponse, NodeStatus } from '@acorn/protocol/broker.ts'
 import { CliError } from './error'
 
@@ -117,9 +118,9 @@ export async function openCliNode(target?: string): Promise<CliNode> {
   if (target) {
     const remembered = matchingNode(fleet, target)
     if (remembered) selected = remembered
-    else if (target.startsWith('https://')) {
+    else if (isNodeAddress(target)) {
       if (!process.stdin.isTTY || !process.stdout.isTTY)
-        throw new CliError('pairing_required', `Pair ${target} in an interactive terminal first.`, 3)
+        throw new CliError('pairing_required', `Pair ${new URL(target).host} in an interactive terminal first.`, 3)
       selected = await pairInteractively(target, fleet, { label: new URL(target).host, local: false })
     } else throw new CliError('unknown_node', `No remembered Node matches ${target}.`, 3)
   } else {
@@ -164,7 +165,7 @@ export async function openCliNode(target?: string): Promise<CliNode> {
     throw new CliError('identity_missing', 'The remembered Node has no certificate pin. Pair it again.', 3)
   let probe: Awaited<ReturnType<typeof probeNode>>
   try {
-    probe = await probeNode(selected.endpoint)
+    probe = await probeNode(selected)
   } catch (error) {
     throw probeFailure(error)
   }

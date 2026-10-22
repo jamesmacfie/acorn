@@ -1,4 +1,5 @@
 import { z } from 'zod'
+import { relayRouteSchema, type RelayRoute } from './relay'
 
 const nodeFetchBodySchema = z.discriminatedUnion('kind', [
   z.strictObject({ kind: z.literal('bytes'), bytes: z.instanceof(Uint8Array) }),
@@ -111,6 +112,9 @@ export const nodeRecordSchema = z.strictObject({
   provider: z
     .strictObject({ providerId: z.string().min(1), providerNodeId: z.string().min(1), sourceNodeId: z.string().min(1) })
     .optional(),
+  // Present for a Node reached through a relay (docs/relay.md). The connection dials the relay and
+  // opens a stream to this route, then runs TLS to the Node inside it, pinned as for a direct one.
+  relay: relayRouteSchema.optional(),
 })
 export type NodeRecord = z.infer<typeof nodeRecordSchema>
 
@@ -160,6 +164,8 @@ export type NodeProbeResult = {
   // False for a protocol major the client cannot speak: the `incompatible` state, decided before
   // pairing rather than after (docs/architecture/fleet.md § Client state and fleet behavior).
   compatible: boolean
+  // Present when the address was a relay route. Never its credential.
+  relay?: RelayRoute
 }
 
 // Completes the probe. No endpoint or fingerprint: pairing against anything other than the endpoint

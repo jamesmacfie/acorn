@@ -421,6 +421,7 @@ describe('broker TLS pinning', () => {
         certPem: readFileSync(join(other, 'cert.pem'), 'utf8'),
       })
       await expect(broker.fetch('n1', { requestId: 'r1', path: '/v1/node' })).rejects.toThrow()
+      expect(statuses.at(-1)).toMatchObject({ state: 'offline', error: { code: 'identity_mismatch' } })
     } finally {
       rmSync(other, { recursive: true, force: true })
     }

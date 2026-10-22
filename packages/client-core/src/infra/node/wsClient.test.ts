@@ -3,7 +3,7 @@ import { QueryObserver } from '@tanstack/solid-query'
 import { prefsKey, prefsRoute } from '@acorn/protocol/api.ts'
 import { prefsOptions } from '../queries'
 import { readJson } from './apiClient'
-import { _resetFleet, clientFor, setCacheStorage } from './fleet'
+import { _resetFleet, clientFor, nodeStatus, refreshFleet, setCacheStorage } from './fleet'
 import { watchWorkspaceChanges } from '../../features/workspaces/watchWorkspaceChanges'
 import type { NodeStatus, NodeTransportError } from '@acorn/protocol/broker.ts'
 import { activeToasts, dismissToast } from '../../features/notifications/toast'
@@ -404,7 +404,25 @@ describe('wsClient', () => {
     expect(asked).toEqual(['n2', 'n1'])
   })
 
-  it('replays each channel owner only on a genuine reconnect of the active node', () => {
+  // The fleet's status listener can sit behind this one. A refetch the announcement started before
+  // the fleet heard `online` would be refused unsent as offline, and the gap it was for stays.
+  it('announces a reconnect once the fleet reads the node as online', async () => {
+    const states: (string | undefined)[] = []
+    client.wsOnReconnect(() => states.push(nodeStatus('n1')?.state))
+    ;(window as unknown as { acorn: Record<string, unknown> }).acorn.fleetList = async () => ({
+      nodes: [{ nodeId: 'n1', label: 'n1', endpoint: 'https://n1.test', local: false }],
+      statuses: [],
+    })
+    _resetFleet()
+    await refreshFleet()
+    bridge.emitStatus('online')
+    bridge.emitStatus('offline')
+    bridge.emitStatus('online')
+    await Promise.resolve()
+    expect(states).toEqual(['online'])
+  })
+
+  it('replays each channel owner only on a genuine reconnect of the active node', async () => {
     const reconnects: number[] = []
     const owner = registerWsChannel(
       'probe',
@@ -418,6 +436,7 @@ describe('wsClient', () => {
     bridge.emitStatus('offline')
     bridge.emitStatus('online')
     expect(framesSent()).toEqual([{ channel: 'probe:attach', id: 's1' }])
+    await Promise.resolve()
     expect(reconnects).toEqual([1])
     owner.dispose()
   })

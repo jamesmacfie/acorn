@@ -13,6 +13,7 @@ import {
   renameNode,
 } from '../../../infra/node/fleetActions'
 import { fingerprintPhrase } from '@acorn/protocol/fingerprintWords.ts'
+import { nodeAddress } from '@acorn/protocol/relay.ts'
 import { ACORN_BUILD, NODE_PROTOCOL_VERSION } from '@acorn/protocol/node.ts'
 import NodeChip from '../../fleet/NodeChip'
 import { createNodePairing, NodePairingButtons, NodePairingPanel } from './NodePairingCode'
@@ -85,13 +86,17 @@ export default function NodesSettings() {
   const probe = () =>
     run(async () => {
       const result = await probeNodeEndpoint(endpoint().trim())
-      setLabel(new URL(result.endpoint).hostname)
+      setLabel(new URL(result.relay?.url ?? result.endpoint).hostname)
       setStep({ kind: 'confirm', probe: result })
     })
 
   const pair = (probed: NodeProbeResult) =>
     run(async () => {
-      await pairNode({ code: code().trim(), deviceName: deviceName().trim(), label: label().trim() || probed.endpoint })
+      await pairNode({
+        code: code().trim(),
+        deviceName: deviceName().trim(),
+        label: label().trim() || nodeAddress(probed),
+      })
       setStep({ kind: 'idle' })
       setCode('')
     })
@@ -207,7 +212,7 @@ export default function NodesSettings() {
                 <div class="node-row" classList={{ 'node-row-alarm': mismatch() }}>
                   <SettingRow
                     label={node().label}
-                    description={node().endpoint}
+                    description={nodeAddress(node())}
                     layout="stacked"
                     savedAt={mine() ? renameSave.savedAt() : undefined}
                     error={mine() && renaming() === node().nodeId ? renameSave.error() : undefined}
@@ -419,12 +424,15 @@ export default function NodesSettings() {
               {pairingStep({
                 step: 1,
                 children: (
-                  <Field label="Node address" hint="The https address the node shows when it starts.">
+                  <Field
+                    label="Node address"
+                    hint="The https address the node shows when it starts, or its relay address with the relay credential."
+                  >
                     <Input
                       label="Node address"
                       assist={false}
                       value={endpoint()}
-                      placeholder="https://host:port"
+                      placeholder="https://host:port or wss://credential@relay/node-id"
                       ref={(el) => queueMicrotask(() => el.focus())}
                       onInput={setEndpoint}
                       onSubmit={() => void probe()}
@@ -455,8 +463,8 @@ export default function NodesSettings() {
                         Does the node show these words?
                       </Text>
                       <Text emphasis="muted" wrap>
-                        Check them against what {probed().endpoint} shows. This is how you know you're pairing with your
-                        own node, and acorn can't check it for you.
+                        Check them against what {nodeAddress(probed())} shows. This is how you know you're pairing with
+                        your own node, and acorn can't check it for you.
                       </Text>
                       {/* Words first, hex second. Two 64-character hex strings differing in the middle look
                           identical to a person, which is exactly the substitution an attacker wants — so the

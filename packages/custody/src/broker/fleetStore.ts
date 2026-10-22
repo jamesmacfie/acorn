@@ -3,6 +3,9 @@ import { join } from 'node:path'
 import { z } from 'zod'
 import { ACORN_BASELINE } from '@acorn/protocol/baseline.ts'
 import { nodeRecordSchema, type NodeRecord } from '@acorn/protocol/broker.ts'
+import type { PairResult } from '@acorn/protocol/node.ts'
+import type { BrokerNode } from './nodeBroker'
+import type { NodeProbe } from './nodePairing'
 import { LOCAL_TOKEN_SCOPE, type DeviceTokens } from '../custody/deviceTokenStore'
 import { createLogger } from '@acorn/node-core/server/telemetry'
 
@@ -16,7 +19,7 @@ const log = createLogger('fleet')
 
 const FLEET_FILE = `${ACORN_BASELINE}-fleet.json`
 
-// The stored record: a NodeRecord plus the two fields the renderer must never need.
+// The stored record: a NodeRecord plus the fields the renderer must never need.
 const fleetNodeSchema = nodeRecordSchema.extend({
   // The node's self-signed certificate, used as the CA for the pinned agent. Public material, but
   // the helper performs the TLS, so the renderer has no use for it.
@@ -24,6 +27,9 @@ const fleetNodeSchema = nodeRecordSchema.extend({
   // This device's row in the node's `devices` table, so "Revoke" can name it. Absent for the local
   // node, which is adopted from the service start handoff rather than paired.
   deviceId: z.string().optional(),
+  // The relay's credential, for a node reached through a relay (docs/relay.md § The client). It
+  // lets a holder reach the relay, not the node, which still asks for the device token.
+  relayCredential: z.string().optional(),
 })
 export type FleetNode = z.infer<typeof fleetNodeSchema>
 
@@ -39,6 +45,31 @@ export const toNodeRecord = (node: FleetNode): NodeRecord => ({
   // Provenance travels to the renderer; the certificate and the device row still do not. A fleet
   // surface has to be able to say which rows came from a provider and which plugin vouched for them.
   ...(node.provider ? { provider: node.provider } : {}),
+  ...(node.relay ? { relay: node.relay } : {}),
+})
+
+// What a broker connects with: the record plus the token, the pin, and any relay credential.
+export const toBrokerNode = (node: FleetNode, token: string): BrokerNode => ({
+  ...toNodeRecord(node),
+  token,
+  ...(node.certPem ? { certPem: node.certPem } : {}),
+  ...(node.relayCredential ? { relayCredential: node.relayCredential } : {}),
+})
+
+// The record a pairing produces, from the probe the owner confirmed and the node's answer.
+export const pairedNode = (
+  probe: NodeProbe,
+  result: PairResult,
+  node: { label: string; local: boolean },
+): FleetNode => ({
+  nodeId: result.nodeId,
+  label: node.label,
+  endpoint: probe.endpoint,
+  fingerprint: probe.fingerprint,
+  certPem: probe.certPem,
+  deviceId: result.device.id,
+  local: node.local,
+  ...(probe.relay ? { relay: probe.relay, relayCredential: probe.relayCredential } : {}),
 })
 
 // The bundled local node's token predates its nodeId. See docs/shell.md, "Fleet membership".

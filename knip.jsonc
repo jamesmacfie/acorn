@@ -24,6 +24,9 @@
     "apps/node": {
       "entry": ["scripts/**/*.mjs", "test/__fixtures__/**/*.{js,mjs,ts}"]
     },
+    "apps/relay": {
+      "entry": ["src/main.ts"]
+    },
     "apps/tui": {
       // The kit files stand in for `@acorn/plugin-api/ui*` and stub packages through build aliases
       // (apps/tui/vite.config.ts), so a plugin's imports reach them where knip can't follow. Their

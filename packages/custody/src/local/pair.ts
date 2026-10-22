@@ -2,28 +2,30 @@ import { hostname } from 'node:os'
 import { createInterface } from 'node:readline/promises'
 import { setTimeout as sleep } from 'node:timers/promises'
 import { askToPair, collectPairing, PairingBusyError, probeNode, pairWithNode } from '../broker/nodePairing'
-import type { FleetNode, FleetStore } from '../broker/fleetStore'
+import { pairedNode, type FleetNode, type FleetStore } from '../broker/fleetStore'
 import { fingerprintPhrase } from '@acorn/protocol/fingerprintWords.ts'
+import { nodeAddress } from '@acorn/protocol/relay.ts'
 import type { PairResult } from '@acorn/protocol/node.ts'
 
 const COLLECT_EVERY_MS = 1_000
 
+// `address` is a direct endpoint or a relay route, as a person types it.
 export async function pairInteractively(
-  endpoint: string,
+  address: string,
   fleet: FleetStore,
   node: { label: string; local: boolean; deviceName?: string },
 ): Promise<FleetNode> {
   if (!process.stdin.isTTY || !process.stdout.isTTY)
     throw new Error('This Node is not paired. Run the same command in an interactive terminal to pair it.')
-  const probe = await probeNode(endpoint)
+  const probe = await probeNode(address)
   if (!probe.compatible)
     throw new Error(
-      `${probe.endpoint} speaks acorn protocol ${probe.protocolVersion}; upgrade whichever side is older.`,
+      `${nodeAddress(probe)} speaks acorn protocol ${probe.protocolVersion}; upgrade whichever side is older.`,
     )
   const deviceName = node.deviceName ?? `acorn on ${hostname()}`
   const words = fingerprintPhrase(probe.fingerprint) ?? probe.fingerprint
   process.stderr.write(
-    `\n  ${probe.endpoint}\n  Identity      ${words}\n\n  Compare these words with the node's boot output.\n`,
+    `\n  ${nodeAddress(probe)}\n  Identity      ${words}\n\n  Compare these words with the node's boot output.\n`,
   )
   // The Node on this computer can ask a paired client to allow this one, so nobody has to copy a
   // code across (docs/api-reference/transport.md § Pairing by approval). The code prompt stays open
@@ -58,18 +60,7 @@ export async function pairInteractively(
     done.abort()
     prompt.close()
   }
-  return fleet.remember(
-    {
-      nodeId: result.nodeId,
-      label: node.label,
-      endpoint: probe.endpoint,
-      fingerprint: probe.fingerprint,
-      certPem: probe.certPem,
-      deviceId: result.device.id,
-      local: node.local,
-    },
-    result.deviceToken,
-  )
+  return fleet.remember(pairedNode(probe, result, node), result.deviceToken)
 }
 
 // Resolves once the owner allows the ask. A denial or an expiry says so and then never resolves, so

@@ -10,8 +10,11 @@ import { type DataRoot } from '../storage/dataRoot'
 import { resolveDatabasePath } from '../storage/paths'
 import { configuredPort, devDataDir } from './listenerConfig'
 import { advertisedHosts } from './advertise'
+import { relaySettings } from './relaySettings'
+import { relayHost } from '@acorn/protocol/relay.ts'
 import { ensureCert } from './tls'
 import { attachWsHub, disposeWsHub } from './wsHub'
+import type { RelayTunnel } from './relayTunnel'
 import type { Env } from '../bindings'
 import { createLogger, describeError } from '../telemetry/logger'
 
@@ -23,6 +26,10 @@ const nodeLog = createLogger('node')
 // a packaged app's module dir is inside the read-only bundle, so the desktop shell passes an
 // application-data root instead.
 export { devDataDir }
+
+// Each listener's relay tunnel, if it has relay settings, so closeListener can stop it. A promise,
+// because the tunnel's module loads on demand and the listener may close before it arrives.
+const relayTunnels = new WeakMap<object, Promise<RelayTunnel>>()
 
 // What the listener bound, plus the certificate identity it bound it with. The endpoint is reported after
 // the kernel chooses a port; the fingerprint and certificate let the broker pin that endpoint.
@@ -94,6 +101,7 @@ export function startListener(
   // empty makes the Host guard reject every upgrade forever, a bare 403 with nothing logged.
   const allowedHosts = new Set<string>()
   const advertised = runtime.ADVERTISED_HOSTS
+  const relay = relaySettings(root)
   // 0.0.0.0 rather than the advertised address itself: children of this node still reach it over loopback
   // with full certificate validation (the cert's SAN is IP:127.0.0.1), so both audiences have to keep
   // working. `endpoint` below stays loopback for the same reason.
@@ -172,6 +180,16 @@ export function startListener(
       // Filled in place, never reassigned: the upgrade handler holds this same Set.
       allowedHosts.add(`127.0.0.1:${address.port}`)
       for (const host of advertised) allowedHosts.add(`${host}:${address.port}`)
+      // Relayed clients name the Node by its route, which is its ID, and no port (docs/relay.md). The
+      // tunnel loads only here, so a Node with no relay settings runs none of its code.
+      if (relay) {
+        allowedHosts.add(relayHost(root.nodeId))
+        const https = server as unknown as import('node:https').Server
+        relayTunnels.set(
+          server,
+          import('./relayTunnel').then(({ startRelayTunnel }) => startRelayTunnel(https, relay, root.nodeId)),
+        )
+      }
       root.recordPort(address.port)
       log.info(`listening on https://127.0.0.1:${address.port}`)
       for (const host of advertised) log.info(`also answering to https://${host}:${address.port}`)
@@ -200,6 +218,7 @@ export function startListener(
 export function closeListener(server: ServerType | null): Promise<void> {
   if (!server) return Promise.resolve()
   const httpServer = server as unknown as import('node:http').Server
+  void relayTunnels.get(server)?.then((tunnel) => tunnel.close())
   disposeWsHub(httpServer)
   return new Promise((resolve) => {
     server.close(() => resolve())

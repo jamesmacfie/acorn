@@ -5,7 +5,7 @@ import { closeSync, existsSync, readFileSync, writeSync } from 'node:fs'
 import { fileURLToPath } from 'node:url'
 import { ACORN_BASELINE } from '@acorn/protocol/baseline.ts'
 import { devDataDir } from '@acorn/node-core/server/transport/listener.ts'
-import { advertisedHosts, confirmAdvertiseHost } from '@acorn/node-core/server/transport'
+import { advertisedHosts, confirmAdvertiseHost, relaySettings } from '@acorn/node-core/server/transport'
 import { openDataRoot } from '@acorn/node-core/server/storage'
 import { enrollNode } from '@acorn/node-core/server/enrollment.ts'
 import { fingerprintPhrase } from '@acorn/protocol/fingerprintWords.ts'
@@ -190,23 +190,30 @@ function enrollmentEndpoint(): string {
 function printPairingBanner(code: string | null): void {
   const port = listener.endpoint.port
   const reachable = advertisedHosts(root).map((host) => `https://${host}:${port}`)
+  // The address a client types to come in through the relay. The credential isn't printed, because
+  // this output often lands in a service log.
+  const relay = relaySettings(root)
+  const relayed = relay && new URL(`${relay.url.replace(/\/+$/, '')}/${root.nodeId}`)
+  if (relayed) relayed.username = 'CREDENTIAL'
   console.log('')
   console.log('  acorn node ready')
   console.log('')
   if (reachable.length > 0) console.log(`    Connect to    ${reachable.join('\n                  ')}`)
   else console.log(`    Connect to    https://127.0.0.1:${port}  (this machine only)`)
+  if (relayed) console.log(`    Through relay ${relayed.href}`)
   console.log(`    Identity      ${fingerprintPhrase(listener.fingerprint) ?? listener.fingerprint}`)
   if (code) console.log(`    Pairing code  ${code}   (valid 10 minutes)`)
   console.log('')
   if (code) {
     console.log('  In acorn: Settings → Nodes → add a node. Paste the address, check the identity')
     console.log('  words match what acorn shows you, then paste the code.')
+    if (relayed) console.log('  In the relay address, put the relay credential in place of CREDENTIAL.')
   } else {
     console.log(`  ${alreadyPaired} device(s) already paired. For another, run:  acorn node pair`)
     if (process.platform !== 'win32')
       console.log(`  or, from a terminal acorn hasn't paired:  kill -USR1 ${process.pid}`)
   }
-  if (reachable.length === 0) {
+  if (reachable.length === 0 && !relayed) {
     console.log('  To reach this node from another machine, run:  acorn node reach <address or name>')
   }
   console.log('')

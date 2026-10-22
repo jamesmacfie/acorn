@@ -4,11 +4,15 @@ import { mkdtempSync, readFileSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { seedTlsCert } from '../../testkit/tls.ts'
-import { afterEach, beforeEach, describe, expect, it } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { openDataRoot, type DataRoot } from '../storage/dataRoot'
 import { makeRuntime, startListener, type Listener } from './listener'
 import { disposeWsHub } from './wsHub'
 import { mintInternalToken } from '../auth/internalTokens'
+import { startRelayTunnel } from './relayTunnel'
+
+// The tunnel dials out, so here it only records whether the listener started it.
+vi.mock('./relayTunnel', () => ({ startRelayTunnel: vi.fn(() => ({ close() {} })) }))
 
 // The listener's transport contract, asserted against a real socket: it speaks TLS with the
 // certificate it reports, that certificate validates for 127.0.0.1 (no `rejectUnauthorized: false`
@@ -22,7 +26,16 @@ type Probe = { status: number; body: string }
 // valid, and the hostname check then has to pass on the IP:127.0.0.1 SAN. If either is wrong this
 // rejects, which is the whole point, because the MCP child (docs/mcp.md) trusts the same file the
 // same way.
-function probe(listener: Listener, path: string, host?: string, headers: Record<string, string> = {}): Promise<Probe> {
+//
+// A relay name isn't in the certificate, because a relayed client pins instead of checking names, so
+// a probe that sends one passes `anyName`. The chain is still checked against the node's certificate.
+function probe(
+  listener: Listener,
+  path: string,
+  host?: string,
+  headers: Record<string, string> = {},
+  anyName = false,
+): Promise<Probe> {
   return new Promise((resolve, reject) => {
     const req = httpsRequest(
       {
@@ -33,6 +46,7 @@ function probe(listener: Listener, path: string, host?: string, headers: Record<
         ca: [listener.certPem],
         rejectUnauthorized: true,
         agent: false, // a fresh connection per probe, so no pooled socket carries a previous request's terms
+        ...(anyName ? { checkServerIdentity: () => undefined } : {}),
         headers: { ...(host ? { host } : {}), ...headers },
       },
       (res) => {
@@ -108,6 +122,34 @@ describe('the loopback TLS listener', () => {
     expect((await probe(started, '/v1/node', 'localhost:1234')).status).toBe(403)
     expect((await probe(started, '/v1/node', `127.0.0.1:${started.endpoint.port}`)).status).toBe(200)
   }, 20_000)
+
+  // A Node with no relay settings loads none of the relay's code and answers to no relay name.
+  it('answers to its relay name, and starts the tunnel, only with relay settings', async () => {
+    const relayName = (): string => `${root!.nodeId}.relay.acorn`
+    const plain = await start()
+    expect((await probe(plain, '/v1/node', relayName(), {}, true)).status).toBe(403)
+    expect(startRelayTunnel).not.toHaveBeenCalled()
+    disposeWsHub(plain.server as unknown as import('node:http').Server)
+    await new Promise<void>((resolve) => plain.server.close(() => resolve()))
+    listener = null
+
+    process.env.ACORN_RELAY_URL = 'ws://127.0.0.1:9'
+    process.env.ACORN_RELAY_CREDENTIAL = 'relay-credential'
+    try {
+      const relayed = await start()
+      expect((await probe(relayed, '/v1/node', relayName(), {}, true)).status).toBe(200)
+      await vi.waitFor(() =>
+        expect(startRelayTunnel).toHaveBeenCalledWith(
+          relayed.server,
+          { url: 'ws://127.0.0.1:9', credential: 'relay-credential' },
+          root!.nodeId,
+        ),
+      )
+    } finally {
+      delete process.env.ACORN_RELAY_URL
+      delete process.env.ACORN_RELAY_CREDENTIAL
+    }
+  }, 30_000)
 
   it('authenticates an internal token using the adapter socket peer', async () => {
     const started = await start()

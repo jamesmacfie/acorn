@@ -1,11 +1,12 @@
 import { randomUUID } from 'node:crypto'
-import { NodeBroker, toNodeRecord, type FleetStore } from '@acorn/custody/broker'
+import { NodeBroker, pairedNode, toBrokerNode, toNodeRecord, type FleetStore } from '@acorn/custody/broker'
 import {
   askToPair,
   collectPairing,
   PairingBusyError,
   pairWithNode,
   probeNode,
+  publicProbe,
 } from '@acorn/custody/broker/nodePairing.ts'
 import { dataRootDir, runningNode } from '@acorn/custody/local'
 import type { NodeFetchBody, NodeFetchResponse, NodeStatus } from '@acorn/protocol/broker.ts'
@@ -217,7 +218,7 @@ export function createBridge(options: {
         throw new BridgeFailure('pairing_required', 'This browser has no credential for that Node. Pair it again.')
       if (activeNodeId !== nodeId) {
         if (activeNodeId) broker.remove(activeNodeId)
-        broker.upsert({ ...toNodeRecord(node), token, certPem: node.certPem })
+        broker.upsert(toBrokerNode(node, token))
       }
     } else if (activeNodeId) broker.remove(activeNodeId)
     if (activeNodeId !== nodeId) identityChanged = null
@@ -237,7 +238,7 @@ export function createBridge(options: {
     if (!node?.fingerprint) return false
     try {
       // Both sides come from `probeNode`, which normalizes the fingerprint.
-      return (await probe(node.endpoint, { timeoutMs })).fingerprint !== node.fingerprint
+      return (await probe(node, { timeoutMs })).fingerprint !== node.fingerprint
     } catch {
       return false
     }
@@ -263,18 +264,7 @@ export function createBridge(options: {
     asking = null
     // Pairing again replaces the pin and token. A selected node reconnects on the new credential.
     if (activeNodeId === result.nodeId) broker.remove(activeNodeId)
-    const node = fleet.remember(
-      {
-        nodeId: result.nodeId,
-        label,
-        endpoint: confirmed.endpoint,
-        fingerprint: confirmed.fingerprint,
-        certPem: confirmed.certPem,
-        deviceId: result.device.id,
-        local: false,
-      },
-      result.deviceToken,
-    )
+    const node = fleet.remember(pairedNode(confirmed, result, { label, local: false }), result.deviceToken)
     if (identityChanged === result.nodeId) identityChanged = null
     if (activeNodeId === result.nodeId) {
       activeNodeId = null
@@ -303,8 +293,7 @@ export function createBridge(options: {
       )
     pending = { ...probed, certPem: running.certPem }
     pendingLocal = true
-    const { certPem: _certPem, ...result } = pending
-    return { ...result, nodeId: running.nodeId }
+    return { ...publicProbe(pending), nodeId: running.nodeId }
   }
 
   // Stops at a changed certificate: the Node's connection closes until the person pairs it again.
@@ -728,8 +717,7 @@ export function createBridge(options: {
         pendingLocal = false
         asking = null
         pending = await probeEndpoint(request.endpoint)
-        const { certPem: _certPem, ...result } = pending
-        return result
+        return publicProbe(pending)
       }
       case 'node.local':
         pending = null

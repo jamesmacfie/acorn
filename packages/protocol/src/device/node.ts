@@ -56,6 +56,9 @@ export const nodeIdentitySchema = z.object({
   // has no attachment at all but must still be able to say so. A failed enrollment is a visible
   // state, never a boot that hangs.
   enrollmentError: z.strictObject({ at: z.number().int().positive(), reason: z.string() }).optional(),
+  // The relay this Node dials out to, and the credential it proves itself with (docs/relay.md). Set
+  // by hand; ACORN_RELAY_URL and ACORN_RELAY_CREDENTIAL win over it. Absent means no relay code runs.
+  relay: z.strictObject({ url: z.string().url(), credential: z.string().min(1) }).optional(),
 })
 
 export type NodeIdentity = z.infer<typeof nodeIdentitySchema>

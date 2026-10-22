@@ -22,6 +22,7 @@ import {
 } from '@acorn/protocol/broker.ts'
 import { EventViewers } from './eventViewers'
 import { BrokerFetch } from './brokerFetch'
+import { openRelayStream, RelayAgent, type OpenRelayStream } from './relaySocket'
 import { emitEvent, telemetryEnabled } from '@acorn/node-core/server/telemetry'
 import { createLogger } from '@acorn/node-core/server/telemetry'
 
@@ -64,8 +65,9 @@ const REMOTE_HTTP_SOCKETS = 6
 const LONG_HTTP_SOCKETS = 4
 const LOOPBACK_HOSTS = new Set(['127.0.0.1', 'localhost', '[::1]'])
 
-// A node plus the material only the helper may hold: the bearer, and the certificate to pin against.
-export type BrokerNode = NodeRecord & { token: string; certPem?: string }
+// A node plus the material only the helper may hold: the bearer, the certificate to pin against, and
+// for a relayed node the relay's credential.
+export type BrokerNode = NodeRecord & { token: string; certPem?: string; relayCredential?: string }
 
 export type BrokerEvents = {
   // A server→client frame arrived. Forwarded verbatim; the broker does not interpret channels.
@@ -109,25 +111,33 @@ export class NodeBroker {
   private readonly requests = new BrokerFetch()
   private readonly pingIntervalMs: number
   private readonly viewerMultiplexing: boolean
+  private readonly openRelayStream: OpenRelayStream
 
   // The heartbeat cadence is injectable so the interval runs for real in tests and the assertion is
-  // that the socket died, not that a timer was scheduled.
+  // that the socket died, not that a timer was scheduled. The relay stream is, so a test can stand
+  // an in-memory pair in for a relay.
   constructor(
     private readonly events: BrokerEvents,
-    options: { pingIntervalMs?: number; viewerMultiplexing?: boolean } = {},
+    options: { pingIntervalMs?: number; viewerMultiplexing?: boolean; openRelayStream?: OpenRelayStream } = {},
   ) {
     this.pingIntervalMs = options.pingIntervalMs ?? PING_INTERVAL_MS
     this.viewerMultiplexing = options.viewerMultiplexing ?? false
+    this.openRelayStream = options.openRelayStream ?? openRelayStream
   }
 
   // Add or replace a node. Replacing tears the old connection down first, so a re-pair with a new
   // token or a moved endpoint cannot leave a socket on the previous credential.
   upsert(node: BrokerNode): void {
     this.remove(node.nodeId)
+    const { relay } = node
     const agentWith = (maxSockets: number) =>
-      node.endpoint.startsWith('https:')
-        ? new HttpsAgent({ keepAlive: true, maxSockets, ...this.pinning(node) })
-        : new HttpAgent({ keepAlive: true, maxSockets })
+      relay
+        ? new RelayAgent({ keepAlive: true, maxSockets, ...this.pinning(node) }, () =>
+            this.openRelayStream(relay, node.relayCredential ?? ''),
+          )
+        : node.endpoint.startsWith('https:')
+          ? new HttpsAgent({ keepAlive: true, maxSockets, ...this.pinning(node) })
+          : new HttpAgent({ keepAlive: true, maxSockets })
     const loopback = LOOPBACK_HOSTS.has(new URL(node.endpoint).hostname)
     const connection: Connection = {
       node,
@@ -230,8 +240,10 @@ export class NodeBroker {
   }
 
   list(): NodeRecord[] {
-    // Never leak the token out of the helper, even to the renderer's own projection.
-    return [...this.connections.values()].map(({ node: { token: _token, ...record } }) => record)
+    // Never leak a credential out of the helper, even to the renderer's own projection.
+    return [...this.connections.values()].map(
+      ({ node: { token: _token, relayCredential: _relayCredential, ...record } }) => record,
+    )
   }
 
   statuses(): NodeStatus[] {
@@ -637,9 +649,20 @@ const errorCodeOf = (response: NodeFetchResponse): string | null => {
   }
 }
 
+// With the pinned certificate as the only CA, these chain failures mean the Node presented some other
+// certificate: the same finding as a fingerprint that doesn't match. A clock problem, such as an
+// expired certificate, is not one of them.
+const NOT_THE_PINNED_CERTIFICATE = new Set([
+  PIN_MISMATCH_CODE,
+  'DEPTH_ZERO_SELF_SIGNED_CERT',
+  'SELF_SIGNED_CERT_IN_CHAIN',
+  'UNABLE_TO_GET_ISSUER_CERT_LOCALLY',
+  'UNABLE_TO_VERIFY_LEAF_SIGNATURE',
+])
+
 const isPinMismatch = (error: unknown): boolean => {
   for (let e: unknown = error; e; e = (e as { cause?: unknown }).cause) {
-    if ((e as { code?: unknown }).code === PIN_MISMATCH_CODE) return true
+    if (NOT_THE_PINNED_CERTIFICATE.has((e as { code?: unknown }).code as string)) return true
   }
   return false
 }

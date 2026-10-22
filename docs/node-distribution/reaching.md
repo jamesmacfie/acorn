@@ -5,6 +5,10 @@ runs PTYs, spawns agents, and executes repository commands on a network, so the 
 answers other machines only on hosts a person on its own computer chose. This page is part of
 [Node distribution](../node-distribution.md).
 
+There are three ways in from another machine: advertise the Node on a network you trust, below, open
+an SSH tunnel to a private Node, or reach it through [a relay](../relay.md). A relay needs no inbound
+port and no shared network, because the Node dials out to it.
+
 ## Choose the hosts
 
 The hosts live in `advertiseHost` in the data root's `node.json`, as a comma-separated list. Three

@@ -174,7 +174,10 @@ function connect(): void {
     // Reconnect means refetch (docs/api-reference/websocket.md § WebSocket). There is no cursor into history, so
     // the client marks the node's cache stale instead of replaying. The QueryClient lives in the app
     // shell, so this announces rather than performs it.
-    reconnectSubs.forEach((cb) => cb())
+    //
+    // A microtask later, once this status has reached every listener. The fleet's can come after this
+    // one, and a refetch that ran first would find the node still offline there and go unsent.
+    queueMicrotask(() => reconnectSubs.forEach((cb) => cb()))
   })
 }
 

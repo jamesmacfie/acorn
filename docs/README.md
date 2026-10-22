@@ -239,6 +239,7 @@ Start with the plugin map, then follow the authoring guide or API reference.
 | [node-distribution/install.md](./node-distribution/install.md) | The archive installers, where they put the Node, starting it at login with `acorn node service`, upgrades, and removal. |
 | [node-distribution/keep-awake.md](./node-distribution/keep-awake.md) | How a Node keeps its computer awake while agents work or workflows run, the inhibitor on each platform, and the setting. |
 | [node-distribution/reaching.md](./node-distribution/reaching.md) | How a person chooses the addresses a Node answers other machines on, and why the port stays fixed. |
+| [relay.md](./relay.md) | The relay: reaching a Node with no public address, the Node's tunnel, relay addresses in clients, and running your own relay. |
 | [release-notes.md](./release-notes.md) | What is in the current release. |
 
 ## Renderer, shell, and terminal topic pages

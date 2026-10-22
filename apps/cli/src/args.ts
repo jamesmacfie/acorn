@@ -179,5 +179,5 @@ export function helpFor(positionals: string[]): string {
                             'browser install|status|uninstall',
                             'mobile [--origin URL]|sessions|revoke ID',
                           ]
-  return `Usage: acorn [--node ID|LABEL|https://HOST:PORT] ${lines.join('\n       acorn ')}\n\nOptions: --output text|json|jsonl  --no-header  --help\nExit codes: 0 success, 1 internal, 2 usage, 3 connection/auth/identity/protocol, 4 domain, 5 timeout, 6 failed wait, 7 ambiguous mutation or partial write.\n`
+  return `Usage: acorn [--node ID|LABEL|https://HOST:PORT|wss://CREDENTIAL@RELAY/NODE-ID] ${lines.join('\n       acorn ')}\n\nOptions: --output text|json|jsonl  --no-header  --help\nExit codes: 0 success, 1 internal, 2 usage, 3 connection/auth/identity/protocol, 4 domain, 5 timeout, 6 failed wait, 7 ambiguous mutation or partial write.\n`
 }

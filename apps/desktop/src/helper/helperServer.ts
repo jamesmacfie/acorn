@@ -17,8 +17,8 @@ import { coreNodeAdoptRoute } from '@acorn/protocol/api.ts'
 import { nodeAdoptResultSchema } from '@acorn/protocol/nodeProviders.ts'
 import { encodeIdFrame, wsFrameSchema, wsSubscriptionIntentSchema } from '@acorn/protocol/ws.ts'
 import type { Helper } from '@acorn/custody/runtime'
-import { toNodeRecord } from '@acorn/custody/broker'
-import { pairWithNode, probeNode } from '@acorn/custody/broker/nodePairing.ts'
+import { pairedNode, toBrokerNode, toNodeRecord } from '@acorn/custody/broker'
+import { pairWithNode, probeNode, publicProbe } from '@acorn/custody/broker/nodePairing.ts'
 import { listenForOauthCallback, type OauthCallbackListener } from '@acorn/custody/oauthCallback'
 import {
   MAX_HELPER_REQUEST_BYTES,
@@ -158,7 +158,7 @@ export function startHelperServer(
     const node = helper.fleet.get(nodeId)
     const token = node && helper.fleet.tokenFor(nodeId)
     if (!node || !token) return
-    helper.broker.upsert({ ...toNodeRecord(node), token, ...(node.certPem ? { certPem: node.certPem } : {}) })
+    helper.broker.upsert(toBrokerNode(node, token))
   }
 
   // The probe is remembered here rather than returned to the renderer, which is what forces the
@@ -223,8 +223,7 @@ export function startHelperServer(
       const { endpoint } = nodeProbeRequestSchema.parse(raw)
       const probe = await probeNode(endpoint)
       pending = probe
-      const { certPem: _certPem, ...result } = probe
-      return result
+      return publicProbe(probe)
     },
     'node-pair': async (raw): Promise<NodeRecord> => {
       const request = nodePairRequestSchema.parse(raw)
@@ -234,15 +233,7 @@ export function startHelperServer(
       const result = await pairWithNode(probe, { code: request.code, deviceName: request.deviceName })
       pending = null
       const node = helper.fleet.remember(
-        {
-          nodeId: result.nodeId,
-          label: request.label,
-          endpoint: probe.endpoint,
-          fingerprint: probe.fingerprint,
-          certPem: probe.certPem,
-          deviceId: result.device.id,
-          local: false,
-        },
+        pairedNode(probe, result, { label: request.label, local: false }),
         result.deviceToken,
       )
       connect(node.nodeId)

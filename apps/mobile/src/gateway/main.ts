@@ -4,7 +4,7 @@ import { join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { parseArgs } from 'node:util'
 import { renderUnicodeCompact } from 'uqr'
-import { NodeBroker, toNodeRecord, type FleetNode } from '@acorn/custody/broker'
+import { NodeBroker, toBrokerNode, type FleetNode } from '@acorn/custody/broker'
 import {
   configDir,
   custody,
@@ -97,7 +97,7 @@ async function serve(flags: { node?: string; port?: string; origin?: string; 'ap
     appDir,
     port,
   })
-  broker.upsert({ ...toNodeRecord(node), token, ...(node.certPem ? { certPem: node.certPem } : {}) })
+  broker.upsert(toBrokerNode(node, token))
 
   console.log(`\n  Serving ${node.label} (${node.endpoint}) on 127.0.0.1:${gateway.port}`)
   printSignIn(origin, codes.issue())

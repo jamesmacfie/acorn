@@ -1,0 +1,25 @@
+{
+  "name": "@acorn/relay",
+  "version": "0.1.0",
+  "description": "The relay: joins a client to a Node that has no public address, and forwards bytes it can't read.",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "start": "node --import tsx src/main.ts",
+    "lint": "tsc --noEmit",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@acorn/protocol": "workspace:*",
+    "tsx": "^4.22.4",
+    "ws": "^8.21.0"
+  },
+  "devDependencies": {
+    "@acorn/custody": "workspace:*",
+    "@acorn/node-core": "workspace:*",
+    "@types/node": "^26.0.0",
+    "@types/ws": "^8.5.13",
+    "typescript": "^6.0.3",
+    "vitest": "^4.1.11"
+  }
+}

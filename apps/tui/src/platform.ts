@@ -1,8 +1,8 @@
 import { NodeBroker } from '@acorn/custody/broker'
 import { DeviceConfigStore } from '@acorn/custody/config'
-import { toNodeRecord } from '@acorn/custody/broker'
+import { pairedNode, toBrokerNode, toNodeRecord } from '@acorn/custody/broker'
 import { listenForOauthCallback } from '@acorn/custody/oauthCallback'
-import { probeNode, pairWithNode } from '@acorn/custody/broker/nodePairing.ts'
+import { probeNode, pairWithNode, publicProbe } from '@acorn/custody/broker/nodePairing.ts'
 import type { NodePairRequest, NodeProbeResult, NodeRecord, NodeStatus } from '@acorn/protocol/broker.ts'
 import type { OpenedNode } from './node/open'
 import { startNode } from './node/supervise'
@@ -66,7 +66,7 @@ export function installPlatform(opened: OpenedNode, quit: () => void): Platform 
     const node = fleet.get(nodeId)
     const token = node && fleet.tokenFor(nodeId)
     if (!node || !token) return
-    broker.upsert({ ...toNodeRecord(node), token, ...(node.certPem ? { certPem: node.certPem } : {}) })
+    broker.upsert(toBrokerNode(node, token))
   }
   // Restore all saved connections, including paired remote nodes. The local row may still name
   // last run's port until the child announces its new endpoint; the broker retries it as offline.
@@ -117,8 +117,7 @@ export function installPlatform(opened: OpenedNode, quit: () => void): Platform 
     nodeProbe: async (endpoint: string): Promise<NodeProbeResult> => {
       const probe = await probeNode(endpoint)
       pending = probe
-      const { certPem: _certPem, ...result } = probe
-      return result
+      return publicProbe(probe)
     },
     nodePair: async (request: NodePairRequest): Promise<NodeRecord> => {
       const probe = pending
@@ -126,18 +125,7 @@ export function installPlatform(opened: OpenedNode, quit: () => void): Platform 
       if (!probe.compatible) throw new Error('That node speaks a different protocol version.')
       const result = await pairWithNode(probe, { code: request.code, deviceName: request.deviceName })
       pending = null
-      const node = fleet.remember(
-        {
-          nodeId: result.nodeId,
-          label: request.label,
-          endpoint: probe.endpoint,
-          fingerprint: probe.fingerprint,
-          certPem: probe.certPem,
-          deviceId: result.device.id,
-          local: false,
-        },
-        result.deviceToken,
-      )
+      const node = fleet.remember(pairedNode(probe, result, { label: request.label, local: false }), result.deviceToken)
       connect(node.nodeId)
       return toNodeRecord(node)
     },

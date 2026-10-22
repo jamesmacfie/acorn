@@ -846,9 +846,10 @@ describe('architecture boundaries', () => {
       // and rail presentation answer, which the tree host, the rail, and the examples read without it,
       // the `panel_show` reader and the tool call JSON it reads, which both clients' panel cards, the app
       // card, and the native host share without the Node loading them at boot, the record change rules
-      // that workflow loops, record triggers, and their preview share, and the starter trigger check and
-      // event feed description the Node and the plugin SDK share.
-      '@acorn/protocol': 95,
+      // that workflow loops, record triggers, and their preview share, the starter trigger check and
+      // event feed description the Node and the plugin SDK share, and the relay protocol, which the relay,
+      // the Node's tunnel, and custody's socket factory share without the broker contract.
+      '@acorn/protocol': 96,
       // client-core publishes narrow entrypoints where a consumer can't take a barrel that pulls in
       // renderer-only modules. Pure leaves the terminal, logic tests or remote trees need: model-provider
       // error guidance, `kit/lib/savedSignal`, `kit/lib/formatChord`, `kit/lib/ansi`, and the address
