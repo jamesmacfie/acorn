@@ -57,7 +57,7 @@ archive. Encrypt and restrict every archive as sensitive task data.
 A failure at any step keeps the attempt visible, keeps the worker alive, and raises an alert. It
 never falls through to destroy.
 
-Which live resources need special handling before a consistent capture is a [phase 6](./phases/06-archive.md)
+Which live resources need special handling before a consistent capture is a [phase 4](./phases/04-archive.md)
 experiment: tmux sessions, open SQLite write transactions, plugin workers, a running dev server, and
 Docker state if the Docker plugin is present.
 
@@ -68,7 +68,7 @@ with a per-team key, and the encrypted data key is stored in the manifest header
 lives on the team Node, wrapped by a key the provider's KMS or the team Node's own sealed storage
 holds.
 
-Open question for [phase 6](./phases/06-archive.md#open-questions): whether the per-team key lives
+Open question for [phase 4](./phases/04-archive.md#open-questions): whether the per-team key lives
 on the team Node, in a managed KMS, or both. Holding it only on the team Node means the control
 plane can never decrypt an archive, which fits the three-party rule, but losing the team Node's
 volume and its backup loses every archive. A KMS in the team's region, with the team Node as the only
@@ -90,7 +90,7 @@ harness session files ([projects and tasks](./projects-and-tasks.md#continuing-a
 6. After the idle window, the restore Node is destroyed without a new archive, because it changed
    nothing.
 
-**Proof the credentials rotated.** Phase 6 must show that an old device token, an old grant, an old
+**Proof the credentials rotated.** Phase 4 must show that an old device token, an old grant, an old
 internal token, and the old certificate all fail against a restored Node.
 
 ## Retention and deletion

@@ -1,6 +1,8 @@
 # Services, repositories, and environments
 
-Status: proposed, 2026-09-29. This file lists every deployable the programme adds, where its code
+Status: proposed, 2026-09-29. Revised October 22, 2026: the account service, website, sign-in
+plugin, and relay are built by [remote access](../remote-access/services.md), and this file lists
+what cloud adds to them. This file lists every deployable the programme adds, where its code
 should live, what it runs on, and how it reaches production. The choices marked _recommended_ are
 defaults a phase can overturn with a reason. The rest are open and listed as questions in the phase
 that first needs them.
@@ -10,13 +12,13 @@ that first needs them.
 | Deployable | What it is | Stack | Runs where | First phase |
 | --- | --- | --- | --- | --- |
 | Node image | The standalone Node plus task tooling, as an OCI image. Used for team Nodes and workers. | `apps/node` build, Debian slim base | Compute provider | [1](./phases/01-node-image.md) |
-| Account service | HTTP API for sign-in, teams, roles, inventory, grants, provisioning, and billing. | TypeScript, Hono, Better Auth, Drizzle, Postgres | One control-plane region | [2](./phases/02-account-service.md) |
-| Admin web app | The browser app for the account service. | TypeScript and Solid, recommended, so it can reuse `@acorn/client-core` kit tokens | Served by the account service, or a static host | [2](./phases/02-account-service.md) |
-| Cloud plugin | A loaded acorn plugin that signs a person in, lists team Nodes as a Node provider, and fetches grants. | acorn plugin API | Each person's local Node | [3](./phases/03-team-node.md) |
-| Provisioner | Creates and destroys machines, reconciles state, and records every operation. | Part of the account service process, with its own job queue | Control-plane region | [3](./phases/03-team-node.md) |
-| Relay | Joins client and Node connections and forwards bytes. Stateless apart from its routing table. | TypeScript on Node, or Go if measured throughput needs it | One or more instances per team region | [4](./phases/04-relay.md) |
-| Object storage | Buckets for snapshots, artifacts, and archives, one per region. | S3-compatible storage | Team region | [5](./phases/05-cloud-task.md) |
-| Status page | Public service status. | Hosted status-page product | Anywhere | [11](./phases/11-production.md) |
+| Account service | Built by remote access. Cloud adds teams, roles, inventory, grants, provisioning, and billing. | TypeScript, Hono, Better Auth, Drizzle, Postgres | One control-plane region | [2](./phases/02-team-node.md) |
+| Admin web app | The account website from remote access, with team administration added. | TypeScript and Solid, recommended, so it can reuse `@acorn/client-core` kit tokens | Served by the account service, or a static host | [2](./phases/02-team-node.md) |
+| Sign-in plugin | Built by remote access. Cloud adds team Nodes to its Node provider, and grants. | acorn plugin API | Each person's local Node | [2](./phases/02-team-node.md) |
+| Provisioner | Creates and destroys machines, reconciles state, and records every operation. | Part of the account service process, with its own job queue | Control-plane region | [2](./phases/02-team-node.md) |
+| Relay | Built by remote access. Cloud runs one in each team region. | TypeScript on Node, or Go if measured throughput needs it | One or more instances per team region | [2](./phases/02-team-node.md) |
+| Object storage | Buckets for snapshots, artifacts, and archives, one per region. | S3-compatible storage | Team region | [3](./phases/03-cloud-task.md) |
+| Status page | Public service status. | Hosted status-page product | Anywhere | [9](./phases/09-production.md) |
 
 The team Node and the worker are not separate codebases. Both are the ordinary Node from the Node
 image, configured by environment at provision time. A team Node turns on the orchestrator and the
@@ -24,24 +26,20 @@ history read model. A worker turns on attempt mode. A local Node turns on neithe
 
 ## Where the code lives
 
-Recommended split:
+Cloud follows the split [remote access](../remote-access/services.md#where-the-code-lives) decided on
+October 22, 2026: the code that runs on people's machines is open, and the hosted service is closed.
+Docs here follow its rule for [referring to the hosted service](../remote-access/services.md#how-the-docs-refer-to-the-hosted-service).
 
-- **This repository, open source:** the Node image build, enrollment v2 and grant verification in
-  `packages/node-core`, the relay client and server, the relay transport in `@acorn/custody`, the
-  history-transfer and archive code, the cloud plugin, and every protocol type in `@acorn/protocol`.
-  Keeping the relay here honors [remote access](../remote.md#coordinate-the-relay):
-  anyone can run their own. Put the relay server in `apps/relay` and the cloud plugin in
-  `plugins/cloud`, both new.
-- **A private repository:** the account service, the admin web app, the provisioner, billing, and
-  the infrastructure definitions. It depends on published `@acorn/protocol` types and nothing else
-  from this repository.
+- **Open source, in this repository:** the Node image build, enrollment v2 and grant verification in
+  `packages/node-core`, the history-transfer and archive code, the team additions to the sign-in
+  plugin, the account API additions for teams and grants, and every protocol type in
+  `@acorn/protocol`.
+- **Closed source, run by acorn:** the hosted service's team, grant, and admin features, the
+  provisioner, billing, and the infrastructure that runs them.
 
-The line is: anything a self-hoster would need to run acorn Nodes behind their own relay is open.
-The multi-tenant business logic is private. The account API must be documented well enough that a
-second control plane can exist, in the same way that [Node enrollment](../../node-enrollment.md)
-lets somebody else write one today. This split is an open question in
-[phase 2](./phases/02-account-service.md#open-questions), because it decides how the admin web app
-consumes UI code from this repository.
+Anything a self-hoster needs to run acorn Nodes behind their own relay is open. The account API must
+be documented well enough that someone else could write a compatible control plane, the way
+[Node enrollment](../../node-enrollment.md) lets somebody else write one today.
 
 ## Environments
 
@@ -57,7 +55,7 @@ implementation that keeps the provider interface honest.
 
 ## Infrastructure that must exist before production
 
-This list is what [phase 11](./phases/11-production.md) checks off. Earlier phases create the
+This list is what [phase 9](./phases/09-production.md) checks off. Earlier phases create the
 staging version of each item as they need it.
 
 - A domain, with DNS for the admin web app, the account API, and each regional relay.
@@ -70,8 +68,8 @@ staging version of each item as they need it.
 - A key management approach for per-team archive keys. See [archive](./archive.md#encryption).
 - Secrets storage for the service itself: provider API token, OAuth client secrets, grant signing
   keys, billing API key, and email API key.
-- An email provider for invitations and account notices, from [phase 9](./phases/09-teams.md).
-- A billing provider, from [phase 10](./phases/10-billing.md).
+- An email provider for invitations and account notices, from [phase 7](./phases/07-teams.md).
+- A billing provider, from [phase 8](./phases/08-billing.md).
 - Logs, metrics, and error reporting that never carry code or prompts. The repository already has
   a Sentry plugin (`plugins/sentry-telemetry`) and OTLP audit export is planned in
   [worker isolation](./isolation.md#audit-export).
@@ -83,7 +81,7 @@ staging version of each item as they need it.
 | Caller | Callee | Credential |
 | --- | --- | --- |
 | Admin web app | Account service | HTTP-only session cookie with CSRF protection. |
-| Cloud plugin on a local Node | Account service | An OAuth access and refresh token from the device flow, stored as an encrypted connection on that local Node. |
+| Sign-in plugin on a local Node | Account service | An OAuth access and refresh token from the device flow, stored as an encrypted connection on that local Node. |
 | Client | Hosted Node | A grant, carried in the `Authorization` header over pinned TLS through the relay. |
 | Client or Node | Relay | A relay ticket for a client, a relay credential for a Node. |
 | Hosted Node | Account service | A per-Node service credential issued at enrollment v2. Used to read revocations and to request provisioning. |

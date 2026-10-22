@@ -14,7 +14,7 @@ secret in its environment. This is ambient authority inherited from the operatin
 from the deliberate authority Acorn grants through task-scoped APIs.
 
 So a worker needs an isolated Linux execution target before anyone outside the building team uses
-it. [Phase 7](./phases/07-isolation.md) builds it. This does not add isolation to local tasks.
+it. [Phase 5](./phases/05-isolation.md) builds it. This does not add isolation to local tasks.
 
 ## What an agent in a worker could reach
 
@@ -107,8 +107,8 @@ evaluate these options:
    namespace. This handles hostnames through TLS SNI or `CONNECT`, at the cost of acorn owning a
    proxy.
 
-Which option ships is the largest open question in [phase 7](./phases/07-isolation.md#open-questions).
-Record the chosen enforcement boundary and its bypass analysis in phase 7.
+Which option ships is the largest open question in [phase 5](./phases/05-isolation.md#open-questions).
+Record the chosen enforcement boundary and its bypass analysis in phase 5.
 
 ## Audit export
 
@@ -117,7 +117,7 @@ against someone controlling its file. If a team requires external audit, export 
 configured endpoint using OTLP, the OpenTelemetry Protocol. Add task-scoped tool-dispatch records
 at the common invocation boundary, with bounded metadata and no credentials, prompts, or tool bodies.
 Export failure needs an explicit delivery and retry policy. Customer audit export is outside the
-closed alpha unless a team requires it; phase 7 records that decision.
+closed alpha unless a team requires it; phase 5 records that decision.
 
 ## What isolation does not fix
 
@@ -128,7 +128,7 @@ provide a route for transmitting that working set, and isolation does not establ
 
 ## The adversarial test
 
-Phase 7 is not done until a deliberately hostile agent and a deliberately hostile loaded plugin,
+Phase 5 is not done until a deliberately hostile agent and a deliberately hostile loaded plugin,
 running in a worker, fail to:
 
 - Read any file in the data root outside the worktree.
@@ -143,11 +143,11 @@ Record each attempt and its result in the phase's evidence.
 The same image must pass functional acceptance: agent Git status, diff, branch, and commit; Acorn
 MCP calls; image and file attachments; terminal interaction and reattachment; development-server
 previews; and Docker or database workflows when offered. Passing denial tests while breaking those
-task operations does not satisfy phase 7.
+task operations does not satisfy phase 5.
 
 ## Verify before building
 
 Check what privileges the chosen provider's VM grants: user namespaces, Landlock support in its
 kernel, and whether a root init step can run before the Node. Verify the checkout and Git metadata
 layout, task API connectivity, and the functional acceptance paths before choosing the execution
-backend. [Phase 7](./phases/07-isolation.md) owns the implementation sequence.
+backend. [Phase 5](./phases/05-isolation.md) owns the implementation sequence.

@@ -1,6 +1,6 @@
 # Team memory
 
-Status: proposed, 2026-10-01. Waits on [cloud phase 9](./phases/09-teams.md), which brings
+Status: proposed, 2026-10-01. Waits on [cloud phase 7](./phases/07-teams.md), which brings
 invitations, roles, and route classification. Nothing here changes a local Node with no account.
 
 ## Goal
@@ -56,7 +56,7 @@ write says who made it, and roles decide who can write and who can undo.
    log.
 10. Any member can undo or restore a project memory change. Only the owning account can undo a change
     to private memory.
-11. The memory routes declare `read` or `mutate`, as cloud phase 9 requires of every route.
+11. The memory routes declare `read` or `mutate`, as cloud phase 7 requires of every route.
 
 ### Optional approval
 
@@ -111,6 +111,6 @@ session does not see it until a member approves.
 
 ## Verify before building
 
-- Cloud phase 5's seed format, and whether memory files can ride in it.
-- Cloud phase 9's route classification API, and where a plugin declares a route's class.
+- Cloud phase 3's seed format, and whether memory files can ride in it.
+- Cloud phase 7's route classification API, and where a plugin declares a route's class.
 - Whether per-account storage on a team Node has an existing home, or memory is its first user.

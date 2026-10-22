@@ -1,4 +1,4 @@
-# Phase 11: production
+# Phase 9: production
 
 Status: proposed, 2026-09-29.
 
@@ -14,7 +14,7 @@ APAC region, public sign-up, a status page, and published documentation.
 
 ## Starting point
 
-The paid beta from [phase 10](./10-billing.md), running on staging-grade infrastructure.
+The paid beta from [phase 8](./08-billing.md), running on staging-grade infrastructure.
 
 ## In scope
 

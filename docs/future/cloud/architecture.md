@@ -94,8 +94,8 @@ trust:
 
 | Flow | Summary | Detail |
 | --- | --- | --- |
-| Sign in | A client signs in to the account service through an OAuth device flow run by a cloud plugin on the local Node. | [identity](./identity.md) |
-| Reach a hosted Node | The client asks for a grant and a relay ticket, dials the relay, and opens pinned TLS through it. | [relay](./relay.md), [identity](./identity.md#grants) |
+| Sign in | A client signs in to the account service through an OAuth device flow run by the sign-in plugin on the local Node. | [remote access accounts](../remote-access/accounts.md) |
+| Reach a hosted Node | The client asks for a grant and a relay ticket, dials the relay, and opens pinned TLS through it. | [relay](../remote-access/relay.md), [identity](./identity.md#grants) |
 | Publish a project | The member publishes a local project to the team. The team Node mints a team project ID, and the local Node stores the mapping. | [projects and tasks](./projects-and-tasks.md#shared-projects) |
 | Run a task in the cloud | The team Node reserves the task and attempt, the provisioner creates a worker, the worker enrolls, pulls its seed, and the client adopts it. | [projects and tasks](./projects-and-tasks.md#the-attempt-lifecycle) |
 | Keep history | The worker streams core and agent events to the team Node with sequence numbers. The team Node acknowledges each batch. | [projects and tasks](./projects-and-tasks.md#history-transfer) |
@@ -113,20 +113,20 @@ change cannot express the behavior, add a separately versioned contract. Put Nod
 | Contract | Addition | Owner | First phase |
 | --- | --- | --- | --- |
 | Container image | A published Node image with task tooling, running as a non-root user. | `apps/node` packaging | [1](./phases/01-node-image.md) |
-| Account API | Sign-in, teams, membership, inventory, and grant issuance. A separate, versioned HTTP API. | Account service | [2](./phases/02-account-service.md) |
-| Enrollment v2 | No device token in the request. The reply carries the grant issuer's keys and a relay credential. | `@acorn/protocol` and the account service | [3](./phases/03-team-node.md) |
-| Grant principal | A third principal kind on hosted Nodes: a person with a team role, from a verified grant. | `packages/node-core` auth | [3](./phases/03-team-node.md) |
-| Grant custody | A client credential that expires and refreshes through the cloud plugin, beside device tokens. | `@acorn/custody` | [3](./phases/03-team-node.md) |
-| Relay transport | A Node-side outbound tunnel and a client-side socket factory that keep pinned TLS. | `packages/node-core` transport, `@acorn/custody` broker, relay | [4](./phases/04-relay.md) |
-| Project identity | Team project IDs, the local-to-team mapping, and execution location on a task. | Team Node, projected through `@acorn/protocol` | [5](./phases/05-cloud-task.md) |
-| Attempt lifecycle | Reserve, provision, set up, route, stop, archive, restore, and reconcile, each idempotent. | Team Node orchestrator | [5](./phases/05-cloud-task.md) |
-| History transfer | Ordered, resumable transfer of core and agent events and artifacts. | Core and the agents plugin | [5](./phases/05-cloud-task.md) |
-| Whole-root archive | A versioned, encrypted format with a manifest, verification, and credential rotation on restore. | Team Node and worker | [6](./phases/06-archive.md) |
-| Execution target | An isolated task execution target inside Linux workers. | `packages/node-core`; [worker isolation](./isolation.md) | [7](./phases/07-isolation.md) |
-| Team policy | Execution, egress, tool, model, and MCP policy, delivered to a worker as the managed layer. | Team Node; [team policy](./isolation.md#team-policy) | [7](./phases/07-isolation.md) |
-| Plugin policy | Team baseline, project overrides, approved hashes and grants, and a frozen lock per attempt. | Team Node and the plugin loader | [8](./phases/08-plugins.md) |
-| Route classification | A read or mutate declaration on every core and plugin route and action. | `packages/node-core` and each plugin | [9](./phases/09-teams.md) |
-| Usage | Admission reservations, provider reconciliation, and hard budgets. | Account service and team Node admission | [10](./phases/10-billing.md) |
+| Account API | Teams, membership, inventory, and grant issuance, added to the [remote access](../remote-access/accounts.md) account API. | Account service | [2](./phases/02-team-node.md) |
+| Enrollment v2 | No device token in the request. The reply carries the grant issuer's keys and a relay credential. | `@acorn/protocol` and the account service | [2](./phases/02-team-node.md) |
+| Grant principal | A third principal kind on hosted Nodes: a person with a team role, from a verified grant. | `packages/node-core` auth | [2](./phases/02-team-node.md) |
+| Grant custody | A client credential that expires and refreshes through the sign-in plugin, beside device tokens. | `@acorn/custody` | [2](./phases/02-team-node.md) |
+| Relay transport | Built by remote access. Hosted Nodes get a relay credential in the enrollment v2 reply. | `packages/node-core` transport, `@acorn/custody` broker, relay | [remote access 1](../remote-access/phases/01-relay.md), [2](./phases/02-team-node.md) |
+| Project identity | Team project IDs, the local-to-team mapping, and execution location on a task. | Team Node, projected through `@acorn/protocol` | [3](./phases/03-cloud-task.md) |
+| Attempt lifecycle | Reserve, provision, set up, route, stop, archive, restore, and reconcile, each idempotent. | Team Node orchestrator | [3](./phases/03-cloud-task.md) |
+| History transfer | Ordered, resumable transfer of core and agent events and artifacts. | Core and the agents plugin | [3](./phases/03-cloud-task.md) |
+| Whole-root archive | A versioned, encrypted format with a manifest, verification, and credential rotation on restore. | Team Node and worker | [4](./phases/04-archive.md) |
+| Execution target | An isolated task execution target inside Linux workers. | `packages/node-core`; [worker isolation](./isolation.md) | [5](./phases/05-isolation.md) |
+| Team policy | Execution, egress, tool, model, and MCP policy, delivered to a worker as the managed layer. | Team Node; [team policy](./isolation.md#team-policy) | [5](./phases/05-isolation.md) |
+| Plugin policy | Team baseline, project overrides, approved hashes and grants, and a frozen lock per attempt. | Team Node and the plugin loader | [6](./phases/06-plugins.md) |
+| Route classification | A read or mutate declaration on every core and plugin route and action. | `packages/node-core` and each plugin | [7](./phases/07-teams.md) |
+| Usage | Admission reservations, provider reconciliation, and hard budgets. | Account service and team Node admission | [8](./phases/08-billing.md) |
 
 Before any phase writes code, its design section names exact endpoints, wire schemas, and
 idempotency keys. An agent or plugin must not reach an administrative cloud grant through an

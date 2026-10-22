@@ -1,4 +1,4 @@
-# Phase 8: plugins in cloud tasks
+# Phase 6: plugins in cloud tasks
 
 Status: proposed, 2026-09-29.
 
@@ -19,7 +19,7 @@ misconfigured plugin blocks launch with a reason before any spend.
 
 ## Starting point
 
-- Hardened workers from [phase 7](./07-isolation.md).
+- Hardened workers from [phase 5](./05-isolation.md).
 - The installer, with hash-pinned installs from GitHub, npm, and tarballs, in
   `packages/node-core/src/server/plugins/installer.ts`.
 - The approval-mediated install review in [plugin activation](../../../plugins/agent-install.md#approval-mediated-install).

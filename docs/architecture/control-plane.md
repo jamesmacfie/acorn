@@ -6,7 +6,8 @@ acorn. Read it before you design anything that stores Node metadata outside a No
 A **client** coordinates across the Nodes it can see. A **Node** owns its data and drives its own
 work. A **control plane** is an optional third party that holds metadata about Nodes and vouches for
 them. It's never in the data path. acorn ships the two seams a control plane uses, but no control
-plane. [The cloud programme](../future/cloud/README.md) proposes one.
+plane. [Remote access](../future/remote-access/README.md) proposes one for reaching a person's own
+Node, and [the cloud programme](../future/cloud/README.md) extends it to hosted Nodes.
 
 The rule for a control plane: it stores what it takes to find a Node and vouch for it, and nothing
 about what the Node is doing. Node inventory, endpoints, fingerprints, enrollment records, provider

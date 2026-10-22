@@ -1,4 +1,4 @@
-# Phase 10: usage, billing, and budgets
+# Phase 8: usage, billing, and budgets
 
 Status: proposed, 2026-09-29.
 
@@ -17,9 +17,9 @@ invoice.
 
 ## Starting point
 
-- The closed beta from [phase 9](./09-teams.md).
-- Relay byte counts reported since [phase 4](./04-relay.md).
-- Provisioning records with machine sizes and lifetimes since [phase 3](./03-team-node.md).
+- The closed beta from [phase 7](./07-teams.md).
+- Relay byte counts metered since [remote access phase 5](../../remote-access/phases/05-production.md).
+- Provisioning records with machine sizes and lifetimes since [phase 2](./02-team-node.md).
 
 ## In scope
 

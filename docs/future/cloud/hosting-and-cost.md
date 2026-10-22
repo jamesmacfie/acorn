@@ -86,7 +86,7 @@ the phase compares one alternative before the programme commits.
 A team chooses one region at creation: US, EU, or APAC. The team Node, workers, snapshots, artifacts,
 and archives stay there. The control plane itself lives in one region and holds only account
 metadata. Where that region is, and whether EU customers need account metadata in the EU, is an open
-question for [phase 2](./phases/02-account-service.md#open-questions).
+question for [remote access phase 2](../remote-access/phases/02-accounts.md#open-questions).
 
 A region move is a separate migration. Changing a preference does not move data, and the UI must not
 suggest it does.

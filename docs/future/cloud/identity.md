@@ -1,49 +1,23 @@
 # Identity, grants, and roles
 
-Status: proposed, 2026-09-29. This file covers accounts, sign-in, how a person proves to a hosted
+Status: proposed, 2026-09-29. Revised October 22, 2026, when accounts and sign-in moved to
+[remote access](../remote-access/accounts.md). This file covers how a person proves to a hosted
 Node who they are and what role they hold, and how that authority is taken away. Today acorn has no
 accounts at all ([authentication](../../authentication.md)). Every paired device is the Node's
 single owner. Hosted Nodes need a second authority path for people, and local Nodes must not
 change.
 
-## Accounts
+## Accounts and sign-in
 
-The account service owns an account ID that has no relationship to any OAuth provider's user ID.
-GitHub is the first sign-in method. The schema and UI leave room for another OAuth provider,
-email and password, account recovery, and an acorn-wide second factor.
+[Remote access](../remote-access/accounts.md) owns accounts, sign-in from each client, and the
+sign-in plugin on each local Node. Cloud adds two things to them:
 
-Better Auth is the leading library. It has a Hono integration, a Drizzle adapter, organization
-membership, explicit account linking, and session management. Two settings are mandatory:
-
-- `disableImplicitLinking: true`. A matching verified email alone never merges two accounts. A
-  person links a second provider while signed in to the first.
-- The organization plugin maps to acorn teams, with custom roles `admin`, `member`, and `viewer`.
-
-Better Auth's two-factor plugin does not gate OAuth sign-in by default. A later acorn-wide second
-factor needs its own enforced step before the account service issues any grant.
-
-For more information, see [Better Auth Hono integration](https://better-auth.com/docs/integrations/hono),
-[account linking](https://better-auth.com/docs/concepts/users-accounts), and
-[two-factor behavior](https://better-auth.com/docs/plugins/2fa). Recheck these before phase 2.
-
-## How each client signs in
-
-| Client | How it signs in | Where the credential lives |
-| --- | --- | --- |
-| Admin web app | GitHub OAuth redirect. | HTTP-only, `SameSite=Lax` session cookie on the account domain. |
-| Desktop | The cloud plugin on the local Node runs an OAuth device authorization flow against the account service. The desktop shows the code and opens the browser. | An encrypted connection row on the local Node, like the GitHub integration token. |
-| TUI | The same plugin, the same flow. The TUI prints the code and URL. | The same connection row, on the Node the TUI attached to or started. |
-| CLI | Reads the same connection through the local Node. No separate sign-in. | Same. |
-
-Running sign-in on the local Node, not in the client, follows
-[security](../../security/control-plane.md): a Node provider's credential is an ordinary connection
-held node-side, so the desktop renderer and the TUI's drawing code never touch it. The GitHub plugin
-already runs a device flow this way ([authentication](../../authentication.md#github-connection)),
-so the UI pattern exists.
-
-Better Auth lists a device authorization plugin. Confirm it works with the organization plugin and
-issues refresh tokens before relying on it. If it does not, the account service implements RFC 8628
-itself on top of Better Auth sessions.
+- Better Auth's organization plugin maps to acorn teams, with custom roles `admin`, `member`, and
+  `viewer`. Confirm its device authorization plugin works with the organization plugin before
+  [phase 2](./phases/02-team-node.md).
+- Better Auth's two-factor plugin doesn't gate OAuth sign-in by default. A later acorn-wide second
+  factor needs its own enforced step before the account service issues any grant. For more
+  information, see [two-factor behavior](https://better-auth.com/docs/plugins/2fa).
 
 ## Grants
 
@@ -63,7 +37,7 @@ Recommended shape: a compact JSON Web Token signed with Ed25519 by the account s
 | `exp` | Five minutes after issue. |
 | `jti` | A unique ID, recorded in the Node's audit trail. |
 
-The client asks the cloud plugin for a grant. The plugin calls the account service with the
+The client asks the sign-in plugin for a grant. The plugin calls the account service with the
 person's session. The account service checks membership and returns the grant and a relay ticket.
 Custody holds both in memory, refreshes them a minute before expiry, and sends the grant as
 `Authorization: Bearer acorn_gr_<jwt>`. A new prefix keeps it from ever reaching the device-token
@@ -159,4 +133,4 @@ control plane, which the open account API contract allows.
 Check that Better Auth's device flow, organization roles, and session revocation behave as described
 here with the current release. Check whether any core or plugin route relies on the principal being
 a device for a reason other than ownership, such as pairing, plugin install, or backup. List those
-before phase 3 and decide whether each is `admin`-only or refused outright on hosted Nodes.
+before phase 2 and decide whether each is `admin`-only or refused outright on hosted Nodes.

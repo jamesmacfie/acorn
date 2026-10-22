@@ -1,4 +1,4 @@
-# Phase 7: worker isolation and team policy
+# Phase 5: worker isolation and team policy
 
 Status: proposed, 2026-09-29.
 
@@ -17,7 +17,7 @@ team admin. The closed alpha opens: single-person teams, using their own model k
 
 ## Starting point
 
-- Working cloud tasks with archive and restore from [phase 6](./06-archive.md).
+- Working cloud tasks with archive and restore from [phase 4](./04-archive.md).
 - The execution boundary and team policy in [isolation](../isolation.md). Neither is built.
 - The three execution chokepoints: `packages/node-core/src/server/core/proc.ts`,
   `plugins/terminal/src/server/terminal.ts`, and `plugins/agents/src/server/drivers/jsonRpcProcess.ts`.
@@ -137,7 +137,7 @@ what changed.
 3. Does the provider's kernel support Landlock and unprivileged user namespaces?
 4. Is a separate Unix user enough, or does the task need a nested container?
 5. Where does a team admin edit team policy: the web app, or desktop and TUI Settings on the team
-   Node? See [phase 8](./08-plugins.md#open-questions) for the same question about plugins.
+   Node? See [phase 6](./06-plugins.md#open-questions) for the same question about plugins.
 6. Does the closed alpha need audit export, or is the team Node's own audit trail enough?
 7. Who runs the outside review, and is a paid penetration test needed before the alpha or only before
    general availability?

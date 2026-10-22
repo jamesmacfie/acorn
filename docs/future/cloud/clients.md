@@ -6,7 +6,7 @@ This file lists every client change, in the order the phases need them.
 
 ## Principles
 
-- **No cloud, no change.** A client with no cloud plugin installed, or not signed in, looks and
+- **No cloud, no change.** A client that isn't signed in, or whose account has no team, looks and
   behaves exactly as it does today. The Fleet source still appears only once more than one Node is
   paired.
 - **One project, one task.** A cloud task appears in its project's task list, not as a separate
@@ -18,15 +18,13 @@ This file lists every client change, in the order the phases need them.
 
 ## Signing in
 
-The cloud plugin adds a **Cloud** page in Settings. Signed out, it shows **Sign in**. Signing in
-runs the device flow on the local Node ([identity](./identity.md#how-each-client-signs-in)). The
-desktop opens the browser with the code filled in. The TUI prints the URL and code. Signed in, the
-page shows the account, the teams, and **Sign out**, which deletes the connection on the local Node
-and forgets every grant.
+[Remote access](../remote-access/accounts.md#the-sign-in-plugin) owns sign-in and the **Account**
+page in Settings. Cloud adds the account's teams to that page. **Sign out** also forgets every
+grant.
 
 ## Adopting the team Node
 
-The cloud plugin is a Node provider. Its `list` returns the team Nodes the account can reach, with
+The sign-in plugin's Node provider also returns the team Nodes the account can reach, with
 each Node's vouched fingerprint and relay route. The host adopts a team Node through the existing
 provided-Node path in Settings → Nodes, and refuses a fingerprint mismatch.
 
@@ -36,7 +34,7 @@ What changes in custody:
   pointer to the provider that issues its grants. Before each connection, and a minute before
   expiry, custody asks the provider for a fresh grant and relay ticket. Custody changes live in
   `packages/custody/src` beside `packages/custody/src/custody/deviceTokenStore.ts`.
-- **The relay socket factory.** See [relay](./relay.md#what-changes-in-the-client).
+- **The relay socket factory.** See [relay](../remote-access/relay.md#what-changes-in-the-client).
 - **A new connection reason.** A signed-out account or an expired membership shows as `offline`
   with a reason, not a new state. The broker's state vocabulary does not grow.
 
@@ -55,14 +53,14 @@ project's default preselected. Choosing **Cloud** shows, before anything is spen
    pick, with total size.
 2. The plugin lock for this attempt, with any blocked plugin and its reason.
 3. Missing cloud connections or settings, each with a link for an admin to fix.
-4. The spend estimate, the team's remaining budget, and the idle rule. From phase 10.
+4. The spend estimate, the team's remaining budget, and the idle rule. From phase 8.
 
 **Run in cloud** then reserves and provisions. The task appears in the rail at once, in
 `reserved`, and moves through its states.
 
 ## Adopting a worker
 
-This is the largest client change, and the first spike in [phase 5](./phases/05-cloud-task.md).
+This is the largest client change, and the first spike in [phase 3](./phases/03-cloud-task.md).
 
 A task's panes call their Node through the active Node's API client. A cloud task's live data is on
 a worker, which is not the active Node and not a fleet workspace. So the client needs:
@@ -81,11 +79,11 @@ a worker, which is not the active Node and not a fleet workspace. So the client 
 
 An alternative is to route a worker's traffic through the team Node, so the client only ever talks
 to one Node. It keeps the client simple but puts every terminal stream through the team Node. That
-trade-off is an open question in phase 5.
+trade-off is an open question in phase 3.
 
 ## Watching a cloud task
 
-The task header shows location, attempt state, region, and, from phase 10, spend so far. Setup
+The task header shows location, attempt state, region, and, from phase 8, spend so far. Setup
 shows its steps: checkout, dependency install, plugin start. A failed attempt shows its reason and
 **Recover**. An agent waiting for an answer shows that the worker is still running and still
 billing.

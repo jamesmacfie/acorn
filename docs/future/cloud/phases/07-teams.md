@@ -1,4 +1,4 @@
-# Phase 9: teams and roles
+# Phase 7: teams and roles
 
 Status: proposed, 2026-09-29.
 
@@ -19,8 +19,8 @@ anything. Admins remove people, and removed people lose access at once.
 
 ## Starting point
 
-- Single-person teams with hardened workers and plugins from [phase 8](./08-plugins.md).
-- Grants that carry a role, with only `admin` accepted, from [phase 3](./03-team-node.md).
+- Single-person teams with hardened workers and plugins from [phase 6](./06-plugins.md).
+- Grants that carry a role, with only `admin` accepted, from [phase 2](./02-team-node.md).
 - The mount coverage test in `packages/node-core/src/server/mountCoverage.test.ts`.
 
 ## In scope

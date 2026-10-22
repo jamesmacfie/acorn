@@ -3,25 +3,19 @@
 Date: October 17, 2026. Status: proposed. Not phased.
 
 These pieces wait until people use the [first release](./README.md). Each needs a decision from the
-owner before it becomes a phase. [Remote access](../remote.md) owns the wider design for most of them.
+owner before it becomes a phase. [Remote access to a browser host](../remote.md) owns the wider design
+for most of them. Moving phone sessions to the Node and reaching more than one Node moved to
+[remote access](../remote-access/phone.md) on October 22, 2026.
 
 ## Send notifications to a sleeping phone
 
 A locked phone holds no socket, so **Needs you** only updates when the app is open. Background
-delivery needs Web Push: the phone gives the gateway a push subscription, and the gateway sends a
+delivery needs Web Push: the phone gives the Node a push subscription, and the Node sends a
 notification when the attention inbox gains an item. The notification carries no task content, only
 a count and the task's title, because it passes through Apple's or Google's push service. iOS
-delivers web push only to an app installed to the home screen. Decide who owns the subscription
-before you build it: the gateway, or the Node once it holds browser sessions.
-
-## Move browser sessions to the Node
-
-The gateway lets the UI work start without changing the Node. In the end, the Node may own browser
-sessions itself, so each phone is its own device with its own audit trail and revocation. That needs
-the five decisions in [build a single-Node browser host](../remote.md#build-a-single-node-browser-host):
-session storage, socket auth, origin checks, who serves the bundle, and a trusted certificate. The
-phone's shell doesn't change when this lands, because only its `transport` group talks to the
-gateway.
+delivers web push only to an app installed to the home screen. The Node owns the subscription, since
+each phone is its own device there once [remote access phase 4](../remote-access/phases/04-phone.md)
+ships.
 
 ## Run loaded plugins on a phone
 
@@ -30,12 +24,6 @@ the bundle, hashing it, and recording the owner's trust decision
 ([browser plugin custody](../remote.md#implement-browser-plugin-custody)). A frame plugin also needs an
 origin of its own per bundle, which the desktop gets from a custom scheme and a browser doesn't
 have. Trees come first, because they draw with the kit and get the narrow mode for free.
-
-## Reach more than one Node
-
-The gateway serves one Node. A phone that switches Nodes needs the `fleet` group's read and select
-verbs against a gateway that holds several, or one gateway per Node with the phone remembering each
-address. Start with the second, because it needs no gateway change.
 
 ## Reuse the narrow mode in the browser extension
 

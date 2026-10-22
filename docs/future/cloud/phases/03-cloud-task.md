@@ -1,4 +1,4 @@
-# Phase 5: shared projects and one person's cloud task
+# Phase 3: shared projects and one person's cloud task
 
 Status: proposed, 2026-09-29.
 
@@ -17,11 +17,11 @@ pick up in the TUI. When they are done, they choose **Stop and delete**. The tra
 readable from the team Node.
 
 Internal use only. Workers in this phase are not hardened, and teardown discards plugin detail
-beyond core and agent history. Phases 6 and 7 fix both.
+beyond core and agent history. Phases 4 and 5 fix both.
 
 ## Starting point
 
-- Team Nodes behind the relay from [phase 4](./04-relay.md).
+- Team Nodes behind the relay from [phase 2](./02-team-node.md).
 - The design in [projects and tasks](../projects-and-tasks.md) and [clients](../clients.md).
 - The task model in [workspaces and tasks](../../../workspaces-and-tasks.md).
 - The agents plugin's durable per-session event sequence.
@@ -40,13 +40,13 @@ beyond core and agent history. Phases 6 and 7 fix both.
 
 ## Out of scope
 
-Automatic teardown, archives, and restore, which are [phase 6](./06-archive.md). Task sandboxing,
-brokered model keys, and egress, which are [phase 7](./07-isolation.md). Loaded plugins, which are
-[phase 8](./08-plugins.md). Budgets and estimates, which are [phase 10](./10-billing.md).
+Automatic teardown, archives, and restore, which are [phase 4](./04-archive.md). Task sandboxing,
+brokered model keys, and egress, which are [phase 5](./05-isolation.md). Loaded plugins, which are
+[phase 6](./06-plugins.md). Budgets and estimates, which are [phase 8](./08-billing.md).
 
 **Named shortcut.** The model key is a team secret injected into the agent process's environment,
 option 2 in [plugins and secrets](../plugins-and-secrets.md#model-keys). Acceptable for the building
-team's own keys on staging. Phase 7 replaces it where a harness allows.
+team's own keys on staging. Phase 5 replaces it where a harness allows.
 
 ## Steps and checkpoints
 
@@ -149,7 +149,7 @@ Deploy with the real provider and a regional bucket.
 - Restart the client, team Node, relay, and worker at different points without a duplicate worker or
   lost acknowledged history.
 - Repeat with a failed built-in plugin, an interrupted upload, and a worker killed mid-turn.
-- A local Node with no cloud plugin behaves exactly as before.
+- A local Node whose owner isn't signed in behaves exactly as before.
 - Guard limits refuse a third concurrent worker, or whatever the cap is, with a clear message.
 
 ## Docs to update when it ships
@@ -173,7 +173,7 @@ Deploy with the real provider and a regional bucket.
 8. How does a project provide secrets like a `.env` file to a worker? As team secrets written into
    the worktree, or as environment variables?
 9. Which records count as core history: task metadata, notes, memory, findings, workflow runs? Each
-   plugin that is not transferred loses its data at **Stop and delete** until phase 6.
+   plugin that is not transferred loses its data at **Stop and delete** until phase 4.
 10. What do the guard limits start at?
 11. How does a deep link to a cloud task look, given the logical task ID lives on the team Node and
     the live data on a worker?

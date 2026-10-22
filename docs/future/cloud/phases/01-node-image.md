@@ -45,7 +45,7 @@ A self-hoster can use this on its own. It is the first cloud-shaped thing acorn 
 
 Accounts, enrollment, relay, cloud tasks, and anything multi-person. The model key in this phase is
 set by hand as a provider secret. That is a named shortcut for a single self-hoster, replaced in
-[phase 7](./07-isolation.md).
+[phase 5](./05-isolation.md).
 
 ## Steps and checkpoints
 
@@ -77,7 +77,7 @@ six identity words with the banner. Enter the code. The Node should appear, and 
 should appear in the rail.
 
 **Checkpoint 3: TUI pairs.** The TUI and CLI support remote pairing through `--node`.
-Pair and open the container workspace using that implemented path. [Phase 3](./03-team-node.md)
+Pair and open the container workspace using that implemented path. [Phase 2](./02-team-node.md)
 needs this container acceptance, not another pairing implementation.
 
 **Checkpoint 4: real work in the container.** On the container Node, connect GitHub through the
@@ -155,7 +155,7 @@ and pair to it by following only the written recipe.
 6. Does the team Node use the same image as a worker, or a slimmer one without agent CLIs?
 7. What volume size does a single self-hosted Node need, and how does a person grow it?
 8. How does a person get the pairing code without reading logs? A provider console command, a
-   one-time URL, or waiting for the account-based flow in phase 3.
+   one-time URL, or waiting for the account-based flow in phase 2.
 9. Which automated and live checks prove the implemented TUI and CLI pairing path against the image?
 10. How do provider health checks work against a Node that answers only pinned HTTPS? `GET /v1/node`
     is unauthenticated, but the provider must accept a self-signed certificate or use a TCP check.

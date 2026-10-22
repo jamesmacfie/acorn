@@ -1,4 +1,4 @@
-# Phase 6: idle teardown, archive, and restore
+# Phase 4: idle teardown, archive, and restore
 
 Status: proposed, 2026-09-29.
 
@@ -17,7 +17,7 @@ from the saved work. Still internal.
 
 ## Starting point
 
-- Cloud tasks with manual stop from [phase 5](./05-cloud-task.md).
+- Cloud tasks with manual stop from [phase 3](./03-cloud-task.md).
 - The online backup code in `packages/node-core/src/server/routes/security/backup.ts`.
 - The design in [archive](../archive.md).
 
@@ -107,7 +107,7 @@ attached.
 **Checkpoint 10: delete means gone.** Delete an archived task. Its archive objects disappear from the
 bucket, and the team Node's audit trail records the deletion. Storage totals drop.
 
-Remove the phase 5 **Stop and delete** path, or keep it only as an explicit **Discard without
+Remove the phase 3 **Stop and delete** path, or keep it only as an explicit **Discard without
 archiving**.
 
 ## Acceptance

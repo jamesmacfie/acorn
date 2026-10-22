@@ -3,8 +3,9 @@
 Date: October 8, 2026. Status: client foundations implemented; browser and mobile clients remain proposed.
 
 Use this design to plan a browser workspace and a mobile progressive web app.
-[Cloud](./cloud/README.md) owns account services, hosted tasks, and the relay.
-Its administration web app is separate from the workspace proposed here.
+[Remote access](./remote-access/README.md) owns accounts, the relay, and the phone's path through
+the account website. [Cloud](./cloud/README.md) owns hosted tasks. The account website is separate
+from the workspace proposed here.
 
 ## Starting point
 
@@ -59,8 +60,10 @@ host that the Node serves itself:
    certificate remains open.
 
 Real-device acceptance is still outstanding ([the checklist](../testing/mobile-on-a-phone.md)).
-Background push, browser plugin custody, and more than one Node are in
-[mobile work after the first release](./mobile/later.md).
+[Remote access](./remote-access/phone.md) replaces the gateway: the account website serves the
+bundle, the phone runs its own encrypted channel to the Node through the relay, each phone is its own
+device on the Node, and the phone reaches several Nodes. Background push and browser plugin custody
+are in [mobile work after the first release](./mobile/later.md).
 
 ## Implement browser plugin custody
 
@@ -107,9 +110,9 @@ Record install behavior and host limitations rather than assuming desktop compon
 
 ## Coordinate the relay
 
-[Cloud relay](./cloud/relay.md) and [its phase plan](./cloud/phases/04-relay.md) own opaque routing,
-account scope, and implementation order. Desktop and TUI relay access can precede a browser workspace.
-Remove the earlier requirement to wait for the browser client.
+[The relay](./remote-access/relay.md) and [its phase plan](./remote-access/phases/01-relay.md) own
+opaque routing, account scope, and implementation order. Desktop and terminal client relay access
+comes first, and the phone follows in [remote access phase 4](./remote-access/phases/04-phone.md).
 
 A browser integration must preserve end-to-end client/Node authority and document its browser TLS
 and session model. Push delivery is a separate contract even if it uses the same hosted service.

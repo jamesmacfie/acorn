@@ -12,13 +12,14 @@ Dated delivery evidence belongs in `docs/testing/` or the dated security reviews
 
 | Folder | Developer handoff | Status |
 | --- | --- | --- |
-| [cloud/](./cloud/README.md) | Eleven phases for hosted Nodes, accounts, relay, workers, archives, isolation, policy, teams, and billing. | Proposed. Enrollment and provider contracts are implemented foundations; hosted services remain unbuilt. |
+| [cloud/](./cloud/README.md) | Nine phases for hosted team Nodes, cloud task workers, archives, isolation, policy, teams, and billing. Depends on remote-access/. | Proposed. Enrollment and provider contracts are implemented foundations; hosted services remain unbuilt. Revised October 22, 2026, when accounts and the relay moved to remote-access/. |
 | [ecosystem/](./ecosystem/README.md) | Design package attestation, implement verification, then build discovery over verified packages. | Authoring, reload, and worker isolation implemented. Signing and discovery remain proposed. |
 | [dynamic-ui/](./dynamic-ui/README.md) | Eight phases for agent-built UI: dashboard panels an agent drafts in the conversation and the owner adds to a dashboard, then a Solid renderer for OpenUI, a spike, and apps written in OpenUI Lang over dashboard plans, with project publishing, apps on dashboards, turning an app into a plugin, and team use. | Proposed October 1, 2026, and revised October 19, 2026 for agent-made panels, OpenUI Lang, and plans. Phases 1 to 7 built October 19 and 20, 2026, and their phase files removed. Phase 8 waits on the cloud programme. |
 | [marketing/](./marketing/20-launch.md) | Launching the public website at `acorn.sh`: the content review, walks with published packages, quality checks, DNS, and deploy. `docs/site.md` documents the site. | Phases 1 to 19 done October 16, 2026. Launch not started. |
 | [mobile/](./mobile/README.md) | Six phases to a mobile web app: a gateway that gives a phone a session, a phone-shaped shell over client-core, a narrow mode switched from the root element, narrow layouts, **Needs you** and the agent conversation, and acceptance on real phones. | Proposed October 17, 2026. Phase 1, the gateway, shipped October 21, 2026. |
 | [node-tray/](./node-tray/README.md) | Eight phases to run a Node for clients on other machines: the device token out of logs, pairing and stopping from the terminal, choosing who can reach the Node, platform archives built by GitHub Actions, an installer and login service per operating system, desktop tray mode, keeping the machine awake, and acceptance on real machines. | Phases 1 to 7 landed October 18, 2026, on macOS. Plans for phases 1 to 3 removed October 20, 2026. Phase 8, acceptance on real machines, remains open. |
 | [perf/](./perf/README.md) | Ten phases to keep the window responsive while the machine is busy: a load test, more helper sockets with a deadline that ignores queue time, polling that follows the screen, lower CPU priority for agents and background work, Node SQLite reads that use their indexes, worktree reads that skip checkout admission, agent frames applied once per animation frame, long tasks off the main thread, panes that draw before every read finishes, and acceptance. | Phases 1 to 9 built October 21 and 22, 2026, and their phase files removed. Acceptance, the paged transcript, and three smaller changes remain. |
+| [remote-access/](./remote-access/README.md) | Five phases to reach your own Node from anywhere with no Tailscale: a relay anyone can run, accounts and sign-in, pairing a new device from a paired one, the phone app served from the account website with its own encrypted connection, and production. | Proposed October 22, 2026. Implementation not started. |
 | [security/](./security/README.md) | Six phases that close the October 22, 2026, security review: keep agents away from the client device tokens, sandbox what the phone gateway forwards, end phone sessions nobody uses, refuse plugin writes from a phone, tell agents what shared memory is, and record the review. | Proposed October 22, 2026. Implementation not started. |
 | [split/](./split/README.md) | Ten phases that fix drift in the Node and client split and the core and plugin split, including forge-neutral repositories and change requests. | Phases 1 to 9 implemented October 15, 2026, and the plans for 1 to 8 removed October 20, 2026. Phase 10, the remote preview proxy, is proposed. |
 | [tui-review/](./tui-review/README.md) | Finish terminal forms, feature journeys, host comparison, and packaged acceptance. | Startup, text controls, setup, Settings routing, files, promotion, and PTY paths implemented. Broader acceptance remains open. |
@@ -34,15 +35,15 @@ Dated delivery evidence belongs in `docs/testing/` or the dated security reviews
 | [integration-ideas.md](./integration-ideas.md) | Research catalogue for selecting integrations and checking contribution coverage. | Research, not an implementation specification. Recheck each candidate before assigning work. |
 | [kimi.md](./kimi.md) | An external Kimi harness package and optional usage/auth probes. | Proposed. No Kimi implementation in this checkout. Other external harnesses already exercise the contribution contract. |
 | [opencode.md](./opencode.md) | An external OpenCode harness package beside Claude Code and Codex, through `opencode acp`. | Postponed October 19, 2026, until OpenCode is installed and signed in. The tool result cap, memory change notes, and `run_script` from the same review were implemented October 19, 2026. |
-| [remote.md](./remote.md) | Browser auth, transport, custody, multiple Nodes, and a mobile progressive web app. | Host foundations implemented. Browser and mobile clients remain proposed; Cloud owns the relay. |
+| [remote.md](./remote.md) | Browser auth, transport, custody, multiple Nodes, and a mobile progressive web app. | Host foundations implemented. Browser and mobile clients remain proposed; remote-access/ owns the relay and the phone's path. |
 | [split.md](./split.md) | Extract loaded plugins and the authoring toolkit with packed-artifact compatibility and host seeding. | Published authoring packages implemented. Repository extraction remains proposed. |
 | [workflows-gaps.md](./workflows-gaps.md) | Assess graph navigation, prompt display, retry safety, agent control, and file triggers. | Proposed gaps. Confirm each against Workflows before implementation. |
 
 ## Choose the owning plan
 
 Dashboard followups do not require rebuilding the studio. Node packaging and repository extraction
-can proceed beside plugin signing; discovery depends on accepted package verification. Cloud owns
-relay order and account identity.
+can proceed beside plugin signing; discovery depends on accepted package verification. Remote access
+owns relay order and account identity, and cloud builds on it.
 
 ## Completed plans removed
 

@@ -57,7 +57,8 @@ cloud result returns through a branch, pull request, or patch, with a deliberate
 ## No team roles on an owner's local Node
 
 Local Nodes remain single-owner and account-free. The first relay flow lets the owner reach their
-own private Node; it does not turn that Node into a shared team service. Hosted team and task Nodes
+own private Node ([remote access](../remote-access/README.md)); it does not turn that Node into a
+shared team service. Hosted team and task Nodes
 use the new role-aware grant path. An owner-controlled opt-in to share a local Node would need a
 separate security and data-ownership design.
 
@@ -88,7 +89,7 @@ E2B's bring-your-own-cloud offering already work the agent way.
 Each customer provider must declare its capabilities, as
 [the provider interface](./hosting-and-cost.md#the-provider-interface) describes. A provider that
 cannot isolate task processes fails closed under [team policy](./isolation.md#team-policy). Billing
-becomes a platform fee, and budgets need the provider's own usage reporting. Revisit after phase 11,
+becomes a platform fee, and budgets need the provider's own usage reporting. Revisit after phase 9,
 or earlier if a paying team requires it.
 
 ## No automatic account merge by email
@@ -100,10 +101,10 @@ service. [Better Auth account linking](https://better-auth.com/docs/concepts/use
 
 ## No public address on a hosted Node
 
-Phase 1 gives a self-hosted Node a public address as a stepping stone. From phase 4 on, team Nodes,
+Phase 1 gives a self-hosted Node a public address as a stepping stone. From phase 2 on, team Nodes,
 workers, and restore Nodes accept connections only through the relay. A public port on each worker
 would widen the attack surface, churn addresses every few minutes, and give two reachability paths to
-test instead of one. See [relay](./relay.md#why-every-hosted-node-uses-it).
+test instead of one. See [relay](../remote-access/relay.md#who-uses-it).
 
 ## No enrollment v1 for hosted Nodes
 
