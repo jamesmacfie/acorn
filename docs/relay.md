@@ -115,6 +115,14 @@ pnpm --filter @acorn/relay start
 | `ACORN_RELAY_HOST` | The address to bind. | `0.0.0.0` |
 | `ACORN_RELAY_TLS_CERT` and `ACORN_RELAY_TLS_KEY` | PEM files, to serve `wss://` directly. | Unset, which serves `ws://`. |
 
+To run it as a container, build `apps/relay/Dockerfile` from the repository root and pass the same
+variables to `docker run`:
+
+```sh
+docker build -f apps/relay/Dockerfile -t acorn-relay .
+docker run -p 8443:8443 -e ACORN_RELAY_CREDENTIAL=$(openssl rand -hex 32) acorn-relay
+```
+
 On a public network, serve `wss://`, either with a certificate and key or behind a proxy that
 terminates TLS. Plain `ws://` still carries only the Nodes' TLS, but it sends the credential in the
 clear.
