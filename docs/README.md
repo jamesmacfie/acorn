@@ -481,6 +481,15 @@ Each plugin landing page above has topic pages in a folder of the same name:
   phone](./future/mobile/06-on-a-phone.md), and [workspaces and compact
   controls](./future/mobile/07-workspaces-and-compact-controls.md), then [later work](./future/mobile/later.md).
 
+## Plugins on the phone proposal
+
+- [Run installed plugins, the terminal, and Preview on the phone](./future/mobile-plugin/README.md),
+  with phases for [the terminal](./future/mobile-plugin/01-terminal.md), [the sandbox
+  origin](./future/mobile-plugin/02-sandbox-origin.md), [browser
+  custody](./future/mobile-plugin/03-browser-custody.md), [the first-party
+  plugins](./future/mobile-plugin/04-first-party-plugins.md), [pixel
+  frames](./future/mobile-plugin/05-pixel-frames.md), and [Preview](./future/mobile-plugin/06-preview.md).
+
 ## Node for other machines proposal
 
 - [Run a Node for clients on other machines](./future/node-tray/README.md), with phases for

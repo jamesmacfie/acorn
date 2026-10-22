@@ -76,6 +76,10 @@ code running in the shell can still use it. Do not describe that as protection f
 Acceptance: install, render, update, revoke, remove, and recover a device bundle after reload.
 Verify tampered bytes, unavailable sources, denied permissions, and browser storage loss.
 
+For the phone, [plugins on the phone](./mobile-plugin/README.md) plans this group. It runs each
+bundle on a subdomain of its own rather than an opaque origin, and leaves device bundles out. The
+owner decided both on October 23, 2026.
+
 ## Add multiple Nodes
 
 Use browser connections to independent Nodes as the initial design. Keep one connection and one

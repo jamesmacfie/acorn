@@ -19,11 +19,9 @@ ships.
 
 ## Run loaded plugins on a phone
 
-The first release runs built-in plugins only. A loaded plugin's tree needs browser custody: storing
-the bundle, hashing it, and recording the owner's trust decision
-([browser plugin custody](../remote.md#implement-browser-plugin-custody)). A frame plugin also needs an
-origin of its own per bundle, which the desktop gets from a custom scheme and a browser doesn't
-have. Trees come first, because they draw with the kit and get the narrow mode for free.
+The first release runs built-in plugins only. [Plugins on the phone](../mobile-plugin/README.md)
+plans the rest, decided October 23, 2026: browser custody, an origin of its own for each bundle,
+trees before frames, the terminal, and Preview through the Node.
 
 ## Reuse the narrow mode in the browser extension
 
