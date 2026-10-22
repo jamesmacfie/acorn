@@ -9,6 +9,7 @@ import {
   RELAY_PING_INTERVAL_MS,
   RELAY_REPLACED,
   RELAY_REVOKED,
+  RELAY_SUBPROTOCOL,
   relayControlMessageSchema,
   relayRouteIdSchema,
   relayStreamIdSchema,
@@ -48,7 +49,14 @@ export async function startRelay(options: RelayOptions): Promise<Relay> {
   const auth = typeof options.auth === 'string' ? staticAuth(options.auth) : options.auth
   const registrations = new Map<string, Registration>()
   const streamCounts = new Map<string, number>()
-  const wss = new WebSocketServer({ noServer: true, maxPayload: RELAY_MAX_MESSAGE_BYTES, perMessageDeflate: false })
+  const wss = new WebSocketServer({
+    noServer: true,
+    maxPayload: RELAY_MAX_MESSAGE_BYTES,
+    perMessageDeflate: false,
+    // A browser offers the relay's name and its ticket as subprotocols. Only the name is selected, so the
+    // ticket is never echoed back.
+    handleProtocols: (protocols) => (protocols.has(RELAY_SUBPROTOCOL) ? RELAY_SUBPROTOCOL : false),
+  })
   const server = options.tls ? createHttpsServer(options.tls) : createHttpServer()
 
   // Every upgrade goes through here, so every connection is pinged and none can throw an unhandled

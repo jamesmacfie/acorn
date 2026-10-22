@@ -61,6 +61,7 @@
     "./server/schedules/scheduler.ts": "./src/server/schedules/scheduler.ts",
     "./server/secretBox.ts": "./src/server/secretBox.ts",
     "./server/storage/nodeRelay.ts": "./src/server/storage/nodeRelay.ts",
+    "./server/transport/channelKey.ts": "./src/server/transport/channelKey.ts",
     "./server/storage": "./src/server/storage/public.ts",
     "./server/storage/dataRoot.ts": "./src/server/storage/dataRoot.ts",
     "./server/storage/paths.ts": "./src/server/storage/paths.ts",
@@ -85,6 +86,7 @@
     "db:migrate": "tsx scripts/migrate.ts"
   },
   "dependencies": {
+    "@acorn/channel": "workspace:*",
     "@acorn/dashboards-core": "workspace:*",
     "@acorn/protocol": "workspace:*",
     "@hono/node-server": "^2.0.11",

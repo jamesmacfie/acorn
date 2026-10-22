@@ -854,8 +854,9 @@ describe('architecture boundaries', () => {
       // that workflow loops, record triggers, and their preview share, the starter trigger check and
       // event feed description the Node and the plugin SDK share, and the relay protocol, which the relay,
       // the Node's tunnel, and custody's socket factory share without the broker contract, and the account API's
-      // types and signed token format, which the sign-in plugin, the relay, and the hosted service share.
-      '@acorn/protocol': 98,
+      // types and signed token format, which the sign-in plugin, the relay, and the hosted service share,
+      // and the phone channel's messages, which the Node's channel endpoint and the phone app share.
+      '@acorn/protocol': 99,
       // client-core publishes narrow entrypoints where a consumer can't take a barrel that pulls in
       // renderer-only modules. Pure leaves the terminal, logic tests or remote trees need: model-provider
       // error guidance, `kit/lib/savedSignal`, `kit/lib/formatChord`, `kit/lib/ansi`, and the address
@@ -873,8 +874,9 @@ describe('architecture boundaries', () => {
       // `server/auth/pairingCodes.ts`, so the mobile gateway's sign-in code keeps the Node's code rules
       // without loading the auth barrel's database modules.
       // Includes `server/storage/nodeRelay.ts`, the relay and owner record the account plugin's lazy routes read,
-      // which stays out of the Node's static graph that way.
-      '@acorn/node-core': 70,
+      // which stays out of the Node's static graph that way, and `server/transport/channelKey.ts`, the key a
+      // phone pins, which the same routes register without loading the channel.
+      '@acorn/node-core': 71,
       '@acorn/custody': 10,
       '@acorn/dashboards-core': 18, // Shared SQL/in-memory summary and time-bucket semantics, the plan's labels, its outline, the plan-writing guide the studio and panel_guide share, and the heatmap's cells HeatmapView draws.
       // The document model, and the store a code host's Node half keeps documents in.

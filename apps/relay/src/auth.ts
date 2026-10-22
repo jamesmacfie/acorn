@@ -9,6 +9,7 @@ import {
   type AccountKeys,
 } from '@acorn/protocol/account.ts'
 import { verifyToken } from '@acorn/protocol/accountToken.ts'
+import { credentialFromProtocols } from '@acorn/protocol/relay.ts'
 
 // Who may use a relay (docs/relay/accounts.md § Who may connect). A relay either holds one static
 // credential that its Nodes and clients share, or checks what an account service signed.
@@ -28,7 +29,12 @@ export type RelayAuth = {
   close?(): void
 }
 
-const bearer = (request: IncomingMessage): string => request.headers.authorization?.replace(/^Bearer /, '') ?? ''
+// The credential in `Authorization`, or in the subprotocols a browser offers, because a browser can't set
+// that header on a WebSocket upgrade (PROTOCOL.md § Connections).
+const bearer = (request: IncomingMessage): string =>
+  request.headers.authorization?.replace(/^Bearer /, '') ??
+  credentialFromProtocols(request.headers['sec-websocket-protocol']) ??
+  ''
 
 export function staticAuth(credential: string): RelayAuth {
   const expected = Buffer.from(credential)

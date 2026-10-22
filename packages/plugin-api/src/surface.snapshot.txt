@@ -274,6 +274,7 @@ node: McpCommands
 node: MirroredResourceContribution
 node: ModelProviderAdapter
 node: NodePlugin
+node: NodeProviderCaller
 node: NodeProviderContribution
 node: NodeSpec
 node: PluginBroadcast
@@ -329,6 +330,7 @@ node: agentProfileRegistry
 node: brokerEnv
 node: buildHeadlessArgv
 node: buildSessionEnv
+node: channelPublicKey
 node: childEnv
 node: chunkRowsByColumnBudget
 node: clientCustodyDirs

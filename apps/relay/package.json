@@ -15,6 +15,7 @@
     "ws": "^8.21.0"
   },
   "devDependencies": {
+    "@acorn/channel": "workspace:*",
     "@acorn/custody": "workspace:*",
     "@acorn/node-core": "workspace:*",
     "@types/node": "^26.0.0",

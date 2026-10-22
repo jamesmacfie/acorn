@@ -3,9 +3,11 @@ import { serve } from '@hono/node-server'
 import type { Server } from 'node:http'
 import type { AddressInfo } from 'node:net'
 import { Hono, type Context } from 'hono'
+import { getCookie, setCookie } from 'hono/cookie'
 import type { ZodType } from 'zod'
 import {
   ACCOUNT_API_PREFIX,
+  ACCOUNT_BROWSER_HEADER,
   accountPaths,
   assertionRequestSchema,
   deviceCodeRequestSchema,
@@ -30,7 +32,8 @@ import { generateSigningKey, signToken } from '@acorn/protocol/accountToken.ts'
 // instead of in a green suite. It keeps everything in memory and signs with a key made at startup.
 //
 // What it leaves out is the hosted service's job: no GitHub, no website, no database, no audit log.
-// A device flow is approved at once for one test account unless a test says otherwise.
+// A device flow is approved at once for one test account unless a test says otherwise. So is the
+// browser sign-in the phone app sends a person to.
 
 export type AccountStub = {
   url: string
@@ -43,7 +46,7 @@ export type AccountStub = {
   /** The requests it has answered, as `METHOD /path`, so a test can show a Node never called it. */
   requests(): string[]
   /** Every account's Nodes, as the website would list them. */
-  nodes(): { nodeId: string; accountId: string; label: string; fingerprint: string }[]
+  nodes(): { nodeId: string; accountId: string; label: string; fingerprint: string; channelKey?: string }[]
   /** Make the next listing say this Node has another certificate, so a test can show a client refusing it. */
   setListedFingerprint(nodeId: string, fingerprint: string): void
   /** What clicking Remove on the website does: the Node is forgotten and its credential revoked. */
@@ -66,7 +69,16 @@ export type AccountStubOptions = {
 }
 
 type Flow = { userCode: string; expiresAt: number; login?: string }
-type Registered = { accountId: string; label: string; fingerprint: string; credentialId: string }
+type Registered = {
+  accountId: string
+  label: string
+  fingerprint: string
+  channelKey?: string
+  credentialId: string
+}
+
+// The website's session cookie, as the stand-in sets it.
+const SESSION_COOKIE = 'acorn_account_session'
 
 export async function startAccountStub(options: AccountStubOptions = {}): Promise<AccountStub> {
   const now = options.now ?? Date.now
@@ -77,6 +89,7 @@ export async function startAccountStub(options: AccountStubOptions = {}): Promis
   const flows = new Map<string, Flow>()
   const accessTokens = new Map<string, { account: Account; expiresAt: number }>()
   const refreshTokens = new Map<string, Account>()
+  const browserSessions = new Map<string, Account>()
   const registered = new Map<string, Registered>()
   const revoked = new Set<string>()
   let relayUrl = 'ws://relay.invalid'
@@ -117,10 +130,20 @@ export async function startAccountStub(options: AccountStubOptions = {}): Promis
       : { refusal: fail(c, 400, 'invalid_request', result.error.issues[0]?.message) }
   }
 
+  // A bearer token, or the website's cookie from a page that also sent the header only a page of the
+  // service's own can (docs/account-api.md § Browsers).
   const signedIn = (c: Context): Account | null => {
     const token = c.req.header('authorization')?.replace(/^Bearer /, '') ?? ''
     const entry = accessTokens.get(token)
-    return entry && entry.expiresAt > now() ? entry.account : null
+    if (entry) return entry.expiresAt > now() ? entry.account : null
+    if (c.req.header(ACCOUNT_BROWSER_HEADER) !== '1') return null
+    return browserSessions.get(getCookie(c, SESSION_COOKIE) ?? '') ?? null
+  }
+
+  const startBrowserSession = (c: Context, login: string): void => {
+    const id = randomBytes(24).toString('base64url')
+    browserSessions.set(id, accountFor(login))
+    setCookie(c, SESSION_COOKIE, id, { httpOnly: true, sameSite: 'Lax', path: '/' })
   }
 
   const claims = (accountId: string) => ({ iss: baseUrl, sub: accountId, jti: randomUUID(), iat: nowSeconds() })
@@ -201,7 +224,13 @@ export async function startAccountStub(options: AccountStubOptions = {}): Promis
     if (!account) return fail(c, 401, 'invalid_token')
     const nodes = [...registered]
       .filter(([, node]) => node.accountId === account.id)
-      .map(([nodeId, { label, fingerprint }]) => ({ nodeId, label, fingerprint, relayUrl }))
+      .map(([nodeId, { label, fingerprint, channelKey }]) => ({
+        nodeId,
+        label,
+        fingerprint,
+        ...(channelKey ? { channelKey } : {}),
+        relayUrl,
+      }))
     return c.json({ nodes } satisfies ListNodesResponse)
   })
 
@@ -244,6 +273,14 @@ export async function startAccountStub(options: AccountStubOptions = {}): Promis
     return c.json({ assertion, expiresAt })
   })
 
+  // Where the phone app sends a person to sign in. The stand-in signs in the one test account at once and
+  // sends the browser back to a path on its own origin.
+  app.get(accountPaths.browserSignIn, (c) => {
+    const next = c.req.query('next') ?? '/'
+    if (!next.startsWith('/') || next.startsWith('//')) return fail(c, 400, 'invalid_request', 'next is a path.')
+    startBrowserSession(c, approveAs || 'test-account')
+    return c.redirect(next)
+  })
   // The browser page a person would approve on. The stub approves without one, so this only explains.
   app.get('/device', (c) => c.text('This is the stand-in account service. It approves sign-ins without asking.'))
   // Not part of the API: the hook the contract tests use to approve, the same on every implementation.
@@ -255,6 +292,15 @@ export async function startAccountStub(options: AccountStubOptions = {}): Promis
     } catch {
       return fail(c, 404, 'not_found')
     }
+    return c.body(null, 204)
+  })
+
+  // Not part of the API either: signs a browser in as this login, so the contract tests can reach the routes
+  // a cookie opens without a GitHub page.
+  app.post('/_test/session', async (c) => {
+    const body = (await c.req.json().catch(() => null)) as { login?: string } | null
+    if (!body?.login) return fail(c, 400, 'invalid_request')
+    startBrowserSession(c, body.login)
     return c.body(null, 204)
   })
 
@@ -287,7 +333,13 @@ export async function startAccountStub(options: AccountStubOptions = {}): Promis
       )
     },
     nodes: () =>
-      [...registered].map(([nodeId, { accountId, label, fingerprint }]) => ({ nodeId, accountId, label, fingerprint })),
+      [...registered].map(([nodeId, { accountId, label, fingerprint, channelKey }]) => ({
+        nodeId,
+        accountId,
+        label,
+        fingerprint,
+        ...(channelKey ? { channelKey } : {}),
+      })),
     setListedFingerprint(nodeId, fingerprint) {
       const node = registered.get(nodeId)
       if (node) node.fingerprint = fingerprint

@@ -199,6 +199,10 @@
         "fingerprint": {
           "type": "string",
           "pattern": "^[0-9a-f]{64}$"
+        },
+        "channelKey": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
         }
       },
       "required": [
@@ -293,6 +297,10 @@
                 "minLength": 1
               },
               "fingerprint": {
+                "type": "string",
+                "pattern": "^[0-9a-f]{64}$"
+              },
+              "channelKey": {
                 "type": "string",
                 "pattern": "^[0-9a-f]{64}$"
               },

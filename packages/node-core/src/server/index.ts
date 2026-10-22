@@ -1,6 +1,7 @@
 import { scripts } from './routes/projects/taskScripts'
 import { Hono } from 'hono'
 import { authMiddleware, type AppEnv } from './middleware/auth'
+import { phoneRules } from './middleware/phoneRules'
 import { buildIntegrationProviderRoutes } from './integrations/providerRoutes'
 import { idempotency } from './middleware/idempotency'
 import { requireDevice, requireProviderAccess, requireTaskScope, requireUser } from './middleware/requireUser'
@@ -67,6 +68,7 @@ export function createApp() {
     .use('/v1/*', authMiddleware) // resolve ctx.principal from a device bearer or the internal token
     .route('/v1', pairing.open) // GET /v1/node + POST /v1/pair, pre-auth by construction
     .use('/v1/*', requireUser) // single 401 gate over the protected router table
+    .use('/v1/*', phoneRules) // a phone's device is held to the routes it has a screen for
     // Below the gate: replay is keyed on the caller's deviceId, which only exists once the
     // principal is resolved (docs/api-reference/transport.md § Request processing).
     .use('/v1/*', idempotency)

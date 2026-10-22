@@ -65,7 +65,8 @@ const pairingFailed = (c: Context<AppEnv>): Response => respondError(c, 401, 'pa
 
 // A device token for the caller, the one time it exists outside the client. Never logged.
 async function paired(c: Context<AppEnv>, deviceName: string): Promise<Response> {
-  const { token, device } = await c.env.DEVICES.issue(deviceName)
+  // A device paired through a phone's channel is a phone's, whatever it says about itself.
+  const { token, device } = await c.env.DEVICES.issue(deviceName, c.env.browserChannel ? 'phone' : undefined)
   return c.json({
     baseline: ACORN_BASELINE,
     deviceToken: token,

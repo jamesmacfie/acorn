@@ -100,7 +100,11 @@ export type RuntimeBindings = {
 //
 // HttpBindings is Partial because the @hono/node-server adapter only spreads raw incoming/outgoing
 // at the app.fetch() seam (server/transport/listener.ts); tests and non-HTTP callers don't provide them.
-export type Env = RuntimeBindings & Partial<HttpBindings>
+//
+// `browserChannel` is set on a request that came through a phone's encrypted channel
+// (server/transport/channel.ts). It has no socket, so the Node can't tell it from any relayed peer by
+// its address, and a route that treats a phone differently reads this.
+export type Env = RuntimeBindings & Partial<HttpBindings> & { browserChannel?: true }
 
 // Immutable file and patch bodies keyed by content (docs/caching.md § Immutable blob cache). One
 // file per key under `dir`; keys are `filebody:<sha>` and `patch:sha256:<hex>` (plugins/github/src/server/blobKeys.ts),

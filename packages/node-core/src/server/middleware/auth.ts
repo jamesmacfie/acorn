@@ -14,6 +14,9 @@ export type Principal = {
   kind: PrincipalKind
   userId: string
   deviceId?: string
+  // `phone` for a device paired from a phone's browser, which is held to fewer routes
+  // (./phoneRules.ts).
+  deviceKind?: 'phone'
   // Set only for kind 'internal'. A route that must not be reachable from an agent-spawned child checks
   // this rather than the kind: `kind === 'internal'` cannot distinguish the service from an agent.
   scope?: InternalScope
@@ -74,7 +77,12 @@ async function devicePrincipal(c: { env: Env }, header: string): Promise<Princip
   // The device is the owner, so it inherits the machine's bound identity exactly as the internal
   // principal does. The identity is minted at boot; the '' fallback exists only so a bare test Env
   // without a bound store still authenticates.
-  return { kind: 'device', userId: c.env.ACTIVE_IDENTITY.get() ?? '', deviceId: authenticated.deviceId }
+  return {
+    kind: 'device',
+    userId: c.env.ACTIVE_IDENTITY.get() ?? '',
+    deviceId: authenticated.deviceId,
+    ...(authenticated.kind ? { deviceKind: authenticated.kind } : {}),
+  }
 }
 
 // Resolve the caller and attach it to the context. Never throws and never enforces: requireUser is the

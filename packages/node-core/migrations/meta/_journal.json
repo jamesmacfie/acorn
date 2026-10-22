@@ -113,6 +113,13 @@
       "when": 1792614940345,
       "tag": "0015_dataset_size_counters",
       "breakpoints": true
+    },
+    {
+      "idx": 16,
+      "version": "6",
+      "when": 1792652588001,
+      "tag": "0016_device_kind",
+      "breakpoints": true
     }
   ]
 }

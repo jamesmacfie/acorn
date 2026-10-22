@@ -37,8 +37,11 @@ A client's ticket opens a stream only when its account owns the Node registered 
 format is in [the account API](../../docs/account-api.md#signed-tokens). The relay polls the service's
 list of revoked credentials, and closes a Node that holds one with code 4001, `revoked`.
 
-A browser can't set this header, so a later version adds a second way to carry the credential for
-browser streams.
+A browser can't set this header on a WebSocket upgrade, so it offers the credential as a subprotocol
+instead. It offers two names in `Sec-WebSocket-Protocol`: `acorn.relay.v1`, and the credential behind the
+prefix `acorn.credential.`. The relay reads the credential from the second and selects the first, so the
+credential never comes back in a response. A credential carried this way is made of characters a
+subprotocol name allows, which a signed ticket is. A client that sends `Authorization` needs none of this.
 
 ## Register a Node
 
@@ -81,9 +84,9 @@ it to the Node.
 | Kind | The bytes are |
 | --- | --- |
 | `tls` | A TLS 1.3 connection to the Node's HTTPS server. Native clients use it. |
-| `browser` | Reserved for a browser's encrypted channel to the Node. |
+| `browser` | A phone's browser, which runs its own encrypted handshake against the Node's channel key and then speaks the messages in [the phone channel](../../docs/relay/phone-channel.md). |
 
-A Node refuses a kind it doesn't serve.
+A Node refuses a kind it doesn't serve, with a `refuse` message on its control connection.
 
 ## Carry bytes
 

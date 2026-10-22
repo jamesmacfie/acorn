@@ -19,6 +19,7 @@
     "./branch.ts": "./src/projects/branch.ts",
     "./workspacesMode.ts": "./src/projects/workspacesMode.ts",
     "./broker.ts": "./src/transport/broker.ts",
+    "./channel.ts": "./src/transport/channel.ts",
     "./relay.ts": "./src/transport/relay.ts",
     "./extensionBridge.ts": "./src/transport/extensionBridge.ts",
     "./chrome.ts": "./src/chrome/surfaces.ts",

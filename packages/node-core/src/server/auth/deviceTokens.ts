@@ -10,8 +10,9 @@ import { recordAudit, type AuditActor } from '../audit'
 // The raw token is returned exactly once, at pairing; only sha256(secret) is stored. A 256-bit
 // random secret makes offline hash guessing infeasible, so nothing reversible is layered on.
 //
-// Every paired device has full owner authority, disclosed at pairing. Device revocation is the
-// lifecycle control; there are no per-token scopes because this is single-owner software.
+// Every paired device has full owner authority, disclosed at pairing, except a phone's, which is held
+// to fewer routes (./phoneRules.ts) and expires when unused. Device revocation is the lifecycle control;
+// there are no per-token scopes because this is single-owner software.
 
 // acorn_dt_<uuid>_<base64url(32 bytes)>. Anchored, so trailing garbage or whitespace is rejected
 // rather than trimmed into a valid-looking token.
@@ -28,6 +29,10 @@ const LAST_SEEN_THROTTLE_MS = 5 * 60_000
 // a revoke this process never saw, which is the same window a live socket already has.
 const AUTH_CACHE_TTL_MS = 60_000
 
+// A phone that nobody has used for this long is revoked the next time it asks, the rule a phone gateway's
+// sessions had. Its token lives in a browser's storage, which is easy to leave behind.
+const PHONE_IDLE_LIMIT_MS = 30 * 24 * 3600_000
+
 const sha256 = (input: string): Buffer => createHash('sha256').update(input).digest()
 
 // The wire shape lives in @acorn/protocol because the device list is an owner-facing response
@@ -37,9 +42,10 @@ type DeviceSummary = PairedDevice
 type IssuedDevice = { token: string; device: DeviceSummary }
 
 export type DeviceService = {
-  issue(name: string): Promise<IssuedDevice>
+  // `kind` is `phone` for a device paired through a phone's channel.
+  issue(name: string, kind?: 'phone'): Promise<IssuedDevice>
   // Resolves a raw bearer to a device id, or null. See the uniform-null note on the implementation.
-  authenticate(bearer: string | undefined): Promise<{ deviceId: string } | null>
+  authenticate(bearer: string | undefined): Promise<{ deviceId: string; kind?: 'phone' } | null>
   list(): Promise<DeviceSummary[]>
   // True if the device existed (whether or not it was already revoked); false if it never existed,
   // which is how a route decides between 204 and 404.
@@ -78,6 +84,7 @@ const summarize = (row: typeof schema.devices.$inferSelect): DeviceSummary => ({
   createdAt: row.createdAt,
   lastSeenAt: row.lastSeenAt,
   revokedAt: row.revokedAt,
+  ...(row.kind ? { kind: row.kind } : {}),
 })
 
 export function deviceService(db: AppDatabase, now: () => number = () => Date.now()): DeviceService {
@@ -89,26 +96,59 @@ export function deviceService(db: AppDatabase, now: () => number = () => Date.no
   //
   // A miss is the only path that reads the row, so `revokedAt` is re-checked on every miss. A revoke
   // through this service drops every entry for that device before it notifies anyone.
-  const warm = new Map<string, { deviceId: string; at: number }>()
+  const warm = new Map<string, { deviceId: string; kind?: 'phone'; at: number }>()
   const forget = (deviceId: string): void => {
     for (const [key, entry] of warm) if (entry.deviceId === deviceId) warm.delete(key)
   }
 
+  async function revokeDevice(id: string, actor: AuditActor, details?: Record<string, string>): Promise<boolean> {
+    const [row] = await db
+      .select({ id: schema.devices.id, revokedAt: schema.devices.revokedAt })
+      .from(schema.devices)
+      .where(eq(schema.devices.id, id))
+      .limit(1)
+    if (!row) return false
+    if (row.revokedAt === null) {
+      await db.update(schema.devices).set({ revokedAt: now() }).where(eq(schema.devices.id, id))
+      // Only on the transition. A repeat revoke still notifies listeners below (a reconnect racing the
+      // first one has to be closed too), but it is not a second security event to review.
+      recordAudit(db, { ...actor, action: 'device.revoked', subject: id, ...(details ? { details } : {}) })
+    }
+    // Before the listeners, and on a repeat revoke too: a warm entry left behind would authenticate
+    // the revoked bearer for up to a minute, which is the one thing this cache must never do.
+    forget(id)
+    // Notify even on a repeat revoke: it is cheap, and a socket that survived the first one (a
+    // reconnect racing the revoke) must still be closed.
+    for (const listener of revokeListeners) listener(id)
+    return true
+  }
+
   return {
-    async issue(name) {
+    async issue(name, kind) {
       const id = randomUUID()
       const secret = randomBytes(32).toString('base64url') // 43 chars, unpadded
       const createdAt = now()
-      await db
-        .insert(schema.devices)
-        .values({ id, name, secretHash: sha256(secret), createdAt, lastSeenAt: null, revokedAt: null })
+      await db.insert(schema.devices).values({
+        id,
+        name,
+        secretHash: sha256(secret),
+        createdAt,
+        lastSeenAt: null,
+        revokedAt: null,
+        kind: kind ?? null,
+      })
       // The actor is 'system': whoever holds the pairing code is by definition not yet a device, and the
       // bundled local node pairs with no code at all because the client spawned it. The name is the only
       // thing the owner will have to recognise this row by, so it goes in the details.
-      recordAudit(db, { actor: 'system', action: 'device.paired', subject: id, details: { name } })
+      recordAudit(db, {
+        actor: 'system',
+        action: 'device.paired',
+        subject: id,
+        details: { name, ...(kind ? { kind } : {}) },
+      })
       return {
         token: `acorn_dt_${id}_${secret}`,
-        device: { id, name, createdAt, lastSeenAt: null, revokedAt: null },
+        device: { id, name, createdAt, lastSeenAt: null, revokedAt: null, ...(kind ? { kind } : {}) },
       }
     },
 
@@ -123,7 +163,8 @@ export function deviceService(db: AppDatabase, now: () => number = () => Date.no
 
       const key = sha256(bearer).toString('base64')
       const cached = warm.get(key)
-      if (cached && now() - cached.at < AUTH_CACHE_TTL_MS) return { deviceId: cached.deviceId }
+      if (cached && now() - cached.at < AUTH_CACHE_TTL_MS)
+        return { deviceId: cached.deviceId, ...(cached.kind ? { kind: cached.kind } : {}) }
       warm.delete(key)
 
       const [row] = await db.select().from(schema.devices).where(eq(schema.devices.id, id)).limit(1)
@@ -137,6 +178,10 @@ export function deviceService(db: AppDatabase, now: () => number = () => Date.no
       if (stored.length !== presented.length || !timingSafeEqual(stored, presented)) return null
 
       const at = now()
+      if (row.kind === 'phone' && at - (row.lastSeenAt ?? row.createdAt) >= PHONE_IDLE_LIMIT_MS) {
+        await revokeDevice(id, { actor: 'system' }, { reason: 'A phone was unused for 30 days.' })
+        return null
+      }
       if (row.lastSeenAt === null || at - row.lastSeenAt >= LAST_SEEN_THROTTLE_MS) {
         // Fire-and-forget: last-seen is telemetry for the device list, so a write failure must not
         // fail authentication or add latency to the request path.
@@ -149,8 +194,9 @@ export function deviceService(db: AppDatabase, now: () => number = () => Date.no
         })()
       }
 
-      warm.set(key, { deviceId: id, at: now() })
-      return { deviceId: id }
+      const kind = row.kind ?? undefined
+      warm.set(key, { deviceId: id, ...(kind ? { kind } : {}), at: now() })
+      return { deviceId: id, ...(kind ? { kind } : {}) }
     },
 
     async list() {
@@ -158,27 +204,7 @@ export function deviceService(db: AppDatabase, now: () => number = () => Date.no
       return rows.sort((a, b) => b.createdAt - a.createdAt).map(summarize)
     },
 
-    async revoke(id, actor = { actor: 'system' as const }) {
-      const [row] = await db
-        .select({ id: schema.devices.id, revokedAt: schema.devices.revokedAt })
-        .from(schema.devices)
-        .where(eq(schema.devices.id, id))
-        .limit(1)
-      if (!row) return false
-      if (row.revokedAt === null) {
-        await db.update(schema.devices).set({ revokedAt: now() }).where(eq(schema.devices.id, id))
-        // Only on the transition. A repeat revoke still notifies listeners below (a reconnect racing the
-        // first one has to be closed too), but it is not a second security event to review.
-        recordAudit(db, { ...actor, action: 'device.revoked', subject: id })
-      }
-      // Before the listeners, and on a repeat revoke too: a warm entry left behind would authenticate
-      // the revoked bearer for up to a minute, which is the one thing this cache must never do.
-      forget(id)
-      // Notify even on a repeat revoke: it is cheap, and a socket that survived the first one (a
-      // reconnect racing the revoke) must still be closed.
-      for (const listener of revokeListeners) listener(id)
-      return true
-    },
+    revoke: (id, actor = { actor: 'system' as const }) => revokeDevice(id, actor),
 
     onRevoked(listener) {
       revokeListeners.add(listener)

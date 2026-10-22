@@ -15,7 +15,7 @@ import {
   type Principal,
   type TestDb,
 } from '@acorn/plugin-api/testkit'
-import { readNodeRelay } from '@acorn/plugin-api/node'
+import { channelPublicKey, readNodeRelay } from '@acorn/plugin-api/node'
 import { accountProvider } from './provider'
 import { accountRoutes } from './routes'
 
@@ -147,7 +147,9 @@ describe('remote access', () => {
     expect(relay?.credential).toBeTruthy()
     expect(owner?.accountId).toBe((await state()).account?.id)
     expect(applied).toEqual([relay])
-    expect(account.nodes()).toMatchObject([{ nodeId: NODE_ID, fingerprint: 'ab'.repeat(32) }])
+    expect(account.nodes()).toMatchObject([
+      { nodeId: NODE_ID, fingerprint: 'ab'.repeat(32), channelKey: channelPublicKey(dataDir) },
+    ])
     expect((await state()).remoteAccess).toMatchObject({ enabled: true, relayUrl: 'wss://relay.example.test' })
   })
 

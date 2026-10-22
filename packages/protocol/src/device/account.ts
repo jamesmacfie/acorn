@@ -21,12 +21,22 @@ export const accountPaths = {
   node: (nodeId: string): string => `${ACCOUNT_API_PREFIX}/nodes/${nodeId}`,
   tickets: `${ACCOUNT_API_PREFIX}/tickets`,
   assertions: `${ACCOUNT_API_PREFIX}/assertions`,
+  // Where the phone app sends a person to sign in on the service's own page. It takes `?next=<path on
+  // the service's own origin>` and sends the browser back there with a session cookie.
+  browserSignIn: `${ACCOUNT_API_PREFIX}/browser/sign-in`,
 }
+
+// A browser served by the account website calls the routes that take an access token with the website's
+// session cookie instead, and sends this header with it. A page on another site can't add a header like it
+// without the service's say-so, so a cookie alone never acts for the person.
+export const ACCOUNT_BROWSER_HEADER = 'x-acorn-account'
 
 // Requests are strict, like the enrollment payload: a field the service doesn't know is a mistake to
 // refuse, not to ignore. Responses are open, because a client that refused an answer for growing a
 // field would be one no service could extend.
 const nodeId = z.string().uuid()
+// The public half of a Node's channel key pair, the Ed25519 key a phone pins, as 64 lowercase hex characters.
+const channelKey = z.string().regex(/^[0-9a-f]{64}$/)
 
 // --- Sign-in: the OAuth device authorization grant, RFC 8628, with JSON bodies ---
 
@@ -77,6 +87,9 @@ export const registerNodeRequestSchema = z.strictObject({
   label: z.string().min(1).max(100),
   // sha256 of the Node's certificate, lowercase hex: the value a client pins.
   fingerprint: z.string().regex(/^[0-9a-f]{64}$/),
+  // What a phone pins (docs/relay/phone-channel.md). A Node sends it every time. It's optional so a service
+  // and a Node from before the phone keep working together, and the phone can't reach a Node without one.
+  channelKey: channelKey.optional(),
 })
 export type RegisterNodeRequest = z.infer<typeof registerNodeRequestSchema>
 
@@ -92,6 +105,8 @@ export const accountNodeSchema = z.object({
   nodeId,
   label: z.string().min(1),
   fingerprint: z.string().regex(/^[0-9a-f]{64}$/),
+  // The key the Node registered for phones. Absent for a Node that registered before phones existed.
+  channelKey: channelKey.optional(),
   // The relay the Node dials. The account service vouches for the fingerprint, not for whether the Node
   // is connected: it can't see that.
   relayUrl: relayRouteSchema.shape.url,

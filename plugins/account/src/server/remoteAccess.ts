@@ -1,6 +1,12 @@
 import { hostname } from 'node:os'
 import type { Context } from 'hono'
-import { providerCredential, readNodeRelay, recordNodeRelay, type AppEnv } from '@acorn/plugin-api/node'
+import {
+  channelPublicKey,
+  providerCredential,
+  readNodeRelay,
+  recordNodeRelay,
+  type AppEnv,
+} from '@acorn/plugin-api/node'
 import type { AccountState, TurnedOff } from '../shared/state'
 import { accountApi, AccountApiError } from './accountApi'
 import { accountUrl } from './config'
@@ -41,6 +47,7 @@ export async function turnOn(c: Context<AppEnv>, account: { id: string }): Promi
   const { relay, keys } = await accountApi(accountUrl()).register(token, c.env.NODE_ID, {
     label: hostname().slice(0, 100) || 'This computer',
     fingerprint: c.env.NODE_FINGERPRINT,
+    channelKey: channelPublicKey(c.env.DATA_DIR),
   })
   recordNodeRelay(c.env.DATA_DIR, { relay, owner: { accountId: account.id, keys } })
   await c.env.RELAY?.apply(readNodeRelay(c.env.DATA_DIR).relay)

@@ -1,5 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { makeTestDb, type TestDb } from '../../testkit/db'
+import { schema } from '../db'
 import { deviceService, type DeviceService } from './deviceTokens'
 
 let harness: TestDb
@@ -142,6 +143,58 @@ describe('device tokens', () => {
     expect(select).toHaveBeenCalled()
     select.mockRestore()
     expect(await devices.authenticate(token)).toEqual({ deviceId: device.id })
+  })
+
+  describe('a phone', () => {
+    const DAY = 24 * 3600_000
+
+    it('is marked in its token’s answer, its listing, and the audit row', async () => {
+      const { token, device } = await devices.issue('iPhone', 'phone')
+      expect(device.kind).toBe('phone')
+      expect(await devices.authenticate(token)).toEqual({ deviceId: device.id, kind: 'phone' })
+      expect((await devices.list())[0]).toMatchObject({ id: device.id, kind: 'phone' })
+      const [row] = harness.db.select().from(schema.audit).all()
+      expect(JSON.parse(row!.details!)).toEqual({ name: 'iPhone', kind: 'phone' })
+    })
+
+    it('leaves another device with no kind', async () => {
+      const { token, device } = await devices.issue('laptop')
+      expect(device).not.toHaveProperty('kind')
+      expect(await devices.authenticate(token)).toEqual({ deviceId: device.id })
+    })
+
+    it('is revoked, with a reason, once it has gone unused for 30 days', async () => {
+      const { token, device } = await devices.issue('iPhone', 'phone')
+      await devices.authenticate(token)
+      clock += 30 * DAY - 1
+      expect(await devices.authenticate(token)).not.toBeNull()
+      clock += 30 * DAY + 1
+      expect(await devices.authenticate(token)).toBeNull()
+      expect(await devices.isActive(device.id)).toBe(false)
+      const revoked = harness.db
+        .select()
+        .from(schema.audit)
+        .all()
+        .find((row) => row.action === 'device.revoked')
+      expect(JSON.parse(revoked!.details!)).toEqual({ reason: 'A phone was unused for 30 days.' })
+    })
+
+    it('counts the day it was paired when it has never been used', async () => {
+      const { token } = await devices.issue('iPhone', 'phone')
+      clock += 31 * DAY
+      expect(await devices.authenticate(token)).toBeNull()
+    })
+
+    it('keeps a phone in daily use, and does not expire a desktop', async () => {
+      const phone = await devices.issue('iPhone', 'phone')
+      const laptop = await devices.issue('laptop')
+      for (let day = 0; day < 40; day++) {
+        clock += DAY
+        expect(await devices.authenticate(phone.token)).not.toBeNull()
+      }
+      clock += 400 * DAY
+      expect(await devices.authenticate(laptop.token)).not.toBeNull()
+    })
   })
 
   it('lists devices newest first', async () => {

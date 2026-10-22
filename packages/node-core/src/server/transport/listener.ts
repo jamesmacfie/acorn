@@ -1,6 +1,7 @@
 import { createAdaptorServer, type Http2Bindings, type HttpBindings, type ServerType } from '@hono/node-server'
 import type { NodeKeys, ServiceEndpoint } from '@acorn/protocol/serviceProtocol.ts'
 import { createServer as createHttpsServer } from 'node:https'
+import type { ChannelSocket } from '@acorn/channel/secure.ts'
 import { execFileSync } from 'node:child_process'
 import { resolve } from 'node:path'
 import { createApp } from '../index'
@@ -12,7 +13,8 @@ import { configuredPort, devDataDir } from './listenerConfig'
 import { advertisedHosts } from './advertise'
 import { relaySettings, type RelayControl } from './relaySettings'
 import { ensureCert } from './tls'
-import { attachWsHub, disposeWsHub } from './wsHub'
+import { attachWsHub, disposeWsHub, type WsHub } from './wsHub'
+import { ensureChannelKey } from './channelKey'
 import type { RelayTunnel } from './relayTunnel'
 import type { Env } from '../bindings'
 import { createLogger, describeError } from '../telemetry/logger'
@@ -140,7 +142,7 @@ export function startListener(
   //
   // The same `allowedHosts` Set the fetch guard above reads, by reference. See the note there for why it
   // must not be copied.
-  attachWsHub(server as unknown as import('node:http').Server, {
+  const hub = attachWsHub(server as unknown as import('node:http').Server, {
     internalToken: runtime.INTERNAL_TOKEN,
     internalCredentials: runtime.INTERNAL_CREDENTIALS,
     allowedHosts,
@@ -181,7 +183,16 @@ export function startListener(
       // Relayed clients name the Node by its route, which is its ID, and no port (docs/relay.md). The
       // tunnel loads only when there are settings, so a Node with none runs none of its code. The
       // account plugin turns remote access on and off through the same control.
-      const control = relayControl(server as unknown as import('node:https').Server, allowedHosts, root.nodeId)
+      const control = relayControl(
+        server as unknown as import('node:https').Server,
+        allowedHosts,
+        root.nodeId,
+        serveBrowser(root, hub, (request) =>
+          Promise.resolve(
+            fetch(request, { incoming: { socket: {} }, browserChannel: true } as unknown as HttpBindings),
+          ),
+        ),
+      )
       relayControls.set(server, control)
       runtime.RELAY = control
       if (relay) void control.apply(relay)
@@ -207,7 +218,12 @@ export function startListener(
 
 // Start and stop this listener's relay tunnel. Changes run one at a time, because the tunnel's module
 // loads on demand and a quick off-then-on mustn't leave two tunnels holding one route.
-function relayControl(server: import('node:https').Server, allowedHosts: Set<string>, nodeId: string): RelayControl {
+function relayControl(
+  server: import('node:https').Server,
+  allowedHosts: Set<string>,
+  nodeId: string,
+  serveBrowser: (socket: ChannelSocket, host: string) => void,
+): RelayControl {
   let tunnel: RelayTunnel | undefined
   let queue = Promise.resolve()
   return {
@@ -215,10 +231,30 @@ function relayControl(server: import('node:https').Server, allowedHosts: Set<str
       (queue = queue.then(async () => {
         tunnel?.close()
         tunnel = undefined
-        if (settings) tunnel = (await import('./relayTunnel')).startRelayTunnel(server, settings, nodeId, allowedHosts)
+        if (settings)
+          tunnel = (await import('./relayTunnel')).startRelayTunnel(
+            server,
+            settings,
+            nodeId,
+            allowedHosts,
+            serveBrowser,
+          )
       })),
     state: () => tunnel?.state(),
   }
+}
+
+// A phone's channel, loaded when the first one arrives. The Node's own router answers its requests, as
+// a peer that isn't on this computer.
+function serveBrowser(
+  root: DataRoot,
+  hub: WsHub,
+  dispatch: (request: Request) => Promise<Response>,
+): (socket: ChannelSocket, host: string) => void {
+  return (socket, host) =>
+    void import('./channel').then(({ serveChannel }) =>
+      serveChannel(socket, { identity: ensureChannelKey(root.dir), host, dispatch, hub }),
+    )
 }
 
 // Stop accepting, then reap every socket this listener still owns. Both composition roots call it as the

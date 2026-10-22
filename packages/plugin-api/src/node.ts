@@ -155,6 +155,8 @@ export { isRepoConfigTrustError } from '@acorn/node-core/server/repoConfigTrust.
 export { TEARDOWN_TIMEOUT_MS } from '@acorn/node-core/server/storage'
 // The relay and owner account node.json records for remote access (docs/account-api.md § The sign-in plugin).
 export { readNodeRelay, recordNodeRelay } from '@acorn/node-core/server/storage/nodeRelay.ts'
+// The key a phone pins, which remote access registers with the account (docs/relay/phone-channel.md).
+export { channelPublicKey } from '@acorn/node-core/server/transport/channelKey.ts'
 export { mirrorFootprintCapability } from '@acorn/node-core/server/storage'
 export { TASK_CREATED, TASK_SESSIONS } from '@acorn/node-core/server/routes'
 export type { TaskCreatedHook, TaskSessionsBridge } from '@acorn/node-core/server/routes'

@@ -111,6 +111,9 @@ const pairedDeviceSchema = z.object({
   createdAt: z.number().int(),
   lastSeenAt: z.number().int().nullable(),
   revokedAt: z.number().int().nullable(),
+  // Set for a device paired from a phone's browser, which the Node holds to fewer routes
+  // (docs/relay/phone-channel.md § What a phone device may do).
+  kind: z.literal('phone').optional(),
 })
 export type PairedDevice = z.infer<typeof pairedDeviceSchema>
 

@@ -93,11 +93,27 @@ export function registerWsChannelHandler(prefix: string, handler: WsChannelHandl
   else channelHandlers.delete(prefix)
 }
 
+// What the hub needs of a socket: a `ws` WebSocket, or a phone's channel standing in for one
+// (./channel.ts). The hub counts what it has written but not yet flushed, which is why `bufferedAmount`
+// is here.
+export type HubSocket = {
+  readonly OPEN: number
+  readonly readyState: number
+  readonly bufferedAmount: number
+  send(data: string | Uint8Array, options?: { binary?: boolean }, callback?: (error?: Error) => void): void
+  send(data: string | Uint8Array, callback?: (error?: Error) => void): void
+  ping(): void
+  terminate(): void
+  close(): void
+  on(event: 'message', listener: (raw: { toString(): string }) => void): unknown
+  on(event: 'pong' | 'close' | 'error', listener: () => void): unknown
+}
+
 // `deviceId` is null for an internal-token socket, the one credential kind with no device row to
 // revoke. `seq` is this connection's own counter (docs/api-reference/websocket.md § Events), so a
 // reconnect legitimately restarts at 1 and the client compares only within one socket's lifetime.
 type Conn = {
-  ws: WebSocket
+  ws: HubSocket
   viewers: WsViewers
   multiplexed: boolean
   deviceId: string | null
@@ -368,7 +384,7 @@ export async function authorizeWsUpgrade(req: IncomingMessage, deps: WsAuthDeps)
   return claims ? { deviceId: null, internal: claims } : null
 }
 
-function onConnect(ws: WebSocket, authorized: Authorized, mark: number, multiplexed: boolean): void {
+function onConnect(ws: HubSocket, authorized: Authorized, mark: number, multiplexed: boolean): void {
   const conn: Conn = {
     ws,
     viewers: new WsViewers(),
@@ -418,7 +434,12 @@ function dropDevice(deviceId: string): void {
   }
 }
 
-export function attachWsHub(server: Server, deps: WsAuthDeps): void {
+// How something other than a WebSocket upgrade joins the hub: a phone's channel (./channel.ts), which has
+// authenticated nobody yet. It's let in as a device presenting `token` for the Node name it reached the
+// Node by, and told whether the hub took it.
+export type WsHub = { join(socket: HubSocket, host: string, token: string): Promise<boolean> }
+
+export function attachWsHub(server: Server, deps: WsAuthDeps): WsHub {
   // Created on the first upgrade, not here, so importing this module does not import the `ws` package.
   // See the import note at the top for why that matters to loaded-plugin bundles.
   let wss: WebSocketServer | null = null
@@ -516,6 +537,16 @@ export function attachWsHub(server: Server, deps: WsAuthDeps): void {
     })().catch(() => refuse(socket))
   }
   server.on('upgrade', onUpgrade)
+  const hub: WsHub = {
+    async join(socket, host, token) {
+      // The same checks an upgrade runs, on the one part of a request that carries them.
+      const request = { headers: { host, authorization: `Bearer ${token}` }, socket: {} } as IncomingMessage
+      const authorized = await authorizeWsUpgrade(request, deps)
+      if (!authorized || disposed) return false
+      onConnect(socket, authorized, deps.maxBufferedBytes ?? MAX_BUFFERED_BYTES, false)
+      return true
+    },
+  }
   hubDisposers.set(server, () => {
     disposed = true
     server.off('upgrade', onUpgrade)
@@ -527,6 +558,7 @@ export function attachWsHub(server: Server, deps: WsAuthDeps): void {
     for (const ws of wss?.clients ?? []) ws.terminate()
     wss?.close()
   })
+  return hub
 }
 
 export function disposeWsHub(server: Server): void {

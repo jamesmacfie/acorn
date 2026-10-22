@@ -54,11 +54,19 @@ it('keeps valid pairing, malformed 401, and the twenty-attempt ceiling', async (
   expect(consume).not.toHaveBeenCalled()
   const valid = JSON.stringify({ code: 'synthetic', deviceName: 'Test' })
   expect((await app.request('/pair', { method: 'POST', body: valid }, env)).status).toBe(200)
-  expect(issue).toHaveBeenCalledWith('Test')
+  expect(issue).toHaveBeenCalledWith('Test', undefined)
   consume.mockReturnValue(false)
   for (let attempt = 2; attempt < 20; attempt += 1)
     expect((await app.request('/pair', { method: 'POST', body: valid }, env)).status).toBe(401)
   expect((await app.request('/pair', { method: 'POST', body: valid }, env)).status).toBe(429)
+})
+
+it('pairs a device through a phone’s channel as a phone’s, whatever it says about itself', async () => {
+  const { app, env, issue } = fixture()
+  const valid = JSON.stringify({ code: 'synthetic', deviceName: 'Definitely a desktop' })
+  const channelEnv = { ...env, browserChannel: true } as Env
+  expect((await app.request('/pair', { method: 'POST', body: valid }, channelEnv)).status).toBe(200)
+  expect(issue).toHaveBeenCalledWith('Definitely a desktop', 'phone')
 })
 
 it('delivers a complete 413 envelope over HTTP for a chunked oversized body', async () => {
@@ -114,7 +122,7 @@ it('pairs a client on this computer once the owner allows it, and refuses one fr
   const claimed = await open.request('/pair/requests/claim', post({ secret: ask.secret }), local)
   expect(claimed.status).toBe(200)
   expect(await claimed.json()).toMatchObject({ deviceToken: 'synthetic-token', nodeId: 'n1' })
-  expect(issue).toHaveBeenCalledWith('acorn')
+  expect(issue).toHaveBeenCalledWith('acorn', undefined)
   // Spent: a second claim gets the same refusal as a wrong secret.
   expect((await open.request('/pair/requests/claim', post({ secret: ask.secret }), local)).status).toBe(401)
 })

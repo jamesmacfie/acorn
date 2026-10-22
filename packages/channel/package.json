@@ -1,0 +1,30 @@
+{
+  "name": "@acorn/channel",
+  "version": "1.0.0",
+  "description": "The phone's encrypted channel to a Node: a Noise handshake over a relay stream, and the messages that cross it. The same code runs in the Node and in a phone's browser.",
+  "private": true,
+  "type": "module",
+  "exports": {
+    "./client.ts": "./src/client.ts",
+    "./secure.ts": "./src/secure.ts",
+    "./testkit.ts": "./src/testkit.ts"
+  },
+  "scripts": {
+    "lint": "tsc --noEmit",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@acorn/protocol": "workspace:*",
+    "@chainsafe/libp2p-noise": "^17.0.0",
+    "@libp2p/crypto": "^5.1.24",
+    "@libp2p/interface": "^3.3.1",
+    "@libp2p/logger": "^6.2.14",
+    "@libp2p/peer-id": "^6.0.16",
+    "@libp2p/utils": "^7.4.2",
+    "uint8arraylist": "^3.0.2"
+  },
+  "devDependencies": {
+    "typescript": "^6.0.3",
+    "vitest": "^4.1.11"
+  }
+}

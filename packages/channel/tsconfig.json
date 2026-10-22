@@ -1,0 +1,9 @@
+{
+  // No DOM and no node types: a Node and a phone's browser both import this package, and it reaches the
+  // network only through the small socket shape in secure.ts.
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    "types": []
+  },
+  "include": ["src"]
+}

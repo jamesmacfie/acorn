@@ -2,6 +2,7 @@ import { randomUUID } from 'node:crypto'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 import type { z } from 'zod'
 import {
+  ACCOUNT_BROWSER_HEADER,
   ASSERTION_LIFETIME_SECONDS,
   DEVICE_CODE_GRANT,
   TICKET_LIFETIME_SECONDS,
@@ -41,11 +42,22 @@ beforeAll(async () => {
 })
 afterAll(() => stub?.close())
 
-type Call = { token?: string; body?: unknown }
-async function call<S extends z.ZodType>(method: string, path: string, { token, body }: Call = {}, schema?: S) {
+// `cookie` is the website's session cookie, and `browser` adds the header a page of the service's own sends with it.
+type Call = { token?: string; body?: unknown; cookie?: string; browser?: boolean }
+async function call<S extends z.ZodType>(
+  method: string,
+  path: string,
+  { token, body, cookie, browser }: Call = {},
+  schema?: S,
+) {
   const response = await fetch(`${base}${path}`, {
     method,
-    headers: { ...(token ? { authorization: `Bearer ${token}` } : {}), 'content-type': 'application/json' },
+    headers: {
+      ...(token ? { authorization: `Bearer ${token}` } : {}),
+      ...(cookie ? { cookie } : {}),
+      ...(browser ? { [ACCOUNT_BROWSER_HEADER]: '1' } : {}),
+      'content-type': 'application/json',
+    },
     ...(body === undefined ? {} : { body: JSON.stringify(body) }),
   })
   const text = await response.text()
@@ -70,9 +82,22 @@ async function signIn(login: string): Promise<TokenResponse> {
   return (await call('POST', accountPaths.token, { body: poll }, tokenResponseSchema)).data!
 }
 
+// What the website would hold after a person signed in on its page: the cookie it set.
+async function browserSession(login: string): Promise<string> {
+  const response = await fetch(`${base}/_test/session`, { method: 'POST', body: JSON.stringify({ login }) })
+  expect(response.status).toBe(204)
+  return response.headers.get('set-cookie')!.split(';')[0]!
+}
+
 const fingerprint = 'ab'.repeat(32)
-const register = (token: string, nodeId: string) =>
-  call('PUT', accountPaths.node(nodeId), { token, body: { label: 'Laptop', fingerprint } }, registerNodeResponseSchema)
+const channelKey = 'cd'.repeat(32)
+const register = (token: string, nodeId: string, extra: object = {}) =>
+  call(
+    'PUT',
+    accountPaths.node(nodeId),
+    { token, body: { label: 'Laptop', fingerprint, ...extra } },
+    registerNodeResponseSchema,
+  )
 
 describe('the account API', () => {
   it('publishes the keys that verify what it signs', async () => {
@@ -127,6 +152,7 @@ describe('the account API', () => {
       const bad = (body: unknown) => call('PUT', path, { token: accessToken, body })
       await expectError(await bad({ label: 'Laptop', fingerprint: 'short' }), 400, 'invalid_request')
       await expectError(await bad({ label: 'Laptop', fingerprint, extra: 1 }), 400, 'invalid_request')
+      await expectError(await bad({ label: 'Laptop', fingerprint, channelKey: 'short' }), 400, 'invalid_request')
       await expectError(
         await call('PUT', accountPaths.node('not-a-uuid'), { token: accessToken, body: {} }),
         400,
@@ -171,6 +197,17 @@ describe('the account API', () => {
       expect(nodes[0]).toMatchObject({ label: 'Laptop', fingerprint, relayUrl: registered.relay.url })
     })
 
+    it('lists the channel key a Node registered, and none for a Node that sent none', async () => {
+      const { accessToken } = await signIn(`keyed-${randomUUID()}`)
+      const keyed = randomUUID()
+      const unkeyed = randomUUID()
+      await register(accessToken, keyed, { channelKey })
+      await register(accessToken, unkeyed)
+      const { nodes } = (await call('GET', accountPaths.nodes, { token: accessToken }, listNodesResponseSchema)).data!
+      expect(nodes.find((node) => node.nodeId === keyed)?.channelKey).toBe(channelKey)
+      expect(nodes.find((node) => node.nodeId === unkeyed)).not.toHaveProperty('channelKey')
+    })
+
     it('does not list a Node another account owns, or one that was removed', async () => {
       const owner = await signIn(`owner-${randomUUID()}`)
       const stranger = await signIn(`stranger-${randomUUID()}`)
@@ -185,6 +222,53 @@ describe('the account API', () => {
 
     it('needs a signed-in account', async () => {
       await expectError(await call('GET', accountPaths.nodes, { token: 'not-a-token' }), 401, 'invalid_token')
+    })
+  })
+
+  describe('a browser on the account website', () => {
+    it("acts with the website's cookie and the header a page of its own sends", async () => {
+      const login = `browser-${randomUUID()}`
+      const { accessToken, account } = await signIn(login)
+      const nodeId = randomUUID()
+      await register(accessToken, nodeId, { channelKey })
+      const cookie = await browserSession(login)
+
+      const who = (await call('GET', accountPaths.account, { cookie, browser: true }, accountSchema)).data!
+      expect(who.id).toBe(account.id)
+      const listed = (await call('GET', accountPaths.nodes, { cookie, browser: true }, listNodesResponseSchema)).data!
+      expect(listed.nodes.map((node) => node.nodeId)).toContain(nodeId)
+      const ticket = (
+        await call('POST', accountPaths.tickets, { cookie, browser: true, body: { nodeId } }, ticketResponseSchema)
+      ).data!
+      expect(ticket.ticket).not.toBe('')
+      expect(
+        (
+          await call(
+            'POST',
+            accountPaths.assertions,
+            { cookie, browser: true, body: { nodeId } },
+            assertionResponseSchema,
+          )
+        ).data!.assertion,
+      ).not.toBe('')
+    })
+
+    it('refuses the cookie without the header, so another site cannot act for the person', async () => {
+      const cookie = await browserSession(`csrf-${randomUUID()}`)
+      await expectError(await call('GET', accountPaths.account, { cookie }), 401, 'invalid_token')
+      await expectError(
+        await call('POST', accountPaths.tickets, { cookie, body: { nodeId: randomUUID() } }),
+        401,
+        'invalid_token',
+      )
+    })
+
+    it('refuses a cookie it never issued', async () => {
+      await expectError(
+        await call('GET', accountPaths.account, { cookie: 'acorn_account_session=forged', browser: true }),
+        401,
+        'invalid_token',
+      )
     })
   })
 

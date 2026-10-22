@@ -32,8 +32,28 @@ export const relayHost = (route: string): string => `${route}.relay.acorn`
 
 // What the bytes of a stream are. `tls` is a native client's TLS connection to the Node's HTTPS server.
 export const RELAY_TLS_STREAM = 'tls'
+// A phone browser's encrypted channel (docs/relay/phone-channel.md).
+export const RELAY_BROWSER_STREAM = 'browser'
 export const relayStreamKindSchema = z.string().regex(/^[a-z][a-z0-9-]{0,31}$/)
 export const relayStreamIdSchema = z.string().regex(/^[0-9a-f]{32}$/)
+
+// A browser can't set `Authorization` on a WebSocket upgrade, but it can offer subprotocols. It offers
+// the relay's own name, which the relay selects, and its ticket behind a prefix, which the relay reads and
+// never selects (apps/relay/PROTOCOL.md § Connections). A credential for a browser has to be made of
+// characters a subprotocol name allows, which a signed ticket is.
+export const RELAY_SUBPROTOCOL = 'acorn.relay.v1'
+const RELAY_CREDENTIAL_PREFIX = 'acorn.credential.'
+export const relayCredentialProtocols = (credential: string): string[] => [
+  RELAY_SUBPROTOCOL,
+  `${RELAY_CREDENTIAL_PREFIX}${credential}`,
+]
+// The credential in an upgrade request's `Sec-WebSocket-Protocol` header, if it offered one.
+export const credentialFromProtocols = (header: string | undefined): string | undefined =>
+  header
+    ?.split(',')
+    .map((protocol) => protocol.trim())
+    .find((protocol) => protocol.startsWith(RELAY_CREDENTIAL_PREFIX))
+    ?.slice(RELAY_CREDENTIAL_PREFIX.length)
 
 const base = (url: string): string => url.replace(/\/+$/, '')
 export const relayUrls = {
