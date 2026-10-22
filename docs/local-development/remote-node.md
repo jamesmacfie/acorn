@@ -68,4 +68,4 @@ in `node-runtime.json`. Its build context is the `release` folder the packer wri
 build stage compiles `node-pty`, and the runtime stage adds Git, tmux, ripgrep, and the agent CLIs.
 The Node runs as the `acorn` user with its data root on the `/data` volume, and the image sets `SHELL`,
 because Docker doesn't and terminals start it. The image is the local half of
-[cloud phase 1](../future/cloud/phases/01-node-image.md#1-write-the-image).
+[cloud phase 1](../future/cloud/01-node-image.md#1-write-the-image).

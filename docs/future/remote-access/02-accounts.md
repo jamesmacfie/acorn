@@ -20,8 +20,8 @@ in to the same account, the Node is reachable. Pairing still uses a code in this
 
 - The relay and socket factory from [phase 1](./01-relay.md).
 - The GitHub device flow in `plugins/github`, the pattern the sign-in plugin follows
-  ([authentication](../../../authentication.md#github-connection)).
-- The design in [accounts](../accounts.md) and [services](../services.md).
+  ([authentication](../../authentication.md#github-connection)).
+- The design in [accounts](./accounts.md) and [services](./services.md).
 
 ## In scope
 
@@ -46,7 +46,7 @@ Hosted service, closed source:
 ## Out of scope
 
 Listing Nodes in the client and pairing from anywhere, which are phase 3. The phone, which is phase 4.
-Teams and roles, which are [cloud](../../cloud/README.md).
+Teams and roles, which are [cloud](../cloud/README.md).
 
 ## Steps and checkpoints
 
@@ -55,7 +55,7 @@ Teams and roles, which are [cloud](../../cloud/README.md).
 Write the account API before any code: sign-in by device flow, Node registration and removal, relay
 credentials, tickets, assertions, and the public keys a Node and the relay verify against. Version it
 under its own prefix, separate from the Node API. Publish the types and schemas, and pin them with
-tests, as [Node enrollment](../../../node-enrollment.md) pins enrollment v1.
+tests, as [Node enrollment](../../node-enrollment.md) pins enrollment v1.
 
 Build the stand-in account service from the contract. It approves a device flow at once for a test
 account, registers Nodes in memory, and signs tickets and assertions with a test key.
@@ -66,7 +66,7 @@ answers, and a request the schema refuses is refused by the stand-in too.
 ### 2. Hosted service: the account service
 
 Build the account service and website to the contract. The design it follows is in
-[accounts](../accounts.md#accounts): Better Auth with GitHub as the only provider and
+[accounts](./accounts.md#accounts): Better Auth with GitHub as the only provider and
 `disableImplicitLinking: true`.
 
 **Checkpoint 2: sign in.** Sign in with GitHub on the website. Sign out and back in: the same account
@@ -138,10 +138,10 @@ with an allowlisted GitHub account. One not on the allowlist is refused with a p
 
 - A new owning document for the account API, `docs/account-api.md` (new), with its schemas in
   `docs/schemas/`.
-- [Authentication](../../../authentication.md): accounts, the sign-in plugin, and the owner account.
+- [Authentication](../../authentication.md): accounts, the sign-in plugin, and the owner account.
 - `docs/relay.md`: tickets and relay credentials.
-- [Node distribution](../../../node-distribution.md): remote access for a local Node.
-- [Security](../../../security.md) and [control plane security](../../../security/control-plane.md):
+- [Node distribution](../../node-distribution.md): remote access for a local Node.
+- [Security](../../security.md) and [control plane security](../../security/control-plane.md):
   what the account service can and can't do.
 
 ## Open questions

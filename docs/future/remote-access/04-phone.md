@@ -22,8 +22,8 @@ switches between Nodes. `acorn mobile` and `apps/mobile/src/gateway` are gone.
   `apps/mobile/src/client/platform.ts` talk to the gateway.
 - The gateway in `apps/mobile/src/gateway`: request forwarding and event messages in `gateway.ts`,
   and the blocked list in `denylist.ts`.
-- The gateway-only phases in the [security programme](../../security/README.md).
-- The design in [phone](../phone.md).
+- The gateway-only phases in the [security programme](../security/README.md).
+- The design in [phone](./phone.md).
 
 ## In scope
 
@@ -40,7 +40,7 @@ switches between Nodes. `acorn mobile` and `apps/mobile/src/gateway` are gone.
 ## Out of scope
 
 Push notifications, loaded plugins on the phone, and a native app, which stay in
-[mobile work after the first release](../../mobile/later.md).
+[mobile work after the first release](../mobile/later.md).
 
 ## Steps and checkpoints
 
@@ -82,7 +82,7 @@ and an agent's question can be answered.
 
 ### 4. Phone device rules and approvals
 
-Mark phone devices. Refuse them the families in [phone](../phone.md#what-a-phone-device-may-do), allow
+Mark phone devices. Refuse them the families in [phone](./phone.md#what-a-phone-device-may-do), allow
 them to answer pairing asks, and revoke one unused for 30 days. Add the approval dialog to the phone.
 
 **Checkpoint 6: refused routes.** From the phone's device, opening a pairing window, a plugin write,
@@ -117,13 +117,13 @@ modules and `acorn mobile` finds only history.
 
 ## Docs to update when it ships
 
-- [The mobile web app](../../../mobile.md): the platform seam, sign-in, and several Nodes.
-- [Use it on a phone](../../../mobile/phone-setup.md): the website instead of Tailscale.
-- [The mobile gateway](../../../security/mobile-gateway.md): delete it, or replace it with the phone
+- [The mobile web app](../../mobile.md): the platform seam, sign-in, and several Nodes.
+- [Use it on a phone](../../mobile/phone-setup.md): the website instead of Tailscale.
+- [The mobile gateway](../../security/mobile-gateway.md): delete it, or replace it with the phone
   device rules and the channel's trust model.
-- [The command line](../../../cli.md): remove `acorn mobile`.
-- [Remote access to a browser host](../../remote.md): the phone's answers to the five decisions.
-- [Security](../../../security.md): the website-serves-the-code trust cost.
+- [The command line](../../cli.md): remove `acorn mobile`.
+- [Remote access to a browser host](../remote.md): the phone's answers to the five decisions.
+- [Security](../../security.md): the website-serves-the-code trust cost.
 
 ## Open questions
 
@@ -138,5 +138,5 @@ Record channel handshake times and phone reconnect times, with dates.
 
 ## Verify before building
 
-Check which phone browsers the [acceptance checklist](../../../testing/mobile-on-a-phone.md) covers,
+Check which phone browsers the [acceptance checklist](../../testing/mobile-on-a-phone.md) covers,
 and that each offers non-extractable WebCrypto keys and the chosen protocol's primitives.

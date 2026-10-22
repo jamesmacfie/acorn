@@ -11,14 +11,14 @@ that first needs them.
 
 | Deployable | What it is | Stack | Runs where | First phase |
 | --- | --- | --- | --- | --- |
-| Node image | The standalone Node plus task tooling, as an OCI image. Used for team Nodes and workers. | `apps/node` build, Debian slim base | Compute provider | [1](./phases/01-node-image.md) |
-| Account service | Built by remote access. Cloud adds teams, roles, inventory, grants, provisioning, and billing. | TypeScript, Hono, Better Auth, Drizzle, Postgres | One control-plane region | [2](./phases/02-team-node.md) |
-| Admin web app | The account website from remote access, with team administration added. | TypeScript and Solid, recommended, so it can reuse `@acorn/client-core` kit tokens | Served by the account service, or a static host | [2](./phases/02-team-node.md) |
-| Sign-in plugin | Built by remote access. Cloud adds team Nodes to its Node provider, and grants. | acorn plugin API | Each person's local Node | [2](./phases/02-team-node.md) |
-| Provisioner | Creates and destroys machines, reconciles state, and records every operation. | Part of the account service process, with its own job queue | Control-plane region | [2](./phases/02-team-node.md) |
-| Relay | Built by remote access. Cloud runs one in each team region. | TypeScript on Node, or Go if measured throughput needs it | One or more instances per team region | [2](./phases/02-team-node.md) |
-| Object storage | Buckets for snapshots, artifacts, and archives, one per region. | S3-compatible storage | Team region | [3](./phases/03-cloud-task.md) |
-| Status page | Public service status. | Hosted status-page product | Anywhere | [9](./phases/09-production.md) |
+| Node image | The standalone Node plus task tooling, as an OCI image. Used for team Nodes and workers. | `apps/node` build, Debian slim base | Compute provider | [1](./01-node-image.md) |
+| Account service | Built by remote access. Cloud adds teams, roles, inventory, grants, provisioning, and billing. | TypeScript, Hono, Better Auth, Drizzle, Postgres | One control-plane region | [2](./02-team-node.md) |
+| Admin web app | The account website from remote access, with team administration added. | TypeScript and Solid, recommended, so it can reuse `@acorn/client-core` kit tokens | Served by the account service, or a static host | [2](./02-team-node.md) |
+| Sign-in plugin | Built by remote access. Cloud adds team Nodes to its Node provider, and grants. | acorn plugin API | Each person's local Node | [2](./02-team-node.md) |
+| Provisioner | Creates and destroys machines, reconciles state, and records every operation. | Part of the account service process, with its own job queue | Control-plane region | [2](./02-team-node.md) |
+| Relay | Built by remote access. Cloud runs one in each team region. | TypeScript on Node, or Go if measured throughput needs it | One or more instances per team region | [2](./02-team-node.md) |
+| Object storage | Buckets for snapshots, artifacts, and archives, one per region. | S3-compatible storage | Team region | [3](./03-cloud-task.md) |
+| Status page | Public service status. | Hosted status-page product | Anywhere | [9](./09-production.md) |
 
 The team Node and the worker are not separate codebases. Both are the ordinary Node from the Node
 image, configured by environment at provision time. A team Node turns on the orchestrator and the
@@ -55,7 +55,7 @@ implementation that keeps the provider interface honest.
 
 ## Infrastructure that must exist before production
 
-This list is what [phase 9](./phases/09-production.md) checks off. Earlier phases create the
+This list is what [phase 9](./09-production.md) checks off. Earlier phases create the
 staging version of each item as they need it.
 
 - A domain, with DNS for the admin web app, the account API, and each regional relay.
@@ -68,8 +68,8 @@ staging version of each item as they need it.
 - A key management approach for per-team archive keys. See [archive](./archive.md#encryption).
 - Secrets storage for the service itself: provider API token, OAuth client secrets, grant signing
   keys, billing API key, and email API key.
-- An email provider for invitations and account notices, from [phase 7](./phases/07-teams.md).
-- A billing provider, from [phase 8](./phases/08-billing.md).
+- An email provider for invitations and account notices, from [phase 7](./07-teams.md).
+- A billing provider, from [phase 8](./08-billing.md).
 - Logs, metrics, and error reporting that never carry code or prompts. The repository already has
   a Sentry plugin (`plugins/sentry-telemetry`) and OTLP audit export is planned in
   [worker isolation](./isolation.md#audit-export).

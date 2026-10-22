@@ -57,7 +57,7 @@ that is a team-owned connection held on the team Node, not a person's local conn
 **Git access.** A worker needs to fetch and push. Recommended: a GitHub App installed on the team's
 organization, with the team Node minting a short-lived installation token per attempt, scoped to the
 project's repository. A person's OAuth token is the fallback for personal accounts. Which one ships
-first is an open question in [phase 3](./phases/03-cloud-task.md#open-questions).
+first is an open question in [phase 3](./03-cloud-task.md#open-questions).
 
 ## Team secrets
 
@@ -84,7 +84,7 @@ Three options, from strongest to weakest:
 3. **The key in the worker's environment.** Every process can read it. Refused for production.
 
 Recommended: option 1 where the harness supports it, option 2 as the named fallback, decided per
-harness in [phase 5](./phases/05-isolation.md). This proxy brokers credentials. Worker-wide egress
+harness in [phase 5](./05-isolation.md). This proxy brokers credentials. Worker-wide egress
 enforcement is a separate requirement in [isolation](./isolation.md#egress).
 
 Limit each key's scope where the provider allows it, such as a dedicated workspace key with a spend

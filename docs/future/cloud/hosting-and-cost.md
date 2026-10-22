@@ -62,7 +62,7 @@ For more information, see [Fly Machines](https://www.fly.io/docs/mcp/deploy-on/f
 [Modal Sandbox reference](https://modal.com/docs/sdk/py/latest/Sandbox), and
 [Cloudflare Containers placement](https://developers.cloudflare.com/containers/platform-details/placement/).
 
-[Phase 1](./phases/01-node-image.md) measures Fly Machines against the speed target. If it misses,
+[Phase 1](./01-node-image.md) measures Fly Machines against the speed target. If it misses,
 the phase compares one alternative before the programme commits.
 
 ### Questions the provider must answer
@@ -86,7 +86,7 @@ the phase compares one alternative before the programme commits.
 A team chooses one region at creation: US, EU, or APAC. The team Node, workers, snapshots, artifacts,
 and archives stay there. The control plane itself lives in one region and holds only account
 metadata. Where that region is, and whether EU customers need account metadata in the EU, is an open
-question for [remote access phase 2](../remote-access/phases/02-accounts.md#open-questions).
+question for [remote access phase 2](../remote-access/02-accounts.md#open-questions).
 
 A region move is a separate migration. Changing a preference does not move data, and the UI must not
 suggest it does.

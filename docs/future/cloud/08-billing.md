@@ -7,7 +7,7 @@ Status: proposed, 2026-09-29.
 Charge teams for what they use, show a cost before it is spent, and stop spending at a hard budget
 through the same safe path as an idle teardown. The invoice must match the usage ledger.
 
-Read [hosting and cost](../hosting-and-cost.md#what-the-customer-pays-for) before starting.
+Read [hosting and cost](./hosting-and-cost.md#what-the-customer-pays-for) before starting.
 
 ## What you can deploy at the end
 
@@ -18,7 +18,7 @@ invoice.
 ## Starting point
 
 - The closed beta from [phase 7](./07-teams.md).
-- Relay byte counts metered since [remote access phase 5](../../remote-access/phases/05-production.md).
+- Relay byte counts metered since [remote access phase 5](../remote-access/05-production.md).
 - Provisioning records with machine sizes and lifetimes since [phase 2](./02-team-node.md).
 
 ## In scope
@@ -90,7 +90,7 @@ with a member's grant. It refuses.
 ## Docs to update when it ships
 
 - The account service's own documentation for the ledger and billing.
-- [hosting and cost](../hosting-and-cost.md) with the actual prices.
+- [hosting and cost](./hosting-and-cost.md) with the actual prices.
 
 ## Open questions
 

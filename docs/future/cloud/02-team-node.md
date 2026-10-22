@@ -23,9 +23,9 @@ adopts it, and works on it like any remote Node. One person per team.
 ## Starting point
 
 - The Node image from [phase 1](./01-node-image.md).
-- From [remote access](../../remote-access/README.md): the account service and website, the sign-in
+- From [remote access](../remote-access/README.md): the account service and website, the sign-in
   plugin `plugins/account`, relay tickets, and the hosted relay
-  ([remote access phase 2](../../remote-access/phases/02-accounts.md)).
+  ([remote access phase 2](../remote-access/02-accounts.md)).
 - Enrollment v1 in `packages/node-core/src/server/enrollment.ts`, with its schema in
   `packages/protocol/src/device/enrollment.ts` and a stub control plane in
   `packages/node-core/src/testkit/controlPlaneStub.ts`.
@@ -68,7 +68,7 @@ account audit log records both actions.
 
 Write the v2 payload in `@acorn/protocol` and publish `docs/schemas/enrollment-v2.json` (new). The
 request has no device token. The reply carries the grant issuer URL, its public keys, the Node's
-service credential, and a relay credential. See [identity](../identity.md#what-the-enrollment-v2-change-is).
+service credential, and a relay credential. See [identity](./identity.md#what-the-enrollment-v2-change-is).
 
 The Node chooses v2 when the provisioner sets a version variable. v1 stays exactly as it is and
 keeps its tests. Extend the stub control plane to speak v2.
@@ -103,7 +103,7 @@ and shows a sign-in reason.
 ### 5. The provisioner
 
 Build the provisioner in the account service: the provider interface from
-[hosting and cost](../hosting-and-cost.md#the-provider-interface), an operation log with idempotency
+[hosting and cost](./hosting-and-cost.md#the-provider-interface), an operation log with idempotency
 keys, and a reconciliation loop. Implement the local Docker adapter first, then the real provider
 adapter. Team creation provisions a team Node with a volume in the team's region. Team deletion
 destroys it after a confirmation that names what is lost.
@@ -126,7 +126,7 @@ Nodes with fingerprint and relay route, and it exposes a capability custody uses
 ### 7. Grant custody and adoption
 
 Extend `@acorn/custody` with a grant-backed fleet record, refresh before expiry, and adoption through
-the provided-Node path. The record holds no device token. See [clients](../clients.md#adopting-the-team-node).
+the provided-Node path. The record holds no device token. See [clients](./clients.md#adopting-the-team-node).
 
 **Checkpoint 8: desktop end to end.** In the desktop, sign in from Settings → Account. The browser
 opens with the code. After approval, Settings → Nodes lists the team Node. Adopt it. Clone a
@@ -164,10 +164,10 @@ no gap and no duplicate approval.
 
 ## Docs to update when it ships
 
-- [Node enrollment](../../../node-enrollment.md): v2 beside v1.
-- [authentication](../../../authentication.md): the `member` principal and grants.
-- [security](../../../security.md): the grant issuer's trust cost.
-- [Node providers](../../../plugins/node-providers.md#node-providers): grant-backed
+- [Node enrollment](../../node-enrollment.md): v2 beside v1.
+- [authentication](../../authentication.md): the `member` principal and grants.
+- [security](../../security.md): the grant issuer's trust cost.
+- [Node providers](../../plugins/node-providers.md#node-providers): grant-backed
   adoption.
 
 ## Open questions
@@ -195,6 +195,6 @@ Record provisioning times per region and any provider findings here, with dates.
 
 ## Verify before building
 
-Reread [Node enrollment](../../../node-enrollment.md) and [authentication](../../../authentication.md).
+Reread [Node enrollment](../../node-enrollment.md) and [authentication](../../authentication.md).
 Check how `FleetBridge.adopt` fetches a credential from the listing Node, because grants change what
 it fetches.

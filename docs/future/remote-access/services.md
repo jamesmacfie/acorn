@@ -8,10 +8,10 @@ lives, and which credential each caller uses.
 
 | Deployable | What it is | Stack | Runs where | First phase |
 | --- | --- | --- | --- | --- |
-| Relay (open) | Joins client and Node connections and forwards bytes. Stateless apart from its routing table. | TypeScript on Node, or Go if measured throughput needs it | One or more instances per region | [1](./phases/01-relay.md) |
-| Account service (hosted, closed) | HTTP API for sign-in, the account's Nodes, relay credentials and tickets, and account assertions. | TypeScript, Hono, Better Auth, Drizzle, Postgres | One region | [2](./phases/02-accounts.md) |
-| Account website (hosted, closed) | Sign-in, the account page, the list of Nodes with **Remove**, and the phone app's files. The phone app itself is open. | Served by the account service, or a static host | Same as the account service | [2](./phases/02-accounts.md) |
-| Sign-in plugin (open) | A bundled first-party plugin that signs a person in, lists the account's Nodes, and fetches tickets and assertions. | acorn plugin API | Each person's local Node | [2](./phases/02-accounts.md) |
+| Relay (open) | Joins client and Node connections and forwards bytes. Stateless apart from its routing table. | TypeScript on Node, or Go if measured throughput needs it | One or more instances per region | [1](./01-relay.md) |
+| Account service (hosted, closed) | HTTP API for sign-in, the account's Nodes, relay credentials and tickets, and account assertions. | TypeScript, Hono, Better Auth, Drizzle, Postgres | One region | [2](./02-accounts.md) |
+| Account website (hosted, closed) | Sign-in, the account page, the list of Nodes with **Remove**, and the phone app's files. The phone app itself is open. | Served by the account service, or a static host | Same as the account service | [2](./02-accounts.md) |
+| Sign-in plugin (open) | A bundled first-party plugin that signs a person in, lists the account's Nodes, and fetches tickets and assertions. | acorn plugin API | Each person's local Node | [2](./02-accounts.md) |
 
 Cloud adds the provisioner, team Nodes, workers, object storage, and billing to the same account
 service ([cloud services](../cloud/services.md)).
@@ -65,7 +65,7 @@ and what stays here is the account API contract and the open-side work.
 
 ## Hosted service: infrastructure before production
 
-[Phase 5](./phases/05-production.md) checks these off. Earlier phases create the staging version of
+[Phase 5](./05-production.md) checks these off. Earlier phases create the staging version of
 each as they need it.
 
 - A domain, with DNS for the account website, the account API, and each regional relay.

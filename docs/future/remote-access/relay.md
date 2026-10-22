@@ -6,7 +6,7 @@ can't read.
 
 ## Who uses it
 
-- **An owner's local Node**, from [phase 1](./phases/01-relay.md) of this programme. The Node sits
+- **An owner's local Node**, from [phase 1](./01-relay.md) of this programme. The Node sits
   behind a home router, so it dials out to the relay and waits there.
 - **Every hosted Node** in [cloud](../cloud/README.md): team Nodes, workers, and restored Nodes. None
   of them listens on a public address.

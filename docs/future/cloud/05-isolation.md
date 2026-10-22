@@ -8,7 +8,7 @@ Keep an agent inside a worker away from that worker's own secrets, keep model ke
 processes where possible, enforce egress on every path out, and let a team set policy that a worker
 cannot widen. This phase is the gate for the first person outside the building team.
 
-Read [isolation](../isolation.md) before starting. It explains why the provider's VM is not enough.
+Read [isolation](./isolation.md) before starting. It explains why the provider's VM is not enough.
 
 ## What you can deploy at the end
 
@@ -18,7 +18,7 @@ team admin. The closed alpha opens: single-person teams, using their own model k
 ## Starting point
 
 - Working cloud tasks with archive and restore from [phase 4](./04-archive.md).
-- The execution boundary and team policy in [isolation](../isolation.md). Neither is built.
+- The execution boundary and team policy in [isolation](./isolation.md). Neither is built.
 - The three execution chokepoints: `packages/node-core/src/server/core/proc.ts`,
   `plugins/terminal/src/server/terminal.ts`, and `plugins/agents/src/server/drivers/jsonRpcProcess.ts`.
 - The child environment allowlist in `packages/node-core/src/server/taskEnv.ts`.
@@ -43,7 +43,7 @@ needs it.
 
 ### 1. Define the worker execution seam
 
-Specify the execution seam from [isolation](../isolation.md#worker-execution-boundary), including
+Specify the execution seam from [isolation](./isolation.md#worker-execution-boundary), including
 streaming, PTYs, cancellation, and cleanup. Confirm the checkout's Git metadata is available to
 task processes while Node secrets are not. Specify task API and MCP connectivity, selected attachment
 delivery, and preview port routing before implementing the backend.
@@ -88,7 +88,7 @@ cannot clone a different private repository in the same organization.
 
 ### 6. Egress
 
-Choose and build the enforcement option from [isolation](../isolation.md#egress). Cover agents,
+Choose and build the enforcement option from [isolation](./isolation.md#egress). Cover agents,
 terminals, setup scripts, plugin node halves, and the Node itself.
 
 **Checkpoint 5: denied is denied.** With the default egress list, `curl` to an unlisted host fails
@@ -97,7 +97,7 @@ and the model provider still work.
 
 ### 7. Team policy
 
-Build the managed layer resolver and the fixed vocabulary from [team policy](../isolation.md#team-policy). The team Node
+Build the managed layer resolver and the fixed vocabulary from [team policy](./isolation.md#team-policy). The team Node
 delivers the team and project policy in the seed. The worker merges most-restrictive-wins. Add a
 resolved-policy view per task: what is allowed, and who decided.
 
@@ -108,7 +108,7 @@ ceiling winning, and an agent cannot call an execute tool.
 ### 8. The adversarial suite
 
 Write a hostile agent script and a hostile loaded plugin that try everything in
-[the adversarial test](../isolation.md#the-adversarial-test). Run them in CI against every image
+[the adversarial test](./isolation.md#the-adversarial-test). Run them in CI against every image
 build.
 
 **Checkpoint 7: an outside review.** Before the alpha opens, someone who did not build this phase
@@ -121,14 +121,14 @@ what changed.
   writing.
 - Every harness acorn ships has a recorded model-key option.
 - A local Node with no policy runs exactly as before.
-- The functional acceptance paths in [isolation](../isolation.md#the-adversarial-test) pass alongside
+- The functional acceptance paths in [isolation](./isolation.md#the-adversarial-test) pass alongside
   the denial tests. A required isolation backend that cannot start refuses execution.
 
 ## Docs to update when it ships
 
-- [Isolation](../isolation.md): mark what shipped and move behavior to owning documents.
-- [security](../../../security.md): worker isolation, credential placement, and egress.
-- [Cloud refusals](../refused.md): record the adopted egress boundary and alternatives rejected.
+- [Isolation](./isolation.md): mark what shipped and move behavior to owning documents.
+- [security](../../security.md): worker isolation, credential placement, and egress.
+- [Cloud refusals](./refused.md): record the adopted egress boundary and alternatives rejected.
 
 ## Open questions
 

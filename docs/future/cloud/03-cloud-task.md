@@ -22,8 +22,8 @@ beyond core and agent history. Phases 4 and 5 fix both.
 ## Starting point
 
 - Team Nodes behind the relay from [phase 2](./02-team-node.md).
-- The design in [projects and tasks](../projects-and-tasks.md) and [clients](../clients.md).
-- The task model in [workspaces and tasks](../../../workspaces-and-tasks.md).
+- The design in [projects and tasks](./projects-and-tasks.md) and [clients](./clients.md).
+- The task model in [workspaces and tasks](../../workspaces-and-tasks.md).
 - The agents plugin's durable per-session event sequence.
 
 ## In scope
@@ -45,7 +45,7 @@ brokered model keys, and egress, which are [phase 5](./05-isolation.md). Loaded 
 [phase 6](./06-plugins.md). Budgets and estimates, which are [phase 8](./08-billing.md).
 
 **Named shortcut.** The model key is a team secret injected into the agent process's environment,
-option 2 in [plugins and secrets](../plugins-and-secrets.md#model-keys). Acceptable for the building
+option 2 in [plugins and secrets](./plugins-and-secrets.md#model-keys). Acceptable for the building
 team's own keys on staging. Phase 5 replaces it where a harness allows.
 
 ## Steps and checkpoints
@@ -55,7 +55,7 @@ team's own keys on staging. Phase 5 replaces it where a harness allows.
 Before any other step, find out how much of `@acorn/client-core` assumes a pane talks to the active
 Node. Build the smallest version of a hidden worker fleet member and route one pane, the agent
 transcript, to it. Decide between direct adoption and routing through the team Node. See
-[clients](../clients.md#adopting-a-worker). Record the decision and the reason here.
+[clients](./clients.md#adopting-a-worker). Record the decision and the reason here.
 
 ### 2. Protocol types
 
@@ -154,9 +154,9 @@ Deploy with the real provider and a regional bucket.
 
 ## Docs to update when it ships
 
-- [workspaces and tasks](../../../workspaces-and-tasks.md): shared projects and execution location.
-- [state ownership](../../../state-ownership.md): what the team Node owns for a cloud task.
-- [API reference](../../../api-reference.md): cloud task routes.
+- [workspaces and tasks](../../workspaces-and-tasks.md): shared projects and execution location.
+- [state ownership](../../state-ownership.md): what the team Node owns for a cloud task.
+- [API reference](../../api-reference.md): cloud task routes.
 - The agents plugin's documentation: imported sessions.
 
 ## Open questions

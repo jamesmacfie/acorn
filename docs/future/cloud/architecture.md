@@ -1,7 +1,7 @@
 # Architecture for cloud tasks
 
 Status: proposed, 2026-09-29. This is the map of the runtimes, who owns what, and which shipped
-contracts change. Each topic has its own file with the detail. [The phases](./phases/README.md)
+contracts change. Each topic has its own file with the detail. [The phases](./README.md#the-phases)
 order the work, and [the refusals](./refused.md) record alternatives.
 
 ## What exists and what is missing
@@ -112,21 +112,21 @@ change cannot express the behavior, add a separately versioned contract. Put Nod
 
 | Contract | Addition | Owner | First phase |
 | --- | --- | --- | --- |
-| Container image | A published Node image with task tooling, running as a non-root user. | `apps/node` packaging | [1](./phases/01-node-image.md) |
-| Account API | Teams, membership, inventory, and grant issuance, added to the [remote access](../remote-access/accounts.md) account API. | Account service | [2](./phases/02-team-node.md) |
-| Enrollment v2 | No device token in the request. The reply carries the grant issuer's keys and a relay credential. | `@acorn/protocol` and the account service | [2](./phases/02-team-node.md) |
-| Grant principal | A third principal kind on hosted Nodes: a person with a team role, from a verified grant. | `packages/node-core` auth | [2](./phases/02-team-node.md) |
-| Grant custody | A client credential that expires and refreshes through the sign-in plugin, beside device tokens. | `@acorn/custody` | [2](./phases/02-team-node.md) |
-| Relay transport | Built by remote access. Hosted Nodes get a relay credential in the enrollment v2 reply. | `packages/node-core` transport, `@acorn/custody` broker, relay | [remote access 1](../remote-access/phases/01-relay.md), [2](./phases/02-team-node.md) |
-| Project identity | Team project IDs, the local-to-team mapping, and execution location on a task. | Team Node, projected through `@acorn/protocol` | [3](./phases/03-cloud-task.md) |
-| Attempt lifecycle | Reserve, provision, set up, route, stop, archive, restore, and reconcile, each idempotent. | Team Node orchestrator | [3](./phases/03-cloud-task.md) |
-| History transfer | Ordered, resumable transfer of core and agent events and artifacts. | Core and the agents plugin | [3](./phases/03-cloud-task.md) |
-| Whole-root archive | A versioned, encrypted format with a manifest, verification, and credential rotation on restore. | Team Node and worker | [4](./phases/04-archive.md) |
-| Execution target | An isolated task execution target inside Linux workers. | `packages/node-core`; [worker isolation](./isolation.md) | [5](./phases/05-isolation.md) |
-| Team policy | Execution, egress, tool, model, and MCP policy, delivered to a worker as the managed layer. | Team Node; [team policy](./isolation.md#team-policy) | [5](./phases/05-isolation.md) |
-| Plugin policy | Team baseline, project overrides, approved hashes and grants, and a frozen lock per attempt. | Team Node and the plugin loader | [6](./phases/06-plugins.md) |
-| Route classification | A read or mutate declaration on every core and plugin route and action. | `packages/node-core` and each plugin | [7](./phases/07-teams.md) |
-| Usage | Admission reservations, provider reconciliation, and hard budgets. | Account service and team Node admission | [8](./phases/08-billing.md) |
+| Container image | A published Node image with task tooling, running as a non-root user. | `apps/node` packaging | [1](./01-node-image.md) |
+| Account API | Teams, membership, inventory, and grant issuance, added to the [remote access](../remote-access/accounts.md) account API. | Account service | [2](./02-team-node.md) |
+| Enrollment v2 | No device token in the request. The reply carries the grant issuer's keys and a relay credential. | `@acorn/protocol` and the account service | [2](./02-team-node.md) |
+| Grant principal | A third principal kind on hosted Nodes: a person with a team role, from a verified grant. | `packages/node-core` auth | [2](./02-team-node.md) |
+| Grant custody | A client credential that expires and refreshes through the sign-in plugin, beside device tokens. | `@acorn/custody` | [2](./02-team-node.md) |
+| Relay transport | Built by remote access. Hosted Nodes get a relay credential in the enrollment v2 reply. | `packages/node-core` transport, `@acorn/custody` broker, relay | [remote access 1](../remote-access/01-relay.md), [2](./02-team-node.md) |
+| Project identity | Team project IDs, the local-to-team mapping, and execution location on a task. | Team Node, projected through `@acorn/protocol` | [3](./03-cloud-task.md) |
+| Attempt lifecycle | Reserve, provision, set up, route, stop, archive, restore, and reconcile, each idempotent. | Team Node orchestrator | [3](./03-cloud-task.md) |
+| History transfer | Ordered, resumable transfer of core and agent events and artifacts. | Core and the agents plugin | [3](./03-cloud-task.md) |
+| Whole-root archive | A versioned, encrypted format with a manifest, verification, and credential rotation on restore. | Team Node and worker | [4](./04-archive.md) |
+| Execution target | An isolated task execution target inside Linux workers. | `packages/node-core`; [worker isolation](./isolation.md) | [5](./05-isolation.md) |
+| Team policy | Execution, egress, tool, model, and MCP policy, delivered to a worker as the managed layer. | Team Node; [team policy](./isolation.md#team-policy) | [5](./05-isolation.md) |
+| Plugin policy | Team baseline, project overrides, approved hashes and grants, and a frozen lock per attempt. | Team Node and the plugin loader | [6](./06-plugins.md) |
+| Route classification | A read or mutate declaration on every core and plugin route and action. | `packages/node-core` and each plugin | [7](./07-teams.md) |
+| Usage | Admission reservations, provider reconciliation, and hard budgets. | Account service and team Node admission | [8](./08-billing.md) |
 
 Before any phase writes code, its design section names exact endpoints, wire schemas, and
 idempotency keys. An agent or plugin must not reach an administrative cloud grant through an

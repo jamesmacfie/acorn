@@ -58,7 +58,7 @@ handshake over a relay stream ([relay](./relay.md#how-the-phone-connects)):
 
 Use a vetted implementation of a published protocol, such as a Noise handshake. Never write the
 handshake by hand. The repository has no crypto library today, so the choice is an open question in
-[phase 4](./phases/04-phone.md#open-questions).
+[phase 4](./04-phone.md#open-questions).
 
 A relayed stream is never a loopback peer, so the routes that trust a loopback caller (pairing asks
 without an assertion, reach changes, and stop) refuse it with no blocked list.

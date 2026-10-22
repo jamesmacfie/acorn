@@ -19,7 +19,7 @@ from the saved work. Still internal.
 
 - Cloud tasks with manual stop from [phase 3](./03-cloud-task.md).
 - The online backup code in `packages/node-core/src/server/routes/security/backup.ts`.
-- The design in [archive](../archive.md).
+- The design in [archive](./archive.md).
 
 ## In scope
 
@@ -31,7 +31,7 @@ from the saved work. Still internal.
 - Continuing from a branch, a new snapshot, or an archived worktree.
 - Continuing an agent session on a new attempt from its harness session files.
 - Measuring pause and resume on the chosen provider, and deciding whether workers pause before
-  they archive ([projects and tasks](../projects-and-tasks.md#pause-before-archiving)).
+  they archive ([projects and tasks](./projects-and-tasks.md#pause-before-archiving)).
 - Deleting archives, and storage accounting.
 
 ## Out of scope
@@ -63,7 +63,7 @@ Record the findings here. They decide steps 3 and 4.
 ### 3. Drain and archive
 
 Build the drain, the online backups, the manifest, chunked encryption, and the upload. Decide the key
-arrangement: see [archive](../archive.md#encryption).
+arrangement: see [archive](./archive.md#encryption).
 
 **Checkpoint 2: an archive verifies.** Stop a worker. An archive appears in the regional bucket. The
 team Node marks it verified. The provider shows the machine destroyed afterwards, not before.
@@ -119,9 +119,9 @@ archiving**.
 
 ## Docs to update when it ships
 
-- [data layer](../../../data-layer.md): the whole-root archive beside backup.
-- [security](../../../security.md): archive encryption, restore credential rotation.
-- [state ownership](../../../state-ownership.md): what an archived task keeps and where.
+- [data layer](../../data-layer.md): the whole-root archive beside backup.
+- [security](../../security.md): archive encryption, restore credential rotation.
+- [state ownership](../../state-ownership.md): what an archived task keeps and where.
 
 ## Open questions
 

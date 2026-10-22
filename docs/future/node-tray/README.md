@@ -156,7 +156,7 @@ These stay with other plans:
 - The preview pane on a remote Node is [the remote preview proxy](../split/10-remote-preview-proxy.md).
 - The browser extension pairs over loopback only, so it can't drive a remote Node
   ([browser extension](../../browser-extension.md)).
-- The container image is [cloud phase 1](../cloud/phases/01-node-image.md).
+- The container image is [cloud phase 1](../cloud/01-node-image.md).
 - Signing and notarization stay in [the bundle plan](../bundle.md#sign-macos-artifacts).
 - Windows arm64, Alpine and other musl Linux distributions, and an automatic updater are left out.
 

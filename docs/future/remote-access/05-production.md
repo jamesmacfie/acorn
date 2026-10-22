@@ -29,7 +29,7 @@ Phases [1](./01-relay.md) to [4](./04-phone.md) on staging, used by allowlisted 
 
 ## Out of scope
 
-Billing, teams, and hosted Nodes, which are [cloud](../../cloud/README.md).
+Billing, teams, and hosted Nodes, which are [cloud](../cloud/README.md).
 
 ## Steps and checkpoints
 
@@ -52,7 +52,7 @@ confirm a Node registered since is absent there and present in production.
 
 ### 3. Real devices
 
-Run the [phone acceptance checklist](../../../testing/mobile-on-a-phone.md) on real phones through the
+Run the [phone acceptance checklist](../../testing/mobile-on-a-phone.md) on real phones through the
 production relay. Run the extension on a second machine on another network.
 
 ### 4. Your own relay
@@ -73,7 +73,7 @@ guide and reaches their Node from their phone with no acorn account.
 ## Docs to update when it ships
 
 - `docs/relay.md`: limits and self-hosting.
-- [Security](../../../security.md): rate limits and what the account service stores.
+- [Security](../../security.md): rate limits and what the account service stores.
 - The public website, with sign-in and the terms.
 
 ## Open questions

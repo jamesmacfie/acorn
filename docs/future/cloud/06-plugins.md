@@ -9,7 +9,7 @@ plugins, freeze the effective set per attempt, and give each plugin the cloud co
 settings it needs. A worker runs exactly the locked set, and a device still trusts each client bundle
 itself.
 
-Read [plugins and secrets](../plugins-and-secrets.md) before starting.
+Read [plugins and secrets](./plugins-and-secrets.md) before starting.
 
 ## What you can deploy at the end
 
@@ -22,7 +22,7 @@ misconfigured plugin blocks launch with a reason before any spend.
 - Hardened workers from [phase 5](./05-isolation.md).
 - The installer, with hash-pinned installs from GitHub, npm, and tarballs, in
   `packages/node-core/src/server/plugins/installer.ts`.
-- The approval-mediated install review in [plugin activation](../../../plugins/agent-install.md#approval-mediated-install).
+- The approval-mediated install review in [plugin activation](../../plugins/agent-install.md#approval-mediated-install).
 - Per-device trust of client bundles by plugin ID and hash.
 
 ## In scope
@@ -98,8 +98,8 @@ local Node appears on the team Node.
 
 ## Docs to update when it ships
 
-- [plugin activation](../../../plugins/activation.md): project policy and locks on hosted Nodes.
-- [security](../../../security.md): team approval and its limits.
+- [plugin activation](../../plugins/activation.md): project policy and locks on hosted Nodes.
+- [security](../../security.md): team approval and its limits.
 
 ## Open questions
 

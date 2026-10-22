@@ -23,14 +23,14 @@ A self-hoster can use this on its own. It is the first cloud-shaped thing acorn 
 
 - `pnpm pack:node` builds the standalone tarball (`scripts/pack-node.mjs`).
 - The standalone entry reads `ACORN_DATA_DIR`, `ACORN_ADVERTISE_HOST`, and `ACORN_PORT`, prints a
-  handshake line and a pairing banner, and drains on SIGTERM ([node distribution](../../../node-distribution.md)).
+  handshake line and a pairing banner, and drains on SIGTERM ([node distribution](../../node-distribution.md)).
 - `node-pty` is the only native module, and `apps/node/externals.ts` lists the packages installed
   beside the bundle.
 - The standalone tarball carries the bundled loaded plugins in its `plugins` folder, and the Node
   reconciles them on boot.
-- [The bundle design](../../bundle.md#build-the-container-image) records the container requirements
+- [The bundle design](../bundle.md#build-the-container-image) records the container requirements
   and release dependencies. `apps/node/Dockerfile` is step 1's local half, built for the
-  [remote Node rig](../../../local-development/remote-node.md). It installs a tarball packed on the
+  [remote Node rig](../../local-development/remote-node.md). It installs a tarball packed on the
   host rather than running `pnpm pack:node` in a build stage.
 
 ## In scope
@@ -113,7 +113,7 @@ Record, for at least 20 runs each:
 - Image size, and memory and CPU at idle and during an agent turn.
 
 If warm create-to-handshake is not well under 15 seconds, leaving room for enrollment and adoption,
-repeat the measurement on one alternative provider from [hosting and cost](../hosting-and-cost.md#candidates-as-of-2026-10-08).
+repeat the measurement on one alternative provider from [hosting and cost](./hosting-and-cost.md#candidates-as-of-2026-10-08).
 
 Price the measured CPU, memory, storage, and transfer at the provider's current rates.
 
@@ -122,7 +122,7 @@ Price the measured CPU, memory, storage, and transfer at the provider's current 
 Add a CI workflow that builds the image for the chosen architectures on a tagged release, runs a
 smoke test that boots the image and checks the handshake line, and pushes it to the registry.
 Consider moving `apps/node/test/integration/lifecycle/enrollment.test.ts` to run against the image,
-as [Node enrollment](../../../node-enrollment.md#testing-against-a-stub) suggests.
+as [Node enrollment](../../node-enrollment.md#testing-against-a-stub) suggests.
 
 **Checkpoint 8: the published image works.** On a clean machine, pull the published image, run it,
 and pair to it by following only the written recipe.
@@ -132,14 +132,14 @@ and pair to it by following only the written recipe.
 - The image boots, pairs, runs an agent, and drains cleanly, locally and on the provider.
 - Restart on the provider keeps identity and data.
 - Boot measurements and a cost estimate are recorded below with dates.
-- The recipe is in [node distribution](../../../node-distribution.md) and a reader followed it
+- The recipe is in [node distribution](../../node-distribution.md) and a reader followed it
   without help.
 
 ## Docs to update when it ships
 
-- [Node distribution](../../../node-distribution.md): a container section, with the port rule, the
+- [Node distribution](../../node-distribution.md): a container section, with the port rule, the
   advertise rule, and the volume.
-- [Node packaging](../../bundle.md): record the implemented image and remaining release requirements.
+- [Node packaging](../bundle.md): record the implemented image and remaining release requirements.
 
 ## Open questions
 

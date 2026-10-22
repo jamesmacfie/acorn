@@ -68,25 +68,67 @@ neither works.
 | [pairing.md](./pairing.md) | Nodes listed by your account, pairing a device from anywhere, approving on a paired device, and the trust cost. |
 | [phone.md](./phone.md) | The phone app served from the account website, its encrypted connection, a device for each phone, and retiring the gateway. |
 | [services.md](./services.md) | The account service, the website, and the relay: where the code lives, environments, and credentials. |
-| [phases/README.md](./phases/README.md) | The five phases, what each deploys, and the rules for every phase. |
 
-## The phases at a glance
+## The phases
 
-| Phase | Deployed at the end |
-| --- | --- |
-| [1](./phases/01-relay.md) | A relay anyone can run, with a static credential. Native clients reach a Node through it. |
-| [2](./phases/02-accounts.md) | The account service and hosted relay. Sign in, turn on **Remote access**, and reach your Node from another network. |
-| [3](./phases/03-pairing.md) | Your account lists your Nodes. Pair a new device from anywhere, approved on a device you already paired. |
-| [4](./phases/04-phone.md) | The phone app on the account website, through the relay, with a device for each phone. The gateway and Tailscale steps are gone. |
-| [5](./phases/05-production.md) | Abuse limits, metering, uptime, terms, real-device acceptance, and docs for people who run their own relay. |
+| Phase | What is deployed at the end | Who can use it | Depends on |
+| --- | --- | --- | --- |
+| [1. Relay](./01-relay.md) | A relay anyone can run with a static credential. Desktop, terminal client, CLI, and extension reach a Node through it. | Anyone who runs their own relay. | Nothing. |
+| [2. Accounts](./02-accounts.md) | The account service, the account website, the sign-in plugin, and a hosted relay. Turn on **Remote access** and reach your Node from another network. | Allowlisted accounts. | 1. |
+| [3. Pairing](./03-pairing.md) | Your account lists your Nodes with their fingerprints. Pair a new device away from home, approved on a paired desktop or terminal client. | Allowlisted accounts. | 2. |
+| [4. Phone](./04-phone.md) | The phone app on the account website, through the relay, with a device for each phone, approvals from the phone, and several Nodes. The gateway and Tailscale steps are deleted. | Allowlisted accounts. | 3. |
+| [5. Production](./05-production.md) | Abuse limits, metering, uptime, terms, real-device acceptance, and docs for running your own relay. | Everyone. | 4. |
+
+[Cloud](../cloud/README.md) starts its team Node phase after phase 2 here, because team Nodes
+use the account service and the relay from day one.
+
+## Why this order
+
+- **The relay first, with no accounts.** It's the riskiest piece: pinned TLS through a forwarded
+  socket, the WebSocket upgrade on a socket that arrived by `emit`, and terminal latency. Self-hosted
+  mode lets all of that be tested before any hosted service exists.
+- **Accounts next.** Sign-in, tickets, and the **Remote access** switch turn the relay into something
+  a person can use without editing configuration.
+- **Pairing before the phone.** The phone pairs by the same relayed ask and approves asks itself, so
+  the ask and its assertion must exist first.
+- **The phone last among features.** It needs the relay, accounts, and pairing, and it's the only
+  piece with a new protocol.
+- **Production last.** Limits and metering need every relayed thing to exist.
+
+## Rules for every phase
+
+- Steps whose titles start with **Hosted service** happen in the closed hosted service, not in this
+  repository. Open-side steps and checkpoints run against the stand-in account service
+  ([services](./services.md#the-account-api-is-the-boundary)). When the hosted service has its own
+  docs, its steps move there.
+- Each phase starts by writing its design section: exact endpoints, wire schemas, and which owning
+  documents change. Put it at the top of the phase file, or in the owning document if the contract is
+  shipping.
+- Run `pnpm lint` and the relevant tests for each slice, and `pnpm test` for the whole suite.
+- For desktop changes, test in the real Tauri window with `pnpm dev:agent` and the UI driver. For
+  terminal client changes, use the isolated PTY driver. See [local development](../../local-development.md).
+- Test a packed Node as well as a checkout.
+- A Node with no relay settings and nobody signed in must behave exactly as before. Each phase
+  checks that it makes no outbound connection.
+- When a phase ships a contract, update the owning document under `docs/` in the same change. Leave
+  the phase file as the record of decisions and evidence.
+- Record measured results, such as latency through the relay, in the phase file's evidence section
+  with the date.
+- Answer each phase's open questions, or defer them with a reason, before signing off its acceptance.
+
+## How a checkpoint works
+
+A checkpoint is a manual test that someone runs and records before the phase continues. It names the
+setup, the steps, and what you should see. If a checkpoint fails, fix the cause before the next step.
+A skipped checkpoint is written down as skipped, with the reason.
 
 ## Known gaps in the design
 
 - Which encrypted channel protocol and library the phone uses. It must be a vetted
-  implementation, never a hand-written handshake ([phase 4](./phases/04-phone.md#open-questions)).
+  implementation, never a hand-written handshake ([phase 4](./04-phone.md#open-questions)).
 - Whether remote access is free, part of a personal plan, or paid
-  ([phase 5](./phases/05-production.md#open-questions)).
-- The product name and domain ([phase 2](./phases/02-accounts.md#open-questions)).
+  ([phase 5](./05-production.md#open-questions)).
+- The product name and domain ([phase 2](./02-accounts.md#open-questions)).
 - How a client finds the relay instance its Node is on once a region has more than one
   ([relay](./relay.md#scale-and-placement)).
 

@@ -14,7 +14,7 @@ sign-in plugin on each local Node. Cloud adds two things to them:
 
 - Better Auth's organization plugin maps to acorn teams, with custom roles `admin`, `member`, and
   `viewer`. Confirm its device authorization plugin works with the organization plugin before
-  [phase 2](./phases/02-team-node.md).
+  [phase 2](./02-team-node.md).
 - Better Auth's two-factor plugin doesn't gate OAuth sign-in by default. A later acorn-wide second
   factor needs its own enforced step before the account service issues any grant. For more
   information, see [two-factor behavior](https://better-auth.com/docs/plugins/2fa).

@@ -110,9 +110,9 @@ Record install behavior and host limitations rather than assuming desktop compon
 
 ## Coordinate the relay
 
-[The relay](./remote-access/relay.md) and [its phase plan](./remote-access/phases/01-relay.md) own
+[The relay](./remote-access/relay.md) and [its phase plan](./remote-access/01-relay.md) own
 opaque routing, account scope, and implementation order. Desktop and terminal client relay access
-comes first, and the phone follows in [remote access phase 4](./remote-access/phases/04-phone.md).
+comes first, and the phone follows in [remote access phase 4](./remote-access/04-phone.md).
 
 A browser integration must preserve end-to-end client/Node authority and document its browser TLS
 and session model. Push delivery is a separate contract even if it uses the same hosted service.

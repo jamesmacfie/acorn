@@ -128,7 +128,7 @@ first and archive later:
 A paused machine costs disk storage only. On Fly that's $0.15 per GB per month
 ([hosting and cost](./hosting-and-cost.md#a-task-hour-on-fly-estimated-october-8-2026)). A failed
 resume falls back to a new attempt that continues from the last checkpoint, as
-[continuing a finished task](#continuing-a-finished-task) describes. [Phase 4](./phases/04-archive.md)
+[continuing a finished task](#continuing-a-finished-task) describes. [Phase 4](./04-archive.md)
 decides whether `paused` becomes a state in the diagram above, after measuring resume time and
 reliability on the chosen provider.
 

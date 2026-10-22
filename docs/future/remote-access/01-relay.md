@@ -26,7 +26,7 @@ today.
 - The `Host` allowlist in `packages/node-core/src/server/transport/listener.ts`.
 - The WebSocket hub in `packages/node-core/src/server/transport/wsHub.ts`.
 - The loopback check in `packages/node-core/src/server/transport/loopbackPeer.ts`.
-- The design in [relay](../relay.md).
+- The design in [relay](./relay.md).
 
 ## In scope
 
@@ -99,8 +99,8 @@ outbound connection.
 
 - A new owning document, `docs/relay.md` (new), for the protocol, the Node and client behavior, and
   self-hosted mode.
-- [Reaching a Node](../../../node-distribution/reaching.md): a relay as a third way in.
-- [Security](../../../security.md): what the relay can and can't see.
+- [Reaching a Node](../../node-distribution/reaching.md): a relay as a third way in.
+- [Security](../../security.md): what the relay can and can't see.
 
 ## Open questions
 

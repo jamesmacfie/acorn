@@ -73,5 +73,5 @@ design spike. It decided to build, and phase 10 is that build.
 
 Key custody on a standalone Node is open finding R21 in the
 [October 11 security review](../../security/review-2026-10-11.md). The container image for hosted
-Nodes is [cloud phase 1](../cloud/phases/01-node-image.md). Phase 2 here reuses its local Docker
+Nodes is [cloud phase 1](../cloud/01-node-image.md). Phase 2 here reuses its local Docker
 half rather than writing a second image.

@@ -24,7 +24,7 @@ connect" with the same words. **Allow** pairs B. Nobody needs to be at A.
   `POST /v1/core/nodes/adopt` in `packages/node-core/src/server/routes/nodeProviders.ts`, which needs a
   provider-held device token.
 - The desktop's pairing dialog, the only client that answers asks today.
-- The design in [pairing](../pairing.md) and [accounts](../accounts.md#account-assertions).
+- The design in [pairing](./pairing.md) and [accounts](./accounts.md#account-assertions).
 
 ## In scope
 
@@ -67,7 +67,7 @@ assertion's ID.
 
 From a listed Node, the client pins the listed fingerprint, raises the ask, waits for the claim, and
 stores a normal fleet record with the device token. Decide whether this needs a Node route or stays
-in the client ([pairing](../pairing.md#adopt-by-pairing)).
+in the client ([pairing](./pairing.md#adopt-by-pairing)).
 
 **Checkpoint 4: pair from a café.** With nobody at A, B clicks **Connect** on A. The dialog shows on a
 third device already paired with A. **Allow**. B is paired and runs an agent on A. No code and no
@@ -102,11 +102,11 @@ approve on a paired device, and use A from the sidebar.
 
 ## Docs to update when it ships
 
-- [Authentication](../../../authentication.md#pairing) and
-  [pairing by approval](../../../api-reference/transport.md#pairing-by-approval): relayed asks.
-- [Node providers](../../../plugins/node-providers.md#node-providers): adopt by pairing.
-- [Browser extension setup](../../../browser-extension/setup.md#pair-a-node): the account's Nodes.
-- [Security](../../../security.md): the trust cost of a vouched fingerprint.
+- [Authentication](../../authentication.md#pairing) and
+  [pairing by approval](../../api-reference/transport.md#pairing-by-approval): relayed asks.
+- [Node providers](../../plugins/node-providers.md#node-providers): adopt by pairing.
+- [Browser extension setup](../../browser-extension/setup.md#pair-a-node): the account's Nodes.
+- [Security](../../security.md): the trust cost of a vouched fingerprint.
 
 ## Open questions
 

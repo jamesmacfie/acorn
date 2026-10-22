@@ -60,7 +60,7 @@ project's default preselected. Choosing **Cloud** shows, before anything is spen
 
 ## Adopting a worker
 
-This is the largest client change, and the first spike in [phase 3](./phases/03-cloud-task.md).
+This is the largest client change, and the first spike in [phase 3](./03-cloud-task.md).
 
 A task's panes call their Node through the active Node's API client. A cloud task's live data is on
 a worker, which is not the active Node and not a fleet workspace. So the client needs:

@@ -7,7 +7,7 @@ Status: proposed, 2026-09-29.
 Let more than one person use a team. Invite members, give each a role, enforce the role on every
 route, stream, plugin bridge, and approval on every hosted Node, and take access away in seconds.
 
-Read [identity](../identity.md#roles-and-route-classification) before starting. The hard part of
+Read [identity](./identity.md#roles-and-route-classification) before starting. The hard part of
 this phase is not invitations. It is classifying every route in core and every plugin so a viewer
 truly cannot mutate.
 
@@ -40,7 +40,7 @@ Per-project roles. Single sign-on. GitHub organization sync.
 
 ## Related work
 
-[Team memory](../memory.md) depends on this phase's roles and route classification. It specifies
+[Team memory](./memory.md) depends on this phase's roles and route classification. It specifies
 shared project memory, private memory per account, worker seeds and write forwarding, attribution,
 and optional approval, with its own delivery checkpoints.
 
@@ -104,8 +104,8 @@ in the clients for admins.
 
 ## Docs to update when it ships
 
-- [authentication](../../../authentication.md): roles and their enforcement.
-- [security](../../../security.md): role enforcement and the outage rule.
+- [authentication](../../authentication.md): roles and their enforcement.
+- [security](../../security.md): role enforcement and the outage rule.
 - The plugin authoring documentation: the route class declaration.
 
 ## Open questions

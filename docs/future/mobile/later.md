@@ -14,7 +14,7 @@ delivery needs Web Push: the phone gives the Node a push subscription, and the N
 notification when the attention inbox gains an item. The notification carries no task content, only
 a count and the task's title, because it passes through Apple's or Google's push service. iOS
 delivers web push only to an app installed to the home screen. The Node owns the subscription, since
-each phone is its own device there once [remote access phase 4](../remote-access/phases/04-phone.md)
+each phone is its own device there once [remote access phase 4](../remote-access/04-phone.md)
 ships.
 
 ## Run loaded plugins on a phone

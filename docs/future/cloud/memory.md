@@ -1,6 +1,6 @@
 # Team memory
 
-Status: proposed, 2026-10-01. Waits on [cloud phase 7](./phases/07-teams.md), which brings
+Status: proposed, 2026-10-01. Waits on [cloud phase 7](./07-teams.md), which brings
 invitations, roles, and route classification. Nothing here changes a local Node with no account.
 
 ## Goal

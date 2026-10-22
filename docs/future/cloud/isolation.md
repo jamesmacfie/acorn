@@ -14,7 +14,7 @@ secret in its environment. This is ambient authority inherited from the operatin
 from the deliberate authority Acorn grants through task-scoped APIs.
 
 So a worker needs an isolated Linux execution target before anyone outside the building team uses
-it. [Phase 5](./phases/05-isolation.md) builds it. This does not add isolation to local tasks.
+it. [Phase 5](./05-isolation.md) builds it. This does not add isolation to local tasks.
 
 ## What an agent in a worker could reach
 
@@ -107,7 +107,7 @@ evaluate these options:
    namespace. This handles hostnames through TLS SNI or `CONNECT`, at the cost of acorn owning a
    proxy.
 
-Which option ships is the largest open question in [phase 5](./phases/05-isolation.md#open-questions).
+Which option ships is the largest open question in [phase 5](./05-isolation.md#open-questions).
 Record the chosen enforcement boundary and its bypass analysis in phase 5.
 
 ## Audit export
@@ -150,4 +150,4 @@ task operations does not satisfy phase 5.
 Check what privileges the chosen provider's VM grants: user namespaces, Landlock support in its
 kernel, and whether a root init step can run before the Node. Verify the checkout and Git metadata
 layout, task API connectivity, and the functional acceptance paths before choosing the execution
-backend. [Phase 5](./phases/05-isolation.md) owns the implementation sequence.
+backend. [Phase 5](./05-isolation.md) owns the implementation sequence.

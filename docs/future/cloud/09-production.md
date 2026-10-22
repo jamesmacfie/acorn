@@ -35,7 +35,7 @@ The paid beta from [phase 8](./08-billing.md), running on staging-grade infrastr
 ### 1. Production infrastructure
 
 Create production accounts for the provider, database, buckets, registry, email, and billing,
-separate from staging. Check off the list in [services](../services.md#infrastructure-that-must-exist-before-production).
+separate from staging. Check off the list in [services](./services.md#infrastructure-that-must-exist-before-production).
 
 ### 2. Regions
 

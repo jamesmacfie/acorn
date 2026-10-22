@@ -25,7 +25,7 @@ Do not repeat the completed staging, dependency scanner, or certificate work.
 
 ## Build the container image
 
-[Cloud phase one](./cloud/phases/01-node-image.md) owns the image, local pairing, hosted deployment,
+[Cloud phase one](./cloud/01-node-image.md) owns the image, local pairing, hosted deployment,
 measurements, and image publication. Implement that phase once and update this page when it ships.
 A container build can compile `node-pty` without waiting for downloadable Linux prebuilds.
 
