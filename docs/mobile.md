@@ -121,8 +121,9 @@ account service. Run these first, each in its own terminal:
    --session phone`. Open Settings → Account, sign in, and turn it on.
 
 `ACORN_MOBILE_PORT` moves the dev server, and `ACORN_MOBILE_HOST` makes it listen for another computer.
-`pnpm --filter @acorn/mobile build` writes `apps/mobile/dist` and checks the
-[startup budget](./frontend/startup-budget.md#the-phone).
+`pnpm --filter @acorn/mobile build` writes `apps/mobile/dist` and `apps/mobile/dist-sandbox`, and checks the
+[startup budget](./frontend/startup-budget.md#the-phone). The dev server also serves the plugin sandbox
+([try the sandbox](./mobile/phone-setup.md#try-the-sandbox)).
 
 ### Check UI work with Playwright
 

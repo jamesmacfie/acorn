@@ -12,6 +12,12 @@ A bundle that draws pixels runs in an iframe on its own hash-addressed origin, u
 `connect-src 'none'`, so the transferred `MessagePort` is the only way out, and both reach the host
 through one broker that decides every call from the manifest's scopes.
 
+A browser has no custom scheme, so the phone app puts the same container on a host name under a
+separate sandbox domain, one name per bundle. The page there checks the bytes the phone posts against
+its own name before it starts them in a `blob:` Worker, and that Worker has `connect-src 'none'`
+([the phone's plugin worker](../mobile/plugin-sandbox.md)). A phone build with no
+sandbox domain draws no tree bundle.
+
 The terminal has no iframe and no CSP, so a tree bundle there runs in a `node:worker_threads` thread
 ([the terminal sandbox](../tui/plugins.md#the-sandbox)). `apps/tui/src/plugins/workerFactory.ts`
 starts it with `execArgv: ['--permission', '--allow-fs-read=<bootstrap>', '--allow-fs-read=<bundle>']`,

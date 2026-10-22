@@ -1,11 +1,15 @@
 // @vitest-environment jsdom
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { createIsolatedTreeWorker } from './isolatedWorker'
+import { createIsolatedTreeWorker, pluginTreeRelayOrigin, setTreeBundleSource } from './isolatedWorker'
 
 const HASH = '0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef'
 const NONCE = 'd1a01ee1-0f3b-4e02-8402-cedcb4d84d02'
 
+const LABEL = '4oymiquy7qobjgx36tejs35zeqt24qpemsnzgtfeswmrw6csxbkq'
+const EMPTY_HASH = 'e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855'
+
 afterEach(() => {
+  setTreeBundleSource(null)
   document.body.replaceChildren()
   vi.unstubAllGlobals()
   vi.restoreAllMocks()
@@ -58,5 +62,83 @@ describe('isolated tree worker relay', () => {
     )
     expect(failed).toHaveBeenCalledOnce()
     expect(document.querySelector('iframe')).toBeNull()
+  })
+})
+
+describe('isolated tree worker relay on the phone', () => {
+  const PHONE = 'https://phone.example'
+  const readyFrom = (frame: HTMLIFrameElement, origin: string) =>
+    window.dispatchEvent(
+      new MessageEvent('message', {
+        origin,
+        source: frame.contentWindow,
+        data: { kind: 'acorn:tree-relay-ready', nonce: NONCE },
+      }),
+    )
+
+  it('names one origin per bundle under the sandbox domain', () => {
+    vi.stubGlobal('__ACORN_SANDBOX_DOMAIN__', 'sandbox.test')
+    expect(pluginTreeRelayOrigin(EMPTY_HASH, PHONE)).toBe(`https://${LABEL}.sandbox.test`)
+    vi.stubGlobal('__ACORN_SANDBOX_DOMAIN__', 'sandbox.localhost:4322')
+    expect(pluginTreeRelayOrigin(EMPTY_HASH, PHONE)).toBe(`http://${LABEL}.sandbox.localhost:4322`)
+    expect(pluginTreeRelayOrigin(EMPTY_HASH, 'app://acorn')).toBe(`app-plugin://${EMPTY_HASH}`)
+  })
+
+  it('refuses a renderer it does not know when the build has no sandbox domain', () => {
+    expect(() => pluginTreeRelayOrigin(EMPTY_HASH, PHONE)).toThrow('unknown renderer origin')
+  })
+
+  it('posts the bundle and the ports only to the exact relay origin after its ready message', async () => {
+    vi.stubGlobal('__ACORN_SANDBOX_DOMAIN__', 'sandbox.test')
+    vi.stubGlobal('crypto', { randomUUID: () => NONCE })
+    const bytes = new TextEncoder().encode('export {}').buffer
+    setTreeBundleSource(async (hash) => (hash === EMPTY_HASH ? bytes : new ArrayBuffer(0)))
+    const sandbox = createIsolatedTreeWorker(EMPTY_HASH, PHONE)
+    const frame = document.querySelector('iframe')!
+    expect(frame.src).toBe(`https://${LABEL}.sandbox.test/worker.html#${NONCE}`)
+    const deliver = vi.spyOn(frame.contentWindow!, 'postMessage').mockImplementation(() => {})
+    const ports = [new MessageChannel().port1, new MessageChannel().port1]
+    sandbox.postMessage({ acornBridge: 1 }, ports)
+
+    readyFrom(frame, 'https://other.sandbox.test')
+    expect(deliver).not.toHaveBeenCalled()
+
+    readyFrom(frame, `https://${LABEL}.sandbox.test`)
+    await vi.waitFor(() => expect(deliver).toHaveBeenCalledOnce())
+    expect(deliver).toHaveBeenCalledWith(
+      { kind: 'acorn:tree-relay-start', nonce: NONCE, hello: { acornBridge: 1 }, bundle: bytes },
+      `https://${LABEL}.sandbox.test`,
+      ports,
+    )
+    sandbox.terminate()
+  })
+
+  it('fails closed when the device has no source for the bytes', () => {
+    vi.stubGlobal('__ACORN_SANDBOX_DOMAIN__', 'sandbox.test')
+    vi.stubGlobal('crypto', { randomUUID: () => NONCE })
+    const sandbox = createIsolatedTreeWorker(EMPTY_HASH, PHONE)
+    const frame = document.querySelector('iframe')!
+    const failed = vi.fn()
+    sandbox.onerror = failed
+    const ports = [new MessageChannel().port1, new MessageChannel().port1]
+    const closed = vi.spyOn(ports[0]!, 'close')
+    sandbox.postMessage({ acornBridge: 1 }, ports)
+    readyFrom(frame, `https://${LABEL}.sandbox.test`)
+    expect(failed).toHaveBeenCalledOnce()
+    expect(closed).toHaveBeenCalled()
+    expect(document.querySelector('iframe')).toBeNull()
+  })
+
+  it('fails closed when the source cannot read the bundle', async () => {
+    vi.stubGlobal('__ACORN_SANDBOX_DOMAIN__', 'sandbox.test')
+    vi.stubGlobal('crypto', { randomUUID: () => NONCE })
+    setTreeBundleSource(() => Promise.reject(new Error('gone')))
+    const sandbox = createIsolatedTreeWorker(EMPTY_HASH, PHONE)
+    const frame = document.querySelector('iframe')!
+    const failed = vi.fn()
+    sandbox.onerror = failed
+    sandbox.postMessage({ acornBridge: 1 }, [new MessageChannel().port1, new MessageChannel().port1])
+    readyFrom(frame, `https://${LABEL}.sandbox.test`)
+    await vi.waitFor(() => expect(failed).toHaveBeenCalledOnce())
   })
 })

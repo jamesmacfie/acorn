@@ -27,7 +27,8 @@ access** off and on again in Acorn, which registers it again ([the phone channel
 
 The account website's operator serves `apps/mobile/dist` under `/app/`, on the same origin as the account
 API, with a content security policy of `script-src 'self'; object-src 'none'; base-uri 'none';
-frame-ancestors 'none'; form-action 'self'`. The build sets Vite's `base` to `/app/`, so every file and
+frame-ancestors 'none'; form-action 'self'`, plus a `frame-src` for the sandbox domain
+([below](#serve-the-sandbox-domain)). The build sets Vite's `base` to `/app/`, so every file and
 every route of the app is under that path and the website keeps its own pages at its root. Any path that
 has no extension answers with `index.html`.
 
@@ -36,6 +37,41 @@ trusted name that also answers the account API serves it. Build it with `pnpm --
 
 Someone who never signs in can't pair a phone yet, because the key the phone pins comes from the account's
 list of Nodes.
+
+## Serve the sandbox domain
+
+Plugin code on the phone runs on a domain of its own, one host name per bundle
+([the phone's plugin worker](./plugin-sandbox.md)). A phone build with no sandbox
+domain draws no plugin trees. To set one up:
+
+1. Register a domain that isn't a subdomain of the app's. The same site would share cookies with the app.
+2. Add a wildcard DNS record and a wildcard certificate for it.
+3. Build the app with the domain in `ACORN_SANDBOX_DOMAIN`, a name and an optional port with no scheme:
+   `ACORN_SANDBOX_DOMAIN=sandbox.example pnpm --filter @acorn/mobile build`.
+4. Serve `apps/mobile/dist-sandbox` on every name under the domain. It holds `worker.html` and
+   `worker-host.js`, and nothing else is a page. Send the headers in `dist-sandbox/headers.json` on every
+   response, including a 404. `apps/mobile/sandbox/headers.mts` writes them.
+5. Add `frame-src https://*.sandbox.example` to the app's content security policy, and nothing else. The app
+   frames a relay page for each bundle it runs.
+
+The sandbox holds no bundles and no secrets. The app posts the bytes, and the page refuses any that don't hash
+to its own host name. The page sets no `frame-ancestors` and doesn't check its parent's origin, because it can't name the app's
+origin. A stranger who frames it gets only code that is public under its own hash.
+
+## Try the sandbox
+
+`pnpm dev:mobile` also serves the sandbox domain, as `localhost:4322` (`ACORN_SANDBOX_PORT` changes the port),
+and a probe bundle that needs no account, Node, or plugin custody. Open `/app/dev/sandbox` on the dev server.
+The page posts the probe to a relay page at `http://<label>.localhost:4322`, and the probe draws a line, then
+tries `fetch`, a `WebSocket`, a module import from another origin, and `indexedDB.databases()`, and draws what
+happened.
+
+- `?probe=<origin>` names where the escape attempts go. Run a server there and expect it to log no request.
+- `?bytes=tampered` posts one byte more than the bundle's hash names. The relay refuses it, and the page shows
+  `.sandbox-fixture-failed`.
+
+Only a development build has the page. A production build has no probe bundle and nothing that sets the source
+of bundle bytes, so a phone refuses to start a tree until the plugin custody phase supplies one.
 
 ## Install it
 

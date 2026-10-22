@@ -128,12 +128,11 @@ old `/plugin-worker/*` route returns 404. The bytes and the trust decision are t
 The relay document allows only its host script and one same-origin Worker. The bundle's response
 carries `default-src 'none'; script-src 'self'; worker-src 'none'; connect-src 'none'`.
 
-On Windows and Android, Wry maps a custom scheme to HTTP by rewriting `<scheme>://<host>` to
-`http://<scheme>.<host>`. The renderer serves from `app://localhost` there, so the page is
-`http://app.localhost`, a secure context. Opening `app://acorn` would load `http://app.acorn`, which the
-navigation guard refuses, leaving a blank window. Plugin frames map to `http://app-plugin.<hash>`. The
-handshake accepts those exact origins. A
-64-character hash host hasn't been checked in WebView2, and if it's rejected, the tree fails closed.
+#### The phone's plugin worker
+
+A browser has no custom schemes, so the phone app runs a tree bundle on a host name under a sandbox domain of
+its own, with the same policy and no network. [The phone's plugin
+sandbox](../mobile/plugin-sandbox.md) covers the names, the checks, and the messages.
 
 `packages/client-core/src/host/tree/workerHost.ts` shares one modern worker per accepted
 `(pluginId, hash)`, with a separate bridge port and context per mounted slot, and a bounded idle pool.

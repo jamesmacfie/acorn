@@ -3,6 +3,12 @@ import { defineConfig } from 'vite'
 import solid from 'vite-plugin-solid'
 import { buildVersion } from '../../scripts/buildVersion.mts'
 
+// The domain plugin code runs under, one origin per bundle (docs/mobile/phone-setup.md § Serve the sandbox
+// domain). A name and an optional port, with no scheme. Unset, the phone draws no plugin trees.
+const sandboxDomain = process.env.ACORN_SANDBOX_DOMAIN?.trim().toLowerCase() || null
+if (sandboxDomain && !/^[a-z0-9-]+(\.[a-z0-9-]+)*(:\d+)?$/.test(sandboxDomain))
+  throw new Error(`ACORN_SANDBOX_DOMAIN ${sandboxDomain} isn't a host name. Give a name and an optional port.`)
+
 // The phone's web app, from `index.html` and `src/client`. The account website serves `dist` as it stands
 // (docs/mobile/phone-setup.md § Serve it yourself). `pnpm dev:mobile` runs this config with a proxy to the
 // account service in front of it (scripts/dev.mjs), so nothing here knows a port.
@@ -13,7 +19,11 @@ export default defineConfig({
   base: '/app/',
   plugins: [solid()],
   // The DOM host, as on the desktop (client-core kit/tokens/support.ts).
-  define: { __ACORN_HOST__: '"dom"', __ACORN_BUILD__: JSON.stringify(buildVersion()) },
+  define: {
+    __ACORN_HOST__: '"dom"',
+    __ACORN_BUILD__: JSON.stringify(buildVersion()),
+    __ACORN_SANDBOX_DOMAIN__: JSON.stringify(sandboxDomain),
+  },
   // The syntax highlighter's worker splits into chunks, which only an ES module worker can load.
   worker: { format: 'es' },
   build: {

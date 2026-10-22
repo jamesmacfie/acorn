@@ -1,5 +1,9 @@
 import { defineConfig } from 'vitest/config'
 
 export default defineConfig({
-  test: { experimental: { fsModuleCache: true }, environment: 'node', include: ['src/**/*.test.ts'] },
+  test: {
+    experimental: { fsModuleCache: true },
+    environment: 'node',
+    include: ['src/**/*.test.ts', 'sandbox/**/*.test.ts'],
+  },
 })
