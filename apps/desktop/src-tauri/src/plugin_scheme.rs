@@ -14,7 +14,7 @@ use tauri::http::{Request, Response};
 // device holds, and nothing else can be named.
 //
 // The frame stylesheet is a staged file rather than a `?raw` import, read once at boot.
-// `scripts/stage.mjs` holds the ordered list of client-core modules that make it up, and
+// `frameStyles.mts` in client-core holds the ordered list of modules that make it up, and
 // `cssHygiene.test.ts` reads the same list to check a frame is dressed in what it needs.
 
 pub const PLUGIN_SCHEME: &str = "app-plugin";

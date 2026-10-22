@@ -41,6 +41,6 @@ by `formFactor()` once per mount ([pane layouts](../panes/layout.md#named-layout
 - `document-over-frame`, `frame-beside-document`, and `stack-split` fill the pane with their first
   region. **Show panel** opens the second in a full-screen `Drawer`.
 - On a phone every `Drawer` is a sheet over the whole screen, because there are no rails or task footer
-  to sit between.
+  to sit between. A plugin's overlay frame is one too ([frames](./plugin-sandbox.md#frames)).
 - `single`, `header-body-footer`, `wizard`, and `tabs` don't change. The tab strip already scrolls
   sideways.

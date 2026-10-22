@@ -1,6 +1,7 @@
 import { For } from 'solid-js'
 import { Dynamic } from 'solid-js/web'
 import { hasHostCapability } from '../../../infra/node/hostCapabilities'
+import { formFactor } from '../../../infra/platform'
 import { ContributionBoundary } from '../../../kit/components/content/ContributionBoundary'
 import {
   isTaskSlot,
@@ -36,6 +37,7 @@ export function SlotHost(props: { slot: UiSlotId; context: UiSlotContext }) {
   const contributions = () =>
     ordered(props.slot)
       .filter((contribution): contribution is ShellSlotContribution => !isTaskSlot(contribution))
+      .filter((contribution) => formFactor() !== 'narrow' || contribution.onPhone === true)
       .filter((contribution) => contribution.when?.(props.context) ?? true)
   return (
     <For each={contributions()}>

@@ -165,6 +165,7 @@
     "./infra/persistence/deviceConfigSync.ts": "./src/infra/persistence/deviceConfigSync.ts",
     "./infra/platform": "./src/infra/platform/public.ts",
     "./infra/queries.ts": "./src/infra/queries.ts",
+    "./infra/styles/frameStyles.mts": "./src/infra/styles/frameStyles.mts",
     "./infra/styles/styles.css": "./src/infra/styles/styles.css",
     "./infra/styles/fonts.css": "./src/infra/styles/fonts.css",
     "./infra/styles/fonts/inter-var.woff2": "./src/infra/styles/fonts/inter-var.woff2",

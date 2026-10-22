@@ -189,6 +189,8 @@
 }
 /* The actions sit at the foot of the sheet, not under a short form. */
 :root[data-form-factor='narrow'] .overlay[role='dialog'] .overlay-body { flex: 1; }
+/* A plugin's overlay frame fills the sheet. Its desktop height would cut the sheet short of the keyboard. */
+:root[data-form-factor='narrow'] .plugin-overlay { height: auto; }
 
 /* The palette's hints line (PaletteSurface footer). */
 .palette-foot { padding: var(--space-3) var(--space-6); font-size: var(--fs-2xs); border-top: var(--chrome-divider); }

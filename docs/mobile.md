@@ -162,7 +162,9 @@ phone](./mobile/agent-pane.md) covers how the shared Agents pane draws here.
   an arrow ([the phone's terminal pane](./terminal/client.md#the-phones-terminal-pane)).
 - With the keyboard up the composer is tall and the transcript nearly disappears.
 - A loaded plugin runs only when the build names a sandbox domain, and only a pane that lists `mobile` in its
-  `formFactor` shows. The phone keeps and trusts bundles, but it installs none, and it asks only about bundles. What a
+  `formFactor` shows. A task pane or an overlay that paints its own iframe draws too, on the plugin's own name under
+  that domain ([the phone's plugin sandbox](./mobile/plugin-sandbox.md#frames)). A project pane and a reference panel
+  have no screen here. The phone keeps and trusts bundles, but it installs none, and it asks only about bundles. What a
   plugin reads and the skills it supplies are approved on the desktop
   ([the phone's plugin custody](./mobile/plugin-custody.md)). The Database, API, Rollbar, and Linear task panes list
   `mobile`, and they and the agent cost draw with no prompt when the phone's release and the Node's match. After a Node

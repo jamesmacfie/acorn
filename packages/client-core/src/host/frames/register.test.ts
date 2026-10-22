@@ -579,6 +579,11 @@ describe('syncFrameContributions', () => {
       })
     })
 
+    // The overlay slot holds the desktop's dialogs too, so a phone draws only a contribution that says so.
+    it('is a slot contribution a phone draws', () => {
+      expect(uiSlotRegistry.get('board-picker')).toMatchObject({ slot: 'overlay', onPhone: true })
+    })
+
     it('offers the close command only while its own overlay is up', () => {
       const command = commandRegistry.get(closeId)!
       const binding = keybindingRegistry.get(closeId)!

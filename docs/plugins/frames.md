@@ -20,6 +20,12 @@ content-addressed cache with `connect-src 'none'`. The frame has no network, no 
 no reach into the shell. Its only input and output is one `MessagePort`. The host pins which Node the
 frame talks to, and the frame can't name one.
 
+On the phone the same iframe draws on `https://<label>.<sandbox domain>`, the bundle's own name under a
+domain of its own, with the same policy, no network, and the same bridge ([the phone's plugin
+sandbox](../mobile/plugin-sandbox.md#frames)). A surface draws there when its `formFactor` lists `mobile`.
+A task pane and an overlay draw. A project pane and a reference panel have no screen on a phone. The host
+takes the frame's origin from `pluginFrameOrigin` in `host/tree/sandboxOrigin.ts`, which knows both.
+
 A `refPanel` and an `overlay` are the two frame targets whose surrounding chrome the host draws. An
 iframe can't draw outside the box it was placed in, so the host supplies the drawer or backdrop and
 the dismiss control, and the frame supplies the body. A reference panel is also the one surface no
@@ -37,7 +43,8 @@ entrypoint stays framework-free.
 
 A frame has to say hello. The SDK posts `connected` when `connect()` resolves, and the host starts a
 10-second deadline when it transfers the port. A frame that sends nothing is replaced with a "This
-plugin's UI failed to start" placeholder. Any message counts as the acknowledgement. A surface the
+plugin's UI failed to start" placeholder. So is a phone frame whose bundle the page refuses, because
+the bytes don't match its name, or that this device can't read. Any message counts as the acknowledgement. A surface the
 device couldn't register, usually because something else owns the contribution id, is skipped and
 reported in the attention inbox.
 

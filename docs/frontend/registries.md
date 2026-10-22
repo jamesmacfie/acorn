@@ -47,7 +47,10 @@ own the declaration contract.
 One slot registry serves two component shapes. `UiSlotId` names five shell slots plus `task.footer`,
 and the ID decides what the component gets. A shell slot gets the whole `UiSlotContext`: the active
 task, the terminal drawer's toggle and close, `openSettings`, and `selectTask`. A task slot gets only a
-`taskId`. `SlotHost` draws the first and `TaskSlotHost` the second, both over `uiSlotRegistry`.
+`taskId`. `SlotHost` draws the first and `TaskSlotHost` the second, both over `uiSlotRegistry`. On a phone
+`SlotHost` draws only a shell slot contribution marked `onPhone`, because the slots hold the desktop's dialogs,
+palettes, and global shortcuts. A loaded plugin's overlay frame is the one that is
+([frames](../mobile/plugin-sandbox.md#frames)).
 
 Each shell slot contribution mounts inside a stable DOM root with `display: contents`, and the ordered
 list reconciles those roots while lazy content changes inside them. This keeps empty text placeholders

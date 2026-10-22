@@ -9,7 +9,7 @@ export {
   unsupportedOverlay,
 } from './hostRequests.ts'
 export type { OwnerActions } from './hostRequests.ts'
-export { setTreeBundleSource } from './isolatedWorker.ts'
+export { setBundleSource } from './sandboxOrigin.ts'
 export { kitComponent } from './kitEntry.ts'
 export type { KitTable } from './kitEntry.ts'
 export { setRemoteTree } from './table.ts'

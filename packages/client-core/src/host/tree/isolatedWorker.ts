@@ -5,8 +5,7 @@
 // cache, so on the phone the renderer posts the bytes to a relay page on the sandbox domain, which
 // checks them against its own host name before it starts them.
 import { PLUGIN_BRIDGE_VERSION } from '@acorn/protocol/plugin/bridge.ts'
-import { bundleLabel } from './bundleLabel'
-import { sandboxDomain } from './sandboxDomain'
+import { bundleSource, phoneSandboxOrigin } from './sandboxOrigin'
 
 export type TreeSandbox = {
   postMessage(
@@ -19,27 +18,10 @@ export type TreeSandbox = {
 
 const RELAY_DEADLINE_MS = 10_000
 const HASH = /^[0-9a-f]{64}$/
-const DESKTOP_RENDERERS = ['app://acorn', 'http://app.localhost', 'https://app.localhost']
-
-/** Where the phone gets a bundle's bytes. The phone's plugin custody sets it. */
-export type TreeBundleSource = (hash: string) => Promise<ArrayBuffer>
-let bundleSource: TreeBundleSource | null = null
-export const setTreeBundleSource = (source: TreeBundleSource | null): void => {
-  bundleSource = source
-}
-
-/** The bundle's origin on the sandbox domain when the renderer is the phone app, otherwise null. */
-const phoneRelayOrigin = (hash: string, rendererOrigin: string | undefined): string | null => {
-  const domain = sandboxDomain()
-  if (!domain || !rendererOrigin || DESKTOP_RENDERERS.includes(rendererOrigin)) return null
-  // Only a name on this machine may be plain http. A browser treats it as a secure context.
-  const secure = !/^([^:]+\.)?localhost(:\d+)?$/.test(domain)
-  return `http${secure ? 's' : ''}://${bundleLabel(hash)}.${domain}`
-}
 
 export const pluginTreeRelayOrigin = (hash: string, rendererOrigin = globalThis.location?.origin): string => {
   if (!HASH.test(hash)) throw new Error('invalid plugin bundle hash')
-  const phone = phoneRelayOrigin(hash, rendererOrigin)
+  const phone = phoneSandboxOrigin(hash, rendererOrigin)
   if (phone) return phone
   if (rendererOrigin === 'http://app.localhost') return `http://app-plugin.${hash}`
   if (rendererOrigin === 'https://app.localhost') return `https://app-plugin.${hash}`
@@ -53,14 +35,14 @@ export const pluginTreeRelayUrl = (
   rendererOrigin = globalThis.location?.origin,
 ): string => {
   if (!HASH.test(hash)) throw new Error('invalid plugin bundle hash')
-  const origin = phoneRelayOrigin(hash, rendererOrigin) ?? `app-plugin://${hash}`
+  const origin = phoneSandboxOrigin(hash, rendererOrigin) ?? `app-plugin://${hash}`
   return `${origin}/worker.html#${nonce}`
 }
 
 /** Worker-shaped host handle. Only the relay window can receive the initial ports. */
 export function createIsolatedTreeWorker(hash: string, rendererOrigin = globalThis.location?.origin): TreeSandbox {
   const origin = pluginTreeRelayOrigin(hash, rendererOrigin)
-  const postsBundle = phoneRelayOrigin(hash, rendererOrigin) !== null
+  const postsBundle = phoneSandboxOrigin(hash, rendererOrigin) !== null
   const nonce = crypto.randomUUID()
   const frame = document.createElement('iframe')
   frame.setAttribute('sandbox', 'allow-scripts allow-same-origin')
@@ -135,8 +117,9 @@ export function createIsolatedTreeWorker(hash: string, rendererOrigin = globalTh
       }
     }
     if (!postsBundle) return start()
-    if (!bundleSource) return fail('no source for the plugin bundle on this device')
-    bundleSource(hash).then(start, () => fail('the plugin bundle could not be read'))
+    const read = bundleSource()
+    if (!read) return fail('no source for the plugin bundle on this device')
+    read(hash).then(start, () => fail('the plugin bundle could not be read'))
   }
   const deadline = setTimeout(() => fail('the isolated plugin worker did not start'), RELAY_DEADLINE_MS)
   window.addEventListener('message', onMessage)

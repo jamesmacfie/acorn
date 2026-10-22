@@ -218,7 +218,7 @@ Start with the plugin map, then follow the authoring guide or API reference.
 | [mobile.md](./mobile.md) | The mobile web app: its platform seam over the account and an encrypted channel, its screens, how to run it, and how to drive it at phone width. |
 | [mobile/narrow-mode.md](./mobile/narrow-mode.md) | How the phone turns narrow mode on, handles the on-screen keyboard, and draws each host layout. |
 | [mobile/agent-pane.md](./mobile/agent-pane.md) | How the Agents pane draws on a phone: the one-row header, the folded composer, sheets, and the keyboard. |
-| [mobile/plugin-sandbox.md](./mobile/plugin-sandbox.md) | Where a tree bundle runs on the phone: a host name per bundle under a sandbox domain, the relay page's checks, and its messages. |
+| [mobile/plugin-sandbox.md](./mobile/plugin-sandbox.md) | Where a plugin bundle runs on the phone, as a tree or as a frame: a host name per bundle under a sandbox domain, the relay and frame pages' checks, and their messages. |
 | [mobile/plugin-custody.md](./mobile/plugin-custody.md) | How the phone keeps a plugin's bundle and its trust decisions in IndexedDB, with the custody rules the desktop shares. |
 | [mobile/phone-setup.md](./mobile/phone-setup.md) | Opening the mobile web app from the account website, installing it to the home screen, its service worker, and its reconnect on return. |
 | [cli.md](./cli.md) | Headless `acorn` commands, Node selection, read resources, output, and exit codes. |

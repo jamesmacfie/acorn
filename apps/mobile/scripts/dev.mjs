@@ -1,9 +1,8 @@
 import { execFileSync } from 'node:child_process'
 import { readFile } from 'node:fs/promises'
 import { createServer as createHttpServer } from 'node:http'
-import { resolve } from 'node:path'
+import { extname, resolve } from 'node:path'
 import { build, createServer } from 'vite'
-import { sandboxHeaders } from '../sandbox/headers.mts'
 
 // `pnpm dev:mobile`: Vite's dev server for the phone's web app, with the account service's routes
 // proxied to a stand-in on this computer (docs/mobile.md § Run it). The app expects to be served by the
@@ -13,8 +12,8 @@ import { sandboxHeaders } from '../sandbox/headers.mts'
 // (`pnpm dev:agent` with `ACORN_ACCOUNT_URL` set, then Settings → Account). `ACORN_ACCOUNT_URL` says
 // where the account service is when it isn't on the port `dev:account` uses.
 //
-// It also serves the sandbox domain, on a port of its own, and the probe bundle the sandbox check page
-// draws (docs/mobile/phone-setup.md § Try the sandbox). Every name under `localhost` reaches the
+// It also serves the sandbox domain, built the way a release is, on a port of its own, and the probe bundle the
+// sandbox check page draws (docs/mobile/phone-setup.md § Try the sandbox). Every name under `localhost` reaches the
 // sandbox server, so each bundle gets an origin of its own, as it does on the real domain.
 
 const root = resolve(import.meta.dirname, '..')
@@ -35,14 +34,23 @@ process.env.NODE_ENV = 'development'
 // against a domain of your own.
 process.env.ACORN_SANDBOX_DOMAIN ||= `localhost:${sandboxPort}`
 
-const sandboxFiles = {
-  '/worker.html': ['text/html; charset=utf-8', await readFile(resolve(root, 'sandbox/worker.html'))],
-  '/worker-host.js': ['text/javascript; charset=utf-8', await readFile(resolve(root, 'sandbox/worker-host.js'))],
+// `dist-sandbox` as the real domain serves it: each file with the rule `headers.json` has for its path.
+execFileSync(process.execPath, [resolve(import.meta.dirname, 'build-sandbox.mjs')], { stdio: 'inherit' })
+const sandboxDir = resolve(root, 'dist-sandbox')
+const headerRules = JSON.parse(await readFile(resolve(sandboxDir, 'headers.json'), 'utf8'))
+const contentTypes = {
+  '.html': 'text/html; charset=utf-8',
+  '.js': 'text/javascript; charset=utf-8',
+  '.css': 'text/css; charset=utf-8',
 }
-const sandbox = createHttpServer((request, response) => {
-  const file = sandboxFiles[new URL(request.url ?? '/', 'http://sandbox').pathname]
-  response.writeHead(file ? 200 : 404, { ...sandboxHeaders, ...(file && { 'content-type': file[0] }) })
-  response.end(file?.[1])
+const sandbox = createHttpServer(async (request, response) => {
+  const path = new URL(request.url ?? '/', 'http://sandbox').pathname
+  // Only a page, script, or sheet that `build-sandbox.mjs` wrote is a file.
+  const servable = /^\/[\w-]+\.(html|js|css)$/.test(path)
+  const body = servable ? await readFile(resolve(sandboxDir, path.slice(1))).catch(() => null) : null
+  const contentType = body ? { 'content-type': contentTypes[extname(path)] } : {}
+  response.writeHead(body ? 200 : 404, { ...(headerRules[path] ?? headerRules['/*']), ...contentType })
+  response.end(body)
 })
 await new Promise((done) => sandbox.listen(sandboxPort, host, done))
 

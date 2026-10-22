@@ -149,7 +149,8 @@ as they take. Reopening builds a fresh iframe, so an editor never inherits the p
 and result are each capped at 64 KiB. Pass an id and fetch bytes over your own route.
 
 A host without overlays answers `unsupported_host`. The terminal mounts trees but has no iframe, so
-catch that code and leave your static preview up.
+catch that code and leave your static preview up. A phone answers it too when the overlay's `formFactor`
+leaves out `mobile`.
 
 ## Rectangles
 

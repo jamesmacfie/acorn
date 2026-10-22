@@ -1,11 +1,14 @@
 import { readFileSync } from 'node:fs'
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { sandboxHeaders } from './headers.mts'
+import { frameHeaders, headerRules, sandboxHeaders } from './headers.mts'
 
 const NONCE = 'd1a01ee1-0f3b-4e02-8402-cedcb4d84d02'
 // The SHA-256 of no bytes, in the label packages/client-core/src/host/tree/bundleLabel.test.ts pins.
 const EMPTY_LABEL = '4oymiquy7qobjgx36tejs35zeqt24qpemsnzgtfeswmrw6csxbkq'
-const script = readFileSync(new URL('./worker-host.js', import.meta.url), 'utf8')
+// Both scripts are classic scripts that share one scope in the browser, and `new Function` gives them one too.
+const script = ['bundle-check.js', 'worker-host.js']
+  .map((file) => readFileSync(new URL(`./${file}`, import.meta.url), 'utf8'))
+  .join('\n')
 
 type Listener = (event: unknown) => void | Promise<void>
 
@@ -95,11 +98,12 @@ describe('the sandbox relay page', () => {
   })
 })
 
+const directives = (headers: { 'content-security-policy': string }) =>
+  Object.fromEntries(headers['content-security-policy'].split('; ').map((directive) => directive.split(/ (.*)/s)))
+
 describe('the sandbox headers', () => {
   it('give the page and its worker no network and no way to start anything but a blob worker', () => {
-    const policy = Object.fromEntries(
-      sandboxHeaders['content-security-policy'].split('; ').map((directive) => directive.split(/ (.*)/s)),
-    )
+    const policy = directives(sandboxHeaders)
     expect(policy).toMatchObject({
       'default-src': "'none'",
       'connect-src': "'none'",
@@ -107,5 +111,27 @@ describe('the sandbox headers', () => {
       'worker-src': 'blob:',
       'frame-src': "'none'",
     })
+  })
+})
+
+describe('the frame page headers', () => {
+  it("are the desktop frame's policy with blob: added to the scripts it may run, and nothing for a worker", () => {
+    expect(directives(frameHeaders)).toEqual({
+      'default-src': "'none'",
+      'script-src': "'self' blob:",
+      'style-src': "'self' 'unsafe-inline'",
+      'img-src': "'self' data:",
+      'font-src': "'self'",
+      'connect-src': "'none'",
+      'frame-src': "'none'",
+      'worker-src': "'none'",
+      'object-src': "'none'",
+      'base-uri': "'none'",
+      'form-action': "'none'",
+    })
+  })
+
+  it('apply to the frame page alone, and every other path gets the relay policy', () => {
+    expect(headerRules).toEqual({ '/*': sandboxHeaders, '/frame.html': frameHeaders })
   })
 })

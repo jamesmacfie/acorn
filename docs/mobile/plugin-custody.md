@@ -52,7 +52,7 @@ ask about it. The group's members load `pluginCustody.ts` on first use, after th
 - `state`, `cachePut`, `trustRecord`, `trustForget`, and `devGrant` are `pluginDecisions`. `cachePut` fetches
   `GET /v1/core/plugins/:id/bundles/:hash` over the channel of the Node that offered the bundle.
 - `install` and `remove` refuse with "Install plugins from the desktop." The phone holds no device plugins.
-- Opening custody gives the sandbox its source for bytes (`setTreeBundleSource`). It reads the bundle from IndexedDB,
+- Opening custody gives the sandbox its source for bytes (`setBundleSource`). It reads the bundle from IndexedDB,
   and the relay page checks the bytes against its own host name before it starts them.
 
 On the phone the page is the only process, so the renderer can read a bundle's bytes. On the desktop it never does.

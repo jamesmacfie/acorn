@@ -50,12 +50,25 @@ beforeEach(() => {
 })
 
 afterEach(() => {
+  delete document.documentElement.dataset.formFactor
   dispose?.()
   host?.remove()
   for (const handle of registered.splice(0)) handle.dispose()
 })
 
 describe('SlotHost', () => {
+  it('draws only the contributions that say they draw on a phone, when the device is one', () => {
+    register({ id: 'dialog', slot: 'overlay', order: 1, component: () => <span data-mark="dialog" /> })
+    register({ id: 'sheet', slot: 'overlay', order: 2, onPhone: true, component: () => <span data-mark="sheet" /> })
+    mount(() => <SlotHost slot="overlay" context={context()} />)
+    expect(marks()).toEqual(['dialog', 'sheet'])
+    dispose()
+    host.remove()
+    document.documentElement.dataset.formFactor = 'narrow'
+    mount(() => <SlotHost slot="overlay" context={context()} />)
+    expect(marks()).toEqual(['sheet'])
+  })
+
   it('draws one slot only, ordered by order and then id', () => {
     register({ id: 'b', slot: 'topbar.left', order: 1, component: () => <span data-mark="b" /> })
     register({ id: 'a', slot: 'topbar.left', order: 1, component: () => <span data-mark="a" /> })

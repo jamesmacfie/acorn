@@ -22,7 +22,7 @@ vi.mock('idb-keyval', () => ({
   del: async (key: string) => void db.rows.delete(key),
 }))
 vi.mock('@acorn/client-core/host/tree', () => ({
-  setTreeBundleSource: (source: typeof db.source) => void (db.source = source),
+  setBundleSource: (source: typeof db.source) => void (db.source = source),
 }))
 vi.mock('@acorn/client-core/infra/telemetry', () => ({
   createLogger: () => ({ warn: vi.fn(), error: vi.fn(), info: vi.fn(), debug: vi.fn() }),

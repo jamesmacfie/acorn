@@ -40,6 +40,9 @@ type SlotBase = {
 
 export type ShellSlotContribution = SlotBase & {
   slot: Exclude<UiSlotId, TaskSlotId>
+  // Whether the contribution draws on a phone. A shell slot is the desktop's: its dialogs, palettes, and
+  // global shortcuts. `SlotHost` skips every one that doesn't say so when `formFactor()` is `narrow`.
+  onPhone?: true
   when?: (context: UiSlotContext) => boolean
   component: Component<{ context: UiSlotContext }>
 }

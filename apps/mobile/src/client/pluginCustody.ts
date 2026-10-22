@@ -1,7 +1,7 @@
 import { BundleCache, pluginDecisions, TrustStore, webCryptoSha256, type BundleFetcher } from '@acorn/custody/rules'
 import type { BundledAck, RulesLog } from '@acorn/custody/rules'
 import type { PluginCustody } from '@acorn/client-core/infra/platform'
-import { setTreeBundleSource } from '@acorn/client-core/host/tree'
+import { setBundleSource } from '@acorn/client-core/host/tree'
 import { createLogger } from '@acorn/client-core/infra/telemetry'
 import { firstPartyBundles } from './firstPartyBundles'
 import { openPluginStorage } from './pluginStorage'
@@ -39,7 +39,7 @@ export async function openPluginCustody(
   const decisions = pluginDecisions(cache, trust, rulesLog)
   // The page is the only process, so the sandbox's bytes come from here. Nothing starts before the
   // first `state()` has opened this, because no plugin is selected until the roster has been read.
-  setTreeBundleSource(storage.readBundle)
+  setBundleSource(storage.readBundle)
 
   // An answer the person is told about waits until what it says is in IndexedDB.
   const kept =

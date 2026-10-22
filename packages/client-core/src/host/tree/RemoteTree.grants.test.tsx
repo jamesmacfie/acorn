@@ -10,6 +10,8 @@ import type { TreeHostRequest, TreeHostResult } from './workerHost'
 // be the one this contribution's own manifest descriptor named. Neither is something the sandbox says.
 
 let handler: ((request: TreeHostRequest) => Promise<TreeHostResult>) | null = null
+// The screen sizes the overlay surface says it works at.
+const overlay = vi.hoisted(() => ({ formFactor: ['desktop'] as ('desktop' | 'mobile')[] }))
 
 vi.mock('@solidjs/router', () => ({ useNavigate: () => () => {} }))
 vi.mock('@tanstack/solid-query', () => ({ useQueryClient: () => ({}) }))
@@ -46,7 +48,9 @@ vi.mock('../plugins/contributions', () => ({
       installed: {
         permissions: { api: [], events: [] },
         // Namespaced, the way ../plugins/contributionIds.ts rewrites it before any of this is read.
-        contributions: { frames: [{ id: 'markup.editor', target: 'overlay', label: 'Image markup' }] },
+        contributions: {
+          frames: [{ id: 'markup.editor', target: 'overlay', label: 'Image markup', formFactor: overlay.formFactor }],
+        },
       },
     },
   ],
@@ -98,6 +102,7 @@ const ask = (request: TreeHostRequest) => handler!(request)
 
 beforeEach(() => {
   handler = null
+  overlay.formFactor = ['desktop']
 })
 
 afterEach(() => {
@@ -178,6 +183,17 @@ describe('opening a companion overlay', () => {
     await expect(ask({ op: 'overlay.open', name: 'settings', payload: null })).resolves.toMatchObject({
       ok: false,
       error: { code: 'unknown_overlay' },
+    })
+  })
+
+  // An overlay this device doesn't register would never draw, and the tree would wait for it forever.
+  it('answers unsupported when the overlay says it works only at another screen size', async () => {
+    overlay.formFactor = ['mobile']
+    mount()
+    focusInside()
+    await expect(ask({ op: 'overlay.open', name: 'markup.editor', payload: null })).resolves.toMatchObject({
+      ok: false,
+      error: { code: 'unsupported_host' },
     })
   })
 

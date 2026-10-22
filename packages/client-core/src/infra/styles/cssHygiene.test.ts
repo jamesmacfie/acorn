@@ -1,7 +1,6 @@
-import { readFileSync } from 'node:fs'
-import { join } from 'node:path'
 import { describe, expect, it } from 'vitest'
-import { readStyleSheets, referenced, workspaceRoot } from './readStyleSheets'
+import { FRAME_STYLES } from './frameStyles.mts'
+import { readStyleSheets, referenced } from './readStyleSheets'
 
 const sheets = readStyleSheets()
 const corpus = sheets.map((f) => f.text).join('\n')
@@ -140,7 +139,7 @@ describe('literal ratchets (these may only go down)', () => {
   })
 })
 
-// A plugin frame is served exactly the sheets scripts/stage.mjs lists, primitives.css among them
+// A plugin frame is served exactly the sheets frameStyles.mts lists, primitives.css among them
 // (docs/ui-design/kit-internals.md § How the kit is built).
 //
 // A font shorthand needs a size and a family. `font: var(--font-ui)` parses, because any var()
@@ -158,9 +157,7 @@ it('never puts a bare token in the font shorthand', () => {
 })
 
 describe('the plugin-frame stylesheet is self-contained', () => {
-  const listPath = join(workspaceRoot(), 'apps/desktop/scripts/stage.mjs')
-  const list = /const FRAME_STYLES = \[([\s\S]*?)\]/.exec(readFileSync(listPath, 'utf8'))?.[1] ?? ''
-  const served = [...list.matchAll(/'([^']+\.css)'/g)].map((m) => m[1])
+  const served = FRAME_STYLES
 
   it('names sheets that exist', () => {
     expect(served.length).toBeGreaterThan(5)

@@ -3,7 +3,7 @@ import { render } from 'solid-js/web'
 import { Route, Router } from '@solidjs/router'
 import { QueryClient, QueryClientProvider } from '@tanstack/solid-query'
 import { RemoteTree } from '@acorn/client-core/host/tree/RemoteTree.tsx'
-import { setTreeBundleSource } from '@acorn/client-core/host/tree'
+import { setBundleSource } from '@acorn/client-core/host/tree'
 import '@acorn/client-core/infra/styles/styles.css'
 
 // `/app/dev/sandbox` in `pnpm dev:mobile`: draws the probe bundle through the sandbox relay with no
@@ -18,7 +18,7 @@ const query = new URLSearchParams(location.search)
 async function fixtureHash(): Promise<string> {
   const bytes = await (await fetch(`${import.meta.env.BASE_URL}dev/sandbox-fixture.js`)).arrayBuffer()
   const posted = query.get('bytes') === 'tampered' ? new Uint8Array([...new Uint8Array(bytes), 10]).buffer : bytes
-  setTreeBundleSource(async () => posted)
+  setBundleSource(async () => posted)
   const digest = new Uint8Array(await crypto.subtle.digest('SHA-256', bytes))
   return Array.from(digest, (byte) => byte.toString(16).padStart(2, '0')).join('')
 }

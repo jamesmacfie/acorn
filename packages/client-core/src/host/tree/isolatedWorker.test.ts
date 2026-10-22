@@ -1,6 +1,7 @@
 // @vitest-environment jsdom
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { createIsolatedTreeWorker, pluginTreeRelayOrigin, setTreeBundleSource } from './isolatedWorker'
+import { createIsolatedTreeWorker, pluginTreeRelayOrigin } from './isolatedWorker'
+import { setBundleSource } from './sandboxOrigin'
 
 const HASH = '0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef'
 const NONCE = 'd1a01ee1-0f3b-4e02-8402-cedcb4d84d02'
@@ -9,7 +10,7 @@ const LABEL = '4oymiquy7qobjgx36tejs35zeqt24qpemsnzgtfeswmrw6csxbkq'
 const EMPTY_HASH = 'e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855'
 
 afterEach(() => {
-  setTreeBundleSource(null)
+  setBundleSource(null)
   document.body.replaceChildren()
   vi.unstubAllGlobals()
   vi.restoreAllMocks()
@@ -92,7 +93,7 @@ describe('isolated tree worker relay on the phone', () => {
     vi.stubGlobal('__ACORN_SANDBOX_DOMAIN__', 'sandbox.test')
     vi.stubGlobal('crypto', { randomUUID: () => NONCE })
     const bytes = new TextEncoder().encode('export {}').buffer
-    setTreeBundleSource(async (hash) => (hash === EMPTY_HASH ? bytes : new ArrayBuffer(0)))
+    setBundleSource(async (hash) => (hash === EMPTY_HASH ? bytes : new ArrayBuffer(0)))
     const sandbox = createIsolatedTreeWorker(EMPTY_HASH, PHONE)
     const frame = document.querySelector('iframe')!
     expect(frame.src).toBe(`https://${LABEL}.sandbox.test/worker.html#${NONCE}`)
@@ -132,7 +133,7 @@ describe('isolated tree worker relay on the phone', () => {
   it('fails closed when the source cannot read the bundle', async () => {
     vi.stubGlobal('__ACORN_SANDBOX_DOMAIN__', 'sandbox.test')
     vi.stubGlobal('crypto', { randomUUID: () => NONCE })
-    setTreeBundleSource(() => Promise.reject(new Error('gone')))
+    setBundleSource(() => Promise.reject(new Error('gone')))
     const sandbox = createIsolatedTreeWorker(EMPTY_HASH, PHONE)
     const frame = document.querySelector('iframe')!
     const failed = vi.fn()

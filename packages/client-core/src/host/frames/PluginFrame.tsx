@@ -8,13 +8,12 @@ import { watchAppearance } from '../../kit/tokens/appearance'
 import { FRAME_TOKENS } from '../../kit/tokens/tokenAxes'
 import { emitError, startSpan } from '../../infra/telemetry/emitter'
 import { createLogger } from '../../infra/telemetry/logger'
+import { phoneSandboxOrigin, pluginFrameOrigin } from '../tree/sandboxOrigin'
 import { createFrameBridge, postAppearance, postBridgeEvent, postSelect, postSurfaceAction } from './broker'
 import { createFrameServices, type PluginFrameProps } from './frameServices'
+import { startPhoneFrame } from './phoneFrame'
 
 export type { PluginFrameProps } from './frameServices'
-
-const PLUGIN_FRAME_SCHEME = 'app-plugin'
-const pluginFrameOrigin = (hash: string): string => `${PLUGIN_FRAME_SCHEME}://${hash}`
 
 // The host component for one sandboxed plugin surface (docs/plugins.md).
 //
@@ -24,7 +23,8 @@ const pluginFrameOrigin = (hash: string): string => `${PLUGIN_FRAME_SCHEME}://${
 //
 // docs/shell.md describes why the `sandbox` attribute carries `allow-same-origin` alongside
 // `allow-scripts`: the pair is only dangerous when the framed document shares the embedder's origin,
-// which is `app://acorn` here, not the frame's own `app-plugin://<hash>`.
+// which is `app://acorn` here, not the frame's own `app-plugin://<hash>`. On the phone the frame's own
+// origin is a name under the sandbox domain, and the phone app is never that origin either.
 
 const currentAxes = (): { theme: string; style: string } => ({
   // Both axes default to an attribute-less state: `light` and `terminal` have no [data-theme]/[data-style]
@@ -264,16 +264,36 @@ export default function PluginFrame(props: PluginFrameProps) {
     }
   }
 
+  // The phone's frame page refused the bytes or never started them: tampered bytes, a bundle this device
+  // can't read, or a bundle that threw while it evaluated. The same placeholder as a frame that never says
+  // hello, because the reader's situation is the same.
+  const onBundleRefused = (error: unknown): void => {
+    const reason = error instanceof Error ? error.message : String(error)
+    log.warn(`${props.binding.pluginId} surface '${props.binding.surface}' did not start: ${reason}`)
+    emitError(props.binding.pluginId, {
+      name: 'FrameBundleRefused',
+      message: reason,
+      handled: true,
+      attrs: { seam: 'frame.boot', 'plugin.surface': props.binding.surface },
+    })
+    retireFrame()
+    setSilent(true)
+  }
+
   const FrameBody = () => {
     onCleanup(() => {
       retireFrame()
       frameEl = undefined
     })
+    const origin = pluginFrameOrigin(props.hash)
+    // The phone's frame page has no bundle of its own: it waits for this host to post the bytes (./phoneFrame.ts).
+    const phone = phoneSandboxOrigin(props.hash, globalThis.location?.origin) !== null
+    const nonce = phone ? crypto.randomUUID() : ''
     return (
       <iframe
         // The bundle hash is the origin, so a plugin update is a new origin and a new frame. There is
         // nothing cached under the old one to reason about.
-        src={`${pluginFrameOrigin(props.hash)}/index.html`}
+        src={phone ? `${origin}/frame.html#${nonce}` : `${origin}/index.html`}
         title={props.binding.surface}
         sandbox="allow-scripts allow-same-origin"
         aria-hidden={props.controllerOnly ? 'true' : undefined}
@@ -284,6 +304,16 @@ export default function PluginFrame(props: PluginFrameProps) {
         }
         ref={(frame) => {
           frameEl = frame
+          if (phone) {
+            // Started now rather than on `load`: the page says it is ready before that event fires.
+            const abort = new AbortController()
+            detachLoad = () => abort.abort()
+            startPhoneFrame(frame, { hash: props.hash, origin, nonce }, abort.signal).then(
+              () => onLoad(frame),
+              onBundleRefused,
+            )
+            return
+          }
           const load = () => onLoad(frame)
           frame.addEventListener('load', load, { once: true })
           detachLoad = () => frame.removeEventListener('load', load)

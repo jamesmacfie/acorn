@@ -13,7 +13,6 @@ import { isCoreExclusiveSlot, qualifiedExtensionPointId, type DetailRegion } fro
 import { isPluginSettingsCategory, isSettingsScope } from '@acorn/protocol/settingsPages.ts'
 import { panelRegion, panelRegionRegistry } from '../../features/dashboards/region'
 import { activeNodeId } from '../../infra/node/activeNode'
-import { formFactor } from '../../infra/platform'
 import { registerPluginExtension } from '../chrome/chromeExtensionPoints'
 import { commandRegistry } from '../registries/commands/commands'
 import { pluginProjectRoutePrefix } from '../registries/commands/corePaths'
@@ -55,6 +54,7 @@ import { closePluginOverlay, pluginOverlayOpen } from './overlays'
 import { paneAvailability } from './paneAvailability'
 import { suppliedDocumentSurface } from './documentSurface'
 import { suppliedFrameSurface } from './frameSurface'
+import { surfaceFitsDevice } from './surfaceFits'
 import { createLogger } from '../../infra/telemetry/logger'
 
 const log = createLogger('plugins')
@@ -190,7 +190,7 @@ function registerSurfaces(
   for (const surface of row.installed?.contributions.frames ?? []) {
     // A surface that doesn't name this host's form factor would draw unusably. The manifest spells
     // `narrow` as `mobile`, and a terminal draws what the desktop does.
-    if (!surface.formFactor.includes(formFactor() === 'narrow' ? 'mobile' : 'desktop')) continue
+    if (!surfaceFitsDevice(surface)) continue
     // An `inline` surface registers nothing of its own: it is a rectangle offered into another plugin's
     // `rectangle` point, and the only thing that ever draws it is that plugin's pane (./InlineSlot.tsx).
     // Registering it as a pane here would put it in this plugin's own switcher, which is the opposite
@@ -737,6 +737,8 @@ function registerSurface(pluginId: string, hash: string, row: NodePluginRow, sur
           id: surface.id,
           slot: 'overlay',
           order: surface.order,
+          // The surface's own `formFactor` already decided that this device registers it.
+          onPhone: true,
           when: () => pluginEnabledOnNode(frameNode(), pluginId),
           component: () => {
             const nodeId = mountedFrameNode()

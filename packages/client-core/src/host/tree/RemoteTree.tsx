@@ -13,6 +13,7 @@ import {
 } from './hostRequests'
 import type { FrameBinding } from '../frames/broker'
 import { closePluginOverlayFrom, openPluginOverlayInvocation } from '../frames/overlays'
+import { surfaceFitsDevice } from '../frames/surfaceFits'
 import { createTreeBridgeFactory } from './bridgeFactory'
 import { eligiblePlugins, isTaskPane } from '../plugins/contributions'
 import { qualifiedContributionId } from '../plugins/contributionIds'
@@ -219,7 +220,7 @@ export function RemoteTree(componentProps: RemoteTreeProps) {
     // preview up (apps/tui/src/plugins/RemoteTree.tsx).
     const owner = eligiblePlugins().find((entry) => entry.pluginId === contribution.pluginId)
     const declared = (owner?.installed.contributions.frames ?? []).some(
-      (frame) => frame.id === wanted && frame.target === 'overlay',
+      (frame) => frame.id === wanted && frame.target === 'overlay' && surfaceFitsDevice(frame),
     )
     if (!declared) return unsupportedOverlay()
     // A modal is a person's act, and this is where that is checked: either the shell's focus is inside

@@ -6,6 +6,8 @@ import { setProjectsLookup } from '@acorn/client-core/features/projects/projectL
 import { setTaskLookup } from '@acorn/client-core/features/tasks'
 import { ToastHost } from '@acorn/client-core/features/notifications/ToastHost.tsx'
 import { PaneModelHost } from '@acorn/client-core/host/registries/panes/PaneModelHost.tsx'
+import { SlotHost } from '@acorn/client-core/host/registries/extensionPoints/uiSlots.tsx'
+import type { UiSlotContext } from '@acorn/client-core/host/registries/extensionPoints/slots.ts'
 import {
   activeCacheId,
   activeNodeId,
@@ -111,6 +113,18 @@ function NodesRoute() {
   )
 }
 
+// What a shell slot's component may ask of the desktop's shell. The phone draws no drawer or palette, so
+// the overlays it draws, a plugin's frame, ask for none of it.
+const slotContext: UiSlotContext = {
+  taskActive: false,
+  terminalOpen: false,
+  toggleTerminal: () => {},
+  closeTerminal: () => {},
+  openSettings: () => {},
+  selectTask: () => {},
+  activeTask: null,
+}
+
 // What every screen needs from the query client: the lookups client-core asks the host for, and the
 // person's theme and style from their preferences.
 function Frame(props: ParentProps) {
@@ -142,6 +156,9 @@ function Frame(props: ParentProps) {
       <Show when={sandboxDomain()}>
         <PluginTrustDialog bundlesOnly />
       </Show>
+      {/* Full-screen sheets over the screen: a plugin's overlay frame. SlotHost draws only the slot's
+          contributions that say they draw on a phone. */}
+      <SlotHost slot="overlay" context={slotContext} />
       <ToastHost />
     </div>
   )

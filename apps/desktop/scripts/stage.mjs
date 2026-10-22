@@ -4,6 +4,7 @@ import { dirname, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { runtimeTarget, stageNodeRuntime, targetTriple } from './node-runtime.mjs'
 import { stageRuntimeDependencies } from './stage-runtime-dependencies.mjs'
+import { readFrameStyles } from '@acorn/client-core/infra/styles/frameStyles.mts'
 
 // Everything the Rust shell needs on disk before `tauri dev` or `tauri build` runs: the bundled Node
 // runtime, the node service beside the helper, and the migration chains where the node's own walk-up
@@ -69,37 +70,11 @@ const pin = JSON.parse(readFileSync(resolve(ROOT, 'node-runtime.json'), 'utf8'))
 const { source } = await stageNodeRuntime({ pkg: PKG, version: pin, triple: target.triple })
 
 // The plugin frame's stylesheet, as one file the `app-plugin://` handler serves at `/ui.css`
-// (src-tauri/src/plugin_scheme.rs). The renderer gets these modules through Vite; the Rust handler
-// cannot, so they are concatenated here instead.
-//
-// Presentation only. Feature and data styles stay out: the list covers what the public UI entrypoint
-// needs — primitives, tabs, modals/mentions, copy controls, tooltips, picker chrome, diff rows, and
-// the style-pack structural overrides — so components imported from @acorn/plugin-api/ui keep the
-// same class contract inside a frame as outside one. Token values arrive over the bridge for the
-// active theme and style axes, not from here.
-//
-// The order is the cascade, so it is the list rather than a directory scan.
-// packages/client-core/src/infra/styles/cssHygiene.test.ts reads this array and checks that what a frame is
-// served covers every class primitives.css styles.
-const FRAME_STYLES = [
-  'infra/styles/base.css',
-  'infra/styles/primitives.css',
-  'infra/styles/overlays.css',
-  'infra/styles/tabs.css',
-  // The delegated tooltip bubble. A frame mounts its own listener, `mountFrameTips` from
-  // client-core/kit/lib/controls/frameTips.ts, because the shell's singleton cannot see into another document. It
-  // lives apart from kit/components/overlays/tips.tsx so a frame bundle does not pull Solid and the primitives in with it.
-  'kit/components/overlays/tips.css',
-  'infra/styles/topbar.css',
-  'infra/styles/diff.css',
-  'infra/styles/style-modern.css',
-  'infra/styles/style-cozy.css',
-  'infra/styles/style-cute.css',
-]
-const frameStyles = FRAME_STYLES.map((rel) => readFileSync(resolve(ROOT, 'packages/client-core/src', rel), 'utf8'))
+// (src-tauri/src/plugin_scheme.rs). The module list is shared with the phone's sandbox build.
+const frameStyles = readFrameStyles()
 mkdirSync(resolve(PKG, 'dist/bridge'), { recursive: true })
-writeFileSync(resolve(PKG, 'dist/bridge/plugin-frame.css'), frameStyles.join('\n'))
+writeFileSync(resolve(PKG, 'dist/bridge/plugin-frame.css'), frameStyles)
 
 console.log(
-  `[stage] node ${pin} (${source}) -> binaries/node-${target.triple}; service + ${chains.length} migration chain(s) -> dist/helper; ${frameStyles.length} frame stylesheet(s) -> dist/bridge`,
+  `[stage] node ${pin} (${source}) -> binaries/node-${target.triple}; service + ${chains.length} migration chain(s) -> dist/helper; frame stylesheet -> dist/bridge`,
 )

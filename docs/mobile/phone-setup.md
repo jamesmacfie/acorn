@@ -42,20 +42,22 @@ list of Nodes.
 
 Plugin code on the phone runs on a domain of its own, one host name per bundle
 ([the phone's plugin worker](./plugin-sandbox.md)). A phone build with no sandbox
-domain draws no plugin trees. To set one up:
+domain draws no plugin trees or frames. To set one up:
 
 1. Register a domain that isn't a subdomain of the app's. The same site would share cookies with the app.
 2. Add a wildcard DNS record and a wildcard certificate for it.
 3. Build the app with the domain in `ACORN_SANDBOX_DOMAIN`, a name and an optional port with no scheme:
    `ACORN_SANDBOX_DOMAIN=sandbox.example pnpm --filter @acorn/mobile build`.
-4. Serve `apps/mobile/dist-sandbox` on every name under the domain. It holds `worker.html` and
-   `worker-host.js`, and nothing else is a page. Send the headers in `dist-sandbox/headers.json` on every
-   response, including a 404. `apps/mobile/sandbox/headers.mts` writes them.
+4. Serve `apps/mobile/dist-sandbox` on every name under the domain. It holds the relay page (`worker.html`,
+   `worker-host.js`), the frame page (`frame.html`, `frame-host.js`, `ui.css`), and `bundle-check.js`, which both
+   pages load. Nothing else is a page. `headers.json` maps a path to the headers to send. Send the `/frame.html`
+   set on that path and the `/*` set on every other response, including a 404, with nothing merged.
+   `apps/mobile/sandbox/headers.mts` writes them.
 5. Add `frame-src https://*.sandbox.example` to the app's content security policy, and nothing else. The app
-   frames a relay page for each bundle it runs.
+   frames a relay page or a frame page for each bundle it runs.
 
 The sandbox holds no bundles and no secrets. The app posts the bytes, and the page refuses any that don't hash
-to its own host name. The page sets no `frame-ancestors` and doesn't check its parent's origin, because it can't name the app's
+to its own host name, for a frame as for a tree. The page sets no `frame-ancestors` and doesn't check its parent's origin, because it can't name the app's
 origin. A stranger who frames it gets only code that is public under its own hash.
 
 ## Try the sandbox
