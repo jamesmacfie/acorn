@@ -76,6 +76,7 @@ export default {
         label: 'API',
         glyph: 'send',
         order: 76,
+        formFactor: ['desktop', 'mobile'],
         layout: 'list-detail',
         collapsible: true,
         regions: {

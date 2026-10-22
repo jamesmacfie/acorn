@@ -293,6 +293,11 @@ export default function DatabasePanel(props: { bridge: AcornBridge; taskId: stri
     }
   }
 
+  const resultKey = (): string | null => {
+    const table = selected()
+    return table ? `${table.schema}.${table.name}` : result() ? 'query' : null
+  }
+
   const primaryKey = (): Record<string, DbCell> => {
     const set = result()
     const index = activeRow()
@@ -476,7 +481,9 @@ export default function DatabasePanel(props: { bridge: AcornBridge; taskId: stri
         <IconButton size="sm" icon="refresh-cw" label="Reconnect" onPress={() => void connect()} />
       </Toolbar>
 
-      <ListDetail split listLabel="Tables" selection={selected() ? `${selected()!.schema}.${selected()!.name}` : null}>
+      {/* A phone shows one column at a time and switches to the results when the selection changes, so a
+          query's rows, which belong to no table, are a selection of their own. */}
+      <ListDetail split listLabel="Tables" selection={resultKey()}>
         <ListColumn label="Tables">
           <SectionHeader count={connected() ? tables().length : undefined}>Tables</SectionHeader>
           {/* Last-known tables remain visible while the connection check runs. */}

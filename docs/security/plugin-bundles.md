@@ -111,6 +111,10 @@ without granting trust to them, and the next launch tries again. The hash is sti
 bytes every launch, so a changed bundle takes the full path. `ACORN_PROMPT_BUNDLED_PLUGIN_TRUST=1`
 skips bundled cache and trust setup.
 
+The phone's build carries the hashes of the bundles it was built with, and accepts a fetched bundle that matches one,
+recording the same acceptance the desktop records. A Node on another release offers hashes the phone doesn't carry, and
+those prompt ([the phone's first-party bundles](../mobile/plugin-custody.md#first-party-bundles)).
+
 ## The threats this closes
 
 - **A hostile paired Node serving malicious JavaScript.** Hash-verified bytes, a per-device

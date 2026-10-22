@@ -185,7 +185,8 @@ lists what agents are waiting on in **Needs you** and answers a permission reque
 a tap. It shows each task's conversation and sends a message, stops a turn, and starts a task with the
 same draft form the desktop uses. Every built-in pane except Preview draws, one at a time. A
 **Terminal** pane opens the task's terminal sessions, with a row of keys for Esc, Tab, Ctrl, and the
-arrows above the on-screen keyboard. Editing files, which nobody has checked at phone width, and the
+arrows above the on-screen keyboard. The Database, API, Rollbar, and Linear panes, and the session cost in the
+agents header, draw too, and need no prompt when the phone and the Node come from the same release. Editing files, which nobody has checked at phone width, and the
 dashboard editor draw but aren't promised on a phone.
 
 ## Command-line client

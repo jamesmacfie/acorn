@@ -1,8 +1,9 @@
 import { BundleCache, pluginDecisions, TrustStore, webCryptoSha256, type BundleFetcher } from '@acorn/custody/rules'
-import type { RulesLog } from '@acorn/custody/rules'
+import type { BundledAck, RulesLog } from '@acorn/custody/rules'
 import type { PluginCustody } from '@acorn/client-core/infra/platform'
 import { setTreeBundleSource } from '@acorn/client-core/host/tree'
 import { createLogger } from '@acorn/client-core/infra/telemetry'
+import { firstPartyBundles } from './firstPartyBundles'
 import { openPluginStorage } from './pluginStorage'
 
 // The phone's `plugins` seam group: the custody rules the desktop and the terminal client run, over
@@ -27,7 +28,10 @@ export type PhonePluginCustody = {
   forgetNode(nodeId: string): Promise<void>
 }
 
-export async function openPluginCustody(fetcher: BundleFetcher): Promise<PhonePluginCustody> {
+export async function openPluginCustody(
+  fetcher: BundleFetcher,
+  firstParty: readonly BundledAck[] = firstPartyBundles,
+): Promise<PhonePluginCustody> {
   const storage = await openPluginStorage()
   const cache = new BundleCache(storage.bundles, fetcher, webCryptoSha256, rulesLog)
   const trust = new TrustStore(storage.trust, rulesLog)
@@ -46,10 +50,22 @@ export async function openPluginCustody(fetcher: BundleFetcher): Promise<PhonePl
       return result
     }
 
+  // A bundle whose hash this phone computed from the bytes, and which this release carries, was built
+  // from the same source as the desktop's own: it is accepted with the disclosure the build recorded,
+  // not the one the Node sends (docs/mobile/plugin-custody.md § First-party bundles).
+  const cachePut = async (asked: Parameters<PluginCustody['cachePut']>[0]) => {
+    const result = await decisions.cachePut(asked)
+    if ('hash' in result) {
+      const carried = firstParty.find((ack) => ack.pluginId === asked.pluginId && ack.hash === result.hash)
+      if (carried) trust.record({ ...carried, decidedAt: Date.now() })
+    }
+    return result
+  }
+
   return {
     custody: {
       state: decisions.state,
-      cachePut: kept(decisions.cachePut),
+      cachePut: kept(cachePut),
       trustRecord: kept(decisions.trustRecord),
       trustForget: kept(decisions.trustForget),
       devGrant: kept(decisions.devGrant),

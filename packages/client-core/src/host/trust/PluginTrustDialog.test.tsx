@@ -1,6 +1,7 @@
 import { render } from 'solid-js/web'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { PLUGIN_API_MAJOR, type NodePluginRow } from '@acorn/protocol/api.ts'
+import type { PluginAckRecord } from '../../infra/platform'
 
 // A plugin with no client half has no bundle to ask about. These pin that it still asks before its
 // derived sources read anyone's data, and that Accept approves exactly the list it showed.
@@ -149,5 +150,31 @@ describe('PluginTrustDialog on a phone', () => {
       expect.objectContaining({ pluginId: 'readiness', hash: 'a'.repeat(64), decision: 'accepted' }),
     )
     expect(writeJson).not.toHaveBeenCalled()
+  })
+
+  it('names the version the person approved when an update changes only the code', async () => {
+    const previous: PluginAckRecord = {
+      pluginId: 'readiness',
+      hash: 'b'.repeat(64),
+      nodeId: 'node-a',
+      version: '0.9.0',
+      permissions: WITH_BUNDLE.installed!.permissions,
+      webviews: [],
+      keyClaims: [],
+      navigationDestinations: [],
+      extensions: [],
+      schedules: [],
+      taskChecks: [],
+      harnesses: [],
+      agentTools: [],
+      contextSections: [],
+      customAgents: [],
+      decision: 'accepted',
+      decidedAt: 1,
+    }
+    _seedPendingTrust([{ ...bundleRequest, previous }])
+    dispose = render(() => <PluginTrustDialog bundlesOnly />, document.body.appendChild(document.createElement('div')))
+    await vi.waitFor(() => expect(dialog()).not.toBeNull())
+    expect(dialog()!.textContent).toContain('You approved 0.9.0.')
   })
 })

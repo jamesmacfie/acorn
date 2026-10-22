@@ -91,6 +91,9 @@
     // The account API's published contract. The hosted account service, which lives in another
     // repository, imports its names, so a name nothing here imports is still in use.
     "packages/protocol/src/device/account.ts": ["exports", "types"],
+    // The phone build's script loads `bundledAck` through Vite, which knip can't follow
+    // (apps/mobile/scripts/build-first-party.mjs).
+    "packages/custody/src/rules/public.ts": ["exports"],
     // Starlight imports the route middleware's `onRequest` by path.
     "apps/site/src/routeData.ts": ["exports"],
     // JSX runtimes. Solid's compiler emits calls to these names, set by `moduleName` in the build.

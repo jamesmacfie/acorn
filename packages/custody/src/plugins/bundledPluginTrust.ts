@@ -1,19 +1,7 @@
 import { readdirSync } from 'node:fs'
 import { join } from 'node:path'
-import {
-  pluginAgentToolGrants,
-  pluginContextSectionGrants,
-  pluginCustomAgentGrants,
-  pluginExtensionGrants,
-  pluginHarnessGrants,
-  pluginKeyClaimGrants,
-  pluginNavigationDestinationGrants,
-  pluginScheduleGrants,
-  pluginTaskCheckGrants,
-  pluginWebviewGrants,
-} from '@acorn/protocol/plugin/grants.ts'
-import { clientDeclaration } from '@acorn/protocol/plugin/declaration.ts'
 import { readPluginManifest, readPluginFile, MAX_CLIENT_BUNDLE_BYTES } from '@acorn/node-core/server/plugins'
+import { bundledAck } from '../rules/bundledAck'
 import type { PluginCache } from './pluginCache'
 import type { PluginAck, PluginTrustStore } from './pluginTrustStore'
 import { createLogger, describeError } from '@acorn/node-core/server/telemetry'
@@ -85,26 +73,7 @@ export function trustBundledClientPlugins(
       }
       try {
         const { manifest } = packages.get(id)!
-        acks.push({
-          pluginId: id,
-          hash: result.hash,
-          nodeId: `bundled:acorn-${appVersion}`,
-          version: manifest.version,
-          declaration: clientDeclaration(manifest),
-          permissions: manifest.permissions,
-          webviews: pluginWebviewGrants(manifest.contributions),
-          keyClaims: pluginKeyClaimGrants(manifest.contributions),
-          navigationDestinations: pluginNavigationDestinationGrants(manifest.contributions),
-          extensions: pluginExtensionGrants(id, manifest.contributions),
-          schedules: pluginScheduleGrants(manifest.contributions),
-          taskChecks: pluginTaskCheckGrants(manifest.contributions),
-          harnesses: pluginHarnessGrants(manifest.contributions),
-          agentTools: pluginAgentToolGrants(manifest.contributions),
-          contextSections: pluginContextSectionGrants(manifest.contributions),
-          customAgents: pluginCustomAgentGrants(manifest.contributions),
-          decision: 'accepted',
-          decidedAt: Date.now(),
-        })
+        acks.push({ ...bundledAck(manifest, result.hash, `bundled:acorn-${appVersion}`), decidedAt: Date.now() })
       } catch (error) {
         log.error(`bundled client for ${id} could not be trusted: ${describeError(error).message}`, { 'plugin.id': id })
       }

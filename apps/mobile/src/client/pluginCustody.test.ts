@@ -1,6 +1,7 @@
 import { createHash } from 'node:crypto'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import type { PluginCustody } from '@acorn/client-core/infra/platform'
+import type { BundledAck } from '@acorn/custody/rules'
 
 // The phone's custody, with the custody rules real and IndexedDB a map: what the person is promised
 // holds across a reload, and a bundle that isn't what the Node advertised never reaches it.
@@ -37,7 +38,8 @@ let served: Uint8Array
 const fetcher = {
   fetch: vi.fn(async () => ({ status: 200, headers: {}, body: served as Uint8Array<ArrayBuffer> })),
 }
-const open = async (): Promise<PluginCustody> => (await openPluginCustody(fetcher)).custody
+const open = async (firstParty: readonly BundledAck[] = []): Promise<PluginCustody> =>
+  (await openPluginCustody(fetcher, firstParty)).custody
 
 type PluginTrustDecision = Parameters<PluginCustody['trustRecord']>[0]
 
@@ -97,6 +99,33 @@ describe('a bundle from the Node', () => {
     expect((await custody.state()).cached).toEqual({})
     expect([...db.rows.keys()].filter((key) => key.startsWith('bundle:'))).toEqual([])
     await expect(db.source!(hash)).rejects.toThrow('holds no bundle')
+  })
+})
+
+describe('a first-party bundle this release carries', () => {
+  const { decision: _, ...disclosure } = decision('accepted')
+  const carried: BundledAck = { ...disclosure, nodeId: 'bundled:acorn-test', decision: 'accepted' }
+
+  it('is accepted with the disclosure the build recorded, with no prompt, and stays accepted after a reload', async () => {
+    const custody = await open([carried])
+    expect(await custody.cachePut(put)).toEqual({ hash })
+    const acks = [
+      expect.objectContaining({ pluginId: 'runn', hash, decision: 'accepted', nodeId: 'bundled:acorn-test' }),
+    ]
+    expect((await custody.state()).acks).toEqual(acks)
+    expect((await (await open()).state()).acks).toEqual(acks)
+  })
+
+  it('is not accepted under another plugin’s name', async () => {
+    const custody = await open([carried])
+    await custody.cachePut({ ...put, pluginId: 'other' })
+    expect((await custody.state()).acks).toEqual([])
+  })
+
+  it('leaves a release the phone doesn’t carry to the prompt', async () => {
+    const custody = await open([{ ...carried, hash: 'a'.repeat(64) }])
+    await custody.cachePut(put)
+    expect((await custody.state()).acks).toEqual([])
   })
 })
 

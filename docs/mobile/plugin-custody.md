@@ -58,6 +58,30 @@ ask about it. The group's members load `pluginCustody.ts` on first use, after th
 On the phone the page is the only process, so the renderer can read a bundle's bytes. On the desktop it never does.
 [Browser plugin custody](../future/remote.md#implement-browser-plugin-custody) accepts that.
 
+## First-party bundles
+
+The phone trusts the bundles that ship with its own release without a prompt, as the desktop does for the bundles in its
+resource directory ([the application's own bundles](../security/plugin-bundles.md#the-applications-own-bundles)). Both
+use `bundledAck` in `packages/custody/src/rules/bundledAck.ts`, which turns a built manifest and the hash of its client
+bundle into the acceptance the trust store records. The desktop calls it at launch for what it finds on disk. The phone
+build calls it once.
+
+`pnpm --filter @acorn/mobile build` first runs `apps/mobile/scripts/build-first-party.mjs`. It builds the roster in
+`scripts/bundled-plugins.mjs` with the function the desktop and the standalone Node use, hashes each client bundle, and
+writes `apps/mobile/first-party-bundles.json`, which Git ignores. `vite.config.ts` hands the file to the app as
+`__ACORN_FIRST_PARTY_BUNDLES__`, and only the custody chunk reads it, so the first screen doesn't grow. `pnpm dev:mobile`
+runs the same script, so a Node started from the same checkout matches.
+
+The script builds with no `NODE_ENV`. A dev server's value changes the bytes, and then no hash would match.
+
+At run time `openPluginCustody` checks each bundle the phone fetches. When the hash the phone computed from the bytes and
+the plugin id match a carried entry, it records that entry as accepted, with the disclosure the build recorded and not the
+one the Node sent. The distribution model then finds an acceptance whose declaration equals the Node's, so nothing prompts.
+A Node on another release offers other hashes, and they take the prompt below. A Node that keeps the bytes and changes the
+declaration loses the match for the same reason it does on the desktop.
+
+An empty list is safe: a build with no file carries nothing, and every bundle asks.
+
 ## The trust prompt
 
 The phone mounts `PluginTrustDialog` lazily, with `bundlesOnly`. What a plugin reads and the skills it supplies are

@@ -60,6 +60,7 @@ export default {
         label: 'Linear',
         glyph: 'brand:linear',
         order: 90,
+        formFactor: ['desktop', 'mobile'],
         providerId: 'linear',
         layout: 'single',
         regions: { body: { kind: 'remote', entry: 'pane' } },

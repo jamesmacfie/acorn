@@ -762,6 +762,14 @@ textarea.ui-input[data-grow] { flex: 1; min-height: 0; resize: none; }
   border-bottom: 0;
   gap: var(--gap-row);
 }
+/* A plugin's bar on a phone wraps its controls onto a second line instead of pushing the last ones past
+   the edge. The heading asks for its own width, because a heading that asks for none is left with
+   whatever the first line has over, which is a sliver. */
+:root[data-form-factor='narrow'] .remote-tree .ui-toolbar:not([data-variant='actions']) {
+  flex-wrap: wrap;
+  padding-block: var(--space-2);
+}
+:root[data-form-factor='narrow'] .remote-tree .ui-toolbar:has(> .ui-toolbar-spacer) > .ui-heading { flex: 1 1 auto; }
 .ui-toolbar-spacer { flex: 1; }
 .ui-toolbar-group { display: inline-flex; align-items: center; gap: var(--space-2); }
 /* Joined: one control out of several buttons. Each child is a button or a Menu's contents-only anchor

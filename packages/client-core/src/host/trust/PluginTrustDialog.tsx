@@ -214,7 +214,7 @@ export default function PluginTrustDialog(props: { bundlesOnly?: boolean }) {
                     }
                   >
                     <Show
-                      when={previousVersion() && !sameBundleReview()}
+                      when={!sameBundleReview() && previousVersion()}
                       fallback={
                         sameBundleReview()
                           ? changedDeclaration()

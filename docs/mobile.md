@@ -164,7 +164,11 @@ phone](./mobile/agent-pane.md) covers how the shared Agents pane draws here.
 - A loaded plugin runs only when the build names a sandbox domain, and only a pane that lists `mobile` in its
   `formFactor` shows. The phone keeps and trusts bundles, but it installs none, and it asks only about bundles. What a
   plugin reads and the skills it supplies are approved on the desktop
-  ([the phone's plugin custody](./mobile/plugin-custody.md)).
+  ([the phone's plugin custody](./mobile/plugin-custody.md)). The Database, API, Rollbar, and Linear task panes list
+  `mobile`, and they and the agent cost draw with no prompt when the phone's release and the Node's match. After a Node
+  update the phone hasn't caught up with, each asks once.
+- The API pane doesn't switch to a request's detail when you tap the request, because a plugin's panes have no way to
+  report a selection. Tap **Show detail**.
 - Telemetry stays off, because nothing on the phone switches it on.
 - The phone tells the plugin distribution it's the desktop app, because it draws the desktop's DOM
   plugin halves.

@@ -31,6 +31,7 @@ export default {
       label: 'Rollbar',
       glyph: 'brand:rollbar',
       order: 100,
+      formFactor: ['desktop', 'mobile'],
       providerId: 'rollbar',
       // One tree fills the whole pane, so the layout is the trivial one. Naming it is still what says
       // "draw this from my tree" rather than "give me a rectangle", and it is what the pane inherits

@@ -2,6 +2,7 @@ node_modules/
 .turbo/
 dist/
 apps/mobile/dist-sandbox/
+apps/mobile/first-party-bundles.json
 .pnpm-store/
 .env
 .env*.local

@@ -1,5 +1,7 @@
 // The custody rules with no host in them, which a phone's browser loads too. Nothing under `rules/` may
 // import `node:` or anything outside this folder but the protocol (tools/arch/boundaries.test.ts).
+export { bundledAck } from './bundledAck.ts'
+export type { BundledAck } from './bundledAck.ts'
 export { BundleCache } from './bundleCache.ts'
 export type { BundleFetcher } from './bundleCache.ts'
 export { pluginDecisions } from './decisions.ts'

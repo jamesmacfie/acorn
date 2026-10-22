@@ -1,3 +1,4 @@
+import { execFileSync } from 'node:child_process'
 import { readFile } from 'node:fs/promises'
 import { createServer as createHttpServer } from 'node:http'
 import { resolve } from 'node:path'
@@ -21,6 +22,11 @@ const port = Number(process.env.ACORN_MOBILE_PORT ?? 4321)
 const sandboxPort = Number(process.env.ACORN_SANDBOX_PORT ?? 4322)
 const account = process.env.ACORN_ACCOUNT_URL ?? 'http://127.0.0.1:48781'
 const host = process.env.ACORN_MOBILE_HOST ?? '127.0.0.1'
+
+// The bundles this checkout ships, so a Node run from it needs no trust prompt on the phone
+// (docs/mobile/plugin-custody.md § First-party bundles). A child process, because it must not see the
+// NODE_ENV set below.
+execFileSync(process.execPath, [resolve(import.meta.dirname, 'build-first-party.mjs')], { stdio: 'inherit' })
 
 // Vite's build, which builds the probe below, would otherwise set `production` for the dev server too.
 process.env.NODE_ENV = 'development'

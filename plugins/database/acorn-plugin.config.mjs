@@ -81,6 +81,7 @@ export default {
       glyph: 'database',
       // Its position in the switcher. Renumbering moves panes under everyone who has this one open.
       order: 70,
+      formFactor: ['desktop', 'mobile'],
       // Hidden on a task with no database source: no connection script, and no DATABASE_URL in the
       // worktree `.env` or the node's environment. There would be nothing to connect to.
       availability: '/v1/p/database/available',
