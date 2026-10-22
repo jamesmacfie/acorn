@@ -56,6 +56,9 @@ export type ButtonProps = Tipped & {
   opens?: 'menu' | 'listbox' | 'dialog'
   expanded?: boolean
   describedBy?: string
+  /** Pressing it leaves the focus where it was: a key that types into the field that has it, such as
+   *  a terminal's row of keys above a phone's keyboard, which would close if the field lost focus. */
+  keepsFocus?: boolean
   /** Renders an <a class="ui-btn">. A control that navigates is a link, not a button: middle-click,
    *  copy-link, and screen-reader semantics depend on it. `target` and `rel` come from the host. */
   href?: string
@@ -114,6 +117,9 @@ export function Button(props: ButtonProps) {
           type={props.submit ? 'submit' : 'button'}
           autofocus={props.autofocus}
           disabled={props.disabled || props.busy}
+          onMouseDown={(event) => {
+            if (props.keepsFocus) event.preventDefault()
+          }}
           onClick={() => props.onPress?.()}
         >
           {body()}

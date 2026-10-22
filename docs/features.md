@@ -183,9 +183,10 @@ states. [Client state and fleet behavior](./architecture/fleet.md) covers the ru
 A phone's browser opens a [mobile web app](./mobile.md) from the account website and reaches the Node through a relay. It
 lists what agents are waiting on in **Needs you** and answers a permission request or a question with
 a tap. It shows each task's conversation and sends a message, stops a turn, and starts a task with the
-same draft form the desktop uses. Every built-in pane except Preview draws, one at a time. These parts
-draw but aren't promised on a phone: typing in a terminal, because the keyboard can't send the control
-keys a shell needs; editing files, which nobody has checked at phone width; and the dashboard editor.
+same draft form the desktop uses. Every built-in pane except Preview draws, one at a time. A
+**Terminal** pane opens the task's terminal sessions, with a row of keys for Esc, Tab, Ctrl, and the
+arrows above the on-screen keyboard. Editing files, which nobody has checked at phone width, and the
+dashboard editor draw but aren't promised on a phone.
 
 ## Command-line client
 

@@ -2,6 +2,7 @@ import { lazy } from 'solid-js'
 import { registerNoticeTargetHandler, setTerminalOpen, type ClientPlugin } from '@acorn/plugin-api/client'
 import { terminalAgentContextContribution } from './agentContextContribution'
 import { terminalDrawerContribution } from './drawerContribution'
+import { terminalPaneContribution } from './paneContribution'
 import { terminalCommands } from './commands'
 import {
   activeTerminal,
@@ -24,6 +25,7 @@ export const terminalClientPlugin: ClientPlugin = {
   required: true,
   init: (ctx) => {
     ctx.slots.register(terminalDrawerContribution)
+    ctx.panes.register(terminalPaneContribution)
     // Other plugins' controls beside the terminal's own, drawn by the desktop drawer and the terminal
     // client's sessions view. One action, Interrupt, and no PTY access (docs/plugins/toolbar-actions.md).
     ctx.extensionPoints.register({

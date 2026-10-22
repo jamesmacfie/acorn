@@ -75,6 +75,9 @@ export function installPlatform(): void {
     const nodes = await pairedNodes()
     known.clear()
     for (const node of nodes) known.set(node.nodeId, node)
+    // After a page load, client-core can name the Node on screen before this list has been read. The
+    // feed waits for it, or the phone hears no events until the person picks another Node.
+    if (interest && known.has(interest)) linkFor(interest).setEvents(true)
     return nodes
   }
 

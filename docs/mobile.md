@@ -155,8 +155,10 @@ phone](./mobile/agent-pane.md) covers how the shared Agents pane draws here.
 
 ## Limits
 
-- Typing in a terminal, editing files, and the dashboard editor draw but aren't promised on a phone
+- Editing files and the dashboard editor draw but aren't promised on a phone
   ([features](./features.md#phone)). The app has no help screen to say so.
+- The terminal pane has no layout recipes or run targets, and its key row has no Alt and no Ctrl with
+  an arrow ([the phone's terminal pane](./terminal/client.md#the-phones-terminal-pane)).
 - With the keyboard up the composer is tall and the transcript nearly disappears.
 - Loaded plugins don't run, because the browser has no plugin custody.
 - Telemetry stays off, because nothing on the phone switches it on.

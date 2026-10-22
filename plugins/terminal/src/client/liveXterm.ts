@@ -2,11 +2,13 @@ import { Terminal } from '@xterm/xterm'
 import { FitAddon } from '@xterm/addon-fit'
 import { WebglAddon } from '@xterm/addon-webgl'
 import '@xterm/xterm/css/xterm.css'
+import { createSignal } from 'solid-js'
 import { isAppDark, telemetryFor, watchAppearance } from '@acorn/plugin-api/client'
 import { holdTerminal, type HeldTerminal } from './heldTerminals'
 import { terminalApi } from './terminalClient'
 import { baseTheme, monoFont, xtermTheme } from './theme'
 import { TERMINAL_LINE_HEIGHT } from './preferences'
+import { keyBytes, withCtrl, type RowKey } from './keyRow'
 
 const telemetry = telemetryFor('terminal')
 
@@ -43,7 +45,13 @@ export type LiveXterm = HeldTerminal & {
   show(): void
   hide(): void
   setFontSize(fontSize: number): void
+  /** Types a key from the phone's key row, as if the keyboard had sent it (./keyRow.ts). */
+  press(key: RowKey): void
 }
+
+/** The terminal whose input has focus, which is where the phone's key row types. */
+const [focusedTerminal, setFocusedTerminal] = createSignal<LiveXterm | null>(null)
+export { focusedTerminal }
 
 // How many terminals keep a WebGL renderer. A WebKit page gets 16 live WebGL contexts and loses the
 // oldest past that, and every terminal a reader has opened is alive at once. The ones shown most
@@ -227,7 +235,7 @@ function buildXterm(nodeId: string, sessionId: string, firstHost: HTMLElement, i
     return true
   })
   term.onData((d) => {
-    if (!disposed) api.write(sessionId, d)
+    if (!disposed) api.write(sessionId, withCtrl(d))
   })
   term.onResize(({ cols, rows }) => {
     if (!disposed) void api.resize(sessionId, cols, rows)
@@ -238,7 +246,7 @@ function buildXterm(nodeId: string, sessionId: string, firstHost: HTMLElement, i
   const ro = new ResizeObserver(() => safeFit())
   ro.observe(firstHost)
 
-  return {
+  const live: LiveXterm = {
     nodeId,
     sessionId,
     get mounted() {
@@ -288,6 +296,9 @@ function buildXterm(nodeId: string, sessionId: string, firstHost: HTMLElement, i
       renderer.shown = false
       detachSoon()
     },
+    press(key) {
+      if (!disposed) term.input(keyBytes(key, term.modes.applicationCursorKeysMode))
+    },
     setFontSize(next) {
       fontSize = next
       if (disposed || term.options.fontSize === next) return
@@ -300,6 +311,7 @@ function buildXterm(nodeId: string, sessionId: string, firstHost: HTMLElement, i
       host = null
       onExit = undefined
       dropWebgl(renderer)
+      if (focusedTerminal() === live) setFocusedTerminal(null)
       clearTimeout(detachTimer)
       detach?.()
       unwatchAppearance()
@@ -307,4 +319,7 @@ function buildXterm(nodeId: string, sessionId: string, firstHost: HTMLElement, i
       term.dispose()
     },
   }
+  term.textarea?.addEventListener('focus', () => setFocusedTerminal(live))
+  term.textarea?.addEventListener('blur', () => setFocusedTerminal((current) => (current === live ? null : current)))
+  return live
 }

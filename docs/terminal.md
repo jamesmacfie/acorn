@@ -1,6 +1,6 @@
 # The terminal plugin
 
-The terminal plugin runs the desktop terminal drawer, task terminal sessions, run targets, provider
+The terminal plugin runs the desktop terminal drawer, the phone's terminal pane, task terminal sessions, run targets, provider
 profiles, and the handoff from a managed agent to its raw CLI. Read this page to find the topic page
 for a part of it. The plugin is in `plugins/terminal/`.
 
@@ -28,8 +28,8 @@ script. The capability belongs to one Node runtime and is disposed with the term
   serialization, the run history and the **Terminal runs** data source, the two workflow step kinds,
   and the palette rows.
 
-- [The terminal drawer](./terminal/client.md) covers the drawer, held terminals, the `pty` rectangle,
-  and terminal client sessions.
+- [The terminal drawer](./terminal/client.md) covers the drawer, the phone's pane, held terminals, the
+  `pty` rectangle, and terminal client sessions.
 
 ## Profiles
 

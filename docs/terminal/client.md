@@ -1,7 +1,7 @@
 # The terminal drawer
 
-This page covers the client side of the terminal plugin: the desktop drawer, why its terminals outlive
-their task, the `pty` rectangle and `attachPty`, and the terminal client's sessions view. The client is
+This page covers the client side of the terminal plugin: the desktop drawer, the phone's pane, why its
+terminals outlive their task, the `pty` rectangle and `attachPty`, and the terminal client's sessions view. The client is
 in `plugins/terminal/src/client/`.
 
 ## Client
@@ -21,6 +21,29 @@ terminal.
 the selected session's id, title, and running state, and can ask for `interrupt`. The drawer sends the
 same interrupt as its own control, and only after a person's press inside that contributor's tree
 ([toolbar actions](../plugins/toolbar-actions.md)).
+
+## The phone's terminal pane
+
+A phone draws panes and no drawers, so the plugin registers a **Terminal** pane with
+`formFactor: ['narrow']`, last in the bar. The drawer (`TerminalPanel.tsx`) and the pane
+(`TerminalPane.tsx`) draw one body, `TerminalSessions.tsx`: the tab strip, the profile menu, and a
+surface per session. The drawer adds its box, grip, and Hide. The pane loads after the first frame.
+
+The sessions live on the Node, so a phone reaches them over its channel like any client. With no
+sessions, the pane starts one from the default profile in **Settings** > **Terminal**, as the drawer's
+button does, or shows **New terminal**. Leaving the pane leaves its sessions running, as hiding the
+drawer does, and closing the last tab leaves the pane empty.
+
+While a terminal has focus, which on a phone is while the keyboard is up, a row of keys sits at the
+foot of the pane, above the keyboard. Its buttons take `keepsFocus`, so a press doesn't close the
+keyboard. Each key goes in through xterm, as typing does (`keyRow.ts`):
+
+| Key | Bytes |
+| --- | --- |
+| Esc | `ESC` (0x1b) |
+| Tab | `HT` (0x09) |
+| Arrows | `ESC [ A` to `ESC [ D`, or `ESC O A` to `ESC O D` while the program asks for application cursor keys, as `vi` and `less` do |
+| Ctrl | Nothing. The next character typed becomes its control code, so `c` sends 0x03. Letters, `@`, `[`, `\`, `]`, `^`, `_`, space, and `?` have one. Anything else is sent unchanged. Either way, Ctrl lets go. |
 
 ## Terminals outlive their task view
 

@@ -7,8 +7,9 @@ export const terminalDrawerContribution: UiSlotContribution = {
   id: 'terminal.drawer',
   slot: 'drawer',
   order: 10,
-  // Desktop-only, declared rather than probed: the drawer is a PTY surface and there is no engine in a
-  // browser (dev:node). The slot host filters on this, so the component never mounts to discover it.
+  // Declared rather than probed: the sessions live on the Node and reach any client over its channel,
+  // so the gate is whether the Node runs the terminal plugin. The slot host filters on this, so the
+  // component never mounts to discover it.
   requires: { plugin: 'terminal' },
   when: (context) => context.terminalOpen,
   // `closeTerminal`, not `toggleTerminal`. TerminalPanel.closeTab decides to close the drawer after two

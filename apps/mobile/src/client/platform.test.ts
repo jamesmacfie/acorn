@@ -213,6 +213,16 @@ describe('the transport', () => {
     expect(opened[0]!.client.sent.at(-1)).toEqual({ channel: 'term:attach', id: 't1' })
   })
 
+  it('opens the feed of a Node named on screen before the paired list was read', async () => {
+    acorn.nodeInterest('node-3')
+    await settle()
+    expect(opened).toEqual([])
+    stored.nodes.set('node-3', { nodeId: 'node-3', label: 'Laptop', channelKey: 'cc'.repeat(32), pairedAt: 3 })
+    await acorn.fleetList()
+    await settle()
+    expect(opened.map((channel) => channel.nodeId)).toEqual(['node-3'])
+  })
+
   it('replays the latest status of each Node to someone who starts listening late', async () => {
     acorn.nodeInterest('node-2')
     await settle()
