@@ -1,7 +1,8 @@
 # The Memory page
 
 This page covers the Memory page in the project rail, how you edit and restore memories there, the
-import flow, the card an agent's memory write draws in the transcript, and the Memories data source.
+import flow, the card an agent's memory write draws in the transcript, the Memories data source, and
+what memory can't stop.
 The store and tools are in [notes and memory](../notes-and-memory.md#memory).
 
 ## The Memory page
@@ -86,3 +87,13 @@ so its record opens nothing.
 
 The source ships four starter panels: memories added this month, memories by type, memories added
 each week by type, and memories untouched for 90 days.
+
+## Limits
+
+Any agent can write a project memory, and every later session in that project sees its name and
+description in the index. Running sessions see it before their next turn. An agent that read hostile
+text can leave one there. The write checks refuse common forms, such as role-like tags, instruction
+overrides, and hidden characters, but not an instruction written in plain words. The contract tells
+the reading agent to treat a memory as a note, never as a request. The Memory page is where you find
+and reverse a bad one: the reader and **Recent changes** link an agent's change to its session,
+**History** keeps 20 earlier versions, and **Undo** reverses the change.

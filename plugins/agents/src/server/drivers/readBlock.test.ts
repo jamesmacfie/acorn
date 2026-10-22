@@ -1,7 +1,7 @@
 import { execFileSync } from 'node:child_process'
 import { mkdirSync, mkdtempSync, realpathSync, rmSync, symlinkSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
-import { dirname, join } from 'node:path'
+import { dirname, join, sep } from 'node:path'
 import { afterEach, describe, expect, it } from 'vitest'
 import type { AgentSession } from '../../contract/wire.ts'
 import { fileToolRefusal } from '@acorn/plugin-api/testkit'
@@ -10,6 +10,7 @@ import { claudeHarness, claudeReadBlockSettings } from './claudeHarness'
 import { dataRootReadBlock, gitWrites, linkedGitDirs } from './readBlock'
 
 const roots: string[] = []
+const within = (path: string, root: string): boolean => path === root || path.startsWith(root + sep)
 const GUARD = { command: '/app/node', args: ['/app/helper/file-guard.js'] }
 // The policy a session's guard hook carries: the last word of its command, single-quoted.
 const guardPolicy = (settings: { preToolUse: unknown[] }): FileGuardPolicy => {
@@ -48,6 +49,7 @@ function fixture() {
     mkdirSync(join(dataDir, dir), { recursive: true })
   for (const file of [
     'core.sqlite',
+    'node.json',
     'node-keys.sealed',
     'internal-credentials/own.token',
     'tls/cert.pem',
@@ -55,6 +57,7 @@ function fixture() {
   ])
     writeFileSync(join(dataDir, file), '')
   const env = {
+    ACORN_DATA_DIR: dataDir,
     ACORN_API_URL: 'https://127.0.0.1:43123',
     ACORN_API_TOKEN_FILE: join(dataDir, 'internal-credentials', 'own.token'),
     NODE_EXTRA_CA_CERTS: join(dataDir, 'tls', 'cert.pem'),
@@ -98,10 +101,11 @@ describe('the data root read block', () => {
     for (const path of [...plain.writeDenied, ...gitWrites(worktree).writeDenied]) expect(path).not.toMatch(/[*?[]/)
   })
 
-  it('hides everything beside the worktree, skills, and own attachments, however deep they sit, and keeps its own token readable', () => {
+  it('hides everything beside the worktree, skills, and own attachments, however deep they sit, and keeps what the task CLI reads readable', () => {
     const { dataDir, repo, worktree, env, skills, pluginSkill, attachments } = fixture()
     const block = dataRootReadBlock({
       dataDir,
+      clientDirs: [],
       worktree,
       env,
       skillPaths: [skills, pluginSkill],
@@ -118,13 +122,21 @@ describe('the data root read block', () => {
         'core.sqlite',
         'internal-credentials',
         'node-keys.sealed',
+        'node.json',
         'plugins/agents.sqlite',
         'tls',
         'worktrees/task-2',
       ].map((entry) => join(dataDir, entry)),
     )
     expect(block.readable).toEqual(
-      expect.arrayContaining([worktree, skills, attachments, env.ACORN_API_TOKEN_FILE, env.NODE_EXTRA_CA_CERTS]),
+      expect.arrayContaining([
+        worktree,
+        skills,
+        attachments,
+        env.ACORN_API_TOKEN_FILE,
+        env.NODE_EXTRA_CA_CERTS,
+        join(dataDir, 'node.json'),
+      ]),
     )
     expect(block).toMatchObject(gitWrites(worktree))
     expect(block.readable.map((path) => realpathSync(path))).toContain(realpathSync(join(repo, '.git')))
@@ -136,7 +148,15 @@ describe('the data root read block', () => {
   it('keeps the file tools out of a protected file created after the session started', () => {
     const { dataDir, repo, worktree, env, skills, pluginSkill, attachments } = fixture()
     const settings = claudeReadBlockSettings(
-      dataRootReadBlock({ dataDir, worktree, env, skillPaths: [skills, pluginSkill], attachments, fileGuard: GUARD }),
+      dataRootReadBlock({
+        dataDir,
+        clientDirs: [],
+        worktree,
+        env,
+        skillPaths: [skills, pluginSkill],
+        attachments,
+        fileGuard: GUARD,
+      }),
     )
     writeFileSync(join(dataDir, '.env'), 'SECRET=fake')
     expect(settings.deny.some((rule) => rule.includes('.env'))).toBe(false)
@@ -165,6 +185,67 @@ describe('the data root read block', () => {
     expect(call('Grep', { pattern: 'x' })).toBeNull()
     expect(call('Read', { file_path: join(repo, 'README.md') })).toBeNull()
   })
+
+  // The CLI and the other clients keep the owner's device token there as a plain file.
+  it('blocks the client folders like the data root, and only the entries beside the work in one holding it', () => {
+    const { dataDir, worktree, env, skills, attachments } = fixture()
+    // An installed desktop's custody root holds the data root, with its key and paired Nodes beside it.
+    const root = dirname(dataDir)
+    writeFileSync(join(root, 'data.key'), 'key')
+    const client = join(root, 'acorn')
+    mkdirSync(join(client, 'mobile'), { recursive: true })
+    writeFileSync(join(client, 'device-token-local'), 'owner')
+    // A development desktop's custody root, beside its Node's data root.
+    const shell = `${dataDir}-shell`
+    mkdirSync(shell)
+    writeFileSync(join(shell, 'data.key'), 'key')
+    const missing = join(root, 'missing')
+    const block = dataRootReadBlock({
+      dataDir,
+      clientDirs: [client, shell, root, missing],
+      worktree,
+      env,
+      skillPaths: [skills],
+      attachments,
+      fileGuard: GUARD,
+    })
+    expect(block.clientDirs).toEqual([client, shell, root, missing])
+    // The sandbox never denies a folder above the worktree or the data root.
+    expect(block.clientReadDenied).toContain(join(root, 'data.key'))
+    expect(block.clientReadDenied).toEqual(expect.arrayContaining([client, shell]))
+    for (const path of block.clientReadDenied) {
+      expect(within(worktree, path) || within(dataDir, path)).toBe(false)
+      expect(path).not.toBe(missing)
+    }
+    expect(block.hidden).toEqual(
+      expect.arrayContaining([join(client, 'device-token-local'), join(shell, 'data.key'), join(root, 'data.key')]),
+    )
+    expect(new Set(block.hidden).size).toBe(block.hidden.length)
+
+    const settings = claudeReadBlockSettings(block)
+    expect((settings.sandbox.filesystem as { denyRead: string[] }).denyRead).toEqual([
+      dataDir,
+      ...block.clientReadDenied,
+    ])
+    expect(settings.deny).toEqual(
+      expect.arrayContaining([`Read(/${join(client, 'device-token-local')})`, `Edit(/${join(client, 'mobile')}/**)`]),
+    )
+    const policy = guardPolicy(settings)
+    expect(policy.dataDir).toEqual([dataDir, client, shell, root, missing])
+    const call = (tool_name: string, tool_input: Record<string, unknown>) =>
+      fileToolRefusal(policy, { tool_name, tool_input, cwd: worktree })
+    expect(call('Read', { file_path: join(client, 'device-token-local') })).toMatch(/data folder/)
+    expect(call('Read', { file_path: join(root, 'data.key') })).toMatch(/data folder/)
+    expect(call('Read', { file_path: join(shell, 'data.key') })).toMatch(/data folder/)
+    // Created after the start, so no deny rule names them.
+    expect(call('Read', { file_path: join(client, 'fleet.json') })).toMatch(/data folder/)
+    expect(call('Read', { file_path: join(missing, 'device-token-local') })).toMatch(/data folder/)
+    // The work inside the desktop's folder still works.
+    expect(call('Read', { file_path: join(worktree, 'README.md') })).toBeNull()
+    expect(call('Write', { file_path: join(worktree, 'src', 'new.ts'), content: 'x' })).toBeNull()
+    expect(call('Read', { file_path: join(skills, 'SKILL.md') })).toBeNull()
+    expect(call('Grep', { pattern: 'x' })).toBeNull()
+  })
 })
 
 describe('the read block in Claude Code', () => {
@@ -175,6 +256,8 @@ describe('the read block in Claude Code', () => {
   it('turns on a sandbox with no unsandboxed retry, and denies the file tools the hidden entries', () => {
     const block = {
       dataDir: '/data',
+      clientDirs: ['/config/acorn', '/config/missing'],
+      clientReadDenied: ['/config/acorn'],
       worktree: '/data/worktrees/t',
       readable: ['/data/worktrees/t', '/skills/a'],
       writable: ['/repo/.git'],
@@ -197,7 +280,7 @@ describe('the read block in Claude Code', () => {
       /^'\/app\/node' '\/app\/helper\/file-guard\.js' '[A-Za-z0-9_-]+'$/,
     )
     expect(guardPolicy(claudeReadBlockSettings(block))).toEqual({
-      dataDir: ['/data'],
+      dataDir: ['/data', '/config/acorn', '/config/missing'],
       read: block.readable,
       write: ['/data/worktrees/t', '/repo/.git'],
       writeDenied: ['/repo/.git/hooks'],
@@ -219,7 +302,7 @@ describe('the read block in Claude Code', () => {
         allowUnsandboxedCommands: false,
         failIfUnavailable: true,
         filesystem: {
-          denyRead: ['/data'],
+          denyRead: ['/data', '/config/acorn'],
           allowRead: block.readable,
           allowWrite: ['/repo/.git'],
           denyWrite: ['/repo/.git/hooks'],

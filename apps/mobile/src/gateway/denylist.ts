@@ -5,12 +5,8 @@
 // A test pins this list, so a new family is a reviewed change.
 export const DENIED_ROUTES: readonly { family: string; methods?: readonly string[]; path: RegExp }[] = [
   { family: 'Pairing and devices', path: /^\/v1\/(core\/)?(pair|devices)(\/|$)/ },
-  {
-    family: 'Plugin installs and removals',
-    methods: ['POST'],
-    path: /^\/v1\/core\/plugins\/(install|[^/]+\/(update|review))$/,
-  },
-  { family: 'Plugin installs and removals', methods: ['DELETE'], path: /^\/v1\/core\/plugins\/[^/]+$/ },
+  // Every plugin write, so a write route added later is refused too. Reads stay open for the roster.
+  { family: 'Plugin settings', methods: ['POST', 'PUT', 'PATCH', 'DELETE'], path: /^\/v1\/core\/plugins(\/|$)/ },
   { family: 'Backup and restore', path: /^\/v1\/core\/backup(\/|$)/ },
   { family: 'Security settings', path: /^\/v1\/core\/security(\/|$)/ },
   { family: 'Security settings', methods: ['PUT'], path: /^\/v1\/core\/node\/reach$/ },

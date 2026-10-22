@@ -92,7 +92,9 @@ The shell's Rust dependency patch and remaining upstream advisories are in
 is [review-2026-10-01.md](./security/review-2026-10-01.md), and its follow-up on October 11, 2026 is
 [review-2026-10-11.md](./security/review-2026-10-11.md). The review of agent-built apps on October 19, 2026 is
 [review-2026-10-19.md](./security/review-2026-10-19.md). The review of the work since October 11, with the
-fixes for it, is [review-2026-10-21.md](./security/review-2026-10-21.md).
+fixes for it, is [review-2026-10-21.md](./security/review-2026-10-21.md). The review of the phone gateway and
+client tokens on October 22, 2026, with the fixes for it, is
+[review-2026-10-22.md](./security/review-2026-10-22.md).
 
 ## What task scope does and doesn't protect against
 

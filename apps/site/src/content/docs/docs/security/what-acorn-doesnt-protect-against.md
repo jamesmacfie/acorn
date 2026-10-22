@@ -8,7 +8,7 @@ sources:
   - docs/managed-agents/permission-policy.md
   - docs/security/node-plugin-security.md
   - docs/security/secret-publication.md
-checked: 52225e24f
+checked: '1b62b6dfb'
 ---
 
 This page lists what acorn's security model leaves out, so you can decide what else you need. The
@@ -30,12 +30,16 @@ processes, so an agent's shell can read:
   TLS private key. Another session's token lets an agent act in that session's task.
 - The Node's keys, wherever they're plain files: every development build, a packaged build whose
   keychain refused them, and every standalone Node.
+- The device token the command line, the terminal client, the phone gateway, and the browser bridge
+  keep as a plain file in their config folder. With it, an agent is you to acorn.
 
 **Keep agents out of Acorn's data folder**, under **Settings** > **Machines** > **Security and backup**,
-closes the data folder for Claude Code sessions, using Claude Code's own sandbox. It's off by default,
-because it also stops the session writing outside its worktree:
+closes the data folder and the clients' config folders for Claude Code sessions, using Claude Code's
+own sandbox. It's off by default, because it also stops the session writing outside its worktree:
 
 - Execute tools stop working: run targets, workflows, delegation, and the browser.
+- `acorn task scripts` fails in the agent's shell, because the sandbox refuses its connection to the
+  Node.
 - Installs that write to a shared package store fail, as do `git push` over SSH and Git commands that
   change the repository's settings.
 - On a machine that can't run the sandbox, such as Linux without `bubblewrap`, the session refuses to

@@ -6,6 +6,9 @@ import { join } from 'node:path'
 // of its session ID, so the directory holds nothing a browser could present. It records a label and
 // when the session started; its modification time is when the session was last used.
 //
+// A session idle past IDLE_LIMIT_MS ends, and its file is deleted the next time anything looks at it.
+// A phone in use keeps its session for as long as it's used.
+//
 // Use touches the file's time rather than rewriting it. `gateway revoke` runs in another process and
 // deletes the file, and a touch can't bring a deleted file back the way a rewrite in flight could.
 
@@ -13,6 +16,7 @@ export type SessionInfo = { id: string; label: string; createdAt: number; lastUs
 
 export type SessionStore = ReturnType<typeof sessionStore>
 
+export const IDLE_LIMIT_MS = 30 * 24 * 60 * 60 * 1000
 const ID_LENGTH = 12
 const LABEL_MAX = 80
 
@@ -26,6 +30,31 @@ const labelFrom = (userAgent: string | undefined): string =>
 
 export function sessionStore(dir: string) {
   const fileOf = (hash: string): string => join(dir, `${hash}.json`)
+
+  // When the session was last used. Null when it's gone, or idle past the limit, which deletes it.
+  const lastUsedAt = (hash: string): number | null => {
+    let mtimeMs: number
+    try {
+      mtimeMs = statSync(fileOf(hash)).mtimeMs
+    } catch {
+      return null
+    }
+    if (Date.now() - mtimeMs <= IDLE_LIMIT_MS) return mtimeMs
+    rmSync(fileOf(hash), { force: true })
+    return null
+  }
+
+  /** Marks a live session used. False when it isn't live. */
+  const touch = (hash: string): boolean => {
+    if (lastUsedAt(hash) === null) return false
+    const now = new Date()
+    try {
+      utimesSync(fileOf(hash), now, now)
+      return true
+    } catch {
+      return false
+    }
+  }
 
   return {
     /** Starts a session and returns its ID, the cookie's value. Only its hash is stored. */
@@ -42,25 +71,23 @@ export function sessionStore(dir: string) {
     /** The session's hash when the session is live, and marks it used. Null when it isn't. */
     use(sessionId: string): string | null {
       const hash = hashOf(sessionId)
-      const now = new Date()
-      try {
-        utimesSync(fileOf(hash), now, now)
-        return hash
-      } catch {
-        return null
-      }
+      return touch(hash) ? hash : null
     },
 
-    isLive: (hash: string): boolean => existsSync(fileOf(hash)),
+    touch,
+
+    isLive: (hash: string): boolean => lastUsedAt(hash) !== null,
 
     list(): SessionInfo[] {
       if (!existsSync(dir)) return []
       return readdirSync(dir)
         .filter((name) => /^[0-9a-f]{64}\.json$/.test(name))
         .flatMap((name) => {
+          const lastUsed = lastUsedAt(name.slice(0, -'.json'.length))
+          if (lastUsed === null) return []
           try {
             const { label, createdAt } = JSON.parse(readFileSync(join(dir, name), 'utf8')) as SessionInfo
-            return [{ id: name.slice(0, ID_LENGTH), label, createdAt, lastUsedAt: statSync(join(dir, name)).mtimeMs }]
+            return [{ id: name.slice(0, ID_LENGTH), label, createdAt, lastUsedAt: lastUsed }]
           } catch {
             return [] // revoked between the listing and the read
           }

@@ -7,7 +7,7 @@ sources:
   - docs/security/credentials.md
   - plugins/git/src/server/changes/localDiff.ts
   - plugins/git/src/client/changes/RemoteBar.tsx
-checked: 52225e24f
+checked: '9aaaaf7d3'
 ---
 
 This page covers four controls on what the Node does with your files and your shell: keeping file
