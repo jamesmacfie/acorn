@@ -35,7 +35,7 @@ function appDataDir(): string {
   return plainAppDataDir()
 }
 
-/** Where the CLI, the terminal client, the phone gateway, and the browser bridge keep their device tokens. */
+/** Where the CLI, the terminal client, and the browser bridge keep their device tokens. */
 export const configDir = (): string => process.env.ACORN_TUI_CONFIG_DIR || join(appDataDir(), 'acorn')
 
 /** Where the installed desktop app keeps its Node's data root on this platform. */

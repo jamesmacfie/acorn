@@ -1,5 +1,4 @@
-import { runChannelClient, type ChannelClient, type ChannelListeners } from '@acorn/channel/client.ts'
-import { openChannel } from '@acorn/channel/secure.ts'
+import type { ChannelClient, ChannelListeners } from '@acorn/channel/client.ts'
 import { RELAY_BROWSER_STREAM, relayCredentialProtocols, relayUrls } from '@acorn/protocol/relay.ts'
 import { fetchTicket } from './account'
 
@@ -34,11 +33,16 @@ export async function openNodeChannel(
   channelKey: string,
   listeners: ChannelListeners,
 ): Promise<ChannelClient> {
+  // The handshake's libraries are most of the app's weight, and the first screen draws from cache without
+  // them. They load while the ticket and the stream are on their way.
+  const libraries = Promise.all([import('@acorn/channel/secure.ts'), import('@acorn/channel/client.ts')])
+  libraries.catch(() => {})
   const { ticket, relayUrl } = await measured('ticket', fetchTicket(nodeId))
   const socket = new WebSocket(
     relayUrls.connect(relayUrl, nodeId, RELAY_BROWSER_STREAM),
     relayCredentialProtocols(ticket),
   )
   await measured('socket', connected(socket))
+  const [{ openChannel }, { runChannelClient }] = await libraries
   return runChannelClient(await measured('handshake', openChannel(socket, channelKey)), listeners)
 }

@@ -5,6 +5,7 @@ import {
   encodeChannelMessage,
   type ChannelClientMessage,
 } from '@acorn/protocol/channel.ts'
+import { ChannelFailure } from './errors.ts'
 import type { SecureChannel } from './secure.ts'
 
 // The phone's end of an open channel: requests that wait for their answers, the event feed, and a
@@ -13,16 +14,6 @@ import type { SecureChannel } from './secure.ts'
 
 export type ChannelRequest = { method: string; path: string; headers: Record<string, string>; body?: Uint8Array }
 export type ChannelResponse = { status: number; headers: Record<string, string>; body: Uint8Array }
-
-/** A request the Node couldn't answer at all, as against one it answered with an error status. */
-export class ChannelFailure extends Error {
-  constructor(
-    readonly code: 'bad_request' | 'response_too_large' | 'unreachable' | 'closed',
-    message: string,
-  ) {
-    super(message)
-  }
-}
 
 export type ChannelClient = {
   request(request: ChannelRequest, signal?: AbortSignal): Promise<ChannelResponse>

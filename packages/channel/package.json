@@ -6,6 +6,7 @@
   "type": "module",
   "exports": {
     "./client.ts": "./src/client.ts",
+    "./errors.ts": "./src/errors.ts",
     "./secure.ts": "./src/secure.ts",
     "./testkit.ts": "./src/testkit.ts"
   },

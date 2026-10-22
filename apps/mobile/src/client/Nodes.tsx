@@ -5,7 +5,8 @@ import { Alert, Button, ConfirmButton, EmptyState, Row } from '@acorn/client-cor
 import { Text } from '@acorn/client-core/kit/components/content'
 import { IconButton } from '@acorn/client-core/kit/components/inputs'
 import type { AccountNode } from '@acorn/protocol/account.ts'
-import { AccountError, listAccountNodes } from './account'
+import { listAccountNodes } from './account'
+import { AccountError } from './accountError'
 import { pairedNodes } from './pairedNodes'
 import { pairWithNode, type Pairing } from './pairing'
 import { pairedVersion, setSignedOut } from './platform'
@@ -125,6 +126,8 @@ export function Nodes(props: { onOpen(nodeId: string): void; onBack?: () => void
                               : node.channelKey
                                 ? 'Not paired'
                                 : 'Needs Remote access turned off and on'}
+                            {/* Two computers can share a name, so the start of the Node's ID tells them apart. */}
+                            {` · ${node.nodeId.slice(0, 8)}`}
                           </Text>
                         }
                       >

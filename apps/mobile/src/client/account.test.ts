@@ -1,5 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { AccountError, fetchAccount, fetchAssertion, fetchTicket, listAccountNodes, signInUrl } from './account'
+import { fetchAccount, fetchAssertion, fetchTicket, listAccountNodes, signInUrl } from './account'
+import type { AccountError } from './accountError'
 
 const json = (status: number, body: unknown) =>
   new Response(JSON.stringify(body), { status, headers: { 'content-type': 'application/json' } })

@@ -90,7 +90,7 @@ with neither takes focus itself. A child that took focus first, such as the wiza
 it.
 
 On a phone a `role="dialog"` modal is a sheet over the whole screen, down to the on-screen keyboard
-when one is up (`--keyboard-inset`, which [the phone's shell](../mobile.md#the-keyboard) keeps), with
+when one is up (`--keyboard-inset`, which [the phone's shell](../mobile/narrow-mode.md#the-keyboard) keeps), with
 its actions at the foot. An `alertdialog` stays a box, because its question is short. The rule is in
 `overlays.css`, keyed on the root attribute like the drawer's.
 

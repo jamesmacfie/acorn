@@ -69,8 +69,8 @@ Phase 5 needs both. Phase 6 needs everything before it, and so does phase 7.
 
 ## What is left before this folder goes
 
-Every phase's behavior is in a reference page: [the mobile web app](../../mobile.md), [the gateway](../../security/mobile-gateway.md),
-and [`acorn mobile`](../../cli/mobile.md). This folder stays until the owner runs
+Every phase's behavior is in a reference page: [the mobile web app](../../mobile.md), [the gateway](../../relay/phone-channel.md),
+and [`acorn mobile`](../../mobile/phone-setup.md). This folder stays until the owner runs
 [the real-device acceptance](../../testing/mobile-on-a-phone.md) on an iPhone and an Android phone, because
 phase 6's own acceptance is the one thing no agent could run. When it passes, delete every shipped phase here. Keep
 [later](./later.md) and any phase still to build.

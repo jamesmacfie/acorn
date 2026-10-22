@@ -12,10 +12,12 @@ import { basename, resolve } from 'node:path'
 
 const dist = resolve(import.meta.dirname, '../dist')
 
-// About 5% above the measurement of 482,910 B of scripts and 121,692 B of styles on October 21, 2026.
-// A change that needs more raises the limit in the same commit and says why. Under the floor, the
-// check is reading the wrong graph.
-const limits = { scripts: 507_000, styles: 128_000, floor: 100_000 }
+// About 2.5% above the measurement of 506,975 B of scripts and 126,786 B of styles on October 22, 2026.
+// The scripts limit rose from 507,000 B for the account and channel code the first screen needs: the
+// token store, the Node links, and the platform's channel plumbing. The handshake's libraries (about
+// 200 KB) load after the first frame. A change that needs more raises the limit in the same commit and says
+// why. Under the floor, the check is reading the wrong graph.
+const limits = { scripts: 520_000, styles: 128_000, floor: 100_000 }
 
 // `main.tsx` installs the seam and then awaits this before it draws, so it is startup even though it
 // is a dynamic import.

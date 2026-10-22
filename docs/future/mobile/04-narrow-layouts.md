@@ -7,7 +7,7 @@ beside [phase 3](./03-narrow-mode.md), but reads `formFactor()` from it.
 
 Completed October 21, 2026. [Pane layouts](../../panes/layout.md#narrow-list-detail) owns the shipped
 behavior, and [two-column panes](../../ui-design/two-column-panes.md#narrow) owns the kit node's.
-[Mobile web app](../../mobile.md#narrow-layouts) lists the projections. This page keeps what the later
+[Mobile web app](../../mobile/narrow-mode.md#narrow-layouts) lists the projections. This page keeps what the later
 phases need.
 
 ### What landed

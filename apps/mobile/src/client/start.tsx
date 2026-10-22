@@ -34,7 +34,7 @@ wsOnReconnect(() => void clientFor(activeCacheId()).client.invalidateQueries({ r
 void selectActiveNode()
 
 createRoot(() => {
-  // A gateway that was down at boot fails the first selection. Its first status after it comes back
+  // A Node that was unreachable at boot fails the first selection. Its first status after it comes back
   // makes the fleet list the Node again (`refreshFleet`), and that is the moment to select it.
   createEffect(() => {
     if (nodes().length && nodeReadiness().kind === 'failed') void selectActiveNode()

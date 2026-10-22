@@ -27,7 +27,7 @@ import {
 import { generateSigningKey, signToken } from '@acorn/protocol/accountToken.ts'
 
 // A small account service for the tests and `pnpm dev:agent` flows that need one
-// to exist (docs/account-api.md § The stand-in). Like the control plane stub, it isn't a mock: every
+// to exist (docs/account-api/testing.md § The stand-in). Like the control plane stub, it isn't a mock: every
 // request is parsed by the schema the API publishes, so a client that changes what it sends fails here
 // instead of in a green suite. It keeps everything in memory and signs with a key made at startup.
 //

@@ -3,7 +3,7 @@ import { join, resolve } from 'node:path'
 
 const dist = resolve(import.meta.dirname, '../dist')
 const chunks = join(dist, 'chunks')
-const files = [join(dist, 'cli.js'), join(dist, 'native-host.js'), join(dist, 'mobile-gateway.js'), ...(existsSync(chunks) ? readdirSync(chunks).map((name) => join(chunks, name)) : [])]
+const files = [join(dist, 'cli.js'), join(dist, 'native-host.js'), ...(existsSync(chunks) ? readdirSync(chunks).map((name) => join(chunks, name)) : [])]
 const source = files.map((file) => readFileSync(file, 'utf8')).join('\n')
 const forbidden = [
   /from\s*['"]solid-js/, /from\s*['"]@acorn\/client-core/, /from\s*['"]@acorn\/plugin-/,

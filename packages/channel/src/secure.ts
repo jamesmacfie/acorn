@@ -5,6 +5,7 @@ import { defaultLogger } from '@libp2p/logger'
 import { peerIdFromPublicKey } from '@libp2p/peer-id'
 import { AbstractMessageStream, lpStream } from '@libp2p/utils'
 import { CHANNEL_HANDSHAKE_TIMEOUT_MS, CHANNEL_MAX_MESSAGE_BYTES } from '@acorn/protocol/channel.ts'
+import { IdentityMismatchError } from './errors.ts'
 
 // The phone's encrypted channel to a Node (docs/relay/phone-channel.md): a Noise XX handshake from
 // `@chainsafe/libp2p-noise` over one relay stream, then length-prefixed messages inside it. A Node and a
@@ -123,14 +124,6 @@ async function wrap(
 
 export const fromHex = (hex: string): Uint8Array =>
   Uint8Array.from(hex.match(/../g) ?? [], (pair) => Number.parseInt(pair, 16))
-
-/** The Node on the other end isn't the one pinned. Retrying can't fix it, and the phone must not go on. */
-export class IdentityMismatchError extends Error {
-  constructor(options?: ErrorOptions) {
-    super('The Node answered with a different identity than the one this phone pinned.', options)
-    this.name = 'IdentityMismatchError'
-  }
-}
 
 // A handshake that fails leaves the stream to close, or the other end waits for a message that never comes.
 async function closingOnFailure<T>(socket: ChannelSocket, handshake: Promise<T>): Promise<T> {

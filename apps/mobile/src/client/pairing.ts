@@ -6,7 +6,7 @@ import { fetchAssertion } from './account'
 import { openNodeChannel } from './openChannel'
 import { savePaired, type PairedNode } from './pairedNodes'
 
-// Pairing this phone with one of the account's Nodes (docs/relay/phone-channel.md § Pair a phone). The
+// Pairing this phone with one of the account's Nodes (docs/relay/phone-channel.md § A device for each phone). The
 // Node's own pairing by approval does the work: this phone asks, with an account assertion that says the
 // person is signed in as the Node's owner, and a device that is already paired shows the same three
 // words and an Allow button. The key the phone pins is the one the account listed for the Node, kept from

@@ -10,8 +10,8 @@ self.addEventListener('fetch', (event) => {
   const { request } = event
   const url = new URL(request.url)
   if (request.method !== 'GET' || url.origin !== location.origin || LIVE.test(url.pathname)) return
-  // Every route of the app is the same page, so a launch from any of them can fall back to `/`.
-  const key = request.mode === 'navigate' ? '/' : request
+  // Every route of the app is the same page, so a launch from any of them can fall back to the app's root.
+  const key = request.mode === 'navigate' ? self.registration.scope : request
   event.respondWith(
     fetch(request).then(
       (response) => {

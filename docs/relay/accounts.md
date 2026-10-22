@@ -53,6 +53,9 @@ network in the clear. A relay on this computer can use `ws://`.
 
 A fleet record for a Node reached with tickets keeps `relay: { url, route }` and no credential.
 
+A phone's browser asks the account service for a ticket itself, with the website's session cookie
+([browsers](../account-api/browsers.md)), and offers it as a subprotocol on its `browser` stream.
+
 ## Remote access
 
 An owner who signs in to an account turns on **Remote access** for the Node in **Settings → Account**.

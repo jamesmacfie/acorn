@@ -60,12 +60,13 @@ An error answers `{ "error": "<code>", "message": "<optional text>" }`:
 | `GET /account/v1/relay/revoked` | Relay | None | The IDs of relay credentials removed on purpose. |
 | `POST /account/v1/device/code` | Plugin | None | Starts a device flow. |
 | `POST /account/v1/token` | Plugin | None | Trades an approved device code, or a refresh token, for tokens. |
-| `GET /account/v1/account` | Plugin | Access token | The signed-in account. |
-| `GET /account/v1/nodes` | Plugin | Access token | The Nodes the account owns, with the fingerprint each registered. |
+| `GET /account/v1/account` | Plugin, phone | Access token, or a browser's cookie | The signed-in account. |
+| `GET /account/v1/nodes` | Plugin, phone | Access token, or a browser's cookie | The Nodes the account owns, with the fingerprint and channel key each registered. |
 | `PUT /account/v1/nodes/{nodeId}` | Plugin | Access token | Registers a Node, or registers it again. |
 | `DELETE /account/v1/nodes/{nodeId}` | Plugin | Access token | Removes a Node and revokes its relay credential. |
-| `POST /account/v1/tickets` | Plugin | Access token | A relay ticket for one of the account's Nodes. |
-| `POST /account/v1/assertions` | Plugin | Access token | An account assertion for one of the account's Nodes. |
+| `POST /account/v1/tickets` | Plugin, phone | Access token, or a browser's cookie | A relay ticket for one of the account's Nodes. |
+| `POST /account/v1/assertions` | Plugin, phone | Access token, or a browser's cookie | An account assertion for one of the account's Nodes. |
+| `GET /account/v1/browser/sign-in` | Phone | None | Signs a browser in on the service's page and sends it back. |
 
 An access token goes in `Authorization: Bearer <token>`. The relay checks tickets and credentials with
 the public keys, so a request to the service isn't on the path of every stream.
@@ -85,18 +86,22 @@ answers with a new pair. A refused refresh means the person must sign in again.
 
 ### Register a Node
 
-`PUT /nodes/{nodeId}` takes `{ label, fingerprint }` and answers
+`PUT /nodes/{nodeId}` takes `{ label, fingerprint, channelKey }` and answers
 `{ relay: { url, credential }, keys }`. The Node ID is the Node's own ID, and the fingerprint is the
-SHA-256 of its certificate, the value a client pins. Registering again replaces the relay credential
-and revokes the old one, so turning remote access off and on gives the Node a new credential.
+SHA-256 of its certificate, the value a client pins. The channel key is the public half of the Node's key
+for a phone's encrypted channel, 64 hex characters, which a phone pins ([the phone channel](./relay/phone-channel.md)).
+A Node sends it every time, and it's optional so a Node from before phones still registers. Registering
+again replaces the relay credential and revokes the old one, so turning remote access off and on gives the
+Node a new credential.
 
 A Node ID belongs to one account. A second account that registers it gets `409 conflict`.
 
 ### List the account's Nodes
 
-`GET /nodes` answers `{ nodes: [{ nodeId, label, fingerprint, relayUrl }] }`, the account's own Nodes
-only. The fingerprint is the one the Node registered, which a client pins when it pairs with one. The
-service can't see whether a Node is connected to its relay, so the list doesn't say.
+`GET /nodes` answers `{ nodes: [{ nodeId, label, fingerprint, channelKey?, relayUrl }] }`, the account's
+own Nodes only. The fingerprint is the one the Node registered, which a client pins when it pairs with one.
+`channelKey` is absent for a Node that registered without one. The service can't see whether a Node is
+connected to its relay, so the list doesn't say.
 
 ### Tickets and assertions
 
@@ -169,32 +174,13 @@ It can route a client to a Node and raise a pairing request. It can't approve on
 a device token. If breached, it could vouch for an impostor Node, so that a person pairs with the wrong
 machine. [Control plane security](./security/control-plane.md#the-account-service) says what bounds that.
 
-## The stand-in
+## Browsers
 
-`startAccountStub` in `packages/node-core/src/testkit/accountStub.ts` is an account service for tests
-and for `pnpm dev:agent` flows. It keeps everything in memory, signs with a key made at startup, and
-approves a device flow at once for one test account. Every request is parsed by the schemas above, so a
-client that changes what it sends fails in a test.
+The phone app is served by the account website, so it calls the account service on its own origin
+([browsers](./account-api/browsers.md)). Three routes that take an access token also take the website's
+session cookie, with a header only a page of the service's own sends.
 
-```ts
-const account = await startAccountStub()
-account.setRelayUrl(`ws://127.0.0.1:${relay.port}`)
-const { accessToken } = await account.signIn('another-login')
-```
+## Test an implementation
 
-`pnpm dev:account` starts it with a relay, prints the address to give a Node as `ACORN_ACCOUNT_URL`,
-and runs until you stop it.
-
-## Conformance tests
-
-`packages/node-core/src/testkit/accountContract.test.ts` holds every implementation to the schemas. It
-runs against the stand-in by default. To run it against another service, set
-`ACORN_ACCOUNT_CONTRACT_URL=<base URL>`:
-
-```sh
-ACORN_ACCOUNT_CONTRACT_URL=http://localhost:8787 pnpm test:focus @acorn/node-core src/testkit/accountContract.test.ts
-```
-
-The suite approves device flows by posting `{ "userCode": "…", "login": "…" }` to `/_test/approve`. That
-route isn't part of the API. A service answers it only when it runs in a test mode, and the stand-in
-always does.
+The stand-in is an account service for tests and for `pnpm dev:agent` flows, and one conformance suite
+holds every service to the schemas ([test an account service](./account-api/testing.md)).

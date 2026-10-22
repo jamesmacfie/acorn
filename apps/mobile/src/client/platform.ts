@@ -11,7 +11,6 @@ import type {
 import { relayHost } from '@acorn/protocol/relay.ts'
 import type { WsClientFrame, WsSendOptions } from '@acorn/protocol/ws.ts'
 import { createNodeLink, type NodeLink } from './nodeLink'
-import { openNodeChannel } from './openChannel'
 import { forgetPaired, pairedNodes, readToken, renamePaired, type PairedNode } from './pairedNodes'
 
 // The platform seam, from a phone's browser, through the account and an encrypted channel
@@ -85,7 +84,8 @@ export function installPlatform(): void {
     const node = known.get(nodeId)
     if (!node) throw new Error('This phone isn’t paired with that Node.')
     const link = createNodeLink(nodeId, {
-      open: (listeners) => openNodeChannel(nodeId, node.channelKey, listeners),
+      // Loaded with the first channel: the account's schemas and the ticket call aren't the first screen's.
+      open: async (listeners) => (await import('./openChannel')).openNodeChannel(nodeId, node.channelKey, listeners),
       token: () => readToken(nodeId),
       report: (status) => {
         latest.set(nodeId, status)

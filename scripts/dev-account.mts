@@ -1,5 +1,5 @@
 // `pnpm dev:account`: the stand-in account service and a relay that checks it, for trying remote access
-// without the hosted service (docs/account-api.md § The stand-in). Start a Node or a `dev:agent` session
+// without the hosted service (docs/account-api/testing.md § The stand-in). Start a Node or a `dev:agent` session
 // with the printed `ACORN_ACCOUNT_URL`. Every sign-in is approved at once as one test account, unless
 // `ACORN_DEV_ACCOUNT_APPROVE=manual`, which waits for you to approve the code with the command it prints.
 import { accountAuth } from '../apps/relay/src/auth.ts'
@@ -10,16 +10,24 @@ import { startAccountStub } from '../packages/node-core/src/testkit/accountStub.
 const port = (name: string, fallback: number): number => Number(process.env[name] ?? fallback)
 const login = process.env.ACORN_DEV_ACCOUNT_LOGIN ?? 'test-account'
 const manual = process.env.ACORN_DEV_ACCOUNT_APPROVE === 'manual'
-const account = await startAccountStub({ port: port('ACORN_DEV_ACCOUNT_PORT', 48781), approveAs: manual ? false : login })
+const account = await startAccountStub({
+  port: port('ACORN_DEV_ACCOUNT_PORT', 48781),
+  approveAs: manual ? false : login,
+})
 const relay = await startRelay({
   auth: await accountAuth({ url: account.url, log: console.log }),
   port: port('ACORN_DEV_RELAY_PORT', 48782),
   log: (line) => console.log(`[relay] ${line}`),
 })
-account.setRelayUrl(`ws://127.0.0.1:${relay.port}`)
+// Where Nodes and phones are told the relay is. It's the relay's own address unless something sits in front of
+// it, such as the tunnel a real phone reaches this computer through.
+const relayUrl = process.env.ACORN_DEV_RELAY_URL ?? `ws://127.0.0.1:${relay.port}`
+account.setRelayUrl(relayUrl)
 
 console.log(`Account service  ${account.url}`)
-console.log(`Relay            ws://127.0.0.1:${relay.port}`)
+console.log(
+  `Relay            ws://127.0.0.1:${relay.port}${relayUrl === `ws://127.0.0.1:${relay.port}` ? '' : `, announced as ${relayUrl}`}`,
+)
 console.log('')
 console.log(`Start a Node or a session with: ACORN_ACCOUNT_URL=${account.url}`)
 console.log('Then open Settings > Account, sign in, and turn on Remote access. Press Ctrl+C to stop.')

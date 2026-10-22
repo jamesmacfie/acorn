@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
-import { acceptChannel, IdentityMismatchError, openChannel } from './secure'
+import { IdentityMismatchError } from './errors'
+import { acceptChannel, openChannel } from './secure'
 import { channelIdentity, socketPair } from './testkit'
 
 const text = (bytes: Uint8Array | null) => new TextDecoder().decode(bytes ?? new Uint8Array())

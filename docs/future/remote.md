@@ -43,27 +43,24 @@ unauthorized task requests fail. Reload preserves only the state and credentials
 
 ### What the mobile programme answered
 
-The [mobile web app](../mobile.md) answered these five decisions for its own deployment, with a gateway
-in front of the Node ([mobile gateway](../security/mobile-gateway.md)). They stay open for a browser
-host that the Node serves itself:
+The [mobile web app](../mobile.md) answered these five decisions for its own deployment, and
+[remote access](./remote-access/phone.md) changed the answers when it replaced the gateway
+([the phone channel](../relay/phone-channel.md)). They stay open for a browser host that the Node serves
+itself:
 
-1. **Session storage.** The gateway keeps one file per session and renews none. A session lasts until
-   `acorn mobile revoke`. The Node sees one device for every phone, so per-browser devices remain open.
-2. **Authentication.** A one-time code opens a cookie session, and the cookie authenticates both the
-   requests and the socket upgrade. The gateway holds the Node's device token, so the browser has none.
-3. **Cross-site protection.** `Host` and `Origin` checks, a 4 KiB sign-in body with one failure answer, and
-   five attempts per code. A cookie is `HttpOnly`, `Secure`, and `SameSite=Strict`.
-4. **Where the bundle is served.** The gateway serves `apps/mobile/dist` and its service worker, so the
-   Node can't replace the bytes. The Node serving the shell remains open.
-5. **TLS and reachability.** Tailscale's `serve` gives the gateway a trusted certificate and the tailnet
-   gives reachability. Any other trusted HTTPS name works too, but only Tailscale is tested. A Node-served
-   certificate remains open.
+1. **Session storage.** Each phone is a device of its own on the Node. Its token sits in IndexedDB under a
+   key the browser won't hand over, and the Node revokes it after 30 days unused.
+2. **Authentication.** The account's session cookie authenticates the phone to the account service, and a
+   device token authenticates it to the Node, inside an encrypted channel. The Node holds no browser session.
+3. **Cross-site protection.** A cookie-authenticated account request needs a header only a page of the
+   service's own can send. The Node takes no request from a browser's origin at all, only from a channel.
+4. **Where the bundle is served.** The account website serves `apps/mobile/dist` under one certificate, so
+   the Node can't replace the bytes. The Node serving the shell remains open.
+5. **TLS and reachability.** The website has an ordinary certificate, and the relay gives reachability with
+   no inbound port. A Node-served certificate remains open.
 
-Real-device acceptance is still outstanding ([the checklist](../testing/mobile-on-a-phone.md)).
-[Remote access](./remote-access/phone.md) replaces the gateway: the account website serves the
-bundle, the phone runs its own encrypted channel to the Node through the relay, each phone is its own
-device on the Node, and the phone reaches several Nodes. Background push and browser plugin custody
-are in [mobile work after the first release](./mobile/later.md).
+Real-device acceptance is still outstanding ([the checklist](../testing/mobile-on-a-phone.md)). Background
+push and browser plugin custody are in [mobile work after the first release](./mobile/later.md).
 
 ## Implement browser plugin custody
 

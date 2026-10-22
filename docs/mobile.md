@@ -1,8 +1,8 @@
 # Mobile web app
 
-This page covers the web app a phone opens through the [mobile gateway](./security/mobile-gateway.md),
-in `apps/mobile/src/client`. Read it before you change the phone's shell, or when you check UI work at
-phone width.
+This page covers the web app a phone opens from the account website, in `apps/mobile/src/client`. It
+reaches Nodes through the account and [the phone channel](./relay/phone-channel.md). Read it before you
+change the phone's shell, or when you check UI work at phone width.
 
 ## What it does
 
@@ -12,10 +12,17 @@ draws the same plugin panes the desktop draws, one at a time, with its own chrom
 | File | What it owns |
 | --- | --- |
 | `apps/mobile/src/client/main.tsx` | Installs the platform seam, then loads the app |
-| `apps/mobile/src/client/platform.ts` | The seam's `transport` and `fleet` groups, over the gateway |
+| `apps/mobile/src/client/platform.ts` | The seam's `transport` and `fleet` groups, over a channel for each Node |
+| `apps/mobile/src/client/nodeLink.ts` | One Node's channel: when it opens, how it reconnects, and what it gives up on |
+| `apps/mobile/src/client/openChannel.ts` | A ticket, a relay stream, and the handshake against the Node's pinned key |
+| `apps/mobile/src/client/account.ts` | The account service, as a browser on the website calls it |
+| `apps/mobile/src/client/pairedNodes.ts` | The paired Nodes and their device tokens, sealed in IndexedDB |
+| `apps/mobile/src/client/pairing.ts` | Pairing with one of the account's Nodes |
 | `apps/mobile/src/client/start.tsx` | The client runtime, the Node selection, and the first render |
 | `apps/mobile/src/client/roster.ts` | Registers the built-in plugins in `plugins.ts` after the first frame |
-| `apps/mobile/src/client/Shell.tsx` | Sign-in, the wait for the gateway, and the routes |
+| `apps/mobile/src/client/Shell.tsx` | Sign-in, the Nodes screen, the pairing dialog, and the routes |
+| `apps/mobile/src/client/SignIn.tsx` | The account sign-in screen |
+| `apps/mobile/src/client/Nodes.tsx` | The account's Nodes: connect, open, and forget |
 | `apps/mobile/src/client/Workspaces.tsx` | The list of workspaces, or of projects with workspaces off |
 | `apps/mobile/src/client/Workspace.tsx` | A workspace's dashboard and tasks, **New task**, and their bar |
 | `apps/mobile/src/client/waiting.tsx` | The one attention inbox, and which workspace each row waits in |
@@ -27,21 +34,28 @@ draws the same plugin panes the desktop draws, one at a time, with its own chrom
 
 The phone installs two groups of the [platform seam](./architecture/node-api.md#the-platform-seam):
 
-- `transport` sends each request to `/node` plus the Node path, and keeps an `AbortController` per
-  request ID. Events come over one `/events` socket. Frames sent before the socket opens wait in a
-  queue. When the socket closes, the transport reports the Node `offline` and reconnects after 250
-  milliseconds, doubling to five seconds. When the page becomes visible again, it replaces the socket at
-  once ([coming back to the foreground](./mobile/phone-setup.md#come-back-to-the-foreground)).
-- `fleet` lists the gateway's one Node from `GET /session`. The verbs that change the fleet reject
-  with "Pair and manage Nodes from Acorn on your computer."
+- `transport` sends each request over the channel of the Node it names, with that Node's device token,
+  and keeps an `AbortController` per request ID. Only the Node on screen holds the event feed, which
+  `interest` switches. A Node nobody has used for 30 seconds closes its channel. A channel that drops
+  reports the Node `offline` and reopens after 250 milliseconds, doubling to five seconds. A foreground
+  return replaces the channel at once ([coming back to the foreground](./mobile/phone-setup.md#come-back-to-the-foreground)).
+- `fleet` lists the Nodes this phone is paired with. Each is its own `NodeRecord` and its own query cache,
+  and a token never leaves `pairedNodes.ts`. `forget` drops this phone's record, and the Node keeps the
+  device until someone revokes it from a computer, because a phone may not manage devices.
 
-Every other group is absent, and client-core hides what needs one. There's no pairing screen, no
-loaded plugins, and the page's own notifications and file inputs stand in. `platform.test.ts` lists
-the groups the phone implements and the ones it leaves out.
+A channel gives up for four reasons, and the Node's status says which: the Node isn't the one pinned
+(`identity_mismatch`), the Node's own router or the event feed refuses the token (`revoked`), the account
+no longer lists the Node, or the account says the person is signed out and the sign-in screen shows. Every
+other group is absent, and client-core hides what needs one. `platform.test.ts` lists the groups the phone
+implements and the ones it leaves out.
 
-A close with code 4401, or a `401 signed_out` from `/node` or `/session`, shows the sign-in screen.
-A refused socket closes the same way as a stopped gateway, so the transport asks `GET /session` which
-it was.
+### Accounts and Nodes
+
+A phone with no account session sees **Sign in**, which sends the browser to the account's page and back
+([browsers](./account-api/browsers.md)). A phone paired with no Node sees **Nodes**, the account's list.
+**Connect** pairs with a Node: the phone shows three words, and a device that is already paired shows the
+same words and **Allow**. The phone's own pairing dialog is the desktop's `PairingRequestDialog`, so it can
+allow the next device too. The top bar's server icon opens **Nodes** from inside the app, to switch.
 
 ### Screens
 
@@ -92,89 +106,52 @@ restore or save the desktop's persisted shell state, so it never changes a layou
 
 ## Use it on a phone
 
-`acorn mobile` serves the app, and `tailscale serve` gives it the HTTPS name a phone needs. [Use the app on a
-phone](./mobile/phone-setup.md) has the steps, the install, the service worker, and the reconnect.
+Open the account website on the phone and sign in. [Use the app on a phone](./mobile/phone-setup.md) has
+the install, the service worker, the reconnect, and serving the app from your own host.
 
 ## Run it
 
-`pnpm dev:mobile` starts the gateway and a Vite dev server at `http://127.0.0.1:4321`, which forwards
-`/node`, `/session`, and `/events` to it. The gateway prints a sign-in code. The first time it meets a
-Node, it asks for a pairing code in the same terminal. Set `ACORN_MOBILE_PORT` and
-`ACORN_MOBILE_GATEWAY_PORT` to move the two servers, and pass gateway flags after `--`, such as
-`pnpm dev:mobile -- --node studio`.
+`pnpm dev:mobile` starts a Vite dev server at `http://127.0.0.1:4321/app/` and forwards `/account` to a stand-in
+account service. Run these first, each in its own terminal:
 
+1. `pnpm dev:account` starts the stand-in and a relay on ports 48781 and 48782
+   ([test an account service](./account-api/testing.md)). Set `ACORN_ACCOUNT_URL` for `dev:mobile` if the
+   stand-in runs elsewhere.
+2. A Node with **Remote access** on, such as `ACORN_ACCOUNT_URL=http://127.0.0.1:48781 pnpm dev:agent --
+   --session phone`. Open Settings → Account, sign in, and turn it on.
+
+`ACORN_MOBILE_PORT` moves the dev server, and `ACORN_MOBILE_HOST` makes it listen for another computer.
 `pnpm --filter @acorn/mobile build` writes `apps/mobile/dist` and checks the
-[startup budget](./frontend/startup-budget.md#the-phone). `pnpm dev:mobile:gateway` serves that build
-at `http://127.0.0.1:4320`.
+[startup budget](./frontend/startup-budget.md#the-phone).
 
 ### Check UI work with Playwright
 
-Drive the app in Chromium at an iPhone's size:
+Drive the app in Chromium or WebKit at an iPhone's size:
 
-1. Run `pnpm dev:mobile` and note the sign-in code.
-2. Set the viewport to 390 by 844 and open `http://127.0.0.1:4321`. With the Playwright MCP tools,
+1. Run the three commands above.
+2. Set the viewport to 390 by 844 and open `http://127.0.0.1:4321/app/`. With the Playwright MCP tools,
    that's `browser_resize`, then `browser_navigate`.
-3. Type the code into **Sign-in code** and press Enter. The page reloads signed in, and the session
-   lasts across gateway restarts.
-4. Open a task and pick panes from the bar. In a script,
+3. Press **Sign in**. The stand-in signs in its test account at once and brings the browser back.
+4. Press **Connect** on the Node. Approve the three words in the Node's own window, or with
+   `POST /v1/core/pair/requests/:id` and a device token.
+5. Open a task and pick panes from the bar. In a script,
    `page.getByRole('navigation', { name: 'Task panes' }).getByRole('button', { name: 'Git' })` finds
    one.
-5. A pane that throws draws "This view stopped working" in a `.contribution-failed` element. Count
+6. A pane that throws draws "This view stopped working" in a `.contribution-failed` element. Count
    those to check that a pane drew.
 
 Watch for these traps:
 
-- Vite reloads the page when its dev server restarts, and stopping the gateway stops `pnpm
-  dev:mobile`. To check the offline state, build the app, run `pnpm dev:mobile:gateway`, and stop
-  and start that.
-- A browser keeps a cookie per host, not per port, so a session from the dev server works on the
-  gateway's own port too.
-- `kill -USR1 PID` prints another sign-in code. The gateway prints its PID with the first one.
+- The stand-in keeps its sessions in memory, so restarting `pnpm dev:account` signs the phone out.
+- A browser keeps a cookie per host, not per port, so two dev servers on `127.0.0.1` share a session.
+- `performance.getEntriesByType('measure')` lists `acorn.channel.ticket`, `socket`, and `handshake`, which
+  is where to read how long a connection took.
 
-## Narrow mode
+## Narrow mode and layouts
 
-`index.html` sets `data-form-factor="narrow"` on `<html>`, so the attribute holds before the first
-paint. Client-core does the rest, and no plugin changes
-([the narrow sheet](./ui-design/tokens.md#the-narrow-sheet)):
-
-- Controls and rows take touch sizes, and text inputs draw at 16px so iOS Safari doesn't zoom into them.
-- Controls that appear on hover are always shown.
-- `startClientRuntime` installs `installLongPressMenu`, which sends the `contextmenu` event a
-  right-click sends after a finger rests for half a second. iOS sends none of its own, and Android's
-  is dropped when ours arrived first, so a menu opens once.
-- A pane that lists only `desktop` in its `formFactor`, such as Preview, isn't offered
-  ([form factor](./panes/contributions.md#form-factor)).
-- The rail data a plugin's tree reads carries `formFactor: 'narrow'`.
-
-The phone's own bars are sized in `mobile.css`.
-
-### The keyboard
-
-A phone's browser keeps the page the same size when the on-screen keyboard opens and shrinks only the
-visual viewport. `trackKeyboardInset` measures the difference and keeps `--keyboard-inset` and
-`data-keyboard` on `<html>`. The shell's height subtracts the inset, a dialog sheet ends above it, and
-the bar of panes is hidden while it's up, so the pane gets every line. A pane reads no window and is
-only given less room. To check it in Playwright, replace `window.visualViewport` with an event target in
-an init script, set its `height`, and dispatch `resize`.
-
-## The conversation
-
-[The agent pane on a phone](./mobile/agent-pane.md) covers how the shared Agents pane draws here.
-
-## Narrow layouts
-
-Each host layout draws a phone projection from the same component it draws the desktop with, choosing
-by `formFactor()` once per mount ([pane layouts](./panes/layout.md#named-layouts)):
-
-- `list-detail` and the kit's `ListDetail` show one column at a time. A pane's `selection` shows the
-  detail, the top bar's **Back** returns to the list, and **Show detail** goes forward again
-  ([narrow `list-detail`](./panes/layout.md#narrow-list-detail)).
-- `document-over-frame`, `frame-beside-document`, and `stack-split` fill the pane with their first
-  region. **Show panel** opens the second in a full-screen `Drawer`.
-- On a phone every `Drawer` is a sheet over the whole screen, because there are no rails or task footer
-  to sit between.
-- `single`, `header-body-footer`, `wizard`, and `tabs` don't change. The tab strip already scrolls
-  sideways.
+`index.html` sets `data-form-factor="narrow"`, and client-core's narrow mode and the host layouts' phone
+projections do the rest ([narrow mode and layouts](./mobile/narrow-mode.md)). [The agent pane on a
+phone](./mobile/agent-pane.md) covers how the shared Agents pane draws here.
 
 ## Limits
 
@@ -185,11 +162,12 @@ by `formFactor()` once per mount ([pane layouts](./panes/layout.md#named-layouts
 - Telemetry stays off, because nothing on the phone switches it on.
 - The phone tells the plugin distribution it's the desktop app, because it draws the desktop's DOM
   plugin halves.
-- A phone that has never loaded the app can't open it while the gateway is down. Afterward the service
-  worker draws the shell, which says "Can't reach the gateway" until the gateway answers.
+- A phone that has never loaded the app can't open it while the website is down. Afterward the service
+  worker draws the shell, which shows the Node `offline` until its channel opens.
+- A phone with no account can't pair, because the key it pins comes from the account's list. Running the
+  app against your own relay with no account isn't supported.
 - No one has run it on a real phone yet ([the acceptance](./testing/mobile-on-a-phone.md)).
-- The gateway sends no `timeoutMs`, so a request that runs past the broker's 30-second default fails
-  with `504`.
+- A request that sends no `timeoutMs` fails as a timeout after 30 seconds.
 
 ## Why
 

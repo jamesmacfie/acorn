@@ -14,16 +14,14 @@ import {
   selectActiveNode,
   setActiveNode,
 } from '@acorn/client-core/infra/node/activeNode.ts'
-import { clientFor, refreshFleet } from '@acorn/client-core/infra/node/fleet.ts'
+import { clientFor, nodeState, refreshFleet } from '@acorn/client-core/infra/node/fleet.ts'
 import { applyAppearance } from '@acorn/client-core/infra/persistence'
 import { QueryCacheProvider } from '@acorn/client-core/infra/persistence/QueryCacheProvider.tsx'
 import { claimNarrowBack } from '@acorn/client-core/kit/lib'
 import { prefsOptions, projectsKey, tasksKey, type Project, type Task } from '@acorn/client-core/infra/queries.ts'
-import { Button, EmptyState } from '@acorn/client-core/kit/components/primitives.tsx'
+import { Alert, Button, EmptyState } from '@acorn/client-core/kit/components/primitives.tsx'
 import { signedOut } from './platform'
 import { trackKeyboardInset } from './keyboardInset'
-import { Nodes } from './Nodes'
-import { SignIn } from './SignIn'
 import { TaskScreen } from './TaskScreen'
 import { trackThemeColor } from './themeColor'
 import { WaitingProvider } from './waiting'
@@ -32,6 +30,9 @@ import { Workspaces } from './Workspaces'
 
 // The desktop's pairing dialog, which a phone shows too: an ask to pair a new device is answered from
 // whichever paired device is at hand.
+// The two screens a person with no Node sees. Neither is the first screen of a phone that has one.
+const Nodes = lazy(() => import('./Nodes').then((module) => ({ default: module.Nodes })))
+const SignIn = lazy(() => import('./SignIn').then((module) => ({ default: module.SignIn })))
 const PairingRequestDialog = lazy(() => import('@acorn/client-core/host/trust/PairingRequestDialog.tsx'))
 
 // The phone's screens: sign-in while the account says this phone has no session, the Nodes screen while
@@ -77,7 +78,7 @@ export function Shell() {
           {(cacheId) => (
             <QueryCacheProvider cache={clientFor(cacheId)}>
               <PaneModelHost nodeId={activeNodeId()}>
-                <Router root={Frame}>
+                <Router base={import.meta.env.BASE_URL.replace(/\/$/, '')} root={Frame}>
                   <Route path="/" component={Workspaces} />
                   <Route path="/nodes" component={NodesRoute} />
                   <Route path="/w/:workspaceId" component={() => <Workspace view="dashboard" />} />
@@ -121,8 +122,18 @@ function Frame(props: ParentProps) {
   createEffect(() => {
     if (prefs.data) onCleanup(applyAppearance(prefs.data))
   })
+  const navigate = useNavigate()
   return (
     <div class="mobile-shell">
+      {/* The Node revoked this phone, on a computer or after 30 days unused. Waiting won't change that. */}
+      <Show when={nodeState(activeNodeId() ?? '') === 'revoked'}>
+        <Alert tone="warn">
+          This phone was signed out of this Node. Forget the Node on the Nodes screen and pair again.
+          <Button size="sm" onPress={() => navigate('/nodes')}>
+            Nodes
+          </Button>
+        </Alert>
+      </Show>
       <WaitingProvider>{props.children}</WaitingProvider>
       <PairingRequestDialog />
       <ToastHost />

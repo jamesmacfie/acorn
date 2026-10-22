@@ -124,8 +124,8 @@ A skipped checkpoint is written down as skipped, with the reason.
 
 ## Known gaps in the design
 
-- Which encrypted channel protocol and library the phone uses. It must be a vetted
-  implementation, never a hand-written handshake ([phase 4](./04-phone.md#open-questions)).
+- How someone who never signs in runs the phone app against a self-hosted relay
+  ([phase 4](./04-phone.md#open-questions)). The phone's channel library is decided: `@chainsafe/libp2p-noise`.
 - Whether remote access is free, part of a personal plan, or paid
   ([phase 5](./05-production.md#open-questions)).
 - The product name and domain ([phase 2](./02-accounts.md#open-questions)).
@@ -138,7 +138,7 @@ Before changing code, read [authentication](../../authentication.md),
 [transport and auth](../../security/transport-and-auth.md),
 [Node providers](../../plugins/node-providers.md#node-providers),
 [reaching a Node](../../node-distribution/reaching.md), [the mobile web app](../../mobile.md), and
-[the mobile gateway](../../security/mobile-gateway.md).
+[the mobile gateway](../../relay/phone-channel.md).
 
 ## Verify before building
 

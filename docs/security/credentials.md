@@ -149,10 +149,11 @@ where the keychain refused the item, keeps the data key in a plain `data.key` fi
 root, and an agent can read that file unless **Keep agents out of Acorn's data folder** is on
 ([the read block](../managed-agents/read-block.md)).
 
-The CLI, the terminal client, the phone gateway, and the browser bridge keep the owner's device tokens
-as plain files in the client config folder. The read block is what keeps agents from them. Sealing
-them with the platform keychain, as the desktop does, is the follow-up; the CLI and the gateway also
-run on Linux and beside a standalone Node, where there's no keychain to use.
+The CLI, the terminal client, and the browser bridge keep the owner's device tokens as plain files in the
+client config folder. The read block is what keeps agents from them. Sealing them with the platform
+keychain, as the desktop does, is the follow-up; the CLI also runs on Linux and beside a standalone Node,
+where there's no keychain to use. A phone keeps its token encrypted in the browser's storage
+([the phone channel](../relay/phone-channel.md#a-device-for-each-phone)).
 
 ### Upgrading a Node with plain key files
 

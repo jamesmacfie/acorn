@@ -352,7 +352,7 @@ export const devices = sqliteTable(
     // revoked and when, and so a replayed token can never be resurrected.
     revokedAt: integer('revoked_at'),
     // What kind of client paired, when it matters to what the Node lets it do. `phone` for a device paired
-    // through a phone's channel (server/auth/phoneRules.ts). Null for everything else, which has full owner
+    // through a phone's channel (`phoneRules` middleware). Null for everything else, which has full owner
     // authority.
     kind: text('kind', { enum: ['phone'] }),
   },

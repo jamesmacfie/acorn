@@ -1,8 +1,8 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { ChannelFailure, type ChannelClient, type ChannelListeners } from '@acorn/channel/client.ts'
-import { IdentityMismatchError } from '@acorn/channel/secure.ts'
+import type { ChannelClient, ChannelListeners } from '@acorn/channel/client.ts'
+import { ChannelFailure, IdentityMismatchError } from '@acorn/channel/errors.ts'
 import type { NodeStatus } from '@acorn/protocol/broker.ts'
-import { AccountError } from './account'
+import { AccountError } from './accountError'
 import { createNodeLink, NodeOfflineError, type LinkHooks } from './nodeLink'
 
 // One Node's link, with the channel standing in as a script: what the link does when a channel opens,
@@ -44,7 +44,7 @@ let statuses: NodeStatus[]
 let frames: unknown[]
 let opens: (() => Promise<void>)[]
 let openFails: Error[]
-let signedOut: ReturnType<typeof vi.fn>
+let signedOut: LinkHooks['signedOut'] & ReturnType<typeof vi.fn>
 let hooks: LinkHooks
 
 beforeEach(() => {
@@ -53,7 +53,7 @@ beforeEach(() => {
   statuses = []
   frames = []
   openFails = []
-  signedOut = vi.fn()
+  signedOut = vi.fn() as typeof signedOut
   hooks = {
     open: async (listeners) => {
       const failure = openFails.shift()

@@ -60,7 +60,8 @@ revoked, or wrong token gets the same null result.
 
 Revoking a device with `DELETE /v1/core/devices/:id` stops its future HTTP calls and closes its live
 sockets. A 60-second activity sweep backs that up for long-lived streams. A client may revoke itself, and
-the desktop separately forgets a Node entry when the user unpairs.
+the desktop separately forgets a Node entry when the user unpairs. A phone has a device of its own, held
+to fewer routes and revoked after 30 days unused ([the phone channel](./relay/phone-channel.md#a-device-for-each-phone)).
 
 ## Pairing
 

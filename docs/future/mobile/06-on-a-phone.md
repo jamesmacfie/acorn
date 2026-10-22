@@ -7,8 +7,8 @@ phase.
 
 Completed October 21, 2026, apart from the real-device acceptance, which the owner still has to run.
 [Mobile web app](../../mobile/phone-setup.md) owns the shipped behavior,
-[the gateway](../../security/mobile-gateway.md#check-every-request) owns the `Host` check, and
-[`acorn mobile`](../../cli/mobile.md) owns the command. This page stays, with the rest of this folder,
+[the gateway](../../relay/phone-channel.md) owns the `Host` check, and
+[`acorn mobile`](../../mobile/phone-setup.md) owns the command. This page stays, with the rest of this folder,
 until [the acceptance](../../testing/mobile-on-a-phone.md) passes.
 
 ### What landed
@@ -26,7 +26,7 @@ until [the acceptance](../../testing/mobile-on-a-phone.md) passes.
 - `visibilitychange` to visible in the phone's transport: it replaces the socket at once.
 - Tests: the visibility cases in `platform.test.ts`, `serviceWorker.test.ts`, and `mobile.test.ts` in the
   CLI.
-- Docs: a setup section in `docs/mobile.md`, `docs/cli/mobile.md`, the real-device results page
+- Docs: a setup section in `docs/mobile.md`, `docs/cli/mobile.md` (deleted in remote access phase 4), the real-device results page
   `docs/testing/mobile-on-a-phone.md` with every row "Not yet run", and updates to the gateway page,
   the closed kit, packaging, `docs/future/remote.md`, and the indexes.
 

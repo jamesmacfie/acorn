@@ -1,4 +1,5 @@
 import type { z } from 'zod'
+import { AccountError } from './accountError'
 import {
   ACCOUNT_BROWSER_HEADER,
   accountErrorSchema,
@@ -17,27 +18,8 @@ import {
 // call. The header is what tells the service a page of its own made the call.
 //
 // It imports nothing that reads the platform seam, because `main.tsx` installs the seam before the app
-// loads.
-
-/** What the service refused with, or `unavailable` when it didn't answer or isn't an account service. */
-export class AccountError extends Error {
-  constructor(
-    readonly status: number,
-    readonly code: string,
-  ) {
-    super(
-      code === 'invalid_token'
-        ? 'You’re signed out of your account.'
-        : code === 'not_found'
-          ? 'Your account doesn’t list that Node.'
-          : 'Can’t reach your account.',
-    )
-  }
-  /** The person has no session, or it ended. */
-  get signedOut(): boolean {
-    return this.code === 'invalid_token'
-  }
-}
+// loads. It loads with the first channel, not the first screen, so `AccountError`, which the link has to
+// recognise, is in a file of its own.
 
 async function call<Schema extends z.ZodType>(
   method: string,

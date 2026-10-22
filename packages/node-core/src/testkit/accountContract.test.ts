@@ -26,7 +26,7 @@ import {
 import { verifyToken } from '@acorn/protocol/accountToken.ts'
 import { startAccountStub, type AccountStub } from './accountStub'
 
-// The account API's conformance suite (docs/account-api.md § Conformance tests). It takes a base URL,
+// The account API's conformance suite (docs/account-api/testing.md § Conformance tests). It takes a base URL,
 // so one set of checks holds every implementation to the same schemas: by default it starts the
 // stand-in, and `ACORN_ACCOUNT_CONTRACT_URL=<base URL>` points it at another service instead, which
 // must answer `POST /_test/approve` as the stand-in does.

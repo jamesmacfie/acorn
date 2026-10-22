@@ -14,7 +14,10 @@ function worker(fetchImpl: (request: unknown) => Promise<Response>) {
   const stored = new Map<unknown, Response>()
   let handler: Handler | undefined
   new Function('self', 'location', 'caches', 'fetch', 'Response', source)(
-    { addEventListener: (_type: string, listener: Handler) => (handler = listener) },
+    {
+      addEventListener: (_type: string, listener: Handler) => (handler = listener),
+      registration: { scope: 'https://app.example.test/app/' },
+    },
     new URL('https://app.example.test'),
     {
       open: async () => ({ put: async (key: unknown, response: Response) => void stored.set(key, response) }),
@@ -50,7 +53,7 @@ describe('the service worker', () => {
       return new Response('page')
     })
     await visit('https://app.example.test/t/task-1', 'navigate')
-    expect([...stored.keys()]).toEqual(['/'])
+    expect([...stored.keys()]).toEqual(['https://app.example.test/app/'])
     up = false
     const answer = await visit('https://app.example.test/t/task-2', 'navigate')
     expect(await answer!.text()).toBe('page')

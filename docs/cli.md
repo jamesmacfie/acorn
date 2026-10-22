@@ -18,7 +18,6 @@ source is `apps/cli/src/`, and `apps/cli/src/args.ts` holds the parser and the h
 | [Plugin commands](./cli/plugin-commands.md) | Discovering and invoking a plugin's CLI commands |
 | [The local service](./cli/local-service.md) | `node start`, `status`, `stop`, `restart`, `pair`, `devices`, `revoke`, `reach`, and `service` |
 | [The browser host](./cli/browser-host.md) | `browser install`, `status`, and `uninstall` for the browser extension |
-| [The phone gateway](./cli/mobile.md) | `mobile`, `mobile sessions`, and `mobile revoke` for the mobile web app |
 
 ## Choosing a Node
 
@@ -67,8 +66,6 @@ acorn [--node NODE] workflow run list --task ID
 acorn [--node NODE] workflow run show ID|steps ID|wait ID [--until finished|attention] [--timeout SECONDS|30m] [--check]
 acorn [--node NODE] run list [--workspace ID|--project ID]
 acorn browser install|status|uninstall [--browser chrome|firefox]
-acorn mobile [--node NODE] [--port N] [--origin URL] [--app-dir PATH]
-acorn mobile sessions|revoke ID
 acorn [--node NODE] plugin list
 acorn [--node NODE] plugin ID commands
 acorn [--node NODE] plugin ID COMMAND --help

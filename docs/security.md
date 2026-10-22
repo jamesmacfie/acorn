@@ -70,9 +70,9 @@ Deleting a workspace removes its datasets. Row and byte caps plus retention boun
   takes the row and action from that run, never from the browser, so the browser can't name a record
   or an action the source didn't offer, and an older app revision acts on nothing. The Node checks
   the confirmed risk against the action's own.
-- **A phone's browser** reaches one Node through the mobile gateway, a process on the Node's
-  computer that holds the device token and the pin and gives the phone a session cookie. The phone
-  has owner power minus a short route denylist ([mobile gateway](./security/mobile-gateway.md)).
+- **A phone's browser** reaches a Node through a relay and its own encrypted channel, as a device of its
+  own that can't write plugins, back up, manage devices, or stop the Node. The account website serves the
+  app, so it could ship code that reads what the phone reads ([the phone channel](./relay/phone-channel.md#trust)).
 - **A relay** forwards TLS to a Node that dialed out to it, with no key to read it. The client pins the
   Node's certificate, a relayed caller is never loopback, and the relay's credential reaches the relay,
   not the Node. An account's listing vouches for a Node's fingerprint in place of identity words
@@ -96,7 +96,7 @@ The shell's Rust dependency patch and remaining upstream advisories are in
 is [review-2026-10-01.md](./security/review-2026-10-01.md), and its follow-up on October 11, 2026 is
 [review-2026-10-11.md](./security/review-2026-10-11.md). The review of agent-built apps on October 19, 2026 is
 [review-2026-10-19.md](./security/review-2026-10-19.md). The review of the work since October 11, with the
-fixes for it, is [review-2026-10-21.md](./security/review-2026-10-21.md). The review of the phone gateway and
+fixes for it, is [review-2026-10-21.md](./security/review-2026-10-21.md). The review of the retired phone gateway and
 client tokens on October 22, 2026, with the fixes for it, is
 [review-2026-10-22.md](./security/review-2026-10-22.md).
 

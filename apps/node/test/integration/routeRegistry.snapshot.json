@@ -4,6 +4,7 @@
     "ALL /v1/*",
     "ALL /v1/*",
     "ALL /v1/*",
+    "ALL /v1/*",
     "ALL /v1/core/attachment",
     "ALL /v1/core/attachment/*",
     "ALL /v1/core/audit",

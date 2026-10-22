@@ -9,6 +9,7 @@ import { prefsOptions, projectsOptions, tasksOptions, workspacesOptions } from '
 import { Text } from '@acorn/client-core/kit/components/content'
 import { IconButton } from '@acorn/client-core/kit/components/inputs'
 import { EmptyState, Row } from '@acorn/client-core/kit/components/primitives.tsx'
+import { appHref } from './appHref'
 import { NeedsYou } from './NeedsYou'
 import { TopBar } from './TopBar'
 import { useWaiting, waitingWorkspaceId, waitsOnNode } from './waiting'
@@ -62,7 +63,7 @@ export function Workspaces() {
             {(workspace) => (
               <Row
                 variant="stacked"
-                href={`/w/${workspace.id}`}
+                href={appHref(`/w/${workspace.id}`)}
                 onPress={() => navigate(`/w/${workspace.id}`)}
                 leading={
                   <WorkspaceIdentity name={workspace.name} appearance={workspace.appearance} nodeId={activeNodeId()} />

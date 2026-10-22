@@ -47,7 +47,7 @@ Other ways to run it:
 | --- | --- |
 | `pnpm dev:no-watch` | The same run with the Rust watcher off. |
 | `pnpm dev:node` | Runs the standalone Node and prints one JSON handshake line with the endpoint, fingerprint, certificate, and Node ID, then its pairing banner. |
-| `pnpm dev:mobile:gateway` | Serves the Node that `pnpm dev` or `pnpm dev:node` runs to a phone's browser. See [mobile gateway](./security/mobile-gateway.md#run-it). |
+| `pnpm dev:mobile` | Serves the phone's web app on `http://127.0.0.1:4321`, with `/account` proxied to the stand-in that `pnpm dev:account` starts. See [run it](./mobile.md#run-it). |
 | `pnpm dev:plugin <id>` | Rebuilds one loaded plugin's package on every save. [Plugins](./plugins.md) § The dev loop has the whole loop. |
 | `pnpm dev:agent -- --session <name>` | Starts an isolated desktop session you can drive. See [agent drivers](./local-development/agent-drivers.md). |
 | `pnpm dev:tui:agent -- --session <name>` | Starts an isolated terminal client you can drive. |

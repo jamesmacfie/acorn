@@ -2,8 +2,8 @@ import { z } from 'zod'
 import { nodeFetchRequestSchema } from './broker.ts'
 
 // What crosses a phone's encrypted channel to a Node (docs/relay/phone-channel.md). Each message is a JSON
-// header, plus bytes for the three that carry a body. The shapes follow what the phone used to send
-// the gateway: a request and its answer, and the event socket's frames in both directions.
+// header, plus bytes for the three that carry a body. The shapes are a request and its answer, and the event
+// socket's frames in both directions.
 
 // A request, an answer, or a terminal frame can hold a 16 MiB body, the limit the desktop helper puts
 // on one request, plus its header.

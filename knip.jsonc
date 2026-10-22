@@ -19,7 +19,7 @@
       "entry": ["scripts/**/*.{mjs,ts}", "src/helper/helperMain.ts", "vite.*.config.ts"]
     },
     "apps/mobile": {
-      "entry": ["src/gateway/main.ts", "src/client/main.tsx", "scripts/**/*.mjs"]
+      "entry": ["src/client/main.tsx", "scripts/**/*.mjs"]
     },
     "apps/node": {
       "entry": ["scripts/**/*.mjs", "test/__fixtures__/**/*.{js,mjs,ts}"]

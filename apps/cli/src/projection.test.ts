@@ -105,13 +105,17 @@ describe('versioned resource contract', () => {
     )
     expect(window).toEqual(example('PairingWindow'))
     expect(device).toEqual(example('Device'))
-    expect(deviceResource('node-one', { ...device, createdAt: 0, lastSeenAt: 0, revokedAt: 0 }, 'other')).toMatchObject(
-      {
-        lastSeenAt: '1970-01-01T00:00:00.000Z',
-        revokedAt: '1970-01-01T00:00:00.000Z',
-        thisTerminal: false,
-      },
-    )
+    expect(
+      deviceResource(
+        'node-one',
+        { id: device.id, name: device.name, createdAt: 0, lastSeenAt: 0, revokedAt: 0 },
+        'other',
+      ),
+    ).toMatchObject({
+      lastSeenAt: '1970-01-01T00:00:00.000Z',
+      revokedAt: '1970-01-01T00:00:00.000Z',
+      thisTerminal: false,
+    })
     for (const resource of [window, device]) expect(validate(resource), JSON.stringify(validate.errors)).toBe(true)
   })
 })

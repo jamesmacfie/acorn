@@ -6,4 +6,5 @@ installPlatform()
 await import('./start')
 
 // The app's own files stay for a relaunch (apps/mobile/public/sw.js). The dev server has no use for them.
-if (import.meta.env.PROD && 'serviceWorker' in navigator) void navigator.serviceWorker.register('/sw.js')
+if (import.meta.env.PROD && 'serviceWorker' in navigator)
+  void navigator.serviceWorker.register(`${import.meta.env.BASE_URL}sw.js`)

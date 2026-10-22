@@ -29,6 +29,11 @@ A stream opens like this:
 
 Everything above TLS is unchanged: HTTP routes, the event WebSocket, and plugin bundle downloads.
 
+A phone's browser opens its stream with `?kind=browser` and offers its ticket as a subprotocol, because it
+can't set `Authorization`. It runs an encrypted handshake against the Node's channel key instead of TLS
+([the phone channel](./relay/phone-channel.md)). A Node that serves no `browser` streams refuses one with a
+`refuse` message, so an older Node answers a phone with `502` at once.
+
 ## The Node
 
 A Node with relay settings dials its relay as soon as its listener binds. The settings are a relay

@@ -120,6 +120,10 @@ These limits apply:
 socket holds no bearer to recheck. A device may revoke itself. Every paired device already has full
 owner authority, so there is no separate guard against self-revocation.
 
+A device paired through a phone's channel is marked `kind: "phone"` in `GET /v1/core/devices`, whatever it
+calls itself. The Node answers it `403 phone_refused` on the routes in [what a phone device may
+do](../relay/phone-channel.md#what-a-phone-device-may-do), and revokes it after 30 days unused.
+
 ## Request processing
 
 `createApp()` applies this order:

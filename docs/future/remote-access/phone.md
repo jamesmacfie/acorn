@@ -1,14 +1,15 @@
 # The phone through the account website
 
-Date: October 22, 2026. Status: proposed. This file covers how the phone app reaches a Node with no
+Date: October 22, 2026. Status: built in [phase 4](./04-phone.md), where the decisions and deviations are, and
+[the phone channel](../../relay/phone-channel.md) owns the shipped design. This file covers how the phone app reaches a Node with no
 Tailscale and no gateway: the app served from the account website, its own encrypted connection
 through the relay, a device record for each phone, and what retiring the gateway removes.
-[The mobile web app](../../mobile.md) and [the mobile gateway](../../security/mobile-gateway.md) own
+[The mobile web app](../../mobile.md) and [the mobile gateway](../../relay/phone-channel.md) own
 the shipped design this replaces.
 
 ## Why the gateway goes
 
-The gateway does three jobs for the phone ([why](../../security/mobile-gateway.md#why)):
+The gateway does three jobs for the phone ([why](../../relay/phone-channel.md)):
 
 1. It presents a certificate the phone's browser trusts, by sitting behind `tailscale serve`.
 2. It serves the app's files from the Node's machine, so the Node can't replace them.
@@ -20,7 +21,7 @@ running its own encrypted connection to the Node, the third job goes away. The g
 nothing to do, and it's also what makes the phone setup a list of commands someone has to keep
 running.
 
-Retiring it also fixes two of its limits ([limits](../../security/mobile-gateway.md#limits)). The Node
+Retiring it also fixes two of its limits ([limits](../../relay/phone-channel.md)). The Node
 sees every phone behind a gateway as one device, so you can't revoke one phone from the Node, and its
 audit log can't tell phones apart. Each phone becomes its own device.
 
@@ -75,7 +76,7 @@ as [remote.md](../remote.md#implement-browser-plugin-custody) records for browse
 ## What a phone device may do
 
 The gateway's blocked list keeps a phone off the routes it has no screen for
-(`apps/mobile/src/gateway/denylist.ts`). A phone's own device would have full owner power, so the
+(`apps/mobile/src/gateway/denylist.ts`, deleted in phase 4). A phone's own device would have full owner power, so the
 list moves into the Node. A device paired from the phone app is marked as a phone device, and the Node
 refuses it:
 
@@ -115,7 +116,7 @@ When phase 4 ships:
 - The `acorn mobile` command and its bundle entry.
 - `pnpm dev:mobile:gateway`, and the gateway half of `pnpm dev:mobile`.
 - The Tailscale steps in [use it on a phone](../../mobile/phone-setup.md) and the gateway reference in
-  [the mobile gateway](../../security/mobile-gateway.md).
+  [the mobile gateway](../../relay/phone-channel.md).
 - The gateway fixes from [the October 22 security review](../../security/review-2026-10-22.md).
   Their rules carry over as listed in [what a phone device may do](#what-a-phone-device-may-do).
 
@@ -125,6 +126,6 @@ from a host with a trusted name.
 ## Verify before building
 
 Check how the gateway's `/node` forwarding and `/events` messages are shaped in
-`apps/mobile/src/gateway/gateway.ts`, since the channel carries the same shapes. Check that the
+`apps/mobile/src/gateway/gateway.ts` (deleted in phase 4), since the channel carries the same shapes. Check that the
 supported phone browsers offer non-extractable WebCrypto keys and the primitives the chosen protocol
 needs.

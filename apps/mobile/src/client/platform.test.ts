@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { SEAM_GROUPS, seamProblems, type SeamGroup } from '@acorn/client-core/infra/platform'
-import type { ChannelClient, ChannelListeners } from '@acorn/channel/client.ts'
+import type { ChannelClient, ChannelListeners, ChannelResponse } from '@acorn/channel/client.ts'
 import type { NodeStatus } from '@acorn/protocol/broker.ts'
 
 // The phone's half of the platform-seam contract, beside the desktop's and the terminal's
@@ -83,7 +83,7 @@ vi.mock('./openChannel', () => ({
       ) => {
         sent.push(request)
         if (request.path === '/v1/slow')
-          return new Promise((_resolve, reject) =>
+          return new Promise<ChannelResponse>((_resolve, reject) =>
             signal?.addEventListener('abort', () => reject(new Error('aborted'))),
           )
         return Promise.resolve({
@@ -232,7 +232,7 @@ describe('the transport', () => {
 
 describe('the account', () => {
   it('shows the sign-in screen once a link learns the account session ended', async () => {
-    const { AccountError } = await import('./account')
+    const { AccountError } = await import('./accountError')
     expect(signedOut()).toBe(false)
     stored.openFails.push(new AccountError(401, 'invalid_token'))
     acorn.nodeInterest('node-1')

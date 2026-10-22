@@ -154,30 +154,22 @@ export function helpFor(positionals: string[]): string {
                         'node service install|uninstall|status (start the installed Node at login)',
                         'stop and restart drain the Node; pair, devices, and revoke also take --node',
                       ]
-                    : section === 'mobile'
+                    : section === 'browser'
                       ? [
-                          'mobile [--node ID|LABEL|URL] [--port N] [--origin https://HOST.TAILNET.ts.net] [--app-dir PATH]',
-                          'mobile sessions|revoke ID',
-                          'serving listens on 127.0.0.1 and prints a QR code and a sign-in code; put tailscale serve in front of it',
-                          'sessions lists the phones signed in, and revoke ID signs one out',
+                          'browser install|status|uninstall [--browser chrome|firefox]',
+                          'install registers the native host the Acorn browser extension starts; run it again to repair',
+                          'uninstall removes the registrations and keeps pairings; status names the folder that holds them',
                         ]
-                      : section === 'browser'
-                        ? [
-                            'browser install|status|uninstall [--browser chrome|firefox]',
-                            'install registers the native host the Acorn browser extension starts; run it again to repair',
-                            'uninstall removes the registrations and keeps pairings; status names the folder that holds them',
-                          ]
-                        : [
-                            'node info|start|status|stop|restart|pair|devices|revoke|reach|service',
-                            'workspace list|show|create|rename|remove|external-projects',
-                            'project list|show|add|rename|move|hide|unhide|detect|remove|config',
-                            'task list|show|create|scripts status|scripts wait|scripts logs',
-                            'agent providers|list|show|start|send|events|wait',
-                            'workflow list|start|run list|run show|run steps|run wait',
-                            'run list',
-                            'plugin list|ID commands|ID COMMAND',
-                            'browser install|status|uninstall',
-                            'mobile [--origin URL]|sessions|revoke ID',
-                          ]
+                      : [
+                          'node info|start|status|stop|restart|pair|devices|revoke|reach|service',
+                          'workspace list|show|create|rename|remove|external-projects',
+                          'project list|show|add|rename|move|hide|unhide|detect|remove|config',
+                          'task list|show|create|scripts status|scripts wait|scripts logs',
+                          'agent providers|list|show|start|send|events|wait',
+                          'workflow list|start|run list|run show|run steps|run wait',
+                          'run list',
+                          'plugin list|ID commands|ID COMMAND',
+                          'browser install|status|uninstall',
+                        ]
   return `Usage: acorn [--node ID|LABEL|https://HOST:PORT|wss://CREDENTIAL@RELAY/NODE-ID] ${lines.join('\n       acorn ')}\n\nOptions: --output text|json|jsonl  --no-header  --help\nExit codes: 0 success, 1 internal, 2 usage, 3 connection/auth/identity/protocol, 4 domain, 5 timeout, 6 failed wait, 7 ambiguous mutation or partial write.\n`
 }

@@ -30,7 +30,7 @@ A blocked session's shell commands, and every process they start:
   `node.json`, its own skill folders, and its own attachment folder. The task CLI uses the token file,
   the certificate, and `node.json`, which gives it the Node's current port. A hard link from the data
   folder into the worktree fails too, because the sandbox checks the source path.
-- Can't read the client config folder, where the CLI, the terminal client, the phone gateway, and the
+- Can't read the client config folder, where the CLI, the terminal client, and the
   browser bridge keep their device tokens as plain files, or the desktop's custody root, which holds
   its paired Nodes and sometimes a plain `data.key` (`clientCustodyDirs` in
   `packages/node-core/src/server/transport/listenerConfig.ts`). The installed desktop's folder holds

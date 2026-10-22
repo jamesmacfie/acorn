@@ -180,7 +180,7 @@ states. [Client state and fleet behavior](./architecture/fleet.md) covers the ru
 
 ## Phone
 
-A phone's browser opens a [mobile web app](./mobile.md) through a gateway on the Node's computer. It
+A phone's browser opens a [mobile web app](./mobile.md) from the account website and reaches the Node through a relay. It
 lists what agents are waiting on in **Needs you** and answers a permission request or a question with
 a tap. It shows each task's conversation and sends a message, stops a turn, and starts a task with the
 same draft form the desktop uses. Every built-in pane except Preview draws, one at a time. These parts

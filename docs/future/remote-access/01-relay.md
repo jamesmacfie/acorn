@@ -107,7 +107,7 @@ today.
   which builds an `https.Agent` with a pinning override. Callers: the desktop helper
   (`apps/desktop/src/helper/rendererConnection.ts`), the terminal client (`apps/tui/src/platform.ts`),
   the CLI (`apps/cli/src/node.ts`), the extension bridge (`apps/cli/src/browser/bridge.ts`), and the
-  phone gateway (`apps/mobile/src/gateway/main.ts`).
+  phone gateway (`apps/mobile/src/gateway/main.ts`, deleted in phase 4).
 - The `Host` allowlist in `packages/node-core/src/server/transport/listener.ts`.
 - The WebSocket hub in `packages/node-core/src/server/transport/wsHub.ts`.
 - The loopback check in `packages/node-core/src/server/transport/loopbackPeer.ts`.

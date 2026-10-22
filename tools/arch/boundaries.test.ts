@@ -487,7 +487,6 @@ describe('architecture boundaries', () => {
       'apps/tui/src/node/supervise.ts', // `acorn` supervising the node it started, when it started one
       'apps/cli/src/supervision/lifecycle.ts', // explicit background Node lifecycle commands
       'apps/cli/src/supervision/service.ts', // launchctl, systemctl, loginctl, and schtasks for `acorn node service`
-      'apps/cli/src/mobile.ts', // `acorn mobile` runs the phone gateway, a long-lived server, as its child
       // Long-lived engines. Each owns its children's lifetime, and the broker has no model for that.
       'plugins/terminal/src/server/terminal.ts', // PTYs
       'plugins/agents/src/server/drivers/jsonRpcProcess.ts', // child stream types for JSON-RPC
@@ -583,20 +582,11 @@ describe('architecture boundaries', () => {
       // handshake, not log lines; everything else in the file goes through the logger
       // (docs/shell/process.md § The shell process).
       'apps/desktop/src/helper/helperMain.ts',
-      // Prints the sign-in banner and the session list a person at this terminal is here to read.
-      // Its request lines go through the logger in gateway.ts.
-      'apps/mobile/src/gateway/main.ts',
     ]
-    // The helper, the mobile gateway, and the custody stack are here rather than with the renderer's
+    // The helper and the custody stack are here rather than with the renderer's
     // rule: they are Node processes, they already depend on node-core, and their lines belong on stderr
     // (docs/shell/node-child.md § What the helper reports).
-    const SCANNED = [
-      'packages/node-core/src',
-      'apps/node/src',
-      'packages/custody/src',
-      'apps/desktop/src/helper',
-      'apps/mobile/src/gateway',
-    ]
+    const SCANNED = ['packages/node-core/src', 'apps/node/src', 'packages/custody/src', 'apps/desktop/src/helper']
     const files = SCANNED.flatMap((dir) => walk(join(ROOT, dir))).filter((file) => !isTestCode(file))
     expect(files.length).toBeGreaterThan(150) // anti-vacuity: the walker found the node
     expect(
@@ -871,12 +861,10 @@ describe('architecture boundaries', () => {
       // (docs/managed-agents/read-block.md). The manifest parser and the core facet list, which the
       // public site's plugin reference reads to check its examples and list the grants. `mcp/toolOutputDir`,
       // so the Claude harness can let an agent read the folder where a cut tool result's full text goes.
-      // `server/auth/pairingCodes.ts`, so the mobile gateway's sign-in code keeps the Node's code rules
-      // without loading the auth barrel's database modules.
       // Includes `server/storage/nodeRelay.ts`, the relay and owner record the account plugin's lazy routes read,
       // which stays out of the Node's static graph that way, and `server/transport/channelKey.ts`, the key a
       // phone pins, which the same routes register without loading the channel.
-      '@acorn/node-core': 71,
+      '@acorn/node-core': 70,
       '@acorn/custody': 10,
       '@acorn/dashboards-core': 18, // Shared SQL/in-memory summary and time-bucket semantics, the plan's labels, its outline, the plan-writing guide the studio and panel_guide share, and the heatmap's cells HeatmapView draws.
       // The document model, and the store a code host's Node half keeps documents in.
@@ -1035,6 +1023,7 @@ describe('architecture boundaries', () => {
       ['packages/change-request-ui/src/views/ChangeRequestDiff.tsx', "'editor' is the pane a diff line opens in"],
       ['packages/change-request-ui/src/views/detailModel.ts', "'linear' is the provider of the linked tickets"],
       ['packages/protocol/src/data/dataSources.ts', 'preview is a query mode, not the preview plugin'],
+      ['packages/protocol/src/transport/relay.ts', "'browser' is the relay's stream kind for a phone's browser"],
       ['packages/node-core/src/server/db/schema.ts', "'account' is the provider account column of a connection row"],
       ['packages/dashboards-core/src/plan.ts', "'account' is a field name in a data plan"],
       ['packages/client-core/src/features/dashboards/EquivalenceForm.tsx', "'account' is a field name in a data plan"],
@@ -1358,20 +1347,27 @@ describe('architecture boundaries', () => {
     expect(importers).toContain('apps/tui/src/platform.ts')
   })
 
-  it('the mobile app keeps custody in its gateway', () => {
-    // The phone's browser never holds a device token or a certificate; the gateway process does
-    // (docs/security/mobile-gateway.md). The web app shares this package, so the promise is a folder
-    // boundary: custody is reachable from the gateway and from nothing the browser loads.
-    const importers = [
-      ...new Set(
-        EDGES.filter((e) => e.fromPkg.name === '@acorn/mobile' && !isTestCode(e.fromFile))
-          .filter((e) => e.target.pkg?.name === '@acorn/custody')
-          .map((e) => rel(e.fromFile)),
-      ),
-    ].sort()
-    expect(importers.filter((file) => !file.startsWith('apps/mobile/src/gateway/'))).toEqual([])
-    // Anti-vacuity: the gateway must still be the thing that opens the broker.
-    expect(importers).toContain('apps/mobile/src/gateway/main.ts')
+  it('the phone’s web app holds no custody and no Node code', () => {
+    // A phone's browser keeps its device token under a key it won't hand over, in the one module that
+    // reads it (docs/relay/phone-channel.md). Custody and the Node's own code are for processes that run
+    // on a computer, and none of it belongs in what the browser loads.
+    const importers = EDGES.filter((e) => e.fromPkg.name === '@acorn/mobile' && !isTestCode(e.fromFile))
+      .filter((e) => ['@acorn/custody', '@acorn/node-core'].includes(e.target.pkg?.name ?? ''))
+      .map((e) => `${rel(e.fromFile)}: ${e.spec}`)
+    expect(importers).toEqual([])
+    // Anti-vacuity: the phone must still be what opens the channel.
+    expect(EDGES.some((e) => e.fromPkg.name === '@acorn/mobile' && e.target.pkg?.name === '@acorn/channel')).toBe(true)
+  })
+
+  it('the channel library reaches the network only through a socket it is handed', () => {
+    // A Node and a phone's browser run the same code (docs/relay/phone-channel.md), so it can't import
+    // what only one of them has.
+    const offenders = EDGES.filter((e) => e.fromPkg.name === '@acorn/channel' && !isTestCode(e.fromFile))
+      .filter((e) => e.spec.startsWith('node:') || e.spec === 'ws')
+      .filter((e) => !rel(e.fromFile).endsWith('/testkit.ts'))
+      .map((e) => `${rel(e.fromFile)}: ${e.spec}`)
+    expect(offenders).toEqual([])
+    expect(EDGES.some((e) => e.fromPkg.name === '@acorn/channel')).toBe(true)
   })
 
   it('the terminal focus store knows the keyboard and not the screen', () => {

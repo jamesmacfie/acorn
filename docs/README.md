@@ -47,12 +47,13 @@ the whole plugin system in one page.
 | [state-ownership/scope-rules.md](./state-ownership/scope-rules.md) | Where client state is stored: the scope table, the three mechanisms, eviction, and drafts. |
 | [state-ownership/reading-places.md](./state-ownership/reading-places.md) | List, timeline, and diff reading places, heights, and parsed rows. |
 | [caching.md](./caching.md) | The client cache, its keys, and the serve-then-revalidate policy. |
-| [account-api.md](./account-api.md) | The account API: sign-in, Nodes, relay credentials, tickets, and assertions, its schemas, the stand-in, and the sign-in plugin. |
+| [account-api.md](./account-api.md) | The account API: sign-in, Nodes, relay credentials, tickets, and assertions, its schemas, and the sign-in plugin. |
+| [account-api/browsers.md](./account-api/browsers.md) | How a browser served by the account website calls the API: the session cookie, its header, and sign-in. |
+| [account-api/testing.md](./account-api/testing.md) | The stand-in account service and the conformance suite that holds every implementation to the schemas. |
 | [authentication.md](./authentication.md) | Device pairing, tokens, principals, and the internal-call scopes. |
 | [security.md](./security.md) | The trust boundaries, what is out of scope, and which page owns each control. |
 | [security/security-diagnostics.md](./security/security-diagnostics.md) | Passive, device-only Node security evidence, scope, and limits. |
 | [security/instruction-review.md](./security/instruction-review.md) | Hidden-character checks, changed instruction approval, first-time setup, and blocked-turn recovery. |
-| [security/mobile-gateway.md](./security/mobile-gateway.md) | The gateway that gives a phone's browser a session on one Node: sign-in, the request checks, forwarding, the route denylist, and the event socket. |
 | [security/transport-and-auth.md](./security/transport-and-auth.md) | TLS and pins, broker limits, the auth gates, mount coverage, task scope, and the WebSocket hub. |
 | [security/credentials.md](./security/credentials.md) | Provider credentials, `SecretService.use`, child environments, and internal token scopes. |
 | [security/process-and-paths.md](./security/process-and-paths.md) | Path confinement, the process broker, config trust, workflow authority, and force push. |
@@ -72,7 +73,7 @@ the whole plugin system in one page.
 | [security/review-2026-10-01.md](./security/review-2026-10-01.md) | Ten-area security review, completed remediation ledger, verification evidence, and remaining limits. |
 | [security/review-2026-10-19.md](./security/review-2026-10-19.md) | Review of agent-built apps: each way a program could reach beyond its plans and host tools, what stops it, and the one open finding. |
 | [security/review-2026-10-21.md](./security/review-2026-10-21.md) | Review of the work since October 11: loaded plugin paths the host dispatches, raced pairing asks, agent-created tasks, unguarded agent steps behind record triggers, and the audit. Each finding, its change, the checks, and what stays open. |
-| [security/review-2026-10-22.md](./security/review-2026-10-22.md) | Review of the phone gateway and client tokens: client device tokens outside the agent fence, forwarded answers that rendered as pages, phone sessions that never expired, plugin writes from a phone, and agent-written memory. Each finding, its change, the checks and walks, and what stays open. |
+| [security/review-2026-10-22.md](./security/review-2026-10-22.md) | Review of the retired phone gateway and client tokens: client device tokens outside the agent fence, forwarded answers that rendered as pages, phone sessions that never expired, plugin writes from a phone, and agent-written memory. Each finding, its change, the checks and walks, and what stays open. |
 | [security/review-2026-10-11.md](./security/review-2026-10-11.md) | Follow-up review: the TOML parser cap, release-build renderer origin, idempotency query strings, plugin route gates, and the dependency audit. |
 
 ## The renderer
@@ -214,16 +215,16 @@ Start with the plugin map, then follow the authoring guide or API reference.
 | [telemetry/diagnosis.md](./telemetry/diagnosis.md) | What Settings → Telemetry shows, diagnosing an unresponsive view, and memory over a day. |
 | [shell.md](./shell.md) | The Tauri shell: schemes, custody, webviews, the helper, and packaging. |
 | [tui.md](./tui.md) | The terminal client: `acorn` in a terminal, its process model, its host switch, how it draws a frame, and its chrome. |
-| [mobile.md](./mobile.md) | The mobile web app: its platform seam over the gateway, its screens, how to run it, and how to drive it at phone width. |
+| [mobile.md](./mobile.md) | The mobile web app: its platform seam over the account and an encrypted channel, its screens, how to run it, and how to drive it at phone width. |
+| [mobile/narrow-mode.md](./mobile/narrow-mode.md) | How the phone turns narrow mode on, handles the on-screen keyboard, and draws each host layout. |
 | [mobile/agent-pane.md](./mobile/agent-pane.md) | How the Agents pane draws on a phone: the one-row header, the folded composer, sheets, and the keyboard. |
-| [mobile/phone-setup.md](./mobile/phone-setup.md) | Reaching the mobile web app over Tailscale, installing it to the home screen, its service worker, and its reconnect on return. |
+| [mobile/phone-setup.md](./mobile/phone-setup.md) | Opening the mobile web app from the account website, installing it to the home screen, its service worker, and its reconnect on return. |
 | [cli.md](./cli.md) | Headless `acorn` commands, Node selection, read resources, output, and exit codes. |
 | [cli/workspaces-projects-tasks.md](./cli/workspaces-projects-tasks.md) | CLI core writes, retries, stdin piping, and task script reads. |
 | [cli/agents-and-workflows.md](./cli/agents-and-workflows.md) | CLI agent sessions, workflow runs, and the run list. |
 | [cli/plugin-commands.md](./cli/plugin-commands.md) | Discovering and running a plugin's CLI commands. |
 | [cli/local-service.md](./cli/local-service.md) | The CLI-owned background Node: start, status, and stop. |
 | [cli/browser-host.md](./cli/browser-host.md) | `acorn browser install`, `status`, and `uninstall`: registering the extension's native host. |
-| [cli/mobile.md](./cli/mobile.md) | `acorn mobile`: serve the phone app, and list and end phone sessions. |
 | [browser-extension.md](./browser-extension.md) | The Chrome and Firefox extension, its native bridge, the native messaging contract, pairing, and sidebar states. |
 | [browser-extension/native-messaging.md](./browser-extension/native-messaging.md) | The frames, operations, and events between the extension's background and its native host, and the frame limits the host enforces. |
 | [browser-extension/setup.md](./browser-extension/setup.md) | Installing the extension's development builds and native bridge on macOS, pairing, repair and removal, and every sidebar state with its next step. |
@@ -242,6 +243,7 @@ Start with the plugin map, then follow the authoring guide or API reference.
 | [node-distribution/keep-awake.md](./node-distribution/keep-awake.md) | How a Node keeps its computer awake while agents work or workflows run, the inhibitor on each platform, and the setting. |
 | [node-distribution/reaching.md](./node-distribution/reaching.md) | How a person chooses the addresses a Node answers other machines on, and why the port stays fixed. |
 | [relay/accounts.md](./relay/accounts.md) | How a relay checks an account service, how a client gets a ticket, and what Remote access does on a Node. |
+| [relay/phone-channel.md](./relay/phone-channel.md) | The phone's encrypted channel through a relay: the Noise handshake, the Node's channel key, the messages, each phone's device, and what a phone device may not do. |
 | [relay.md](./relay.md) | The relay: reaching a Node with no public address, the Node's tunnel, relay addresses in clients, and running your own relay. |
 | [release-notes.md](./release-notes.md) | What is in the current release. |
 

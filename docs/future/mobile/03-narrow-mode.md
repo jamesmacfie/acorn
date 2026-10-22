@@ -5,7 +5,7 @@ shell. Can run beside [phase 4](./04-narrow-layouts.md).
 
 ## Completion note
 
-Completed October 21, 2026. [Mobile web app](../../mobile.md#narrow-mode) and
+Completed October 21, 2026. [Mobile web app](../../mobile/narrow-mode.md#narrow-mode) and
 [the narrow sheet](../../ui-design/tokens.md#the-narrow-sheet) own the shipped behavior, and
 [form factor](../../panes/contributions.md#form-factor) owns the pane field. This page keeps what the
 later phases need.

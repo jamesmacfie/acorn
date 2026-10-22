@@ -14,7 +14,6 @@ import { advertisedHosts } from './advertise'
 import { relaySettings, type RelayControl } from './relaySettings'
 import { ensureCert } from './tls'
 import { attachWsHub, disposeWsHub, type WsHub } from './wsHub'
-import { ensureChannelKey } from './channelKey'
 import type { RelayTunnel } from './relayTunnel'
 import type { Env } from '../bindings'
 import { createLogger, describeError } from '../telemetry/logger'
@@ -252,7 +251,7 @@ function serveBrowser(
   dispatch: (request: Request) => Promise<Response>,
 ): (socket: ChannelSocket, host: string) => void {
   return (socket, host) =>
-    void import('./channel').then(({ serveChannel }) =>
+    void Promise.all([import('./channel'), import('./channelKey')]).then(([{ serveChannel }, { ensureChannelKey }]) =>
       serveChannel(socket, { identity: ensureChannelKey(root.dir), host, dispatch, hub }),
     )
 }

@@ -3,11 +3,14 @@ import { defineConfig } from 'vite'
 import solid from 'vite-plugin-solid'
 import { buildVersion } from '../../scripts/buildVersion.mts'
 
-// The phone's web app, from `index.html` and `src/client`. The gateway serves `dist` as it stands
-// (docs/security/mobile-gateway.md). `pnpm dev:mobile` runs this config with a proxy to the gateway in
-// front of it (scripts/dev.mjs), so nothing here knows a port.
+// The phone's web app, from `index.html` and `src/client`. The account website serves `dist` as it stands
+// (docs/mobile/phone-setup.md § Serve it yourself). `pnpm dev:mobile` runs this config with a proxy to the
+// account service in front of it (scripts/dev.mjs), so nothing here knows a port.
 export default defineConfig({
   root: import.meta.dirname,
+  // The website keeps its own pages at its root, so the app lives under `/app/`: every file the build
+  // writes and every route is under it, and `Shell.tsx` gives the router the same prefix.
+  base: '/app/',
   plugins: [solid()],
   // The DOM host, as on the desktop (client-core kit/tokens/support.ts).
   define: { __ACORN_HOST__: '"dom"', __ACORN_BUILD__: JSON.stringify(buildVersion()) },

@@ -78,7 +78,7 @@ only the desktop shows the dialog
 
 - **The terminal client**, in phase 3.
 - **The phone**, in phase 4. The gateway's blocked list refuses every pairing route today
-  (`apps/mobile/src/gateway/denylist.ts`). With the gateway retired, a phone's own device may answer
+  (`apps/mobile/src/gateway/denylist.ts`, deleted in phase 4). With the gateway retired, a phone's own device may answer
   asks but not open a code window or manage devices ([phone](./phone.md#what-a-phone-device-may-do)).
 
 The browser extension waits. The dialog shows the device name, the account it signed in as, the three

@@ -153,6 +153,7 @@ describe('the loopback TLS listener', () => {
           { url: 'ws://127.0.0.1:9', credential: 'relay-credential' },
           root!.nodeId,
           expect.any(Set),
+          expect.any(Function),
         ),
       )
       expect((await probe(relayed, '/v1/node', relayName(), {}, true)).status).toBe(200)

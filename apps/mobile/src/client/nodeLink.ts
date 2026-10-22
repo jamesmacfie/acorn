@@ -1,7 +1,7 @@
 import type { ChannelClient, ChannelListeners, ChannelRequest, ChannelResponse } from '@acorn/channel/client.ts'
-import { IdentityMismatchError } from '@acorn/channel/secure.ts'
+import { IdentityMismatchError } from '@acorn/channel/errors.ts'
 import type { NodeStatus } from '@acorn/protocol/broker.ts'
-import { AccountError } from './account'
+import { AccountError } from './accountError'
 
 // One Node as the phone sees it: a channel that is opened when something needs it, replaced when it
 // drops, and given up on for the three reasons retrying can't fix. It holds the Node's device token, so a

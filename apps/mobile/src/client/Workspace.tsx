@@ -11,6 +11,7 @@ import { Text } from '@acorn/client-core/kit/components/content'
 import { Button, EmptyState, Row, SectionHeader } from '@acorn/client-core/kit/components/primitives.tsx'
 import { NeedsYou } from './NeedsYou'
 import { TopBar } from './TopBar'
+import { appHref } from './appHref'
 import { taskState } from './taskState'
 import { useWaiting, waitingWorkspaceId } from './waiting'
 
@@ -95,7 +96,11 @@ export function Workspace(props: { view: 'dashboard' | 'tasks' }) {
                       </SectionHeader>
                       <For each={group.tasks}>
                         {(task) => (
-                          <Row variant="stacked" href={`/t/${task.id}`} onPress={() => navigate(`/t/${task.id}`)}>
+                          <Row
+                            variant="stacked"
+                            href={appHref(`/t/${task.id}`)}
+                            onPress={() => navigate(`/t/${task.id}`)}
+                          >
                             <Text emphasis="strong">{task.title}</Text>
                             <Show when={taskState(task.id)}>{(state) => <Text emphasis="muted">{state()}</Text>}</Show>
                           </Row>

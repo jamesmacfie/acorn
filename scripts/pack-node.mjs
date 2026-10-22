@@ -136,7 +136,6 @@ console.log('[pack-node] building the artifact')
 runPnpm(['--filter', '@acorn/node', 'build'], { cwd: ROOT, stdio: 'inherit' })
 runPnpm(['--filter', '@acorn/cli', 'build'], { cwd: ROOT, stdio: 'inherit' })
 runPnpm(['--filter', '@acorn/tui', 'build'], { cwd: ROOT, stdio: 'inherit' })
-runPnpm(['--filter', '@acorn/mobile', 'build'], { cwd: ROOT, stdio: 'inherit' })
 
 const dist = join(NODE_APP, 'dist')
 if (!existsSync(join(dist, 'standalone.js'))) throw new Error('apps/node/dist/standalone.js is missing after the build.')
@@ -157,8 +156,6 @@ const runnable = { recursive: true, filter: (path) => !path.endsWith('.map') && 
 cpSync(dist, join(staging, 'dist'), runnable)
 cpSync(join(CLI_APP, 'dist'), join(staging, 'dist/cli'), runnable)
 cpSync(join(TUI_APP, 'dist'), join(staging, 'dist/tui'), runnable)
-// `acorn mobile` serves the phone's web app from beside cli.js (apps/cli/src/main.ts).
-cpSync(join(ROOT, 'apps/mobile/dist'), join(staging, 'dist/cli/mobile'), runnable)
 mkdirSync(join(staging, 'bin'), { recursive: true })
 cpSync(join(CLI_APP, 'bin/acorn.mjs'), join(staging, 'bin/acorn.mjs'))
 mkdirSync(join(staging, 'scripts'), { recursive: true })

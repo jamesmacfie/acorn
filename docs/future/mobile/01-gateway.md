@@ -4,7 +4,7 @@ Date: October 17, 2026. Status: shipped October 21, 2026.
 
 ## Completion note
 
-Completed October 21, 2026. [Mobile gateway](../../security/mobile-gateway.md) owns the shipped
+Completed October 21, 2026. [Mobile gateway](../../relay/phone-channel.md) owns the shipped
 behavior. This page keeps what the later phases need.
 
 ### What landed
@@ -49,7 +49,7 @@ process closed the socket with code `4401` about 270 milliseconds after the comm
 
 - **Phase 2's transport.** `fetch` sends to `/node` plus the Node path, with an `x-request-id`
   header. Aborting the `fetch` aborts the Node request. The `/events` messages are in
-  [relay events](../../security/mobile-gateway.md#relay-events). The first message on a socket is
+  [relay events](../../relay/phone-channel.md). The first message on a socket is
   `{ status }`, which names the Node's ID. A close with code `4401`, or a `401 signed_out` from
   `/node`, means the phone is signed out and should show the sign-in screen.
 - **Phase 2's fleet.** No gateway route returns the Node's fleet record. If `fleet.list` needs the

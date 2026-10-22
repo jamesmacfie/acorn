@@ -11,7 +11,7 @@ import { recordAudit, type AuditActor } from '../audit'
 // random secret makes offline hash guessing infeasible, so nothing reversible is layered on.
 //
 // Every paired device has full owner authority, disclosed at pairing, except a phone's, which is held
-// to fewer routes (./phoneRules.ts) and expires when unused. Device revocation is the lifecycle control;
+// to fewer routes (`phoneRules`) and expires when unused. Device revocation is the lifecycle control;
 // there are no per-token scopes because this is single-owner software.
 
 // acorn_dt_<uuid>_<base64url(32 bytes)>. Anchored, so trailing garbage or whitespace is rejected
@@ -29,8 +29,7 @@ const LAST_SEEN_THROTTLE_MS = 5 * 60_000
 // a revoke this process never saw, which is the same window a live socket already has.
 const AUTH_CACHE_TTL_MS = 60_000
 
-// A phone that nobody has used for this long is revoked the next time it asks, the rule a phone gateway's
-// sessions had. Its token lives in a browser's storage, which is easy to leave behind.
+// A phone that nobody has used for this long is revoked the next time it asks. Its token lives in a browser's storage, which is easy to leave behind.
 const PHONE_IDLE_LIMIT_MS = 30 * 24 * 3600_000
 
 const sha256 = (input: string): Buffer => createHash('sha256').update(input).digest()
