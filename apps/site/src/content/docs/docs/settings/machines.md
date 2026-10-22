@@ -25,7 +25,7 @@ covers:
   - telemetry
   - sentry-telemetry
   - storage
-checked: '9aaaaf7d3'
+checked: '1b62b6dfb'
 ---
 
 This page lists every setting in **Settings** > **Machines**. **Nodes** is stored on **This device**,

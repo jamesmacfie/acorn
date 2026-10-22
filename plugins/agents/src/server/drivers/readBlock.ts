@@ -101,14 +101,17 @@ export function dataRootReadBlock(input: {
   const dataDir = resolve(input.dataDir)
   const worktree = resolve(input.worktree)
   const git = linkedGitDirs(worktree)?.shared
-  // What the agent works in. Its token file and the Node's certificate are read by the task CLI, never
-  // by the model, so they stay out of this list and their folders stay hidden from the file tools.
+  // What the agent works in. Its token file, the Node's certificate, and `node.json`, where the task CLI
+  // finds the Node's current port, are read by the task CLI, never by the model, so they stay out of
+  // this list and stay hidden from the file tools.
   const workspace = [worktree, ...input.skillPaths, input.attachments, ...(git ? [git] : [])].map((path) =>
     resolve(path),
   )
-  const credentials = [input.env.ACORN_API_TOKEN_FILE, input.env.NODE_EXTRA_CA_CERTS].filter(
-    (path): path is string => !!path,
-  )
+  const credentials = [
+    input.env.ACORN_API_TOKEN_FILE,
+    input.env.NODE_EXTRA_CA_CERTS,
+    input.env.ACORN_DATA_DIR && join(input.env.ACORN_DATA_DIR, 'node.json'),
+  ].filter((path): path is string => !!path)
   let loopback: string | null = null
   try {
     loopback = new URL(input.env.ACORN_API_URL ?? '').host || null

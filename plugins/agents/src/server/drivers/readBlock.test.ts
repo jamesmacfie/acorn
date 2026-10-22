@@ -48,6 +48,7 @@ function fixture() {
     mkdirSync(join(dataDir, dir), { recursive: true })
   for (const file of [
     'core.sqlite',
+    'node.json',
     'node-keys.sealed',
     'internal-credentials/own.token',
     'tls/cert.pem',
@@ -55,6 +56,7 @@ function fixture() {
   ])
     writeFileSync(join(dataDir, file), '')
   const env = {
+    ACORN_DATA_DIR: dataDir,
     ACORN_API_URL: 'https://127.0.0.1:43123',
     ACORN_API_TOKEN_FILE: join(dataDir, 'internal-credentials', 'own.token'),
     NODE_EXTRA_CA_CERTS: join(dataDir, 'tls', 'cert.pem'),
@@ -98,7 +100,7 @@ describe('the data root read block', () => {
     for (const path of [...plain.writeDenied, ...gitWrites(worktree).writeDenied]) expect(path).not.toMatch(/[*?[]/)
   })
 
-  it('hides everything beside the worktree, skills, and own attachments, however deep they sit, and keeps its own token readable', () => {
+  it('hides everything beside the worktree, skills, and own attachments, however deep they sit, and keeps what the task CLI reads readable', () => {
     const { dataDir, repo, worktree, env, skills, pluginSkill, attachments } = fixture()
     const block = dataRootReadBlock({
       dataDir,
@@ -119,13 +121,21 @@ describe('the data root read block', () => {
         'core.sqlite',
         'internal-credentials',
         'node-keys.sealed',
+        'node.json',
         'plugins/agents.sqlite',
         'tls',
         'worktrees/task-2',
       ].map((entry) => join(dataDir, entry)),
     )
     expect(block.readable).toEqual(
-      expect.arrayContaining([worktree, skills, attachments, env.ACORN_API_TOKEN_FILE, env.NODE_EXTRA_CA_CERTS]),
+      expect.arrayContaining([
+        worktree,
+        skills,
+        attachments,
+        env.ACORN_API_TOKEN_FILE,
+        env.NODE_EXTRA_CA_CERTS,
+        join(dataDir, 'node.json'),
+      ]),
     )
     expect(block).toMatchObject(gitWrites(worktree))
     expect(block.readable.map((path) => realpathSync(path))).toContain(realpathSync(join(repo, '.git')))

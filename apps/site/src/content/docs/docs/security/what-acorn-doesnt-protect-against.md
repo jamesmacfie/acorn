@@ -8,7 +8,7 @@ sources:
   - docs/managed-agents/permission-policy.md
   - docs/security/node-plugin-security.md
   - docs/security/secret-publication.md
-checked: '9aaaaf7d3'
+checked: '1b62b6dfb'
 ---
 
 This page lists what acorn's security model leaves out, so you can decide what else you need. The
@@ -38,6 +38,8 @@ closes the data folder and the clients' config folders for Claude Code sessions,
 own sandbox. It's off by default, because it also stops the session writing outside its worktree:
 
 - Execute tools stop working: run targets, workflows, delegation, and the browser.
+- `acorn task scripts` fails in the agent's shell, because the sandbox refuses its connection to the
+  Node.
 - Installs that write to a shared package store fail, as do `git push` over SSH and Git commands that
   change the repository's settings.
 - On a machine that can't run the sandbox, such as Linux without `bubblewrap`, the session refuses to
