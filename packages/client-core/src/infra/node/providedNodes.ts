@@ -1,5 +1,5 @@
 import { coreNodeLifecycleRoute, coreNodeProvidersRoute } from '@acorn/protocol/api.ts'
-import type { NodeRecord } from '@acorn/protocol/broker.ts'
+import type { NodeAdoption, NodeRecord } from '@acorn/protocol/broker.ts'
 import type {
   NodeLifecycleVerb,
   NodeProviderDescriptor,
@@ -102,10 +102,14 @@ export function creatableProviders(
 export const providerFailures = (result: FleetResult<NodeProvidersResponse>): NodeProvidersResponse['failures'] =>
   result.rows.flatMap((answer) => answer.data.failures)
 
-/** True when any node has a provider at all. What the fleet surface hides its whole section behind, so
- *  an install with no cloud plugin never mentions provided nodes. */
+/** True when the section has something to draw: a node, a failure to report, or a provider that can make
+ *  nodes. What the fleet surface hides its whole section behind, so an install whose provider has nothing
+ *  to list, such as an account nobody signed in to, never mentions provided nodes. */
 export const hasNodeProviders = (result: FleetResult<NodeProvidersResponse>): boolean =>
-  result.rows.some((answer) => answer.data.providers.length > 0)
+  result.rows.some(
+    ({ data }) =>
+      data.nodes.length > 0 || data.failures.length > 0 || data.providers.some((p) => p.verbs.includes('create')),
+  )
 
 /** The reactive read. Every reachable node answers; one without a provider answers an empty list,
  *  which costs one request and keeps the surface honest about where a provider may run. */
@@ -124,18 +128,29 @@ const jsonBody = (value: unknown) => ({
  *
  *  The renderer names the provider and the node and nothing else. The host asks `sourceNodeId` for the
  *  endpoint, the fingerprint and the credential, then probes and checks the fingerprint itself, so
- *  there is no version of this call where the renderer supplies connection material. */
-export async function adoptProvidedNode(row: ProvidedNodeRow): Promise<NodeRecord> {
+ *  there is no version of this call where the renderer supplies connection material.
+ *
+ *  A node whose provider holds no credential, such as one an account lists, isn't adopted yet when this
+ *  answers. It answers with the words a device already paired with that node shows, and
+ *  `collectAdoption` finishes the job once that device allows it. */
+export async function adoptProvidedNode(row: ProvidedNodeRow): Promise<NodeAdoption> {
   const bridge = fleetBridge()
   if (!bridge) throw new Error('This build cannot adopt nodes.')
-  const record = await bridge.adopt({
+  const adoption = await bridge.adopt({
     sourceNodeId: row.sourceNodeId,
     providerId: row.providerId,
     providerNodeId: row.providerNodeId,
     label: row.label,
   })
-  await refreshFleet()
-  return record
+  if ('node' in adoption) await refreshFleet()
+  return adoption
+}
+
+/** The node an approved adoption became, or null while nobody has allowed it. */
+export async function collectAdoption(): Promise<NodeRecord | null> {
+  const record = await fleetBridge()?.collectAdoption()
+  if (record) await refreshFleet()
+  return record ?? null
 }
 
 /** `destroy`, `start` and `stop`, asked of the node that listed the provider. Confirmation is the

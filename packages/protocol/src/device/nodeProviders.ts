@@ -77,13 +77,20 @@ export const nodeAdoptBodySchema = z.strictObject({
 // Everything the host needs to remember a node, from the node that listed it. `certPem` is absent:
 // the host probes the endpoint itself and refuses a certificate whose fingerprint is not the one
 // vouched for here, so the provider's claim is checked rather than trusted.
-export const nodeAdoptResultSchema = z.object({
+//
+// What the provider holds decides how the host gets in. A device token it already has is used as it
+// stands. A provider that only knows where the node is, such as an account, hands over an assertion
+// instead, and the host pairs by approval with it (docs/plugins/node-providers.md § Node providers).
+const adoptedNodeSchema = z.object({
   nodeId: z.string().min(1),
   label: z.string().min(1),
   endpoint: z.string().url(),
   fingerprint: z.string().regex(/^[0-9a-f]{64}$/),
-  deviceToken: z.string().min(1),
 })
+export const nodeAdoptResultSchema = z.union([
+  adoptedNodeSchema.extend({ deviceToken: z.string().min(1) }),
+  adoptedNodeSchema.extend({ assertion: z.string().min(1) }),
+])
 export type NodeAdoptResult = z.infer<typeof nodeAdoptResultSchema>
 
 // `POST /v1/core/nodes/create`. `options` is a provider-specific bag of strings — a region, a size,

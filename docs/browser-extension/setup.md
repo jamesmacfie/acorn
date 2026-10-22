@@ -64,10 +64,15 @@ closes pairing.
 
 1. **Connect to Acorn.** The Node running on this Mac shows as a card, **This computer** with its
    address and **Connect**. The bridge found it in the same data folder `acorn` reads. With no Node on
-   this Mac, or one already paired, the card is left out. **Connect to another Node** is under it.
+   this Mac, or one already paired, the card is left out. Once a Node is paired, the Nodes its account
+   lists show under it, each with **Connect**. **Connect to another Node** is under them.
 2. **Approve in Acorn.** **Connect** asks the Node and shows three words. The desktop opens a dialog
    with the same words. Click **Allow** there, and the panel moves on by itself. **Use a pairing code
    instead** shows the code field. A Node that can't take an ask goes straight to the code.
+   A listed Node has no words to compare, because the account vouches for its fingerprint. **Approve on
+   another device** shows three words, and a desktop or terminal client already paired with that Node
+   shows the same words and **Allow**. The panel moves on when it's allowed. Sign in to the account in
+   Acorn's **Settings → Account**: the panel lists Nodes through the Node it has paired.
 3. **Another Node.** Enter its HTTPS address and click **Check**. **Check its identity** shows six
    words. Compare them with the ones the Node shows: the code panel in the desktop's **Settings →
    Nodes**, or a standalone Node's banner. Click **They match** only if they do. The Node on this Mac

@@ -17,6 +17,8 @@ request carries `v: 1` and a request `id`, and the host answers with the same `i
 | `node.pair` | `code`, `label` | The paired Node's record |
 | `node.ask` | none | `{ phrase }`: the words the owner's dialog shows. Only after `node.local`. Fails with `pairing_busy` when another ask overlapped, and asking again starts clean |
 | `node.collect` | `label` | The paired Node's record once the owner allows the ask, or `null` while they haven't. A denial or an expiry fails with `pairing_failed` |
+| `nodes.provided` | none | `{ nodes, available }`: the Nodes the selected Node's providers list, such as its owner's account, each `{ providerId, providerNodeId, label, adopted }`. `available` is whether the Node has a provider at all. Empty until a Node is selected |
+| `node.adopt` | `providerId`, `providerNodeId` | `{ phrase }`: the selected Node vouches for the listed Node and gives an assertion, and the host asks it to pair by approval. `node.collect` finishes it. Fails with `identity_mismatch` when the Node presents another certificate than its account vouched for |
 | `node.select` | `nodeId` or `null` | `{ nodes, activeNodeId, status }` |
 | `node.forget` | `nodeId` | `{ nodes, activeNodeId, status }` |
 | `node.rename` | `nodeId`, `label` (1 to 120 characters) | `{ nodes, activeNodeId, status }`. The name is this browser's own, so nothing on the Node or in other clients changes |

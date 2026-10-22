@@ -247,6 +247,7 @@ export type { ModelProviderAdapter } from '@acorn/node-core/server/modelProvider
 // the map, since a loaded bundle inlines every @acorn/* import it makes. `ProvidedNode` and its state
 // enum live in @acorn/protocol, which a plugin already depends on.
 export type {
+  NodeProviderCaller,
   NodeProviderContribution,
   NodeSpec,
   ProvidedNodeRecord,

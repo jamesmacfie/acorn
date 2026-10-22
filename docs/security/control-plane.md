@@ -50,10 +50,13 @@ Node's ID, a label, and the Node's certificate fingerprint, and nothing about wh
 impostor.** It signs relay tickets for any Node it lists and account assertions for any account. What
 it can't do is approve a pairing, read relayed traffic, or get a device token. A relay forwards TLS the
 client pins, so an impostor Node fails the pin as `identity_mismatch` unless the person pairs with it
-after comparing the wrong identity words. Four things bound that:
+after comparing the wrong identity words. A Node the account lists skips the words, because the
+account vouches for its fingerprint, so a person who connects to a listing from a breached service pairs
+with the impostor and sends it their work. Four things bound that:
 
 - **Pairing is still a person's act.** A new device needs a code from a paired device or an approval
-  on the Node's own computer.
+  from a device already paired with the Node. An assertion lets the owner account raise the dialog
+  and nothing more.
 - **The owner record isn't a grant.** `node.json` names the owner account and the service's keys, and
   nothing in a Node lets an account in.
 - **Tokens are short.** A ticket lasts five minutes and an assertion two. A relay credential lasts

@@ -87,9 +87,10 @@ Ordinary failures get one `401 pairing_failed` with no detail. The 4 KiB body ce
 window or issues a token. [Pairing](./api-reference/transport.md#pairing) owns the byte and deadline
 limits.
 
-A client on the Node's own computer can skip the code. The terminal client, the CLI, and the browser
-extension ask the Node, the desktop opens a dialog with the three words the asker prints, and one
-click on **Allow** pairs it. The code prompt stays open beside the wait.
+A client on the Node's own computer, or the owner's account on another, can skip the code. The client
+asks the Node, a paired desktop or terminal client shows the three words the asker prints, and one
+click on **Allow** pairs it. The code prompt stays open beside the wait. Another computer's ask
+needs an account assertion for this Node's owner, so only the owner can raise the dialog.
 [Pairing by approval](./api-reference/transport.md#pairing-by-approval) owns the steps and limits.
 
 The bundled local Node is the exception: the helper spawned it, so the service handshake returns a device

@@ -20,7 +20,7 @@ const PHRASE_WORDS = 3
 
 export type PairingRequests = {
   // Null when another ask was still waiting for an answer: that one is cancelled too.
-  ask(deviceName: string): PairingAsk | null
+  ask(deviceName: string, remote?: boolean): PairingAsk | null
   // The request waiting for an answer, or null once it is answered, expired, or replaced.
   pending(): PairingRequest | null
   // False when `id` isn't the request waiting for an answer.
@@ -37,6 +37,7 @@ export function pairingRequests(now: () => number = () => Date.now()): PairingRe
     secret: Buffer
     expiresAt: number
     allowed: boolean
+    remote: boolean
   } | null = null
 
   const live = () => {
@@ -45,7 +46,7 @@ export function pairingRequests(now: () => number = () => Date.now()): PairingRe
   }
 
   return {
-    ask(deviceName) {
+    ask(deviceName, remote = false) {
       if (live() && !held!.allowed) {
         held = null
         return null
@@ -53,15 +54,23 @@ export function pairingRequests(now: () => number = () => Date.now()): PairingRe
       const secret = randomBytes(32)
       // Words from random bytes, through the same list the certificate words use.
       const phrase = fingerprintWords(randomBytes(32).toString('hex'), PHRASE_WORDS)!.join(' ')
-      held = { id: randomUUID(), deviceName, phrase, secret, expiresAt: now() + PAIRING_REQUEST_MS, allowed: false }
+      held = {
+        id: randomUUID(),
+        deviceName,
+        phrase,
+        secret,
+        expiresAt: now() + PAIRING_REQUEST_MS,
+        allowed: false,
+        remote,
+      }
       return { secret: secret.toString('base64url'), phrase, expiresInMs: PAIRING_REQUEST_MS }
     },
 
     pending() {
       const request = live()
       if (!request || request.allowed) return null
-      const { id, deviceName, phrase, expiresAt } = request
-      return { id, deviceName, phrase, expiresAt }
+      const { id, deviceName, phrase, expiresAt, remote } = request
+      return { id, deviceName, phrase, expiresAt, ...(remote ? { remote } : {}) }
     },
 
     decide(id, decision) {

@@ -31,12 +31,21 @@ export type ProvidedNodeRecord = ProvidedNode & {
  *  provider's catalogue calls for. */
 export type NodeSpec = { label: string; options: Record<string, string> }
 
+/** Who is asking, so a provider can borrow that user's credential for its own connection through
+ *  `ctx.providers.withConnection`. Nothing more: a provider gets no request context, because a loaded
+ *  plugin's provider would then hold the node's secrets. */
+export type NodeProviderCaller = { userId: string }
+
 export type NodeProviderContribution = {
   /** Unique within the declaring plugin. The host qualifies it as `<pluginId>:<id>`, so a plugin
    *  cannot register under a stranger's name, exactly as with routes, schedules and capabilities. */
   id: string
   label: string
-  list(signal: AbortSignal): Promise<ProvidedNodeRecord[]>
+  list(signal: AbortSignal, caller: NodeProviderCaller): Promise<ProvidedNodeRecord[]>
+  /** For a provider that holds no device token for its nodes, such as an account that only knows where
+   *  they are: a short-lived assertion that its user owns the node. The host hands it to the client, which
+   *  pairs by approval with it, so the provider never holds a device token. */
+  pairingAssertion?(providerNodeId: string, signal: AbortSignal, caller: NodeProviderCaller): Promise<string>
   /** Declaring `create` makes this a machine provider, and the host then requires `destroy`, as DevPod's
    *  provider model does. Validated at registration: a provider that can make nodes but not remove them
    *  is a load error rather than a support ticket. */

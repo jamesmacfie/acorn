@@ -111,9 +111,10 @@ import missing from its list and on a listed import that's gone. Add the reason 
   `appShowCall`, so the sidebar names an agent's app as the desktop's app card does.
 - **CLI and workflows.** The built-in `workflow` commands read the run, step, and definition shapes from
   `wire.ts`. The native bridge (`browser/bridge.ts` and `browser/workflows.ts`) relays the same shapes.
-- **Desktop and terminal client, and account.** The desktop helper (`helperMain.ts`) and the terminal
-  client (`platform.ts`) read the relay ticket route from account's `routes.ts`, so custody asks the
-  local Node for a ticket. Custody is a library and names no plugin's route, so each app passes it in.
+- **Desktop, terminal client, browser bridge, and account.** The desktop helper (`helperMain.ts`), the
+  terminal client (`platform.ts`), and the browser's native bridge (`browser/bridge.ts`) read the relay
+  ticket route from account's `routes.ts`, so custody asks a Node for a ticket. Custody is a library and
+  names no plugin's route, so each app passes it in.
 - **Desktop and terminal.** `TaskView.tsx` opens a terminal profile through `sessionsClient`, the create
   and list half of terminal's client, so the shell can't write to, attach to, or kill a session.
 - **Extension and agents.** The sidebar draws a session's state with `runtimeState`, marks the Agents

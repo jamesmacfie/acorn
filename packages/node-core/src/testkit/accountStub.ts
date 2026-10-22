@@ -19,6 +19,7 @@ import {
   DEVICE_CODE_GRANT,
   type Account,
   type AccountError,
+  type ListNodesResponse,
   type TokenResponse,
 } from '@acorn/protocol/account.ts'
 import { generateSigningKey, signToken } from '@acorn/protocol/accountToken.ts'
@@ -41,8 +42,10 @@ export type AccountStub = {
   signIn(login: string): Promise<TokenResponse>
   /** The requests it has answered, as `METHOD /path`, so a test can show a Node never called it. */
   requests(): string[]
-  /** The accounts' Nodes, as the website would list them. */
+  /** Every account's Nodes, as the website would list them. */
   nodes(): { nodeId: string; accountId: string; label: string; fingerprint: string }[]
+  /** Make the next listing say this Node has another certificate, so a test can show a client refusing it. */
+  setListedFingerprint(nodeId: string, fingerprint: string): void
   /** What clicking Remove on the website does: the Node is forgotten and its credential revoked. */
   remove(nodeId: string): void
   /** A ticket for any account and Node, owned or not, so a test can show the relay refusing it. */
@@ -193,6 +196,15 @@ export async function startAccountStub(options: AccountStubOptions = {}): Promis
     return c.json({ relay: { url: relayUrl, credential: await signToken('credential', credential, signing) }, keys })
   })
 
+  app.get(accountPaths.nodes, (c) => {
+    const account = signedIn(c)
+    if (!account) return fail(c, 401, 'invalid_token')
+    const nodes = [...registered]
+      .filter(([, node]) => node.accountId === account.id)
+      .map(([nodeId, { label, fingerprint }]) => ({ nodeId, label, fingerprint, relayUrl }))
+    return c.json({ nodes } satisfies ListNodesResponse)
+  })
+
   app.delete(`${ACCOUNT_API_PREFIX}/nodes/:nodeId`, (c) => {
     const account = signedIn(c)
     if (!account) return fail(c, 401, 'invalid_token')
@@ -276,6 +288,10 @@ export async function startAccountStub(options: AccountStubOptions = {}): Promis
     },
     nodes: () =>
       [...registered].map(([nodeId, { accountId, label, fingerprint }]) => ({ nodeId, accountId, label, fingerprint })),
+    setListedFingerprint(nodeId, fingerprint) {
+      const node = registered.get(nodeId)
+      if (node) node.fingerprint = fingerprint
+    },
     remove,
     forgeTicket: ticketFor,
     close: () =>

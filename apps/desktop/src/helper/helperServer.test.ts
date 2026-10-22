@@ -17,11 +17,18 @@ const VOUCHED = 'a'.repeat(64)
 const SUBSTITUTED = 'b'.repeat(64)
 
 const probeNode = vi.fn()
+const askVouchedNode = vi.fn()
+const collectPairing = vi.fn()
 vi.mock('@acorn/custody/broker/nodePairing.ts', () => ({
   probeNode: (endpoint: string) => probeNode(endpoint),
+  collectPairing: (...args: unknown[]) => collectPairing(...args),
   pairWithNode: () => {
     throw new Error('not used')
   },
+}))
+
+vi.mock('@acorn/custody/broker/vouchedNode.ts', () => ({
+  askVouchedNode: (...args: unknown[]) => askVouchedNode(...args),
 }))
 
 const { startHelperServer } = await import('./helperServer')
@@ -40,7 +47,7 @@ type Stub = {
   upserted: unknown[]
 }
 
-const stubHelper = (): Stub => {
+const stubHelper = (adopted: object = ADOPT_RESULT): Stub => {
   const remembered: { node: FleetNode; token: string }[] = []
   const upserted: unknown[] = []
   const helper = {
@@ -48,9 +55,10 @@ const stubHelper = (): Stub => {
       fetch: async () => ({
         status: 200,
         headers: { 'content-type': 'application/json' },
-        body: new TextEncoder().encode(JSON.stringify(ADOPT_RESULT)),
+        body: new TextEncoder().encode(JSON.stringify(adopted)),
       }),
       upsert: (record: unknown) => void upserted.push(record),
+      relayTicket: async () => 'a-ticket',
       statuses: () => [],
       abort: () => {},
       send: () => {},
@@ -99,6 +107,8 @@ const call = async (helper: Helper, method: HelperMethod, params: unknown): Prom
 
 afterEach(async () => {
   probeNode.mockReset()
+  askVouchedNode.mockReset()
+  collectPairing.mockReset()
   for (const server of servers.splice(0)) await server.close()
 })
 
@@ -164,18 +174,90 @@ describe('node-adopt checks the vouched fingerprint against the certificate', ()
       handlerMs: expect.any(Number),
     })
     expect(reply.ok === true && reply.value).toEqual({
-      nodeId: 'node-1',
-      label: 'Big box',
-      endpoint: ADOPT_RESULT.endpoint,
-      fingerprint: VOUCHED,
-      local: false,
-      provider: { providerId: 'cloud:nodes', providerNodeId: 'inst-42', sourceNodeId: 'local' },
+      node: {
+        nodeId: 'node-1',
+        label: 'Big box',
+        endpoint: ADOPT_RESULT.endpoint,
+        fingerprint: VOUCHED,
+        local: false,
+        provider: { providerId: 'cloud:nodes', providerNodeId: 'inst-42', sourceNodeId: 'local' },
+      },
     })
     expect(JSON.stringify(reply)).not.toContain(ADOPT_RESULT.deviceToken)
     expect(remembered).toHaveLength(1)
     expect(remembered[0]?.token).toBe(ADOPT_RESULT.deviceToken)
     expect(remembered[0]?.node.certPem).toBe('cert-pem')
     expect(upserted).toHaveLength(1)
+  })
+})
+
+// A provider that holds no device token, such as an account, hands over an assertion. The node isn't
+// remembered until a device already paired with it allows the ask.
+describe('node-adopt by approval', () => {
+  const { deviceToken: _token, ...listed } = ADOPT_RESULT
+  const ASSERTED = { ...listed, endpoint: 'wss://relay.example/node-1', assertion: 'an-assertion' }
+  const probe = {
+    endpoint: 'https://node-1.relay.acorn',
+    fingerprint: VOUCHED,
+    certPem: 'cert-pem',
+    relay: { url: 'wss://relay.example', route: 'node-1' },
+  }
+  const paired = { deviceToken: 'device-token-nobody-else-sees', nodeId: 'node-1', device: { id: 'device-1' } }
+
+  it('asks with the assertion, remembers nothing until it is allowed, and then keeps the token out of the reply', async () => {
+    askVouchedNode.mockResolvedValue({ probe, ask: { secret: 'secret', phrase: 'maple river stone' } })
+    const { helper, remembered, upserted } = stubHelper(ASSERTED)
+    const server = await startHelperServer(helper, { secret: 's'.repeat(32), appOrigin: 'http://acorn.localhost' })
+    servers.push(server)
+    const socket = new WebSocket(`ws://127.0.0.1:${server.port}/helper?secret=${server.secret}`)
+    await new Promise<void>((resolve) => socket.once('open', () => resolve()))
+    let id = 0
+    const ask = (method: HelperMethod, params?: unknown) =>
+      new Promise<HelperReply>((resolve) => {
+        socket.once('message', (data) => resolve(JSON.parse(String(data)) as HelperReply))
+        socket.send(JSON.stringify({ id: ++id, method, params }))
+      })
+
+    const adopted = await ask('node-adopt', REQUEST)
+    expect(adopted.ok === true && adopted.value).toEqual({ phrase: 'maple river stone' })
+    expect(askVouchedNode).toHaveBeenCalledWith(
+      { endpoint: ASSERTED.endpoint, fingerprint: VOUCHED, assertion: 'an-assertion' },
+      expect.stringContaining('acorn on'),
+      expect.any(Function),
+    )
+    expect(remembered).toEqual([])
+
+    collectPairing.mockResolvedValueOnce(null)
+    const waiting = await ask('node-collect-adoption')
+    expect(waiting.ok === true && waiting.value).toBeNull()
+    expect(remembered).toEqual([])
+
+    collectPairing.mockResolvedValueOnce(paired)
+    const collected = await ask('node-collect-adoption')
+    expect(collected.ok === true && collected.value).toMatchObject({
+      nodeId: 'node-1',
+      label: 'Big box',
+      provider: { providerId: 'cloud:nodes', providerNodeId: 'inst-42', sourceNodeId: 'local' },
+    })
+    expect(JSON.stringify(collected)).not.toContain(paired.deviceToken)
+    expect(remembered).toHaveLength(1)
+    expect(remembered[0]?.token).toBe(paired.deviceToken)
+    expect(upserted).toHaveLength(1)
+    socket.close()
+  })
+
+  it('pairs nothing when the listed Node presents another identity', async () => {
+    askVouchedNode.mockRejectedValue(new Error('presented a different identity than your account vouched for'))
+    const { helper, remembered } = stubHelper(ASSERTED)
+    const reply = await call(helper, 'node-adopt', REQUEST)
+    expect(reply.ok).toBe(false)
+    expect(reply.ok === false && reply.error).toContain('different identity')
+    expect(remembered).toEqual([])
+  })
+
+  it('has nothing to collect when no adoption is waiting', async () => {
+    const { helper } = stubHelper(ASSERTED)
+    expect((await call(helper, 'node-collect-adoption', undefined)).ok).toBe(false)
   })
 })
 

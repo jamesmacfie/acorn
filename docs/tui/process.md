@@ -58,7 +58,7 @@ started the Node owns its lifetime, as on the desktop.
 
 Attaching needs a device token, and a Node the desktop started holds the desktop's token. So the first
 `acorn` against it asks to pair. It prints three words, and the desktop opens a dialog with the same
-words. Click **Allow** there, and the client carries on
+words (a terminal client already paired with it asks in its confirmation). Click **Allow** there, and the client carries on
 ([pairing by approval](../api-reference/transport.md#pairing-by-approval)). The code prompt stays open
 beside the wait. For a code from a desktop-supervised Node, open **Settings → Nodes → Pair another
 client**. For a standalone Node, run `kill -USR1 <pid>` and read the code from its terminal. The client

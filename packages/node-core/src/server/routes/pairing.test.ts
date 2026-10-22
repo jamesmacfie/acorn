@@ -1,4 +1,5 @@
 import { createServer, request } from 'node:http'
+import { tmpdir } from 'node:os'
 import { getRequestListener } from '@hono/node-server'
 import { expect, it, vi } from 'vitest'
 import type { Env } from '../bindings'
@@ -8,7 +9,8 @@ import { MAX_PAIR_REQUEST_BYTES } from './pairingBody'
 function fixture() {
   const consume = vi.fn(() => true)
   const issue = vi.fn(async () => ({ token: 'synthetic-token', device: { id: 'd1' } }))
-  const env = { PAIRING_CODES: { consume }, DEVICES: { issue }, NODE_ID: 'n1' } as unknown as Env
+  // A data folder with no node.json, so no owner account.
+  const env = { PAIRING_CODES: { consume }, DEVICES: { issue }, NODE_ID: 'n1', DATA_DIR: tmpdir() } as unknown as Env
   const app = pairingRoutes().open
   return { consume, issue, app, env }
 }

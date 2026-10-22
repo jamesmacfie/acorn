@@ -172,6 +172,7 @@ export function installPlatform(): void {
       }
     },
     nodeAdopt: () => Promise.reject(new Error(LEAVE_FLEET_ALONE)),
+    nodeCollectAdoption: () => Promise.reject(new Error(LEAVE_FLEET_ALONE)),
     nodeRename: () => Promise.reject(new Error(LEAVE_FLEET_ALONE)),
     nodeForget: () => Promise.reject(new Error(LEAVE_FLEET_ALONE)),
     nodeRestartLocal: () => Promise.reject(new Error(LEAVE_FLEET_ALONE)),

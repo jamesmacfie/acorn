@@ -149,5 +149,8 @@ describe('the provider summaries a fleet surface draws from', () => {
     // An install with no cloud plugin: every node answers an empty list, and the whole section is
     // hidden rather than drawn empty.
     expect(hasNodeProviders(result(answer('node-a', { providers: [], nodes: [], failures: [] })))).toBe(false)
+    // A provider with nothing to list, and no way to make a node, has nothing to draw either.
+    const quiet = { id: 'account:nodes', label: 'acorn account', verbs: [] }
+    expect(hasNodeProviders(result(answer('node-a', { providers: [quiet], nodes: [], failures: [] })))).toBe(false)
   })
 })

@@ -170,8 +170,16 @@ export class PairingBusyError extends Error {
 // computer: ask, and show the phrase so the owner can match it in their dialog. Null when the Node
 // can't take an ask, such as one that isn't on this computer or one that is answering too many,
 // which leaves the code as the way in. Throws `PairingBusyError` when asks overlapped.
-export async function askToPair(probe: PinnedProbe, deviceName: string): Promise<PairingAsk | null> {
-  const { status, body } = await pinnedPost(probe, '/v1/pair/requests', { deviceName })
+// `assertion` is how the owner's account asks from another computer.
+export async function askToPair(
+  probe: PinnedProbe,
+  deviceName: string,
+  assertion?: string,
+): Promise<PairingAsk | null> {
+  const { status, body } = await pinnedPost(probe, '/v1/pair/requests', {
+    deviceName,
+    ...(assertion ? { assertion } : {}),
+  })
   if (status === 409) throw new PairingBusyError()
   if (status !== 200) return null
   const ask = JSON.parse(body) as Partial<PairingAsk>

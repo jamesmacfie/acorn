@@ -41,11 +41,11 @@ wss://relay.example.com/<node ID>
 
 Custody asks the Node on its own computer for a ticket, through that Node's account plugin, and keeps
 the ticket in memory. It asks when a stream needs one and a minute or less remains, so nothing runs on a
-timer. Both the desktop and the terminal client ask this way. `acorn --node` and the browser
-extension's **Connect to another Node** screen don't yet, and still need the credential in the address
-when the relay is in self-hosted mode. `NodeBroker` takes the route to ask through
-`relayTicketRoute`, because a library can't name a plugin's route, and each app passes
-`ACCOUNT_TICKET_ROUTE` from the plugin's contract.
+timer. The desktop and the terminal client ask this way. The browser extension's bridge asks the Node it
+selected, or the one that listed the Node it selected, which it keeps connected for that. `acorn --node`
+doesn't yet, and still needs the credential in the address when the relay is in self-hosted mode.
+`NodeBroker` takes the route to ask through `relayTicketRoute`, because a library can't name a plugin's
+route, and each app passes `ACCOUNT_TICKET_ROUTE` from the plugin's contract.
 
 A ticket goes only to the relay the account service lists for the Node. An address that names another
 relay is refused, and so is a `ws://` address for another computer, because the ticket would cross the

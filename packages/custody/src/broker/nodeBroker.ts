@@ -130,12 +130,17 @@ export class NodeBroker {
       // library can't name a plugin's route. A relayed Node whose address has no credential gets a
       // ticket there. The local Node's account plugin holds the sign-in.
       relayTicketRoute?: string
+      // Which Node to ask for it, when that isn't the local one. A browser's bridge keeps no local Node,
+      // and asks the Node it selected, or the one that listed the Node it selected.
+      relayTicketNode?: () => string | undefined
     } = {},
   ) {
     this.pingIntervalMs = options.pingIntervalMs ?? PING_INTERVAL_MS
     this.viewerMultiplexing = options.viewerMultiplexing ?? false
     this.openRelayStream = options.openRelayStream ?? openRelayStream
-    this.tickets = new RelayTickets((nodeId) => this.ticketFromLocalNode(options.relayTicketRoute, nodeId))
+    this.tickets = new RelayTickets((nodeId) =>
+      this.ticketFromAccountNode(options.relayTicketRoute, options.relayTicketNode, nodeId),
+    )
   }
 
   // Add or replace a node. Replacing tears the old connection down first, so a re-pair with a new
@@ -183,13 +188,18 @@ export class NodeBroker {
     return this.tickets.ticket(relay)
   }
 
-  // A ticket for a relayed Node, asked of the Node on this computer, whose account plugin holds the
-  // sign-in. The ticket goes to the relay and no further.
-  private async ticketFromLocalNode(route: string | undefined, nodeId: string): Promise<Ticket> {
-    const local = [...this.connections.values()].find((connection) => connection.node.local)
-    if (!route || !local)
+  // A ticket for a relayed Node, asked of the Node whose account plugin holds the sign-in: the Node on this
+  // computer, or the one the app names. The ticket goes to the relay and no further.
+  private async ticketFromAccountNode(
+    route: string | undefined,
+    askedOf: (() => string | undefined) | undefined,
+    nodeId: string,
+  ): Promise<Ticket> {
+    const holder =
+      askedOf?.() ?? [...this.connections.values()].find((connection) => connection.node.local)?.node.nodeId
+    if (!route || !holder || !this.connections.has(holder))
       throw new Error('Reaching a Node through your account needs this computer’s own Node, signed in to it.')
-    const response = await this.fetch(local.node.nodeId, {
+    const response = await this.fetch(holder, {
       requestId: randomUUID(),
       path: route,
       method: 'POST',

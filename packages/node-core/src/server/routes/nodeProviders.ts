@@ -9,6 +9,7 @@ import {
 } from '@acorn/protocol/nodeProviders.ts'
 import { nodeProvider, nodeProviderDescriptor, nodeProviders, type ProvidedNodeRecord } from '../nodeProviders/registry'
 import type { AppEnv } from '../middleware/auth'
+import { ownerId } from '../middleware/requireUser'
 import { respondError } from '../respond'
 
 // The nodes this node's plugins know about, and the four lifecycle verbs
@@ -58,13 +59,14 @@ const withTimeout = async <T>(ms: number, run: (signal: AbortSignal) => Promise<
 export const nodeProviderRoutes = new Hono<AppEnv>()
   .get('/', async (c) => {
     const registered = nodeProviders()
+    const caller = { userId: ownerId(c) }
     const nodes: NodeProvidersResponse['nodes'] = []
     const failures: NodeProvidersResponse['failures'] = []
     // Sequential rather than Promise.all: providers are few, each is a network call the owner is
     // paying for, and a partial answer is the contract anyway.
     for (const provider of registered) {
       try {
-        const listed = await withTimeout(LIST_TIMEOUT_MS, (signal) => provider.list(signal))
+        const listed = await withTimeout(LIST_TIMEOUT_MS, (signal) => provider.list(signal, caller))
         for (const record of listed) nodes.push(publicNode(record, provider.qualifiedId))
       } catch (error) {
         // One provider being unreachable is a line, never a failed response: the same partial-result
@@ -88,9 +90,10 @@ export const nodeProviderRoutes = new Hono<AppEnv>()
     const provider = nodeProvider(body.data.providerId)
     if (!provider)
       return respondError(c, 404, 'not_found', [`No node provider '${body.data.providerId}' on this node.`])
+    const caller = { userId: ownerId(c) }
     let listed: ProvidedNodeRecord[]
     try {
-      listed = await withTimeout(LIST_TIMEOUT_MS, (signal) => provider.list(signal))
+      listed = await withTimeout(LIST_TIMEOUT_MS, (signal) => provider.list(signal, caller))
     } catch (error) {
       return respondError(c, 502, 'upstream', [`${provider.label} could not list its nodes: ${reasonOf(error)}`])
     }
@@ -102,18 +105,29 @@ export const nodeProviderRoutes = new Hono<AppEnv>()
     if (!record.nodeId || !record.endpoint || !record.fingerprint) {
       return respondError(c, 409, 'conflict', [`${record.label} is ${record.state} and has nothing to connect to yet.`])
     }
-    if (!record.enrollment?.deviceToken) {
-      return respondError(c, 409, 'conflict', [
-        `${provider.label} holds no credential for ${record.label}, so it cannot be adopted.`,
-      ])
-    }
-    return c.json({
+    const adopted = {
       nodeId: record.nodeId,
       label: record.label,
       endpoint: record.endpoint,
       fingerprint: record.fingerprint,
-      deviceToken: record.enrollment.deviceToken,
-    } satisfies NodeAdoptResult)
+    }
+    if (record.enrollment?.deviceToken) {
+      return c.json({ ...adopted, deviceToken: record.enrollment.deviceToken } satisfies NodeAdoptResult)
+    }
+    const assert = provider.pairingAssertion?.bind(provider)
+    if (!assert) {
+      return respondError(c, 409, 'conflict', [
+        `${provider.label} holds no credential for ${record.label}, so it cannot be adopted.`,
+      ])
+    }
+    try {
+      const assertion = await withTimeout(LIST_TIMEOUT_MS, (signal) => assert(record.providerNodeId, signal, caller))
+      return c.json({ ...adopted, assertion } satisfies NodeAdoptResult)
+    } catch (error) {
+      return respondError(c, 502, 'upstream', [
+        `${provider.label} could not vouch for ${record.label}: ${reasonOf(error)}`,
+      ])
+    }
   })
   .post('/create', async (c) => {
     const body = nodeCreateRequestSchema.safeParse(await c.req.json().catch(() => null))

@@ -106,3 +106,22 @@ it("shows the local Node's waiting request when it mounts", async () => {
   expect(readPairingRequest).toHaveBeenCalledExactlyOnceWith('node-1')
   expect(dialog()!.textContent).toContain('maple river stone')
 })
+
+// A request from the owner's account on another computer says so, and tells the owner when to deny.
+it('says when the request came from another computer', async () => {
+  vi.mocked(readPairingRequest).mockResolvedValueOnce({
+    request: {
+      id: 'req-3',
+      deviceName: 'MacBook',
+      phrase: 'maple river stone',
+      expiresAt: Date.now() + 60_000,
+      remote: true,
+    },
+  })
+  dispose = render(() => <PairingRequestDialog />, document.body.appendChild(document.createElement('div')))
+  await vi.waitFor(() => expect(dialog()).not.toBeNull())
+  const text = dialog()!.textContent ?? ''
+  expect(text).toContain('MacBook, signed in to your account on another computer')
+  expect(text).toContain("If you didn't just click Connect on another computer, deny it.")
+  expect(text).not.toContain('on the computer running')
+})

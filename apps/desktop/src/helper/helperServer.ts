@@ -1,4 +1,5 @@
 import { createServer, type Server } from 'node:http'
+import { hostname } from 'node:os'
 import { randomUUID, timingSafeEqual } from 'node:crypto'
 import { WebSocketServer, type WebSocket } from 'ws'
 import { z } from 'zod'
@@ -10,6 +11,7 @@ import {
   nodePairRequestSchema,
   nodeProbeRequestSchema,
   nodeRenameRequestSchema,
+  type NodeAdoption,
   type NodeProbeResult,
   type NodeRecord,
 } from '@acorn/protocol/broker.ts'
@@ -17,8 +19,9 @@ import { coreNodeAdoptRoute } from '@acorn/protocol/api.ts'
 import { nodeAdoptResultSchema } from '@acorn/protocol/nodeProviders.ts'
 import { encodeIdFrame, wsFrameSchema, wsSubscriptionIntentSchema } from '@acorn/protocol/ws.ts'
 import type { Helper } from '@acorn/custody/runtime'
-import { pairedNode, toBrokerNode, toNodeRecord } from '@acorn/custody/broker'
-import { pairWithNode, probeNode, publicProbe } from '@acorn/custody/broker/nodePairing.ts'
+import { pairedNode, toBrokerNode, toNodeRecord, type FleetNode } from '@acorn/custody/broker'
+import { askVouchedNode } from '@acorn/custody/broker/vouchedNode.ts'
+import { collectPairing, pairWithNode, probeNode, publicProbe } from '@acorn/custody/broker/nodePairing.ts'
 import { listenForOauthCallback, type OauthCallbackListener } from '@acorn/custody/oauthCallback'
 import {
   MAX_HELPER_REQUEST_BYTES,
@@ -164,6 +167,14 @@ export function startHelperServer(
   // The probe is remembered here rather than returned to the renderer, which is what forces the
   // fingerprint confirmation to be a step instead of a parameter the renderer could skip.
   let pending: Awaited<ReturnType<typeof probeNode>> | null = null
+  // An adoption waiting for a paired device to allow it: the pinned probe, the secret that collects the
+  // token, and the provenance the fleet record keeps. One at a time, as the Node holds one request.
+  let adopting: {
+    probe: Awaited<ReturnType<typeof probeNode>>
+    secret: string
+    label: string
+    provider: NonNullable<FleetNode['provider']>
+  } | null = null
 
   // Sign-in return trips (docs/mcp/sign-in.md). A window cannot open a port, so the
   // listener lives here and the renderer waits on its result by id.
@@ -247,7 +258,10 @@ export function startHelperServer(
     // What the owner's eyes do in probe-then-pair, the provider's word does here. What nothing does is
     // let the renderer name an endpoint or hold a token: it names a provider and a node id, and every
     // piece of connection material is fetched here.
-    'node-adopt': async (raw): Promise<NodeRecord> => {
+    //
+    // A provider that holds no device token hands over an assertion instead, and the node isn't
+    // remembered until a device already paired with it allows the ask (`node-collect-adoption`).
+    'node-adopt': async (raw): Promise<NodeAdoption> => {
       const request = nodeAdoptRequestSchema.parse(raw)
       const response = await helper.broker.fetch(request.sourceNodeId, {
         requestId: `adopt-${request.providerId}-${request.providerNodeId}`,
@@ -267,6 +281,21 @@ export function startHelperServer(
       const adopted = nodeAdoptResultSchema.safeParse(JSON.parse(text) as unknown)
       if (!adopted.success) throw new Error('The node returned an unusable adoption result.')
       const record = adopted.data
+      const provider = {
+        providerId: request.providerId,
+        providerNodeId: request.providerNodeId,
+        sourceNodeId: request.sourceNodeId,
+      }
+      adopting = null
+      if ('assertion' in record) {
+        const { probe, ask } = await askVouchedNode(
+          { endpoint: record.endpoint, fingerprint: record.fingerprint, assertion: record.assertion },
+          `acorn on ${hostname()}`,
+          (relay) => helper.broker.relayTicket(relay),
+        )
+        adopting = { probe, secret: ask.secret, label: request.label, provider }
+        return { phrase: ask.phrase }
+      }
       // The provider vouched for a fingerprint; this is where that claim is checked against the
       // certificate the endpoint actually presents. A provider that lied, or an endpoint that has been
       // substituted since it was listed, fails here rather than becoming a pinned connection.
@@ -285,13 +314,30 @@ export function startHelperServer(
           fingerprint: probe.fingerprint,
           certPem: probe.certPem,
           local: false,
-          provider: {
-            providerId: request.providerId,
-            providerNodeId: request.providerNodeId,
-            sourceNodeId: request.sourceNodeId,
-          },
+          provider,
         },
         record.deviceToken,
+      )
+      connect(node.nodeId)
+      return { node: toNodeRecord(node) }
+    },
+    // The other half of an adoption that is waiting on a paired device. Null while nobody has answered.
+    // Rejects, and forgets the request, when it was denied or ran out.
+    'node-collect-adoption': async (): Promise<NodeRecord | null> => {
+      const waiting = adopting
+      if (!waiting) throw new Error('No adoption is waiting for approval.')
+      let result: Awaited<ReturnType<typeof collectPairing>>
+      try {
+        result = await collectPairing(waiting.probe, waiting.secret)
+      } catch (error) {
+        adopting = null
+        throw error
+      }
+      if (!result) return null
+      adopting = null
+      const node = helper.fleet.remember(
+        { ...pairedNode(waiting.probe, result, { label: waiting.label, local: false }), provider: waiting.provider },
+        result.deviceToken,
       )
       connect(node.nodeId)
       return toNodeRecord(node)

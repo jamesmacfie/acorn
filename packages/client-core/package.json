@@ -146,6 +146,7 @@
     "./host/tree/Slot.tsx": "./src/host/tree/Slot.tsx",
     "./host/tree/TreeHost.tsx": "./src/host/tree/TreeHost.tsx",
     "./host/tree/workerHost.ts": "./src/host/tree/workerHost.ts",
+    "./host/trust/pairingRequestModel.ts": "./src/host/trust/pairingRequestModel.ts",
     "./host/trust/PairingRequestDialog.tsx": "./src/host/trust/PairingRequestDialog.tsx",
     "./host/trust/PluginApprovalDialog.tsx": "./src/host/trust/PluginApprovalDialog.tsx",
     "./host/trust/PluginTrustDialog.tsx": "./src/host/trust/PluginTrustDialog.tsx",

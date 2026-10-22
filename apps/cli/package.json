@@ -15,6 +15,7 @@
     "@acorn/node-core": "workspace:*"
   },
   "devDependencies": {
+    "@acorn/plugin-account": "workspace:*",
     "@acorn/plugin-agents": "workspace:*",
     "@acorn/plugin-trellis": "workspace:*",
     "@acorn/plugin-workflows": "workspace:*",

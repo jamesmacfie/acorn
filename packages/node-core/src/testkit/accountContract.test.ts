@@ -13,6 +13,7 @@ import {
   assertionResponseSchema,
   credentialClaimsSchema,
   deviceCodeResponseSchema,
+  listNodesResponseSchema,
   registerNodeResponseSchema,
   revokedCredentialsSchema,
   ticketClaimsSchema,
@@ -155,6 +156,35 @@ describe('the account API', () => {
       const nodeId = randomUUID()
       await register((await signIn('first-owner')).accessToken, nodeId)
       await expectError(await register((await signIn('second-owner')).accessToken, nodeId), 409, 'conflict')
+    })
+  })
+
+  describe('listing Nodes', () => {
+    it("lists the account's Nodes with the fingerprints and relay they registered with", async () => {
+      const { accessToken } = await signIn(`lister-${randomUUID()}`)
+      const first = randomUUID()
+      const second = randomUUID()
+      await register(accessToken, first)
+      const registered = (await register(accessToken, second)).data!
+      const { nodes } = (await call('GET', accountPaths.nodes, { token: accessToken }, listNodesResponseSchema)).data!
+      expect(nodes.map((node) => node.nodeId).sort()).toEqual([first, second].sort())
+      expect(nodes[0]).toMatchObject({ label: 'Laptop', fingerprint, relayUrl: registered.relay.url })
+    })
+
+    it('does not list a Node another account owns, or one that was removed', async () => {
+      const owner = await signIn(`owner-${randomUUID()}`)
+      const stranger = await signIn(`stranger-${randomUUID()}`)
+      const nodeId = randomUUID()
+      await register(owner.accessToken, nodeId)
+      const listed = async (token: string) =>
+        (await call('GET', accountPaths.nodes, { token }, listNodesResponseSchema)).data!.nodes.map((n) => n.nodeId)
+      expect(await listed(stranger.accessToken)).not.toContain(nodeId)
+      await call('DELETE', accountPaths.node(nodeId), { token: owner.accessToken })
+      expect(await listed(owner.accessToken)).not.toContain(nodeId)
+    })
+
+    it('needs a signed-in account', async () => {
+      await expectError(await call('GET', accountPaths.nodes, { token: 'not-a-token' }), 401, 'invalid_token')
     })
   })
 

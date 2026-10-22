@@ -17,6 +17,7 @@ export const accountPaths = {
   deviceCode: `${ACCOUNT_API_PREFIX}/device/code`,
   token: `${ACCOUNT_API_PREFIX}/token`,
   account: `${ACCOUNT_API_PREFIX}/account`,
+  nodes: `${ACCOUNT_API_PREFIX}/nodes`,
   node: (nodeId: string): string => `${ACCOUNT_API_PREFIX}/nodes/${nodeId}`,
   tickets: `${ACCOUNT_API_PREFIX}/tickets`,
   assertions: `${ACCOUNT_API_PREFIX}/assertions`,
@@ -86,6 +87,20 @@ export const registerNodeResponseSchema = z.object({
 })
 export type RegisterNodeResponse = z.infer<typeof registerNodeResponseSchema>
 
+// A Node the account owns, as its service remembers it: where it is, and the certificate a client pins.
+export const accountNodeSchema = z.object({
+  nodeId,
+  label: z.string().min(1),
+  fingerprint: z.string().regex(/^[0-9a-f]{64}$/),
+  // The relay the Node dials. The account service vouches for the fingerprint, not for whether the Node
+  // is connected: it can't see that.
+  relayUrl: relayRouteSchema.shape.url,
+})
+export type AccountNode = z.infer<typeof accountNodeSchema>
+
+export const listNodesResponseSchema = z.object({ nodes: z.array(accountNodeSchema) })
+export type ListNodesResponse = z.infer<typeof listNodesResponseSchema>
+
 export const ticketRequestSchema = z.strictObject({ nodeId })
 export const ticketResponseSchema = z.object({
   ticket: z.string().min(1),
@@ -131,6 +146,7 @@ export const accountMessages = {
   Keys: accountKeysSchema,
   RegisterNodeRequest: registerNodeRequestSchema,
   RegisterNodeResponse: registerNodeResponseSchema,
+  ListNodesResponse: listNodesResponseSchema,
   TicketRequest: ticketRequestSchema,
   TicketResponse: ticketResponseSchema,
   AssertionRequest: assertionRequestSchema,

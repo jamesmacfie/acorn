@@ -28,6 +28,7 @@ const ACTION_LABELS: Record<string, string> = {
   'pairing.window.opened': 'Pairing window opened',
   'pairing.window.closed': 'Pairing window closed',
   'pairing.request.decided': 'Pairing request answered',
+  'pairing.request.raised': 'Pairing request from your account',
   'device.paired': 'Device paired',
   'device.revoked': 'Device revoked',
   'secret.created': 'Credential connected',

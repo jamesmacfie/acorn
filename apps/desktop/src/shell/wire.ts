@@ -23,6 +23,7 @@ export type HelperMethod =
   | 'node-probe'
   | 'node-pair'
   | 'node-adopt'
+  | 'node-collect-adoption'
   | 'node-rename'
   | 'node-forget'
   | 'node-reconnect'

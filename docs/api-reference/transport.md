@@ -14,7 +14,7 @@ WebSocket, and it serves no HTML, JavaScript, or static assets. `createApp()` in
 | --- | --- | --- |
 | Node probe | `GET /v1/node` | Pre-auth. The unauthenticated answer is limited. |
 | Pairing | `POST /v1/pair` | Pre-auth. Spends a one-time code. |
-| Pairing by approval | `POST /v1/pair/requests`, `POST /v1/pair/requests/claim` | Pre-auth. The ask is loopback only. |
+| Pairing by approval | `POST /v1/pair/requests`, `POST /v1/pair/requests/claim` | Pre-auth. The ask is from this computer, or from the owner's account. |
 | Core | `/v1/core/*` | A device, or an internal principal the route permits |
 | Plugin | `/v1/p/<plugin>/*` | A device, or an internal principal the route permits |
 | Events and streams | `/v1/events` | Authenticated WebSocket upgrade |
@@ -73,12 +73,13 @@ proves nothing by itself. The value comes from a person reading both screens.
 
 ## Pairing by approval
 
-A client on the Node's own computer can pair without a code. The terminal client, the CLI, and the
-browser extension's bridge ask, a paired client shows the owner a dialog, and the asker collects its
-token once the owner allows it. The code stays open beside the wait, for a Node no paired client is
+A client on the Node's own computer, or one signed in as the Node's owner account on another computer,
+can pair without a code. The client asks, a paired client shows the owner a dialog, and the asker
+collects its token once the owner allows it. The code stays open beside the wait, for a Node no paired client is
 watching. The store is `packages/node-core/src/server/auth/pairingRequests.ts`.
 
-1. The client sends `POST /v1/pair/requests` with `deviceName`. The Node answers with a `secret`, a
+1. The client sends `POST /v1/pair/requests` with `deviceName`, and an `assertion` when it isn't on
+   this computer. The Node answers with a `secret`, a
    three-word `phrase`, and `expiresInMs`, and broadcasts a content-free `pairing:requested` frame.
 2. A paired client reads `GET /v1/core/pair/requests` from the Node that sent the frame and shows the
    device name and the phrase. The asker prints the same phrase.
@@ -91,8 +92,14 @@ watching. The store is `packages/node-core/src/server/auth/pairingRequests.ts`.
 
 These limits apply:
 
-- The ask answers only a loopback peer. Anything else gets `403 pairing_local_only` and pairs with a
-  code, because a dialog anyone on the network could raise is one the owner learns to click through.
+- The ask answers a loopback peer, or another computer whose `assertion` is one the account service
+  signed ([account API](../account-api.md#tickets-and-assertions)) for this Node's ID and its owner
+  account. The Node checks the signature against the keys it recorded when remote access was turned
+  on, the audience, the subject, and the expiry. Anything else gets `403 pairing_local_only` and pairs
+  with a code, because a dialog anyone on the network could raise is one the owner learns to click
+  through. A Node with remote access off has no owner account and keeps the loopback-only rule.
+  A remote ask counts against the ceiling only when its assertion checks out, and the audit trail
+  records it as `pairing.request.raised`, with the account ID and the assertion's ID.
 - The ask has its own ceiling of 6 a minute, apart from the code route's 20, so a loop of asks can't
   block someone typing a code from another computer. The claim has no ceiling, because its secret is
   256 random bits.
@@ -106,9 +113,8 @@ These limits apply:
   raced in by something else.
 - The desktop opens the dialog by itself, and never changes the request it shows. A frame that brings
   a different request, or none, closes the dialog with a toast. **Allow** stays disabled for the
-  first second.
- The terminal client draws no dialog, so it can ask but
-  can't allow.
+  first second. The request says when it came from another computer, and the dialog says so. The
+  terminal client shows the same request in its confirmation, which starts on **Cancel** and denies.
 
 `DELETE /v1/core/devices/:id` closes that device's open WebSocket connections at once, because a live
 socket holds no bearer to recheck. A device may revoke itself. Every paired device already has full

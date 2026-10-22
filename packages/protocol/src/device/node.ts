@@ -132,7 +132,12 @@ export type PairingWindow = { code: string; expiresInMs: number }
 // own computer asks, the owner allows it from a paired client, and the asker collects its token.
 //
 // POST /v1/pair/requests. Strict and bounded like `pairRequestSchema`: an unpaired caller sends it.
-export const pairingAskSchema = z.strictObject({ deviceName: z.string().min(1).max(120) })
+// `assertion` is what lets an ask from another computer through: an account assertion naming this Node's
+// owner (docs/account-api.md § Tickets and assertions). A caller on this computer needs none.
+export const pairingAskSchema = z.strictObject({
+  deviceName: z.string().min(1).max(120),
+  assertion: z.string().min(1).max(2048).optional(),
+})
 // Its answer. `secret` is what collects the token, so it travels only in bodies, never in a path a
 // log could keep. `phrase` is what the owner's dialog shows too.
 export type PairingAsk = { secret: string; phrase: string; expiresInMs: number }
@@ -144,7 +149,9 @@ export const pairingClaimSchema = z.strictObject({ secret: z.string().min(1).max
 export type PairingClaimPending = { status: 'pending' }
 
 // GET /v1/core/pair/requests: what the owner's dialog shows. One request at a time, like a code.
-export type PairingRequest = { id: string; deviceName: string; phrase: string; expiresAt: number }
+// `remote` is an ask from another computer, raised by the owner's account, so the dialog doesn't say the
+// asker is on this one.
+export type PairingRequest = { id: string; deviceName: string; phrase: string; expiresAt: number; remote?: true }
 export type PairingRequestResponse = { request: PairingRequest | null }
 
 // POST /v1/core/pair/requests/:id.

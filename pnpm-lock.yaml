@@ -79,6 +79,9 @@ importers:
         specifier: workspace:*
         version: link:../../packages/protocol
     devDependencies:
+      '@acorn/plugin-account':
+        specifier: workspace:*
+        version: link:../../plugins/account
       '@acorn/plugin-agents':
         specifier: workspace:*
         version: link:../../plugins/agents

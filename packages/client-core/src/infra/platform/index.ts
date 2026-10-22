@@ -1,6 +1,7 @@
 import type { VisibleElementRect } from './webviewGeometry'
 import type { ResponsivenessPulse } from '../telemetry/responsiveness'
 import type {
+  NodeAdoption,
   NodeAdoptRequest,
   NodeFetchRequest,
   NodeFetchResponse,
@@ -63,7 +64,10 @@ export type FleetBridge = {
   // (@acorn/protocol/broker.ts § nodeAdoptRequestSchema). No probe step and no fingerprint here on
   // purpose: the host fetches the connection material from the node that listed the record and checks
   // the fingerprint itself, so there is nothing for a caller to confirm or to get wrong.
-  adopt(request: NodeAdoptRequest): Promise<NodeRecord>
+  adopt(request: NodeAdoptRequest): Promise<NodeAdoption>
+  // After an adopt that answered with a phrase: the node once a paired device has allowed it, or null while
+  // nobody has. Rejects when the request was denied or ran out.
+  collectAdoption(): Promise<NodeRecord | null>
   rename(nodeId: string, label: string): Promise<NodeRecord | null>
   forget(nodeId: string, revoke: boolean): Promise<void>
   reconnect(nodeId: string): void
@@ -341,6 +345,7 @@ type AcornPreload = {
   nodeProbe?: FleetBridge['probe']
   nodePair?: FleetBridge['pair']
   nodeAdopt?: FleetBridge['adopt']
+  nodeCollectAdoption?: FleetBridge['collectAdoption']
   nodeRename?: FleetBridge['rename']
   nodeForget?: FleetBridge['forget']
   nodeReconnect?: FleetBridge['reconnect']
@@ -431,6 +436,11 @@ export const fleetBridge = (): FleetBridge | null => {
       const adopt = acorn.nodeAdopt
       if (!adopt) throw new Error('This build cannot adopt provided nodes.')
       return adopt(request)
+    },
+    collectAdoption: () => {
+      const collect = acorn.nodeCollectAdoption
+      if (!collect) throw new Error('This build cannot adopt provided nodes.')
+      return collect()
     },
     rename: async (nodeId, label) => (await acorn.nodeRename?.(nodeId, label)) ?? null,
     forget: async (nodeId, revoke) => {

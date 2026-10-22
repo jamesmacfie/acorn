@@ -1,5 +1,12 @@
 import { randomUUID } from 'node:crypto'
-import { NodeBroker, pairedNode, toBrokerNode, toNodeRecord, type FleetStore } from '@acorn/custody/broker'
+import {
+  NodeBroker,
+  pairedNode,
+  toBrokerNode,
+  toNodeRecord,
+  type FleetNode,
+  type FleetStore,
+} from '@acorn/custody/broker'
 import {
   askToPair,
   collectPairing,
@@ -8,6 +15,9 @@ import {
   probeNode,
   publicProbe,
 } from '@acorn/custody/broker/nodePairing.ts'
+import { askVouchedNode, VouchedIdentityError } from '@acorn/custody/broker/vouchedNode.ts'
+import { ACCOUNT_TICKET_ROUTE } from '@acorn/plugin-account/contract/routes.ts'
+import { nodeAdoptResultSchema, type NodeProvidersResponse } from '@acorn/protocol/nodeProviders.ts'
 import { dataRootDir, runningNode } from '@acorn/custody/local'
 import type { NodeFetchBody, NodeFetchResponse, NodeStatus } from '@acorn/protocol/broker.ts'
 import type { ArchiveResult, DeleteResult } from '@acorn/protocol/task.ts'
@@ -24,6 +34,8 @@ import {
   type BridgeResults,
 } from '@acorn/protocol/extensionBridge.ts'
 import {
+  coreNodeAdoptRoute,
+  coreNodeProvidersRoute,
   projectConfigRoute,
   projectsRoute,
   taskArchiveRoute,
@@ -158,12 +170,14 @@ export function createBridge(options: {
   pair?: typeof pairWithNode
   ask?: typeof askToPair
   collect?: typeof collectPairing
+  askVouched?: typeof askVouchedNode
 }) {
   const { fleet } = options
   const probe = options.probe ?? probeNode
   const pair = options.pair ?? pairWithNode
   const ask = options.ask ?? askToPair
   const collect = options.collect ?? collectPairing
+  const askVouched = options.askVouched ?? askVouchedNode
   let activeNodeId: string | null = null
   // The selected Node presented a certificate other than its pin. Its connection is closed until the
   // person pairs it again, and its status says why rather than reading as an ordinary outage.
@@ -174,31 +188,37 @@ export function createBridge(options: {
   // Whether `pending` is this computer's Node, the only one `node.ask` may ask.
   let pendingLocal = false
   // An ask the owner hasn't answered. The secret stays in this process; the sidebar sees the phrase.
-  let asking: { probe: Probe; secret: string } | null = null
+  // `provider` is where a listed Node came from, which its record keeps.
+  let asking: { probe: Probe; secret: string; provider?: NonNullable<FleetNode['provider']> } | null = null
   // The plugins whose state the sidebar shows, as the last `tasks.pages` read found them: those that
   // publish task addresses, and those that declare a panel.
   let statusPlugins = new Set<string>()
   const hints = agentHints(options.hint ?? (() => {}))
-  const broker = new NodeBroker({
-    frame(nodeId, frame) {
-      if (nodeId !== activeNodeId) return
-      hints.note(nodeId, frame)
-      const channel = (frame as { channel?: unknown } | null)?.channel
-      if (channel === 'plugins:changed') options.handoffsChanged?.(nodeId)
-      // A workspace rename or a project moved between workspaces changes Home's task list too.
-      if (channel === 'project:changed' || channel === 'workspace:changed') options.projectsChanged?.(nodeId)
-      if (channel === 'tasks:changed') options.tasksChanged?.(nodeId)
-      // A plugin that publishes task addresses or a panel asks clients to read its status again when its
-      // state changes, such as a stack coming up, so its addresses and panel may have changed too.
-      const pluginId = (frame as { pluginId?: unknown }).pluginId
-      if (channel === 'term:status' && typeof pluginId === 'string' && statusPlugins.has(pluginId))
-        options.tasksChanged?.(nodeId)
+  const broker = new NodeBroker(
+    {
+      frame(nodeId, frame) {
+        if (nodeId !== activeNodeId) return
+        hints.note(nodeId, frame)
+        const channel = (frame as { channel?: unknown } | null)?.channel
+        if (channel === 'plugins:changed') options.handoffsChanged?.(nodeId)
+        // A workspace rename or a project moved between workspaces changes Home's task list too.
+        if (channel === 'project:changed' || channel === 'workspace:changed') options.projectsChanged?.(nodeId)
+        if (channel === 'tasks:changed') options.tasksChanged?.(nodeId)
+        // A plugin that publishes task addresses or a panel asks clients to read its status again when its
+        // state changes, such as a stack coming up, so its addresses and panel may have changed too.
+        const pluginId = (frame as { pluginId?: unknown }).pluginId
+        if (channel === 'term:status' && typeof pluginId === 'string' && statusPlugins.has(pluginId))
+          options.tasksChanged?.(nodeId)
+      },
+      bytes() {},
+      status(status) {
+        if (status.nodeId === activeNodeId) options.status(status)
+      },
     },
-    bytes() {},
-    status(status) {
-      if (status.nodeId === activeNodeId) options.status(status)
-    },
-  })
+    // A Node reached through the account needs a ticket, and this browser has no Node of its own to ask. It
+    // asks the Node whose account listed the selected one (see `held`), or else the selected one.
+    { relayTicketRoute: ACCOUNT_TICKET_ROUTE, relayTicketNode: () => ticketHolder(activeNodeId) },
+  )
 
   const nodes = (): BridgeNodes => ({
     nodes: fleet.list().map(toNodeRecord),
@@ -209,19 +229,37 @@ export function createBridge(options: {
         : (broker.statuses().find((status) => status.nodeId === activeNodeId) ?? null),
   })
 
+  // The Node a ticket for the selected one is asked of: the one that listed it, when that was another Node
+  // in this fleet, or else the selected Node itself, which is where a listing is asked.
+  const ticketHolder = (nodeId: string | null): string | undefined => {
+    const source = nodeId ? fleet.get(nodeId)?.provider?.sourceNodeId : undefined
+    return source && fleet.get(source) ? source : (nodeId ?? undefined)
+  }
+
+  // The Nodes the broker keeps connected for a selection: the selected one, and the one its tickets come
+  // from. Only the selected one reports status and frames.
+  const connected = (nodeId: string | null): string[] => (nodeId ? [...new Set([nodeId, ticketHolder(nodeId)!])] : [])
+
   const select = (nodeId: string | null): BridgeNodes => {
+    const credential = (id: string) => {
+      const node = fleet.get(id)
+      const token = fleet.tokenFor(id)
+      return node && token && node.certPem ? toBrokerNode(node, token) : null
+    }
     if (nodeId !== null) {
-      const node = fleet.get(nodeId)
-      if (!node) throw new BridgeFailure('unknown_node', 'This browser has not paired that Node.')
-      const token = fleet.tokenFor(nodeId)
-      if (!token || !node.certPem)
+      if (!fleet.get(nodeId)) throw new BridgeFailure('unknown_node', 'This browser has not paired that Node.')
+      if (!credential(nodeId))
         throw new BridgeFailure('pairing_required', 'This browser has no credential for that Node. Pair it again.')
-      if (activeNodeId !== nodeId) {
-        if (activeNodeId) broker.remove(activeNodeId)
-        broker.upsert(toBrokerNode(node, token))
+    }
+    if (activeNodeId !== nodeId) {
+      const next = connected(nodeId)
+      for (const id of connected(activeNodeId)) if (!next.includes(id)) broker.remove(id)
+      for (const id of next) {
+        const record = credential(id)
+        if (record && !connected(activeNodeId).includes(id)) broker.upsert(record)
       }
-    } else if (activeNodeId) broker.remove(activeNodeId)
-    if (activeNodeId !== nodeId) identityChanged = null
+      identityChanged = null
+    }
     activeNodeId = nodeId
     return nodes()
   }
@@ -238,7 +276,10 @@ export function createBridge(options: {
     if (!node?.fingerprint) return false
     try {
       // Both sides come from `probeNode`, which normalizes the fingerprint.
-      return (await probe(node, { timeoutMs })).fingerprint !== node.fingerprint
+      return (
+        (await probe(node, { timeoutMs, relayTicket: (relay) => broker.relayTicket(relay) })).fingerprint !==
+        node.fingerprint
+      )
     } catch {
       return false
     }
@@ -247,7 +288,7 @@ export function createBridge(options: {
   // A probe whose failure the sidebar can explain. It sends no token and grants nothing.
   async function probeEndpoint(endpoint: string): Promise<Probe> {
     try {
-      return await probe(endpoint)
+      return await probe(endpoint, { relayTicket: (relay) => broker.relayTicket(relay) })
     } catch (error) {
       const message = messageOf(error)
       if (/baseline|protocol/.test(message)) throw new BridgeFailure('incompatible', message)
@@ -258,13 +299,21 @@ export function createBridge(options: {
 
   // A pairing that worked, by code or by approval: keep the pin and token, and reconnect if it's the
   // selected Node.
-  function remember(confirmed: Probe, result: Awaited<ReturnType<typeof pairWithNode>>, label: string) {
+  function remember(
+    confirmed: Probe,
+    result: Awaited<ReturnType<typeof pairWithNode>>,
+    label: string,
+    provider?: FleetNode['provider'],
+  ) {
     pending = null
     pendingLocal = false
     asking = null
     // Pairing again replaces the pin and token. A selected node reconnects on the new credential.
     if (activeNodeId === result.nodeId) broker.remove(activeNodeId)
-    const node = fleet.remember(pairedNode(confirmed, result, { label, local: false }), result.deviceToken)
+    const node = fleet.remember(
+      { ...pairedNode(confirmed, result, { label, local: false }), ...(provider ? { provider } : {}) },
+      result.deviceToken,
+    )
     if (identityChanged === result.nodeId) identityChanged = null
     if (activeNodeId === result.nodeId) {
       activeNodeId = null
@@ -701,6 +750,64 @@ export function createBridge(options: {
     return { nodeId, outcome: answer.outcome, ...(answer.action ? { action: answer.action } : {}) }
   }
 
+  // The Nodes the selected Node's providers list, such as the account's, with whether this browser has
+  // paired each. Nothing is listed until a Node is selected, since only a paired Node can be asked.
+  async function providedNodes(): Promise<BridgeResults['nodes.provided']> {
+    if (!activeNodeId) return { nodes: [], available: false }
+    const listing = (await nodeRequest(activeNodeId, {
+      method: 'GET',
+      path: coreNodeProvidersRoute,
+    })) as NodeProvidersResponse | null
+    const paired = fleet.list()
+    return {
+      available: !!listing?.providers.length,
+      nodes: (listing?.nodes ?? []).map(({ providerId, providerNodeId, label, nodeId }) => ({
+        providerId,
+        providerNodeId,
+        label,
+        adopted: paired.some(
+          (node) =>
+            node.nodeId === nodeId ||
+            (node.provider?.providerId === providerId && node.provider.providerNodeId === providerNodeId),
+        ),
+      })),
+    }
+  }
+
+  // Pairing by approval with a Node the selected Node's account lists. The selected Node says where it is,
+  // vouches for its fingerprint, and gives the assertion that shows its owner is asking. The Node isn't
+  // remembered until a paired device allows it and `node.collect` collects it.
+  async function adoptProvided(providerId: string, providerNodeId: string): Promise<BridgeResults['node.adopt']> {
+    if (!activeNodeId) throw new BridgeFailure('not_selected', 'Select a Node whose account lists the Node first.')
+    const source = activeNodeId
+    pending = null
+    pendingLocal = false
+    asking = null
+    const answer = nodeAdoptResultSchema.safeParse(
+      await nodeRequest(source, {
+        method: 'POST',
+        path: coreNodeAdoptRoute,
+        body: { providerId, providerNodeId },
+        read: true,
+      }),
+    )
+    if (!answer.success || !('assertion' in answer.data))
+      throw new BridgeFailure('node_error', 'That Node does not pair by approval.')
+    try {
+      const { probe: vouched, ask: asked } = await askVouched(
+        { endpoint: answer.data.endpoint, fingerprint: answer.data.fingerprint, assertion: answer.data.assertion },
+        options.deviceName,
+        (relay) => broker.relayTicket(relay),
+      )
+      asking = { probe: vouched, secret: asked.secret, provider: { providerId, providerNodeId, sourceNodeId: source } }
+      return { phrase: asked.phrase }
+    } catch (error) {
+      if (error instanceof PairingBusyError) throw new BridgeFailure('pairing_busy', error.message)
+      if (error instanceof VouchedIdentityError) throw new BridgeFailure('identity_mismatch', error.message)
+      throw new BridgeFailure('pairing_failed', messageOf(error))
+    }
+  }
+
   async function handle(request: BridgeRequest): Promise<BridgeResults[BridgeRequest['op']]> {
     switch (request.op) {
       case 'nodes.list': {
@@ -764,8 +871,12 @@ export function createBridge(options: {
           asking = null
           throw new BridgeFailure('pairing_failed', messageOf(error))
         }
-        return result ? remember(current.probe, result, request.label) : null
+        return result ? remember(current.probe, result, request.label, current.provider) : null
       }
+      case 'nodes.provided':
+        return providedNodes()
+      case 'node.adopt':
+        return adoptProvided(request.providerId, request.providerNodeId)
       case 'node.select':
         return select(request.nodeId)
       case 'node.forget':

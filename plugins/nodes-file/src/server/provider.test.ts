@@ -11,6 +11,7 @@ import { nodesFileProvider } from './provider'
 
 const FINGERPRINT = 'b'.repeat(64)
 const signal = new AbortController().signal
+const caller = { userId: 'owner' }
 
 describe('nodesFileProvider', () => {
   let dir = ''
@@ -26,7 +27,7 @@ describe('nodesFileProvider', () => {
   it('reads an empty inventory from a file that is not there', async () => {
     // Not an error. A provider that reported one until somebody created a file would read as broken
     // rather than empty, and the fleet surface would show a banner for a normal state.
-    await expect(nodesFileProvider(path).list(signal)).resolves.toEqual([])
+    await expect(nodesFileProvider(path).list(signal, caller)).resolves.toEqual([])
   })
 
   it('lists what the file says, filling the absent fields with null', async () => {
@@ -46,7 +47,7 @@ describe('nodesFileProvider', () => {
         ],
       }),
     )
-    const listed = await nodesFileProvider(path).list(signal)
+    const listed = await nodesFileProvider(path).list(signal, caller)
     expect(listed).toEqual([
       {
         providerNodeId: 'cloud-1',
@@ -72,7 +73,7 @@ describe('nodesFileProvider', () => {
 
   it('says what is wrong with a file it cannot use', async () => {
     writeFileSync(path, JSON.stringify({ nodes: [{ label: 'no id' }] }))
-    await expect(nodesFileProvider(path).list(signal)).rejects.toThrow(/not a usable node list/)
+    await expect(nodesFileProvider(path).list(signal, caller)).rejects.toThrow(/not a usable node list/)
   })
 
   it('creates a node as provisioning, then destroys it', async () => {
@@ -81,10 +82,10 @@ describe('nodesFileProvider', () => {
     // No endpoint: this provider records the intent and builds nothing, which is the honest shape for a
     // file and still exercises the state a real provider spends its first minute in.
     expect(created).toMatchObject({ label: 'New one', state: 'provisioning', endpoint: null, nodeId: null })
-    expect(await provider.list(signal)).toHaveLength(1)
+    expect(await provider.list(signal, caller)).toHaveLength(1)
 
     await provider.destroy!(created.providerNodeId, signal)
-    expect(await provider.list(signal)).toEqual([])
+    expect(await provider.list(signal, caller)).toEqual([])
     // Written back as a whole file, so what is left is readable rather than a truncated tail.
     expect(JSON.parse(readFileSync(path, 'utf8'))).toEqual({ nodes: [] })
   })
@@ -93,9 +94,9 @@ describe('nodesFileProvider', () => {
     const provider = nodesFileProvider(path)
     const created = await provider.create!({ label: 'New one', options: {} }, signal)
     await provider.start!(created.providerNodeId, signal)
-    expect((await provider.list(signal))[0]!.state).toBe('ready')
+    expect((await provider.list(signal, caller))[0]!.state).toBe('ready')
     await provider.stop!(created.providerNodeId, signal)
-    expect((await provider.list(signal))[0]!.state).toBe('stopped')
+    expect((await provider.list(signal, caller))[0]!.state).toBe('stopped')
     await expect(provider.stop!('nope', signal)).rejects.toThrow(/lists no node/)
   })
 })

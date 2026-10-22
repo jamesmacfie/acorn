@@ -66,6 +66,11 @@ async function fakeNode(nodeId: string, options: { protocolVersion?: number } = 
     allowed: false,
     // Whether another ask is waiting, so the Node cancels both.
     busy: false,
+    // Every body an ask arrived with.
+    asks: [] as unknown[],
+    // What its providers list, and what adopting one answers, as a Node that has an account would.
+    provided: [] as Record<string, unknown>[],
+    adopted: null as Record<string, unknown> | null,
     projectsDelay: null as Promise<void> | null,
     // Accept the next turn, then drop the connection before answering.
     dropTurnReply: false,
@@ -179,8 +184,12 @@ async function fakeNode(nodeId: string, options: { protocolVersion?: number } = 
     }
     if (req.url === '/v1/pair/requests' && state.busy)
       return reply(409, { error: { code: 'pairing_busy', message: 'Another client asked at the same moment.' } })
-    if (req.url === '/v1/pair/requests')
+    if (req.url === '/v1/pair/requests') {
+      let body = ''
+      for await (const chunk of req) body += chunk
+      state.asks.push(JSON.parse(body))
       return reply(200, { secret: 'ask-secret', phrase: 'maple river stone', expiresInMs: 1 })
+    }
     if (req.url === '/v1/pair/requests/claim') {
       let body = ''
       for await (const chunk of req) body += chunk
@@ -452,6 +461,13 @@ async function fakeNode(nodeId: string, options: { protocolVersion?: number } = 
       }
       return reply(200, state.actAnswers.get(key))
     }
+    if (req.url === '/v1/core/nodes')
+      return reply(200, {
+        providers: [{ id: 'account:nodes', label: 'acorn account', verbs: [] }],
+        nodes: state.provided,
+        failures: [],
+      })
+    if (req.url === '/v1/core/nodes/adopt') return reply(200, state.adopted)
     if (req.url === '/v1/core/projects') {
       await state.projectsDelay
       return reply(200, { projects: state.projects })
@@ -586,6 +602,77 @@ async function paired(nodeId = 'node-a') {
   await subject.call({ op: 'node.pair', code: CODE, label: 'Studio' })
   return { node, ...subject }
 }
+
+describe('browser bridge pairing with a Node an account lists', () => {
+  // The Node this browser is paired with lists "away" under its account, and "away" takes the ask.
+  async function setup() {
+    const away = await fakeNode('node-away')
+    const home = await paired('node-home')
+    home.node.state.provided = [
+      {
+        providerId: 'account:nodes',
+        providerNodeId: 'node-away',
+        nodeId: 'node-away',
+        label: 'Away',
+        endpoint: away.endpoint,
+        fingerprint: certA.fingerprint,
+        state: 'ready',
+      },
+    ]
+    home.node.state.adopted = {
+      nodeId: 'node-away',
+      label: 'Away',
+      endpoint: away.endpoint,
+      fingerprint: certA.fingerprint,
+      assertion: 'an-assertion',
+    }
+    await home.call({ op: 'node.select', nodeId: 'node-home' })
+    return { away, ...home }
+  }
+  const away = { op: 'node.adopt', providerId: 'account:nodes', providerNodeId: 'node-away' }
+
+  it('lists nothing until a Node is selected, then lists the account’s Nodes', async () => {
+    const { call, node } = await setup()
+    expect(await call({ op: 'nodes.provided' })).toEqual({
+      available: true,
+      nodes: [{ providerId: 'account:nodes', providerNodeId: 'node-away', label: 'Away', adopted: false }],
+    })
+    expect(node.state.paths).toContain('/v1/core/nodes')
+    await call({ op: 'node.select', nodeId: null })
+    expect(await call({ op: 'nodes.provided' })).toEqual({ available: false, nodes: [] })
+  })
+
+  it('asks the listed Node with the assertion, and pairs it once a paired device allows it', async () => {
+    const { call, away: target } = await setup()
+    expect(await call(away)).toEqual({ phrase: 'maple river stone' })
+    expect(target.state.asks).toEqual([{ deviceName: 'test', assertion: 'an-assertion' }])
+    expect(await call({ op: 'node.collect', label: 'Away' })).toBeNull()
+    target.state.allowed = true
+    expect(await call({ op: 'node.collect', label: 'Away' })).toMatchObject({
+      nodeId: 'node-away',
+      provider: { providerId: 'account:nodes', providerNodeId: 'node-away', sourceNodeId: 'node-home' },
+    })
+    expect(((await call({ op: 'nodes.provided' })) as { nodes: { adopted: boolean }[] }).nodes[0]!.adopted).toBe(true)
+    await call({ op: 'node.select', nodeId: 'node-away' })
+    expect(await call({ op: 'projects.list', nodeId: 'node-away' })).toMatchObject({ nodeId: 'node-away' })
+  })
+
+  it('pairs nothing with a Node that presents another identity than its account vouched for', async () => {
+    const { call, node, away: target } = await setup()
+    node.state.adopted = { ...node.state.adopted, fingerprint: 'ab'.repeat(32) }
+    await expect(call(away)).rejects.toMatchObject({ code: 'identity_mismatch' })
+    expect(target.state.asks).toEqual([])
+    await expect(call({ op: 'node.collect', label: 'Away' })).rejects.toMatchObject({ code: 'no_probe' })
+  })
+
+  it('refuses a listing that holds no assertion, and needs a selected Node', async () => {
+    const { call, node } = await setup()
+    node.state.adopted = { ...node.state.adopted, assertion: undefined, deviceToken: 'a-token' }
+    await expect(call(away)).rejects.toMatchObject({ code: 'node_error' })
+    await call({ op: 'node.select', nodeId: null })
+    await expect(call(away)).rejects.toMatchObject({ code: 'not_selected' })
+  })
+})
 
 describe('browser bridge pairing', () => {
   it('shows the presented fingerprint, then pairs without returning the credential', async () => {

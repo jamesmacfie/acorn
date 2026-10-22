@@ -122,6 +122,11 @@ const SettingsHost = lazy(() => import('./SettingsHost').then(({ SettingsHost })
 const TaskLaunchHost = lazy(() => import('./TaskLaunchHost'))
 const ActionPickerHost = lazy(() => import('./ActionPickerHost'))
 const LinkPreviewDialog = lazy(() => import('./LinkPreviewDialog'))
+// Listens for a pairing request once the first frame is up, so the model it shares with the desktop's
+// dialog stays out of the first-frame graph.
+const PairingRequests = lazy(() =>
+  import('./PairingRequests').then(({ PairingRequests }) => ({ default: PairingRequests })),
+)
 
 export function Shell(props: {
   nodeId: string
@@ -764,6 +769,9 @@ export function Shell(props: {
             <Confirmation request={request} />
           </box>
         )}
+      </Show>
+      <Show when={model.ready()}>
+        <PairingRequests />
       </Show>
       <Notifications />
       <Footer nodeId={props.nodeId} />

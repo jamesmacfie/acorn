@@ -47,6 +47,15 @@ fetches the endpoint, fingerprint, and credential from the Node that listed the 
 the endpoint and refuses a certificate whose fingerprint doesn't match. The renderer can't introduce a
 Node of its own invention and never sees a device token.
 
+A provider that only knows where a Node is, such as an account, holds no device token to hand over. It
+declares `pairingAssertion` instead, a short-lived statement that its user owns the Node. `adopt`
+then answers with that assertion in place of a token, and the host pairs by approval: it probes the
+endpoint, refuses a certificate other than the one the provider vouched for, asks with the assertion,
+and remembers the Node only once a device already paired with it allows the ask. The provider never
+holds a device token. The desktop's `adopt` answers with the words to show and a second call collects
+the Node. `list` and `pairingAssertion` receive the caller's user ID and nothing else of the request,
+and reach the user's own connection with `ctx.providers.withConnection`.
+
 The client confirms the four lifecycle verbs using the `ToolRisk` tiers in `NODE_LIFECYCLE_RISK`
 (`packages/protocol/src/device/nodeProviders.ts`). `create`, `start`, and `stop` are `write`. `destroy`
 is `execute` and asks first in the shell's confirmation, which names what goes and what stays. Core

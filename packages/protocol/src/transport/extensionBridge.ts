@@ -169,6 +169,16 @@ export const bridgeRequestSchema = z.discriminatedUnion('op', [
   // dialog shows, then calls `node.collect` until the owner answers.
   z.strictObject({ ...envelope, op: z.literal('node.ask') }),
   z.strictObject({ ...envelope, op: z.literal('node.collect'), label: z.string().trim().min(1).max(120) }),
+  // The Nodes the selected Node's providers list, such as the ones its owner's account has. Pairing with
+  // one is `node.adopt` and then `node.collect`, for a listed Node's identity is its account's word and
+  // needs no words compared (docs/plugins/node-providers.md § Node providers).
+  z.strictObject({ ...envelope, op: z.literal('nodes.provided') }),
+  z.strictObject({
+    ...envelope,
+    op: z.literal('node.adopt'),
+    providerId: z.string().min(1).max(200),
+    providerNodeId: z.string().min(1).max(200),
+  }),
   // No endpoint or fingerprint: pairing completes the probe the person just confirmed.
   z.strictObject({
     ...envelope,
@@ -603,6 +613,9 @@ export type BridgeWorkflowStep = {
   session: BridgeAgentSession | null
 }
 
+// A Node a provider lists. `adopted` is whether this browser has paired it already.
+export type BridgeProvidedNode = { providerId: string; providerNodeId: string; label: string; adopted: boolean }
+
 export type BridgeResults = {
   'nodes.list': BridgeNodes
   'node.probe': NodeProbeResult
@@ -612,6 +625,11 @@ export type BridgeResults = {
   'node.ask': { phrase: string }
   // Null while the owner hasn't answered. A denial or an expiry is a `pairing_failed` failure.
   'node.collect': NodeRecord | null
+  // `available` is whether the selected Node has a provider at all, so the sidebar can tell a provider
+  // with no Nodes from no provider.
+  'nodes.provided': { nodes: BridgeProvidedNode[]; available: boolean }
+  // The words a device already paired with that Node shows, as `node.ask` answers.
+  'node.adopt': { phrase: string }
   'node.select': BridgeNodes
   'node.forget': BridgeNodes
   'node.rename': BridgeNodes

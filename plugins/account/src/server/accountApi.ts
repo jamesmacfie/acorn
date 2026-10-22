@@ -4,7 +4,9 @@ import {
   accountErrorSchema,
   accountSchema,
   DEVICE_CODE_GRANT,
+  assertionResponseSchema,
   deviceCodeResponseSchema,
+  listNodesResponseSchema,
   registerNodeResponseSchema,
   ticketResponseSchema,
   tokenResponseSchema,
@@ -65,11 +67,14 @@ export function accountApi(baseUrl: string) {
     refresh: (refreshToken: string) =>
       call('POST', accountPaths.token, tokenResponseSchema, { body: { grantType: 'refresh_token', refreshToken } }),
     account: (token: string) => call('GET', accountPaths.account, accountSchema, { token }),
+    nodes: (token: string) => call('GET', accountPaths.nodes, listNodesResponseSchema, { token }),
     register: (token: string, nodeId: string, node: RegisterNodeRequest) =>
       call('PUT', accountPaths.node(nodeId), registerNodeResponseSchema, { token, body: node }),
     // The answer is 204, with no body.
     remove: (token: string, nodeId: string) => call('DELETE', accountPaths.node(nodeId), z.undefined(), { token }),
     ticket: (token: string, nodeId: string) =>
       call('POST', accountPaths.tickets, ticketResponseSchema, { token, body: { nodeId } }),
+    assertion: (token: string, nodeId: string) =>
+      call('POST', accountPaths.assertions, assertionResponseSchema, { token, body: { nodeId } }),
   }
 }

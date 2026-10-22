@@ -23,6 +23,8 @@ function mount(
     local?: { nodeId: string; endpoint: string }
     // A Node that takes an ask. Without one, the ask fails and only the code works.
     approval?: { allowed: boolean; busy?: boolean }
+    // The Nodes the selected Node's account lists.
+    listed?: { providerId: string; providerNodeId: string; label: string; adopted: boolean }[]
   } = {},
 ) {
   const fake = fakeBrowser()
@@ -69,6 +71,8 @@ function mount(
         : options.approval
           ? reply({ phrase: 'maple river stone' })
           : host.send({ v: 1, id: request.id, ok: false, error: { code: 'pairing_failed', message: 'no ask' } })
+    if (request.op === 'nodes.provided') return reply({ available: !!options.listed, nodes: options.listed ?? [] })
+    if (request.op === 'node.adopt') return reply({ phrase: 'oak ridge cloud' })
     if (request.op === 'node.collect') {
       if (!options.approval?.allowed) return reply(null)
       known.push('new')
@@ -364,6 +368,47 @@ describe('sidebar', () => {
     expect(nodeRow(root, 'Node a')).toBeUndefined()
     await goHome(root)
     expect(shownNode(root)).toBe('No Node')
+  })
+
+  it('lists the Nodes the account has, and pairs one once a paired device allows it', async () => {
+    const approval = { allowed: false }
+    const listed = [
+      { providerId: 'account:nodes', providerNodeId: 'away', label: 'Away', adopted: false },
+      { providerId: 'account:nodes', providerNodeId: 'home', label: 'Home', adopted: true },
+    ]
+    const { fake, root } = mount(['a'], { approval, listed })
+    await settle()
+    await useNode(root, 'Node a')
+    await openSettings(root)
+    button(root.querySelector('[data-settings-section="nodes"]')!, 'Pair')!.click()
+    await settle()
+    // The one this browser has paired is not offered again.
+    expect(root.textContent).toContain('Away')
+    expect(root.textContent).not.toContain('Home')
+    const away = [...root.querySelectorAll<HTMLElement>('.connect .ui-card')].find((card) =>
+      card.textContent?.includes('Away'),
+    )!
+    button(away, 'Connect')!.click()
+    await settle()
+    expect(sent(fake, 'node.adopt').at(-1)).toMatchObject({ providerId: 'account:nodes', providerNodeId: 'away' })
+    expect(screenTitles(root)).toEqual(['Approve on another device'])
+    expect(words(root, 'oak ridge cloud')).toEqual(['oak', 'ridge', 'cloud'])
+
+    approval.allowed = true
+    await new Promise((resolve) => setTimeout(resolve, 1_100))
+    await settle()
+    expect(sent(fake, 'node.collect').at(-1)).toMatchObject({ label: 'Away' })
+    expect(screenTitles(root)[0]).toBe('Connected to Away')
+  })
+
+  it('says how to list the account’s Nodes when it has none, and offers nothing when there is no account', async () => {
+    const { root } = mount(['a'], { listed: [] })
+    await settle()
+    await useNode(root, 'Node a')
+    await openSettings(root)
+    button(root.querySelector('[data-settings-section="nodes"]')!, 'Pair')!.click()
+    await settle()
+    expect(root.textContent).toContain('No Nodes from your acorn account.')
   })
 
   it('renames a Node in place, where Enter saves and Escape cancels', async () => {

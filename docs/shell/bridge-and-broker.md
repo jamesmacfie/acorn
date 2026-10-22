@@ -149,6 +149,11 @@ endpoint, fingerprint, and device token, probes the endpoint itself, and refuses
 fingerprint isn't the one the provider vouched for. So the renderer can't invent a Node, and no token
 crosses the bridge.
 
+A provider with no device token answers `adopt` with an assertion, and the helper asks the Node
+to pair by approval instead. The renderer gets the three words (`{ phrase }`), and `node-collect-adoption`
+finishes the pairing once a paired device allows it. The helper holds the secret, and the Node is
+remembered only then.
+
 The provider's word replaces you comparing a fingerprint, which is the trust you granted when you
 connected it. The record keeps `provider` provenance: which provider, which provider Node ID, and which
 Node listed it. An adopted row has no `deviceId`, because the far Node's device row belongs to the

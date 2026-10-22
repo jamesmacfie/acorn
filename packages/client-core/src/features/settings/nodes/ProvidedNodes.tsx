@@ -1,7 +1,8 @@
-import { createSignal, For, Show } from 'solid-js'
+import { createSignal, For, onCleanup, Show } from 'solid-js'
 import { NODE_LIFECYCLE_RISK, type NodeLifecycleVerb, type ProvidedNodeState } from '@acorn/protocol/nodeProviders.ts'
 import {
   adoptProvidedNode,
+  collectAdoption,
   createProvidedNode,
   creatableProviders,
   createProvidedNodes,
@@ -13,7 +14,7 @@ import {
 } from '../../../infra/node/providedNodes'
 import { nodes } from '../../../infra/node/fleet'
 import { canPairNodes } from '../../../infra/platform'
-import { Alert, Badge, Button, Card, Field, Input } from '../../../kit/components/primitives'
+import { Alert, Badge, Button, Card, Field, Input, Spinner } from '../../../kit/components/primitives'
 import Icon from '../../../kit/components/content/Icon'
 import { Inline } from '../../../kit/components/layout/Inline'
 import { Stack } from '../../../kit/components/layout/Stack'
@@ -51,6 +52,9 @@ const STATE_TONE: Record<ProvidedNodeState, 'accent' | 'ok' | 'danger' | 'neutra
   failed: 'danger',
 }
 
+// How often a node waiting for a paired device's answer is asked whether it has one.
+const COLLECT_EVERY_MS = 1_000
+
 const VERB_LABEL: Record<NodeLifecycleVerb, string> = {
   create: 'Create',
   destroy: 'Destroy',
@@ -75,6 +79,27 @@ export default function ProvidedNodes() {
   const [error, setError] = createSignal('')
   const [creating, setCreating] = createSignal<string | null>(null)
   const [newLabel, setNewLabel] = createSignal('')
+  // A node waiting for a device already paired with it to allow this one, and the words that device shows.
+  const [approving, setApproving] = createSignal<{ label: string; phrase: string } | null>(null)
+  let collecting: ReturnType<typeof setTimeout> | undefined
+  onCleanup(() => clearTimeout(collecting))
+
+  const stopWaiting = () => {
+    clearTimeout(collecting)
+    setApproving(null)
+  }
+  // Asks again until the node answers. A denial or an expiry ends the wait and says so.
+  const collect = async () => {
+    try {
+      if (await collectAdoption()) {
+        stopWaiting()
+        await refetch()
+      } else collecting = setTimeout(() => void collect(), COLLECT_EVERY_MS)
+    } catch {
+      stopWaiting()
+      setError('The request was denied or has expired.')
+    }
+  }
 
   // Naming a new node is a form with Create and Cancel, so a typed name counts as unsaved.
   useUnsavedChanges(() => creating() !== null && !!newLabel().trim())
@@ -117,6 +142,28 @@ export default function ProvidedNodes() {
           )}
         </For>
 
+        <Show when={approving()}>
+          {(waiting) => (
+            <Card>
+              <Stack gap="row">
+                <p>
+                  Open Acorn on a device already paired with {waiting().label}. It asks to allow this computer, with
+                  these words:
+                </p>
+                <p>
+                  <strong>{waiting().phrase}</strong>
+                </p>
+                <Inline gap="row">
+                  <Spinner label="Waiting for approval" />
+                  <Button variant="ghost" onPress={stopWaiting}>
+                    Cancel
+                  </Button>
+                </Inline>
+              </Stack>
+            </Card>
+          )}
+        </Show>
+
         <For each={rows()}>
           {(row: ProvidedNodeRow) => (
             <SettingRow label={row.label} description={row.endpoint ?? row.providerNodeId}>
@@ -135,11 +182,15 @@ export default function ProvidedNodes() {
                     disabled={busy()}
                     onPress={() =>
                       void run(async () => {
-                        await adoptProvidedNode(row)
+                        const adoption = await adoptProvidedNode(row)
+                        if ('phrase' in adoption) {
+                          setApproving({ label: row.label, phrase: adoption.phrase })
+                          void collect()
+                        }
                       })
                     }
                   >
-                    Add to this computer
+                    Connect
                   </Button>
                 </Show>
                 <For each={OFFERED[row.state].filter((verb) => row.verbs.includes(verb))}>

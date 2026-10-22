@@ -76,6 +76,7 @@ const GROUPS = {
       'probe',
       'pair',
       'adopt',
+      'collectAdoption',
       'rename',
       'forget',
       'reconnect',

@@ -61,6 +61,7 @@ An error answers `{ "error": "<code>", "message": "<optional text>" }`:
 | `POST /account/v1/device/code` | Plugin | None | Starts a device flow. |
 | `POST /account/v1/token` | Plugin | None | Trades an approved device code, or a refresh token, for tokens. |
 | `GET /account/v1/account` | Plugin | Access token | The signed-in account. |
+| `GET /account/v1/nodes` | Plugin | Access token | The Nodes the account owns, with the fingerprint each registered. |
 | `PUT /account/v1/nodes/{nodeId}` | Plugin | Access token | Registers a Node, or registers it again. |
 | `DELETE /account/v1/nodes/{nodeId}` | Plugin | Access token | Removes a Node and revokes its relay credential. |
 | `POST /account/v1/tickets` | Plugin | Access token | A relay ticket for one of the account's Nodes. |
@@ -91,14 +92,22 @@ and revokes the old one, so turning remote access off and on gives the Node a ne
 
 A Node ID belongs to one account. A second account that registers it gets `409 conflict`.
 
+### List the account's Nodes
+
+`GET /nodes` answers `{ nodes: [{ nodeId, label, fingerprint, relayUrl }] }`, the account's own Nodes
+only. The fingerprint is the one the Node registered, which a client pins when it pairs with one. The
+service can't see whether a Node is connected to its relay, so the list doesn't say.
+
 ### Tickets and assertions
 
 `POST /tickets` takes `{ nodeId }` and answers `{ ticket, expiresAt, relayUrl }`. It answers
 `404 not_found` for a Node the account doesn't own, and for one that doesn't exist.
 
 `POST /assertions` takes the same body and answers `{ assertion, expiresAt }`. An assertion says that a
-person is signed in as an account, for the Node it names. Nothing in this phase checks one. A later
-phase has a Node accept it with a pairing ask, and no assertion ever acts as a device token.
+person is signed in as an account, for the Node it names. A Node accepts one in a pairing ask from
+another computer, when its subject is the Node's owner account
+([pairing by approval](./api-reference/transport.md#pairing-by-approval)). No assertion ever acts as a
+device token.
 
 ## Signed tokens
 

@@ -13,7 +13,8 @@ const REFRESH_WHILE_CONNECTING_MS = 2_000
 
 const connectionText = (remote: AccountState['remoteAccess']): string => {
   if (remote.blocked) return remote.blocked
-  if (!remote.enabled) return 'Reach this Node from another network, through the relay. Pairing still needs a code.'
+  if (!remote.enabled)
+    return 'Reach this Node from another network, through the relay. A device you’ve already paired approves each new one.'
   const relay = remote.relayUrl ? new URL(remote.relayUrl).host : 'the relay'
   return remote.connected
     ? `Connected to ${relay} since ${new Date(remote.since ?? Date.now()).toLocaleTimeString()}.`

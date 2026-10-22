@@ -13,7 +13,7 @@ sources:
   - packages/client-core/src/features/settings/nodes/NodeReachSetting.tsx
   - packages/client-core/src/host/trust/PairingRequestDialog.tsx
   - packages/custody/src/local/pair.ts
-checked: 'e7c7447f7'
+checked: '6857132fe'
 ---
 
 Pairing gives a client, such as the desktop app on your laptop, a token for a Node on another machine.
@@ -113,12 +113,13 @@ https://192.168.1.20:4317 in an interactive terminal first.** and exit code 3.
 
 ## Pair without a code on the same computer
 
-When the Node runs on the same computer, and the desktop app is open and paired with it, the terminal
-client, the command line, and the browser extension can ask instead.
+When the Node runs on the same computer, and the desktop app or the terminal client is open and paired
+with it, the terminal client, the command line, and the browser extension can ask instead.
 
 1. Run `acorn` in a terminal. It prints three words, such as **Allow this in Acorn on this computer. It
    shows: maple river stone**, and also asks for a code.
-2. The desktop app opens **Allow a new client?** with the client's name and the same three words.
+2. The desktop app opens **Allow a new client?** with the client's name and the same three words. The
+   terminal client asks the same question.
 3. If the words match, click **Allow**. **Deny** refuses it.
 
 The request lasts two minutes. Any program on the computer can ask, agents included, which is why the
@@ -154,8 +155,9 @@ the connection.
 
 ## In the terminal
 
-The terminal client pairs with `acorn --node <address>`, as above. It can ask to be allowed, but it
-can't allow another client, because it draws no dialog. Use the desktop app or a code for that.
+The terminal client pairs with `acorn --node <address>`, as above. It can ask to be allowed, and it
+shows the same question when another client asks. Its choice starts on **Cancel**, which denies the
+request, so move to **Allow** to pair the other client.
 
 ## Limits
 

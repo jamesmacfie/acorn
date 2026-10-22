@@ -1,6 +1,6 @@
 import { For, Match, Show, Switch, createEffect, createSignal, onCleanup, onMount } from 'solid-js'
 import type { NodeProbeResult, NodeRecord } from '@acorn/protocol/broker.ts'
-import type { BridgeHandoff, BridgeNodes, BridgeResults } from '@acorn/protocol/extensionBridge.ts'
+import type { BridgeHandoff, BridgeNodes, BridgeProvidedNode, BridgeResults } from '@acorn/protocol/extensionBridge.ts'
 import { fingerprintPhrase, fingerprintWords } from '@acorn/protocol/fingerprintWords.ts'
 import { nodeAddress } from '@acorn/protocol/relay.ts'
 import { AcornArt } from '@acorn/client-core/kit/components/content/Acorn.tsx'
@@ -76,6 +76,8 @@ type Step =
   | { kind: 'identity'; probe: NodeProbeResult }
   // `local` is a Node whose certificate the bridge read from its own files.
   | { kind: 'code'; probe: NodeProbeResult; local: boolean }
+  // A Node the account lists, waiting for a paired device to allow this browser.
+  | { kind: 'approve'; node: BridgeProvidedNode }
   | { kind: 'done'; node: NodeRecord }
 
 // Choose a Node, check its identity, pair, and offer what comes next. The Node on this computer needs
@@ -116,6 +118,7 @@ export function Pairing(props: {
             fleet={props.fleet}
             connect={(probe) => setStep({ kind: 'code', probe, local: true })}
             another={() => setStep({ kind: 'address' })}
+            approve={(node) => setStep({ kind: 'approve', node })}
           />
         </Match>
         <Match when={step().kind === 'address'}>
@@ -143,6 +146,18 @@ export function Pairing(props: {
             />
           )}
         </Match>
+        <Match when={stepOf('approve')} keyed>
+          {(current) => (
+            <Approve
+              client={props.client}
+              node={current.node}
+              paired={(node) => {
+                props.paired(node)
+                setStep({ kind: 'done', node })
+              }}
+            />
+          )}
+        </Match>
         <Match when={stepOf('done')} keyed>
           {(current) => <Paired api={props.api} node={current.node} handoffs={props.handoffs} done={props.done} />}
         </Match>
@@ -158,6 +173,7 @@ function Choose(props: {
   fleet: BridgeNodes | null
   connect(probe: NodeProbeResult): void
   another(): void
+  approve(node: BridgeProvidedNode): void
 }) {
   const [local, setLocal] = createSignal<{ node: BridgeResults['node.local']; problem: string | null } | null>(null)
   // Asked each time this step shows, which also makes the local Node the probe `node.pair` completes.
@@ -167,6 +183,17 @@ function Choose(props: {
       setLocal({ node, problem: node && !node.compatible ? incompatible(node) : null })
     } catch (failure) {
       setLocal({ node: null, problem: failure instanceof Error ? failure.message : String(failure) })
+    }
+  })
+  // The Nodes the selected Node's account lists, once a Node is paired to ask. The first screen of a
+  // browser that has paired nothing has no Node to ask and lists none.
+  const [listed, setListed] = createSignal<BridgeResults['nodes.provided'] | null>(null)
+  onMount(async () => {
+    if (!props.fleet?.activeNodeId) return
+    try {
+      setListed(await props.client.call({ op: 'nodes.provided' }))
+    } catch {
+      // The account's list is a convenience: a Node that can't give it leaves the other ways in.
     }
   })
   const unpaired = () => {
@@ -201,6 +228,34 @@ function Choose(props: {
                     </Row>
                   </Card>
                 )}
+              </Show>
+              <Show when={listed()?.available}>
+                <Stack>
+                  <For each={listed()?.nodes.filter((node) => !node.adopted)}>
+                    {(node) => (
+                      <Card pad="sm">
+                        <Row
+                          variant="stacked"
+                          leading={<Icon name="laptop" size="1.5em" tone="muted" />}
+                          trailing={
+                            <Button variant="solid" size="sm" onPress={() => props.approve(node)}>
+                              Connect
+                            </Button>
+                          }
+                        >
+                          <Text emphasis="strong">{node.label}</Text>
+                          <Text tone="muted">From your acorn account</Text>
+                        </Row>
+                      </Card>
+                    )}
+                  </For>
+                  <Show when={!listed()?.nodes.length}>
+                    <Text tone="muted">
+                      No Nodes from your acorn account. Sign in to it in Acorn › Settings › Account, and turn on Remote
+                      access on each Node.
+                    </Text>
+                  </Show>
+                </Stack>
               </Show>
               <Show when={found().problem}>{(problem) => <Alert>{problem()}</Alert>}</Show>
               <Button variant={unpaired() ? 'bare' : 'outline'} onPress={() => props.another()}>
@@ -311,22 +366,20 @@ function Code(props: { client: BridgeClient; probe: NodeProbeResult; local: bool
     stopped = true
     clearTimeout(timer)
   })
-  const collect = async () => {
-    if (stopped) return
-    try {
-      const node = await props.client.call({ op: 'node.collect', label })
-      if (stopped) return
-      if (node) return props.paired(node)
-      timer = setTimeout(() => void collect(), COLLECT_EVERY_MS)
-    } catch {
-      if (!stopped) setRefused(true)
-    }
-  }
+  const collect = () =>
+    collectApproval(
+      props.client,
+      label,
+      () => stopped,
+      props.paired,
+      () => setRefused(true),
+      (next) => (timer = next),
+    )
   const ask = async () => {
     setOverlapped(false)
     try {
       setPhrase((await props.client.call({ op: 'node.ask' })).phrase)
-      void collect()
+      collect()
     } catch (error) {
       // Any other failure is a Node that can't take an ask, which still takes a code.
       if (error instanceof CallFailure && error.code === 'pairing_busy') setOverlapped(true)
@@ -418,6 +471,91 @@ function Code(props: { client: BridgeClient; probe: NodeProbeResult; local: bool
           </EmptyState>
         )}
       </Show>
+    </Show>
+  )
+}
+
+// Asks the host once a second whether the owner has allowed this browser, until they have.
+function collectApproval(
+  client: BridgeClient,
+  label: string,
+  stopped: () => boolean,
+  paired: (node: NodeRecord) => void,
+  refused: () => void,
+  schedule: (timer: ReturnType<typeof setTimeout>) => void,
+): void {
+  void (async () => {
+    if (stopped()) return
+    try {
+      const node = await client.call({ op: 'node.collect', label })
+      if (stopped()) return
+      if (node) return paired(node)
+      schedule(setTimeout(() => collectApproval(client, label, stopped, paired, refused, schedule), COLLECT_EVERY_MS))
+    } catch {
+      if (!stopped()) refused()
+    }
+  })()
+}
+
+// A Node the account lists: its fingerprint is the account's word, so no words to compare, and a device
+// already paired with it approves this browser.
+function Approve(props: { client: BridgeClient; node: BridgeProvidedNode; paired(node: NodeRecord): void }) {
+  const [phrase, setPhrase] = createSignal<string | null>(null)
+  const [problem, setProblem] = createSignal<string | null>(null)
+  const [refused, setRefused] = createSignal(false)
+  let timer: ReturnType<typeof setTimeout> | undefined
+  let stopped = false
+  onCleanup(() => {
+    stopped = true
+    clearTimeout(timer)
+  })
+  onMount(async () => {
+    try {
+      const adopted = await props.client.call({
+        op: 'node.adopt',
+        providerId: props.node.providerId,
+        providerNodeId: props.node.providerNodeId,
+      })
+      setPhrase(adopted.phrase)
+      collectApproval(
+        props.client,
+        props.node.label,
+        () => stopped,
+        props.paired,
+        () => setRefused(true),
+        (next) => (timer = next),
+      )
+    } catch (failure) {
+      setProblem(failure instanceof CallFailure ? errorGuidance(failure) : String(failure))
+    }
+  })
+  return (
+    <Show
+      when={phrase()}
+      fallback={
+        <EmptyState title={`Connecting to ${props.node.label}`}>
+          <Show when={problem()} fallback={<Waiting>{`Asking ${props.node.label}`}</Waiting>}>
+            {(text) => <Alert>{text()}</Alert>}
+          </Show>
+        </EmptyState>
+      }
+    >
+      {(words) => (
+        <EmptyState
+          title="Approve on another device"
+          action={
+            <Stack>
+              <Words phrase={words()} words={words().split(' ')} />
+              <Show when={!refused()} fallback={<Alert>The request was denied or has expired.</Alert>}>
+                <Waiting>Waiting for approval</Waiting>
+              </Show>
+            </Stack>
+          }
+        >
+          Open Acorn on a device already paired with {props.node.label}. It asks to allow this browser. Allow it if it
+          shows these words.
+        </EmptyState>
+      )}
     </Show>
   )
 }

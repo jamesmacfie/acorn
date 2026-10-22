@@ -73,9 +73,10 @@ Deleting a workspace removes its datasets. Row and byte caps plus retention boun
 - **A phone's browser** reaches one Node through the mobile gateway, a process on the Node's
   computer that holds the device token and the pin and gives the phone a session cookie. The phone
   has owner power minus a short route denylist ([mobile gateway](./security/mobile-gateway.md)).
-- **A relay** forwards a client's TLS to a Node that dialed out to it, with no key to read it. The
-  client pins the Node's certificate, a relayed caller is never loopback, and the relay's credential
-  reaches the relay, not the Node ([relay](./relay.md), [accounts](./security/control-plane.md#the-account-service)).
+- **A relay** forwards TLS to a Node that dialed out to it, with no key to read it. The client pins the
+  Node's certificate, a relayed caller is never loopback, and the relay's credential reaches the relay,
+  not the Node. An account's listing vouches for a Node's fingerprint in place of identity words
+  ([relay](./relay.md), [accounts](./security/control-plane.md#the-account-service)).
 - **The terminal client** collapses the shell and helper into one process. UI code and the broker share
   a realm, so what the desktop holds as a process boundary this holds as a module boundary. The device
   token lives in the broker's module, the plugin cache and acknowledgements in one custody module, and
@@ -127,8 +128,7 @@ What stays readable to an agent:
 - Every key on a standalone Node, which has no keychain and warns about this at boot.
 
 What it doesn't stop, outside a blocked Claude Code session, is an agent that plants a file and waits
-for a restart. It can delete
-`node-keys.sealed` and leave its own `session.key`, which the next start treats as an upgrade, or
+for a restart. It can delete `node-keys.sealed` and leave its own `session.key`, which the next start treats as an upgrade, or
 write a `.env` into the data root, which the helper loads. That's persistence as the person's own
 user, which no desktop app can rule out. The audit trail records a key check that fails, and
 **Check this node** shows a plain key file in the data root.

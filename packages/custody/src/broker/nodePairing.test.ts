@@ -10,6 +10,7 @@ import { NODE_PROTOCOL_VERSION } from '@acorn/protocol/node.ts'
 import { afterAll, afterEach, beforeAll, expect, it } from 'vitest'
 import { NodeResponseTooLargeError } from './nodeRequest'
 import { MAX_NODE_PROBE_BYTES, pairWithNode, probeNode } from './nodePairing'
+import { askVouchedNode, VouchedIdentityError } from './vouchedNode'
 
 let directory: string
 let cert: ReturnType<typeof ensureCert>
@@ -110,4 +111,47 @@ it('retains certificate comparison on a successful bounded probe', async () => {
     compatible: true,
     certPem: cert.certPem,
   })
+})
+
+// A Node an account lists: the account vouches for the fingerprint, and the ask carries an assertion.
+async function startNodeAskedBy(asks: string[]): Promise<string> {
+  return start((req, res) => {
+    if (req.url === '/v1/node')
+      return res.end(
+        JSON.stringify({
+          baseline: ACORN_BASELINE,
+          protocolVersion: NODE_PROTOCOL_VERSION,
+          fingerprint: cert.fingerprint,
+        }),
+      )
+    let body = ''
+    req.on('data', (chunk) => (body += chunk))
+    req.on('end', () => {
+      asks.push(body)
+      res.end(JSON.stringify({ secret: 's', phrase: 'one two three', expiresInMs: 1000 }))
+    })
+  })
+}
+
+it('asks a listed Node with the assertion once its certificate is the one the account vouched for', async () => {
+  const asks: string[] = []
+  const endpoint = await startNodeAskedBy(asks)
+  const { ask } = await askVouchedNode(
+    { endpoint, fingerprint: cert.fingerprint, assertion: 'an-assertion' },
+    'MacBook',
+    () => Promise.reject(new Error('a direct endpoint needs no ticket')),
+  )
+  expect(ask.phrase).toBe('one two three')
+  expect(JSON.parse(asks[0]!)).toEqual({ deviceName: 'MacBook', assertion: 'an-assertion' })
+})
+
+it('asks nothing of a listed Node whose certificate is not the one the account vouched for', async () => {
+  const asks: string[] = []
+  const endpoint = await startNodeAskedBy(asks)
+  await expect(
+    askVouchedNode({ endpoint, fingerprint: 'ab'.repeat(32), assertion: 'an-assertion' }, 'MacBook', () =>
+      Promise.reject(new Error('unused')),
+    ),
+  ).rejects.toBeInstanceOf(VouchedIdentityError)
+  expect(asks).toEqual([])
 })

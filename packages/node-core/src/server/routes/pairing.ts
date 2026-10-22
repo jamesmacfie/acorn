@@ -112,20 +112,34 @@ export function pairingRoutes(): { open: Hono<AppEnv>; core: Hono<AppEnv> } {
       if (!parsed.success || !c.env.PAIRING_CODES.consume(parsed.data.code)) return pairingFailed(c)
       return paired(c, parsed.data.deviceName)
     })
-    // Pairing by approval (docs/api-reference/transport.md § Pairing by approval). Only from this
-    // computer: a dialog anyone on the network could raise is a dialog the owner learns to click
-    // through. Another machine pairs with a code. The ceiling bounds the noise a loop of asks makes in
-    // the owner's dialog. It doesn't stop a swap: an ask that overlaps another cancels both.
+    // Pairing by approval (docs/api-reference/transport.md § Pairing by approval). From this computer, or
+    // from another one by the Node's owner account: a dialog anyone on the network could raise is a
+    // dialog the owner learns to click through. Anyone else pairs with a code. The ceiling bounds the
+    // noise a loop of asks makes in the owner's dialog. It doesn't stop a swap: an ask that overlaps
+    // another cancels both.
     .post('/pair/requests', async (c) => {
-      if (!isLoopbackPeer(c.env.incoming?.socket.remoteAddress))
-        return respondError(c, 403, 'pairing_local_only', ['Pair from another computer with a pairing code.'])
-      if (!withinAskCeiling())
+      const remote = !isLoopbackPeer(c.env.incoming?.socket.remoteAddress)
+      // A remote ask is counted after its assertion checks out, so a flood of bad ones can't use up the
+      // asks the owner has.
+      if (!remote && !withinAskCeiling())
         return respondError(c, 429, 'rate_limited', ['Too many pairing attempts. Try again shortly.'])
       const body = await readPairingBody(c.req.raw)
       if (body.oversized) return respondError(c, 413, 'payload_too_large', ['Pairing request exceeds 4 KiB.'])
       const parsed = pairingAskSchema.safeParse(body.value)
+      const owner = remote
+        ? await (await import('../auth/pairingAssertion')).ownerAssertion(parsed.data?.assertion, c.env)
+        : null
+      if (remote && !owner)
+        return respondError(c, 403, 'pairing_local_only', ['Pair from another computer with a pairing code.'])
       if (!parsed.success) return respondError(c, 400, 'bad_request', ['A pairing request needs a device name.'])
-      const ask = requests.ask(parsed.data.deviceName)
+      if (remote && !withinAskCeiling())
+        return respondError(c, 429, 'rate_limited', ['Too many pairing attempts. Try again shortly.'])
+      const ask = requests.ask(parsed.data.deviceName, remote)
+      if (owner)
+        auditRequest(c, {
+          action: 'pairing.request.raised',
+          details: { accountId: owner.accountId, assertionId: owner.assertionId, deviceName: parsed.data.deviceName },
+        })
       broadcastPairingRequested()
       if (!ask) return respondError(c, 409, 'pairing_busy', ['Another client asked at the same moment. Try again.'])
       return c.json(ask satisfies PairingAsk)

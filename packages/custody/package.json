@@ -7,6 +7,7 @@
   "exports": {
     "./broker": "./src/broker/public.ts",
     "./broker/nodePairing.ts": "./src/broker/nodePairing.ts",
+    "./broker/vouchedNode.ts": "./src/broker/vouchedNode.ts",
     "./custody/deviceTokenStore.ts": "./src/custody/deviceTokenStore.ts",
     "./plugins": "./src/plugins/public.ts",
     "./config": "./src/config/deviceConfig.ts",
