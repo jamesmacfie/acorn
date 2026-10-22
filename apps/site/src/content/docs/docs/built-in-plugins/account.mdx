@@ -9,7 +9,7 @@ sources:
   - plugins/account/src/node/index.ts
   - plugins/account/src/server/routes.ts
   - plugins/account/src/server/remoteAccess.ts
-checked: ''
+checked: '84e7ddfef'
 ---
 
 import PluginFacts from '../../../../components/PluginFacts.astro'
@@ -29,6 +29,9 @@ an open port.
 Open **Settings** > **Machines** > **Account** and click **Sign in**. The page shows an address and a
 code. Open the address in a browser, sign in with GitHub, and approve the code. The terminal client
 prints the same address and code.
+
+A build of acorn signs in only when `ACORN_ACCOUNT_URL` names an account service, which is a plain
+`https` address, or `http` for a service on the same computer. Set it in the Node's environment.
 
 You sign in on the Node whose settings are open. The sign-in belongs to that Node and its computer, and
 it ends when you click **Sign out**.

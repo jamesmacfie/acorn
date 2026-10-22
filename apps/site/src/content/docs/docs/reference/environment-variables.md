@@ -11,12 +11,13 @@ sources:
   - apps/node/src/entries/standalone.ts
   - packages/node-core/src/server/transport/listenerConfig.ts
   - packages/node-core/src/server/transport/advertise.ts
+  - packages/node-core/src/server/transport/relaySettings.ts
   - packages/node-core/src/server/taskEnv.ts
   - packages/custody/src/local/paths.ts
   - apps/tui/src/kit/notify.ts
   - apps/tui/src/kit/copy.ts
   - apps/tui/src/keys/install.ts
-checked: '9aaaaf7d3'
+checked: '84e7ddfef'
 ---
 
 This page lists every environment variable acorn reads that you might set, and the ones acorn sets for
@@ -31,6 +32,8 @@ or writing a [task script](/docs/using/task-scripts/).
 | `ACORN_DATA_DIR` | The folder the Node keeps everything in ([Where your data lives](/docs/nodes/where-your-data-lives/)). Without it, the command line and the terminal client use the desktop app's folder when the app is installed, and a checkout's `apps/node/.acorn` when they run from one. A Node unpacked from the archive has neither, so set it. |
 | `ACORN_PORT` | The port the Node listens on. With it set, the Node uses that port or fails to start. Without it, the Node takes the port it used last time if it's free, or any free port. |
 | `ACORN_ADVERTISE_HOST` | The addresses other machines reach the Node at, separated by commas, such as `192.168.1.20,build.local`. With it set, the Node listens on every interface and answers those names and loopback. It wins over the hosts `acorn node reach`, the desktop's switch, or the first-start question recorded. A Node that `acorn node start` runs never sees it ([Pair a device or a remote Node](/docs/nodes/pair-a-device-or-a-remote-node/#let-other-machines-reach-the-node)). |
+| `ACORN_RELAY_URL` | The `wss://` or `ws://` address of a relay the Node dials out to, so a client on another network can reach it. Set it with `ACORN_RELAY_CREDENTIAL`, or neither. It wins over a relay in `node.json`, and over **Remote access**. |
+| `ACORN_RELAY_CREDENTIAL` | The shared secret the relay at `ACORN_RELAY_URL` expects, for a relay you run yourself. |
 | `ACORN_BUNDLED_PLUGINS_DIR` | A folder of built plugin packages a standalone Node installs and keeps up to date at every start, the way the desktop app does with the plugins it ships. For running from a checkout. |
 | `ACORN_PERF` | `1` prints each request's timing, and timing tables for Git and the databases, to the Node's error output. `kill -USR2 <pid>` prints the tables again. |
 | `SESSION_ENC_KEY` | The 64-character hexadecimal key the Node encrypts stored credentials with. Without it, a standalone Node makes one and keeps it in `session.key` in its data folder. |
