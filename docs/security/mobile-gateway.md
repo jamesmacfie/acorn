@@ -107,7 +107,11 @@ The gateway's device has owner power, so `DENIED_ROUTES` refuses these families 
 `403 gateway_refused` and a message that sends the person to Acorn on their computer:
 
 - Pairing and devices: `/v1/pair`, `/v1/core/pair`, and `/v1/core/devices`, every method.
-- Plugin installs and removals: `POST` to `install`, `update`, and `review`, and `DELETE` of a plugin.
+- Plugin settings: every `POST`, `PUT`, `PATCH`, and `DELETE` under `/v1/core/plugins`. That covers
+  installs, removals, reloads, development mode, grants, skills, the roster switch, answers to an
+  agent's install request, and plugin CLI commands. One rule refuses a plugin write route added later
+  too. `GET` stays open, so the phone can read the roster. The phone runs no loaded plugins, and no
+  screen on it answers an install request.
 - Backup and restore: `/v1/core/backup`.
 - Security settings: `/v1/core/security` and `PUT /v1/core/node/reach`.
 - Stopping the Node: `POST /v1/core/node/stop`.

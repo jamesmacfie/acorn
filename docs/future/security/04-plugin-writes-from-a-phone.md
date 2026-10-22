@@ -1,6 +1,39 @@
 # Phase 4: refuse every plugin write from a phone
 
-Date: October 22, 2026. Status: proposed. Severity: low.
+## Completion note
+
+Done on October 22, 2026.
+
+What landed:
+
+- One rule in `DENIED_ROUTES` replaces the two install rules: `POST`, `PUT`, `PATCH`, and `DELETE`
+  under `/v1/core/plugins`, in the family "Plugin settings". `GET` and `HEAD` pass.
+- `denylist.test.ts` refuses every write route this doc lists, plus three spellings of the
+  development route: an encoded letter, an encoded slash, and doubled slashes. `GET` of the roster and
+  of a bundle by hash pass, and so does `HEAD` of a bundle.
+- The mobile gateway reference lists the new family under **Refuse what a phone has no screen for**.
+  No public site page cites the changed files.
+
+Decisions and deviations:
+
+- No path stays open. The phone has no screen that answers an install request. Its **Needs you** list
+  reads attention sources and opens a target. Only the desktop's bell opens `PluginApprovalDialog`,
+  which posts to `/requests/:requestId`. So that route is refused too, and the old test that forwarded
+  it now expects a refusal.
+- The rule names the four write methods rather than "everything but `GET` and `HEAD`". That keeps the
+  rule in the list's existing shape. Every plugin route uses one of those four methods.
+
+Checked live: a throwaway standalone Node with the gateway in front of it. The built phone app, signed
+in, made one plugin request, `GET /v1/core/plugins`, which answered `200`. `curl` through the gateway
+got `403 gateway_refused` for `PUT /node/v1/core/plugins/acme/development`, for `PUT` of the roster,
+for reload, for an install request answer, and for `/node/v1//core/plugins/acme/%64evelopment`.
+
+For later phases:
+
+- Phase 6 can reuse the `curl` cases above. The gateway's denylist changed in no other way, and
+  sessions and headers are untouched.
+
+Date: October 22, 2026. Status: done. Severity: low.
 
 The gateway refuses plugin installs, updates, reviews, and removals, because a phone has no screen
 for deciding what code runs on the Node. Seven other plugin routes make the same kind of decision and

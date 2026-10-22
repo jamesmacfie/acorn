@@ -5,7 +5,7 @@ describe('the gateway denylist', () => {
   it('names exactly these families', () => {
     expect([...new Set(DENIED_ROUTES.map((route) => route.family))]).toEqual([
       'Pairing and devices',
-      'Plugin installs and removals',
+      'Plugin settings',
       'Backup and restore',
       'Security settings',
       'Stopping the Node',
@@ -21,9 +21,20 @@ describe('the gateway denylist', () => {
     ['POST', '/v1/core/pair/requests/abc'],
     ['GET', '/v1/core/devices'],
     ['DELETE', '/v1/core/devices/abc'],
+    ['PUT', '/v1/core/plugins'],
     ['POST', '/v1/core/plugins/install'],
     ['POST', '/v1/core/plugins/acme/update'],
     ['POST', '/v1/core/plugins/acme/review'],
+    ['POST', '/v1/core/plugins/acme/reload'],
+    ['PUT', '/v1/core/plugins/acme/development'],
+    ['POST', '/v1/core/plugins/acme/input-grant'],
+    ['DELETE', '/v1/core/plugins/acme/input-grant'],
+    ['PUT', '/v1/core/plugins/acme/model-grant'],
+    ['DELETE', '/v1/core/plugins/acme/model-grant'],
+    ['PUT', '/v1/core/plugins/acme/skills'],
+    ['POST', '/v1/core/plugins/acme/skill-grant'],
+    ['POST', '/v1/core/plugins/requests/abc'],
+    ['POST', '/v1/core/plugins/acme/cli/sync'],
     ['DELETE', '/v1/core/plugins/acme'],
     ['GET', '/v1/core/backup'],
     ['POST', '/v1/core/backup'],
@@ -40,8 +51,11 @@ describe('the gateway denylist', () => {
     ['with repeated slashes', '/v1//core/devices'],
     ['with a trailing slash', '/v1/core/plugins/install/'],
     ['in another case', '/V1/Core/Devices'],
+    ['with an encoded plugin path', '/v1/core/plugins/acme/%64evelopment'],
+    ['with an encoded slash', '/v1/core/plugins%2Facme%2Fdevelopment'],
+    ['with doubled slashes in a plugin path', '/v1/core//plugins//acme//development'],
   ])('refuses a denied path written %s', (_written, path) => {
-    expect(refusal(path.includes('install') ? 'post' : 'GET', path)).not.toBeNull()
+    expect(refusal(path.includes('plugins') ? 'put' : 'GET', path)).not.toBeNull()
   })
 
   it('refuses a path that does not decode', () => {
@@ -53,7 +67,8 @@ describe('the gateway denylist', () => {
     ['POST', '/v1/core/tasks'],
     ['GET', '/v1/core/plugins'],
     ['GET', '/v1/core/plugins/acme/logs'],
-    ['POST', '/v1/core/plugins/requests/abc'],
+    ['GET', '/v1/core/plugins/acme/bundles/abc123'],
+    ['HEAD', '/v1/core/plugins/acme/bundles/abc123'],
     ['GET', '/v1/core/node/reach'],
     ['GET', '/v1/node'],
   ])('forwards %s %s', (method, path) => {
