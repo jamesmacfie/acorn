@@ -19,7 +19,7 @@ exclusive `node.lock` protects it, so only one process opens it.
   worktrees/                   task worktrees
   notes/                       task, workspace, and global notes, as markdown
   tls/{key.pem,cert.pem}
-  channel/key.pem              the Ed25519 key a phone pins, made when a phone first needs it
+  channel/key.pem              the Ed25519 key a phone pins, made when Remote access is turned on
   logs/
   node.json
   node.lock

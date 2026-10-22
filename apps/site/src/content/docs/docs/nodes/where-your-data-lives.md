@@ -9,7 +9,7 @@ sources:
   - docs/tui/process.md
   - packages/custody/src/local/paths.ts
   - plugins/memory/src/server/memory.ts
-checked: '9aaaaf7d3'
+checked: '5c33b7b33'
 ---
 
 Everything a Node knows is in one folder on its machine, its data folder. Your device keeps a few things
@@ -39,6 +39,7 @@ second one that tries is refused.
 | `notes/` | Notes, as Markdown files you can read or edit by hand. |
 | `blobs/` | Files acorn fetched and can fetch again, such as from GitHub. |
 | `tls/` | The Node's certificate and its private key. |
+| `channel/` | The key a phone pins, made when Remote access is turned on. |
 | `logs/` | The Node's logs. |
 | `node.json` | The Node's ID, when it was made, the last port it used, and the address answer from its first start. |
 | `node.lock` | Says a Node has the folder open. |
