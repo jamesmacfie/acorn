@@ -44,11 +44,12 @@ export const idempotency = createMiddleware<AppEnv>(async (c, next) => {
   const store: IdempotencyStore | undefined = c.env.IDEMPOTENCY
   if (!store) return next()
 
-  // Reading the body here is safe because Hono memoizes c.req body reads. The route handler still
-  // gets its own c.req.json(). The hash covers the method, the path with its query string, and the
-  // body, so the same key on any different request is a conflict rather than a replay. A request with
+  // The hash reads a copy, so the request's own body is still unread for what runs next. A body limit
+  // with no Content-Length to check streams that body itself, and a phone's channel sends none, so a
+  // body read here would make it throw. The hash covers the method, the path with its query string, and
+  // the body, so the same key on any different request is a conflict rather than a replay. A request with
   // no query string hashes as it did before the query string was included, so stored keys still match.
-  const raw = await c.req.text()
+  const raw = await c.req.raw.clone().text()
   const url = new URL(c.req.url)
   const hash = requestHash(c.req.method, url.pathname + url.search, raw)
   const scope = `${deviceId}\n${key}`
