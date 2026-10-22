@@ -1,5 +1,5 @@
 import { homedir } from 'node:os'
-import { dirname, join, resolve } from 'node:path'
+import { basename, dirname, join, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { resolveServerPaths } from '../storage/paths'
 
@@ -22,26 +22,40 @@ export const devDataDir = (): string => resolveServerPaths(dirname(fileURLToPath
 
 const DESKTOP_BUNDLE_ID = 'com.acorn.desktop'
 
-function appDataDir(): string {
+// The platform's app data folder as a client sees it with neither APPDATA nor XDG_CONFIG_HOME set.
+function plainAppDataDir(): string {
   if (process.platform === 'darwin') return join(homedir(), 'Library', 'Application Support')
-  if (process.platform === 'win32') return process.env.APPDATA || join(homedir(), 'AppData', 'Roaming')
-  return process.env.XDG_CONFIG_HOME || join(homedir(), '.config')
+  if (process.platform === 'win32') return join(homedir(), 'AppData', 'Roaming')
+  return join(homedir(), '.config')
 }
 
-const defaultConfigDir = (): string => join(appDataDir(), 'acorn')
+function appDataDir(): string {
+  if (process.platform === 'win32') return process.env.APPDATA || plainAppDataDir()
+  if (process.platform !== 'darwin') return process.env.XDG_CONFIG_HOME || plainAppDataDir()
+  return plainAppDataDir()
+}
 
 /** Where the CLI, the terminal client, the phone gateway, and the browser bridge keep their device tokens. */
-export const configDir = (): string => process.env.ACORN_TUI_CONFIG_DIR || defaultConfigDir()
+export const configDir = (): string => process.env.ACORN_TUI_CONFIG_DIR || join(appDataDir(), 'acorn')
 
 /** Where the installed desktop app keeps its Node's data root on this platform. */
 export const desktopDataRootDir = (): string => join(appDataDir(), DESKTOP_BUNDLE_ID, 'node')
 
 /** Every folder where a client of the Node at `dataDir` may keep device tokens, or the key that opens
- *  them, for the agents' read block (docs/managed-agents/read-block.md). The default client folder is
- *  listed even when `ACORN_TUI_CONFIG_DIR` moves this process's, because a client started elsewhere
- *  doesn't share the Node's environment. The desktop's custody root holds its Node's root when
- *  installed, and sits beside it with a `-shell` suffix in a development build
- *  (`development_custody_root` in the desktop crate). */
-export const clientCustodyDirs = (dataDir: string): string[] => [
-  ...new Set([defaultConfigDir(), configDir(), dirname(desktopDataRootDir()), `${resolve(dataDir)}-shell`]),
-]
+ *  them, for the agents' read block (docs/managed-agents/read-block.md). Each client folder is listed
+ *  as this process's environment spells it and as the platform's default, because a client started
+ *  from another shell may not share the Node's `ACORN_TUI_CONFIG_DIR`, `APPDATA`, or `XDG_CONFIG_HOME`.
+ *  The desktop's custody root holds its Node's root when installed, and sits beside it with a
+ *  `-shell` suffix in a development build (`development_custody_root` in the desktop crate). The
+ *  installed one is read from `dataDir` too, because on Linux it sits in the data folder, not here. */
+export const clientCustodyDirs = (dataDir: string): string[] => {
+  const root = resolve(dataDir)
+  return [
+    ...new Set([
+      configDir(),
+      ...[appDataDir(), plainAppDataDir()].flatMap((base) => [join(base, 'acorn'), join(base, DESKTOP_BUNDLE_ID)]),
+      ...(basename(dirname(root)) === DESKTOP_BUNDLE_ID ? [dirname(root)] : []),
+      `${root}-shell`,
+    ]),
+  ]
+}

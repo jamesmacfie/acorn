@@ -118,19 +118,25 @@ export function dataRootReadBlock(input: {
   } catch {
     // No listener address yet. The task CLI then can't reach the Node from the sandbox.
   }
-  // A client folder holding the worktree or the data root is left out, so the sandbox never stacks a
-  // second deny above the paths it opens again. That is the installed desktop's own folder, whose
-  // tokens are sealed, or a project someone keeps in the CLI's folder.
-  const clientDirs = input.clientDirs
-    .map((dir) => resolve(dir))
-    .filter((dir) => existsSync(dir) && !within(worktree, dir) && !within(dataDir, dir))
+  // The file guard checks every client folder, so one a client makes after the start is covered too.
+  const clientDirs = [...new Set(input.clientDirs.map((dir) => resolve(dir)))]
+  const kept = [...workspace, dataDir]
+  // The sandbox denies an existing client folder whole, or, when it holds the worktree or the data root,
+  // the entries beside them, so it never stacks a second deny above the paths it opens again. The
+  // installed desktop's own folder is the second kind.
+  const clientReadDenied = clientDirs
+    .filter((dir) => existsSync(dir))
+    .flatMap((dir) => (kept.some((path) => within(path, dir)) ? hiddenBeside(dir, kept) : [dir]))
   return {
     dataDir,
     clientDirs,
+    clientReadDenied,
     worktree,
     readable: [...new Set([...workspace, ...credentials])],
     ...gitWrites(worktree),
-    hidden: [...new Set([dataDir, ...clientDirs].flatMap((dir) => hiddenBeside(dir, workspace)))],
+    hidden: [
+      ...new Set([...hiddenBeside(dataDir, workspace), ...clientDirs.flatMap((dir) => hiddenBeside(dir, kept))]),
+    ],
     loopback,
     fileGuard: input.fileGuard,
   }

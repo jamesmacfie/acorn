@@ -54,9 +54,8 @@ export function claudeReadBlockSettings(block: AgentDriverReadBlock): {
   deny: string[]
   preToolUse: unknown[]
 } {
-  const blocked = [block.dataDir, ...block.clientDirs]
   const policy = encodeFileGuardPolicy({
-    dataDir: blocked,
+    dataDir: [block.dataDir, ...block.clientDirs],
     read: block.readable,
     write: [block.worktree, ...block.writable],
     writeDenied: block.writeDenied,
@@ -70,7 +69,7 @@ export function claudeReadBlockSettings(block: AgentDriverReadBlock): {
       // A machine that can't run the sandbox refuses the session rather than running it unconfined.
       failIfUnavailable: true,
       filesystem: {
-        denyRead: blocked,
+        denyRead: [block.dataDir, ...block.clientReadDenied],
         allowRead: block.readable,
         allowWrite: block.writable,
         denyWrite: block.writeDenied,

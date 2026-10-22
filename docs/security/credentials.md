@@ -146,9 +146,8 @@ travels the same IPC route.
 The sealed file is only as safe as the data key. On a packaged build with the key in the keychain,
 another process can't read it without a prompt the person sees. A development build, or a machine
 where the keychain refused the item, keeps the data key in a plain `data.key` file in the custody
-root, and an agent can read that file. **Keep agents out of Acorn's data folder**
-([the read block](../managed-agents/read-block.md)) covers a development build's custody root, but
-not a packaged build's, because that folder holds the data root.
+root, and an agent can read that file unless **Keep agents out of Acorn's data folder** is on
+([the read block](../managed-agents/read-block.md)).
 
 The CLI, the terminal client, the phone gateway, and the browser bridge keep the owner's device tokens
 as plain files in the client config folder. The read block is what keeps agents from them. Sealing

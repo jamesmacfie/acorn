@@ -94,8 +94,11 @@ export type AgentDriverLoopHooks = { command: string; args: string[]; beforeTool
  *  docs/managed-agents/read-block.md). Paths are absolute. */
 export type AgentDriverReadBlock = {
   dataDir: string
-  /** The client folders, blocked like the data root. Each one existed at the start. */
+  /** The client folders, which the file guard blocks like the data root, whether they exist yet or not. */
   clientDirs: string[]
+  /** What the shell sandbox denies for them: each existing folder whole, or, for one holding the
+   *  worktree or the data root, its entries beside those. */
+  clientReadDenied: string[]
   /** The session's working folder, which its file tools may write. */
   worktree: string
   /** What the agent's commands still read inside the data root: its worktree, its own token file, the

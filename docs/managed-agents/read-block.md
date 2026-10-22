@@ -31,12 +31,11 @@ A blocked session's shell commands, and every process they start:
   the certificate, and `node.json`, which gives it the Node's current port. A hard link from the data
   folder into the worktree fails too, because the sandbox checks the source path.
 - Can't read the client config folder, where the CLI, the terminal client, the phone gateway, and the
-  browser bridge keep their device tokens as plain files, or a development desktop's custody root,
-  which holds its plain `data.key` (`clientCustodyDirs` in
-  `packages/node-core/src/server/transport/listenerConfig.ts`). A client folder that holds the
-  session's worktree or the data folder isn't blocked, so a project kept in one still works. That
-  leaves out the installed desktop's own folder, which holds the data folder; its device tokens are
-  sealed with a key in the keychain.
+  browser bridge keep their device tokens as plain files, or the desktop's custody root, which holds
+  its paired Nodes and sometimes a plain `data.key` (`clientCustodyDirs` in
+  `packages/node-core/src/server/transport/listenerConfig.ts`). The installed desktop's folder holds
+  the data folder, so the sandbox denies the entries beside it rather than the whole folder. An entry
+  created there after the start is covered only by the file guard below.
 - Can write only in its worktree, a temporary folder, and the parts of the repository's `.git`
   folder a commit from a worktree writes. The files that make git run a program or read a different
   repository stay unwritable: `config`, `config.worktree`, `hooks`, `modules`, each worktree's
