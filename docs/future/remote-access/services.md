@@ -9,7 +9,7 @@ lives, and which credential each caller uses.
 | Deployable | What it is | Stack | Runs where | First phase |
 | --- | --- | --- | --- | --- |
 | Relay (open) | Joins client and Node connections and forwards bytes. Stateless apart from its routing table. | TypeScript on Node, or Go if measured throughput needs it | One or more instances per region | [1](./01-relay.md) |
-| Account service (hosted, closed) | HTTP API for sign-in, the account's Nodes, relay credentials and tickets, and account assertions. | TypeScript, Hono, Better Auth, Drizzle, Postgres | One region | [2](./02-accounts.md) |
+| Account service (hosted, closed) | HTTP API for sign-in, the account's Nodes, relay credentials and tickets, and account assertions. | TypeScript, Hono, Better Auth, Drizzle, SQLite | One machine in one region | [2](./02-accounts.md) |
 | Account website (hosted, closed) | Sign-in, the account page, the list of Nodes with **Remove**, and the phone app's files. The phone app itself is open. | Served by the account service, or a static host | Same as the account service | [2](./02-accounts.md) |
 | Sign-in plugin (open) | A bundled first-party plugin that signs a person in, lists the account's Nodes, and fetches tickets and assertions. | acorn plugin API | Each person's local Node | [2](./02-accounts.md) |
 
@@ -71,7 +71,9 @@ each as they need it.
 - A domain, with DNS for the account website, the account API, and each regional relay.
 - Public TLS certificates for the website, the account API, and the relays. Nodes keep their own
   self-signed, pinned certificates.
-- Managed Postgres for the account service, with point-in-time recovery.
+- The account service's database, with point-in-time recovery. Decided October 22, 2026: SQLite on
+  the service's own disk, copied continuously to object storage, because one machine carries the
+  load. Several machines would need Postgres or a replicated SQLite such as Turso.
 - Secrets storage for the service: OAuth client secrets and the signing keys for tickets and
   assertions.
 - Logs, metrics, and error reporting that never carry task content. The repository has a Sentry
@@ -92,8 +94,8 @@ each as they need it.
 
 ## Hosted service: operating it
 
-- The account service and relay are stateless apart from Postgres and the relay's in-memory routing
-  table. Scale them sideways.
+- The relay is stateless apart from its in-memory routing table. The account service keeps its
+  database on its own disk, so it runs as one machine, and a deploy restarts it for a few seconds.
 - A relay restart drops every stream. Clients reconnect through the existing reconnect and refetch
   path, and agents on the Node keep running.
 - An account service outage stops new sign-ins, tickets, and assertions. Connections already open

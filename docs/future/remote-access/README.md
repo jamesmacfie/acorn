@@ -1,8 +1,9 @@
 # Remote access: reach your own Node from anywhere
 
-Date: October 22, 2026. Status: proposed. Nothing in this programme is built or scheduled. Where a
-file here disagrees with a shipped contract, the owning reference document wins until the code
-changes that contract.
+Date: October 22, 2026. Status: phases 1 to 4 built October 22, 2026, except their hosted staging
+steps, which wait on a domain and a product name. Phase 5 isn't started. Each phase file's completion
+note records what landed. Where a file here disagrees with a shipped contract, the owning reference
+document wins.
 
 ## What this is
 

@@ -44,7 +44,7 @@ Node.
 
 ### 2. Hosted service: production
 
-Deploy production with point-in-time recovery for Postgres, an uptime check on the website, API, and
+Deploy production with point-in-time recovery for the account database, an uptime check on the website, API, and
 each relay, and a status page.
 
 **Checkpoint 3: restore.** Restore the production database to a scratch copy from an hour ago, and
