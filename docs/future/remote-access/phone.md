@@ -81,14 +81,15 @@ refuses it:
 
 - opening a pairing window and managing devices, but not answering a pairing ask, which a phone may
   now do;
-- every plugin write under `/v1/core/plugins` ([security phase 4](../security/04-plugin-writes-from-a-phone.md));
+- every plugin write under `/v1/core/plugins`
+  ([T4 in the October 22 review](../../security/review-2026-10-22.md#findings));
 - backup and restore, security settings, reach changes, and stopping the Node.
 
 A phone device that goes unused for 30 days is revoked, the rule
-[security phase 3](../security/03-phone-session-expiry.md) sets for gateway sessions.
+[T3 in the October 22 review](../../security/review-2026-10-22.md#findings) sets for gateway sessions.
 
-[Security phase 2](../security/02-gateway-answer-headers.md) fixes a risk that exists because the
-gateway serves the app and the Node's answers from one address. Through the channel, the Node's
+[T2 in the October 22 review](../../security/review-2026-10-22.md#findings) fixed a risk that exists
+because the gateway serves the app and the Node's answers from one address. Through the channel, the Node's
 answers reach the app's code as data and never load as a page on the app's address, so that risk goes
 away. The app's own content security policy still applies.
 
@@ -115,8 +116,8 @@ When phase 4 ships:
 - `pnpm dev:mobile:gateway`, and the gateway half of `pnpm dev:mobile`.
 - The Tailscale steps in [use it on a phone](../../mobile/phone-setup.md) and the gateway reference in
   [the mobile gateway](../../security/mobile-gateway.md).
-- The gateway-only work in the [security programme](../security/README.md), if it hasn't shipped
-  by then. Its rules carry over as listed in [what a phone device may do](#what-a-phone-device-may-do).
+- The gateway fixes from [the October 22 security review](../../security/review-2026-10-22.md).
+  Their rules carry over as listed in [what a phone device may do](#what-a-phone-device-may-do).
 
 Someone who never signs in runs their own relay in self-hosted mode and serves `apps/mobile/dist`
 from a host with a trusted name.

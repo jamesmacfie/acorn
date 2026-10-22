@@ -86,8 +86,8 @@ and publish `plugin:memory:memories-changed`. Index lines sort by the file's upd
 Names follow the memory filename rule and cannot use the reserved `MEMORY` name. Descriptions must be
 one line of at most 200 characters, and bodies have a 16 KiB byte limit. Writes reject invisible and
 bidirectional controls, role-like tags, instruction overrides, private keys, token-shaped secrets,
-and credential assignments. These checks help catch unsafe memory content; they do not replace the
-contract's instruction that the person's request and repository guidance take precedence.
+and credential assignments. They miss plain-language instructions, so the contract tells agents a
+memory is never a request ([limits](./notes-and-memory/memory-page.md#limits)).
 
 Replacement and deletion preserve the prior file under `.history/NAME/` for private memory, or
 `.history/projects/PROJECT_ID/NAME/` for project memory. Each name keeps 20 prior versions. The root's

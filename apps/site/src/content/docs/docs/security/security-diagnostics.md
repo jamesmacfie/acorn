@@ -7,7 +7,7 @@ sources:
   - docs/managed-agents/read-block.md
   - packages/client-core/src/features/settings/SecuritySettings.tsx
   - packages/node-core/src/server/storage/diskEncryption.ts
-checked: 52225e24f
+checked: '1b62b6dfb'
 ---
 
 This page covers what **Settings** > **Machines** > **Security and backup** tells you about a Node: its

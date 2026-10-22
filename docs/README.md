@@ -71,6 +71,7 @@ the whole plugin system in one page.
 | [security/review-2026-10-01.md](./security/review-2026-10-01.md) | Ten-area security review, completed remediation ledger, verification evidence, and remaining limits. |
 | [security/review-2026-10-19.md](./security/review-2026-10-19.md) | Review of agent-built apps: each way a program could reach beyond its plans and host tools, what stops it, and the one open finding. |
 | [security/review-2026-10-21.md](./security/review-2026-10-21.md) | Review of the work since October 11: loaded plugin paths the host dispatches, raced pairing asks, agent-created tasks, unguarded agent steps behind record triggers, and the audit. Each finding, its change, the checks, and what stays open. |
+| [security/review-2026-10-22.md](./security/review-2026-10-22.md) | Review of the phone gateway and client tokens: client device tokens outside the agent fence, forwarded answers that rendered as pages, phone sessions that never expired, plugin writes from a phone, and agent-written memory. Each finding, its change, the checks and walks, and what stays open. |
 | [security/review-2026-10-11.md](./security/review-2026-10-11.md) | Follow-up review: the TOML parser cap, release-build renderer origin, idempotency query strings, plugin route gates, and the dependency audit. |
 
 ## The renderer
@@ -488,16 +489,6 @@ Each plugin landing page above has topic pages in a folder of the same name:
 
 - [Keep the window responsive under load](./future/perf/README.md): what shipped, what's still open,
   and [acceptance](./future/perf/10-acceptance.md).
-
-## October 22 security findings proposal
-
-- [Close the October 22 security findings](./future/security/README.md), with phases for [client device
-  tokens and the agent fence](./future/security/01-client-tokens-and-the-agent-fence.md), [gateway answer
-  headers](./future/security/02-gateway-answer-headers.md), [phone session
-  expiry](./future/security/03-phone-session-expiry.md), [plugin writes from a
-  phone](./future/security/04-plugin-writes-from-a-phone.md), [agent-written
-  memory](./future/security/05-agent-written-memory.md), and [recording the
-  review](./future/security/06-record-the-review.md).
 
 ## OpenCode harness proposal
 

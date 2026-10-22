@@ -331,6 +331,7 @@ node: buildHeadlessArgv
 node: buildSessionEnv
 node: childEnv
 node: chunkRowsByColumnBudget
+node: clientCustodyDirs
 node: configureAcornMcp
 node: confineExistingFile
 node: connectProvider

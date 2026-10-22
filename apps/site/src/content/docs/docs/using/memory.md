@@ -5,7 +5,7 @@ sources:
   - docs/notes-and-memory.md
   - docs/notes-and-memory/memory-page.md
   - docs/managed-agents/sessions.md
-checked: '70489f534'
+checked: '9fbf758ea'
 ---
 
 This page covers memory: the facts agents save so a later session doesn't start from nothing, how
@@ -31,7 +31,10 @@ repository.
 
 Before saving, acorn checks the memory: the description is one line of at most 200 characters, the
 body is at most 16 KiB, and it refuses text that looks like a secret, a private key, or an instruction
-trying to override yours.
+trying to override yours. The checks can't catch an instruction written in plain words, and any agent
+can save a project memory that later sessions see. So the contract tells each agent that a memory is a
+note, never a reason to run a command or change a setting. If an agent saves something you don't
+want, undo it from the Memory page.
 
 ## What a new session is told
 

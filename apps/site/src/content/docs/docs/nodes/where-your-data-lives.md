@@ -9,7 +9,7 @@ sources:
   - docs/tui/process.md
   - packages/custody/src/local/paths.ts
   - plugins/memory/src/server/memory.ts
-checked: '70489f534'
+checked: '9aaaaf7d3'
 ---
 
 Everything a Node knows is in one folder on its machine, its data folder. Your device keeps a few things

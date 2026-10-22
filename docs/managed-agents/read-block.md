@@ -27,9 +27,15 @@ own Claude settings files.
 A blocked session's shell commands, and every process they start:
 
 - Can't read the data folder, except its own worktree, its own token file, the Node's certificate,
-  its own skill folders, and its own attachment folder. The task CLI uses the token file and the
-  certificate. A hard link from the data folder into the worktree fails too, because the sandbox
-  checks the source path.
+  `node.json`, its own skill folders, and its own attachment folder. The task CLI uses the token file,
+  the certificate, and `node.json`, which gives it the Node's current port. A hard link from the data
+  folder into the worktree fails too, because the sandbox checks the source path.
+- Can't read the client config folder, where the CLI, the terminal client, the phone gateway, and the
+  browser bridge keep their device tokens as plain files, or the desktop's custody root, which holds
+  its paired Nodes and sometimes a plain `data.key` (`clientCustodyDirs` in
+  `packages/node-core/src/server/transport/listenerConfig.ts`). The installed desktop's folder holds
+  the data folder, so the sandbox denies the entries beside it rather than the whole folder. An entry
+  created there after the start is covered only by the file guard below.
 - Can write only in its worktree, a temporary folder, and the parts of the repository's `.git`
   folder a commit from a worktree writes. The files that make git run a program or read a different
   repository stay unwritable: `config`, `config.worktree`, `hooks`, `modules`, each worktree's
@@ -40,9 +46,12 @@ A blocked session's shell commands, and every process they start:
   covered only by Claude Code's own protection, which refuses its `commondir` on macOS. A session
   working directly in a repository's main checkout, with a plain `.git` folder, can't write that
   folder at all, because a rename of it couldn't be stopped otherwise.
-- Reach the network through Claude Code's proxy. The Node's own address is allowed. In
-  skip-permissions mode other hosts are allowed too. In other modes Claude Code decides per host, as
-  its sandbox documentation describes.
+- Reach the network through Claude Code's proxy. In skip-permissions mode other hosts are allowed. In
+  other modes Claude Code decides per host, as its sandbox documentation describes. The settings
+  allow the Node's own address, but Claude Code sets `no_proxy` for loopback addresses and the
+  sandbox refuses a direct loopback connection, so on macOS no shell command reaches the Node. The
+  task CLI fails with `connect EPERM` in a blocked session
+  ([the October 22 review](../security/review-2026-10-22.md#still-open)).
 - Can't rerun a refused command outside the sandbox, because `allowUnsandboxedCommands` is off.
   Without that, a skip-permissions session could retry any blocked command unconfined.
 
@@ -62,11 +71,11 @@ built as `file-guard.js` beside `mcp.js`). The guard resolves every link in the 
 file that doesn't exist yet through its folder, then checks that real path against the session's
 allowlist:
 
-- Inside the data folder, a read must fall within the session's worktree, its skill folders, its
-  attachment folder, its own token file, or the Node's certificate. A write must fall within the worktree or the git folders a
-  commit writes.
+- Inside the data folder or a client folder, a read must fall within the session's worktree, its
+  skill folders, its attachment folder, its own token file, the Node's certificate, or `node.json`. A
+  write must fall within the worktree or the git folders a commit writes.
 - The git files listed above can't be written, inside the data folder or not.
-- A search can't start from a folder that holds the data folder.
+- A search can't start from a folder that holds the data folder or a client folder.
 
 So a `.env` created in the data folder after the session started is refused, as is a write reached
 through a link in the worktree. The guard decides from the policy on its command line and never asks
@@ -94,7 +103,7 @@ outside contributors, and leave it off for work that needs those tools.
 ## What it doesn't cover
 
 - The agent's own token, which reaches only its own task.
-- Anything outside the data folder that your user can read.
+- Anything outside the data folder and the client folders that your user can read.
 
 For the rest of the model, see
 [what task scope does and doesn't protect against](../security.md#what-task-scope-does-and-doesnt-protect-against).

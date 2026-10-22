@@ -22,7 +22,8 @@ switches between Nodes. `acorn mobile` and `apps/mobile/src/gateway` are gone.
   `apps/mobile/src/client/platform.ts` talk to the gateway.
 - The gateway in `apps/mobile/src/gateway`: request forwarding and event messages in `gateway.ts`,
   and the blocked list in `denylist.ts`.
-- The gateway-only phases in the [security programme](../security/README.md).
+- The gateway fixes from [the October 22 security review](../../security/review-2026-10-22.md), findings T2
+  to T5.
 - The design in [phone](./phone.md).
 
 ## In scope

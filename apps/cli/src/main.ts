@@ -40,6 +40,9 @@ export async function main(argv: string[] = process.argv.slice(2)): Promise<numb
       return 0
     }
     validateCommand(args)
+    // Stops a person running the wrong command in a task terminal. It isn't a boundary: an agent can
+    // unset both variables, and what keeps it from the device token is the read block
+    // (docs/managed-agents/read-block.md), so don't add more environment checks here.
     if (
       (process.env.ACORN_TASK_ID || process.env.ACORN_API_TOKEN) &&
       !(args.positionals[0] === 'task' && args.positionals[1] === 'scripts')

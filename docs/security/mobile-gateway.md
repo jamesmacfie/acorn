@@ -33,8 +33,9 @@ code follows the Node's pairing rules, from the same `pairingCodes` store: 128 b
 attempts, in memory only. `kill -USR1 PID` prints a new code and ends the old one.
 
 `POST /session` with `{ "code": "..." }` spends the code. A right code answers `204` with a cookie
-named `acorn_session`, flagged `HttpOnly`, `Secure`, `SameSite=Strict`, and `Path=/`, with a 400-day
-`Max-Age`. Every failure answers the same `401 sign_in_failed`: a wrong code, a spent or expired one,
+named `acorn_session`, flagged `HttpOnly`, `Secure`, `SameSite=Strict`, and `Path=/`, with a 30-day
+`Max-Age`. `GET /session` sends the cookie again with a fresh 30 days, and the phone asks it each time
+it starts, so the browser keeps the cookie while the phone is in use. Every failure answers the same `401 sign_in_failed`: a wrong code, a spent or expired one,
 a malformed body, or a body over 4 KiB. A malformed or oversized body spends no attempt.
 
 ### Keep sessions
@@ -42,6 +43,12 @@ a malformed body, or a body over 4 KiB. A malformed or oversized body spends no 
 Each session is a file under the gateway's directory, named by the SHA-256 hash of the session ID. It
 holds a label taken from the user agent and the time it started. The file's modification time is when
 the phone last used it. Nothing on disk is a credential a browser could present.
+
+A session ends after 30 days without use. Each `/node` request and the socket upgrade mark the session
+used, and so does a socket message, at most once a minute per phone. The gateway deletes a session's
+file the first time it finds the session idle past the limit: on a request, in its socket check, or
+in `gateway sessions`, which lists only sessions that still work. The phone then gets the same
+`401 signed_out`, or socket close `4401`, as a revoked one.
 
 `gateway sessions` lists the sessions with a 12-character ID each, and `gateway revoke ID` deletes
 one. The running gateway checks its open sockets against the files every 500 milliseconds and closes
@@ -74,12 +81,19 @@ The gateway answers these paths:
 | `GET /session` | Names the Node, as `{ nodeId, label }`, to a phone with a live session, and answers `401 signed_out` to one without |
 | `/node/*` | Forwards the rest of the path and the query to the Node through `broker.fetch`, and answers with the Node's status, headers, and body |
 | `GET /events` | The event socket |
-| Any other `GET` | A file from the built web app in `apps/mobile/dist`, or its `index.html` for a path without an extension, with `Content-Security-Policy: script-src 'self'` |
+| Any other `GET` | A file from the built web app in `apps/mobile/dist`, or its `index.html` for a path without an extension, with `Content-Security-Policy: script-src 'self'; object-src 'none'; base-uri 'none'; frame-ancestors 'none'; form-action 'self'` |
 
 A forwarded request keeps its headers except the ones that describe the phone's connection to the
 gateway: the cookie, `Authorization`, `Host`, `Origin`, `Referer`, the `Sec-` and `X-Forwarded-`
 families, and the hop-by-hop headers. The broker sets the Node's own `Authorization`. The answer drops
 `Set-Cookie` and the hop-by-hop headers.
+
+The gateway sandboxes every forwarded answer, so a Node answer never renders as a page with the
+phone's session. It replaces any `Content-Security-Policy` and `X-Content-Type-Options` the Node sent
+with `Content-Security-Policy: sandbox; default-src 'none'` and `X-Content-Type-Options: nosniff`. A
+loaded plugin's HTML opened at a `/node` address runs no script, makes no requests, and has an opaque
+origin, so it can't use the cookie. The app reads these answers with `fetch`, which the policy doesn't
+touch, and an image still draws. The gateway's own error answers carry the same two headers.
 
 The request's `x-request-id`, or a fresh one, becomes the broker's request ID, prefixed with the
 session so phones can't collide. When the phone closes a request before the answer, the gateway calls
@@ -93,7 +107,11 @@ The gateway's device has owner power, so `DENIED_ROUTES` refuses these families 
 `403 gateway_refused` and a message that sends the person to Acorn on their computer:
 
 - Pairing and devices: `/v1/pair`, `/v1/core/pair`, and `/v1/core/devices`, every method.
-- Plugin installs and removals: `POST` to `install`, `update`, and `review`, and `DELETE` of a plugin.
+- Plugin settings: every `POST`, `PUT`, `PATCH`, and `DELETE` under `/v1/core/plugins`. That covers
+  installs, removals, reloads, development mode, grants, skills, the roster switch, answers to an
+  agent's install request, and plugin CLI commands. One rule refuses a plugin write route added later
+  too. `GET` stays open, so the phone can read the roster. The phone runs no loaded plugins, and no
+  screen on it answers an install request.
 - Backup and restore: `/v1/core/backup`.
 - Security settings: `/v1/core/security` and `PUT /v1/core/node/reach`.
 - Stopping the Node: `POST /v1/core/node/stop`.
@@ -155,8 +173,9 @@ a dev server ([mobile web app](../mobile.md#run-it)).
 
 - The Node sees one device for every phone behind a gateway, and its audit log names the gateway.
   The gateway's own log is the only record of which phone did what.
-- A stolen session cookie gives owner access, minus the denylist, until someone revokes it. Sessions
-  don't expire. Keep the gateway on a private network.
+- A stolen session cookie gives owner access, minus the denylist, until someone revokes it or until
+  nobody has used it for 30 days. A session in use doesn't expire. Keep the gateway on a private
+  network.
 - The gateway serves one Node. A phone that uses two Nodes needs two gateways.
 - Loaded plugins don't run on a phone, because the browser has no plugin custody.
 
