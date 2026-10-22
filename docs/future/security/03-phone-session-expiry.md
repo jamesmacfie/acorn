@@ -1,6 +1,42 @@
 # Phase 3: end phone sessions nobody uses
 
-Date: October 22, 2026. Status: proposed. Severity: medium.
+## Completion note
+
+Done on October 22, 2026.
+
+What landed:
+
+- `sessionStore` in `apps/mobile/src/gateway/sessions.ts` exports `IDLE_LIMIT_MS`, 30 days. One
+  helper, `lastUsedAt`, reads the file's time and deletes the file when it's past the limit. `use`,
+  `isLive`, and `list` all go through it, so each refuses or leaves out an idle session and deletes it.
+- The store also exposes `touch(hash)`. The gateway holds a phone's session hash, not its ID, so
+  `use` couldn't serve the socket. A socket message calls `touch` at most once a minute per phone.
+- The cookie's `Max-Age` is `IDLE_LIMIT_MS / 1000`, one `setCookie` helper builds it, and sign-in uses
+  that helper.
+- The mobile gateway reference changed under **Sign a phone in**, **Keep sessions**, and **Limits**. The CLI's
+  mobile page says an unused session ends after 30 days. No public site page cites the changed files.
+- Tests: three idle cases in `sessions.test.ts`, and four in `gateway.test.ts`. They cover the
+  `/node` request, the socket close, the throttled socket touch, and the renewed cookie.
+- The acceptance walk ran against a throwaway standalone Node and gateway. After `touch -t` set the
+  file back 31 days, `/node/v1/core/tasks` answered `401 signed_out` and the file was gone.
+
+Decisions and deviations:
+
+- `GET /session` sends the cookie again with a fresh 30 days. The doc only asked to lower `Max-Age`.
+  But a cookie set once at sign-in would expire 30 days later even on a phone used every day, and
+  that breaks this doc's own rule that a session in use doesn't end. The phone calls `GET /session`
+  each time it starts and after a dropped socket, in `fleetList` and the socket's close handler.
+- `touch` stats the file before it updates the time. If the stat finds the session past the limit,
+  `touch` deletes the file and refuses, so a late socket message can't revive an idle session.
+
+For later phases:
+
+- Phase 6 should check on a real phone that the browser keeps the renewed cookie. Look for the
+  30-day expiry in the browser's tools after the app reloads.
+- No other gateway behavior changed. Phase 4's denylist work touches neither the session store nor
+  the cookie.
+
+Date: October 22, 2026. Status: done. Severity: medium.
 
 A phone session can do anything the gateway's device can, minus its blocked list. That includes
 opening a terminal and starting an agent in a mode that doesn't ask. Today a session never ends unless

@@ -1,4 +1,4 @@
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs'
+import { mkdirSync, mkdtempSync, readdirSync, rmSync, statSync, utimesSync, writeFileSync } from 'node:fs'
 import { request as httpRequest } from 'node:http'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
@@ -54,6 +54,14 @@ async function cookie(): Promise<string> {
   const reply = await signIn(code)
   expect(reply.status).toBe(204)
   return String(reply.headers['set-cookie']).split(';')[0]!
+}
+
+// Sets every session file's time back, past the idle limit unless told otherwise, as a phone left
+// unused would.
+function idle(days = 31): void {
+  const sessions = join(dir, 'sessions')
+  const then = new Date(Date.now() - days * 24 * 60 * 60 * 1000)
+  for (const name of readdirSync(sessions)) utimesSync(join(sessions, name), then, then)
 }
 
 type Message = { data: unknown; isBinary: boolean }
@@ -118,7 +126,9 @@ describe('signing in', () => {
     expect(reply.status).toBe(204)
     const flags = String(reply.headers['set-cookie']).split('; ')
     expect(flags[0]).toMatch(/^acorn_session=[A-Za-z0-9_-]{43}$/)
-    expect(flags).toEqual(expect.arrayContaining(['HttpOnly', 'Secure', 'SameSite=Strict', 'Path=/']))
+    expect(flags).toEqual(
+      expect.arrayContaining(['HttpOnly', 'Secure', 'SameSite=Strict', 'Path=/', 'Max-Age=2592000']),
+    )
   })
 
   it('takes a code once', async () => {
@@ -187,6 +197,23 @@ describe('the checks on every request', () => {
     const signedOut = await send('/session')
     expect(signedOut.status).toBe(401)
     expect(JSON.parse(signedOut.body).error.code).toBe('signed_out')
+  })
+
+  it('sends the cookie again for another 30 days each time the phone starts', async () => {
+    const session = await cookie()
+    const reply = await send('/session', { headers: { cookie: session } })
+    expect(String(reply.headers['set-cookie']).split('; ')).toEqual(
+      expect.arrayContaining([session, 'HttpOnly', 'Secure', 'SameSite=Strict', 'Path=/', 'Max-Age=2592000']),
+    )
+  })
+
+  it('signs out a session idle past the limit', async () => {
+    const session = await cookie()
+    idle()
+    const reply = await send('/node/v1/core/tasks', { headers: { cookie: session } })
+    expect(reply.status).toBe(401)
+    expect(JSON.parse(reply.body).error.code).toBe('signed_out')
+    expect(broker.fetch).not.toHaveBeenCalled()
   })
 
   it('refuses a denied route and names the desktop', async () => {
@@ -334,6 +361,32 @@ describe('the event socket', () => {
     expect(await closed).toBe(SIGNED_OUT_CLOSE_CODE)
     expect(Date.now() - revokedAt).toBeLessThan(1000)
     expect((await send('/node/v1/core/tasks', { headers: { cookie: session } })).status).toBe(401)
+  })
+
+  it('closes the socket of a session idle past the limit', async () => {
+    const session = await cookie()
+    const { ws } = await openSocket({ origin: ORIGIN, cookie: session })
+    const closed = new Promise<number>((done) => ws.once('close', (code) => done(code)))
+    idle()
+    expect(await closed).toBe(SIGNED_OUT_CLOSE_CODE)
+  })
+
+  it('keeps the session of a phone that only uses its socket, marking it at most once a minute', async () => {
+    const { ws } = await openSocket({ origin: ORIGIN, cookie: await cookie() })
+    const sessions = join(dir, 'sessions')
+    const usedAt = (): number => statSync(join(sessions, readdirSync(sessions)[0]!)).mtimeMs
+    const message = JSON.stringify({ frame: { channel: 'tasks:watch' } })
+    idle(29)
+    ws.send(message)
+    await vi.waitFor(() => expect(broker.send).toHaveBeenCalledTimes(1))
+    expect(Date.now() - usedAt()).toBeGreaterThan(28 * 24 * 60 * 60 * 1000)
+
+    const later = Date.now() + 61_000
+    const clock = vi.spyOn(Date, 'now').mockReturnValue(later)
+    ws.send(message)
+    await vi.waitFor(() => expect(broker.send).toHaveBeenCalledTimes(2))
+    clock.mockRestore()
+    expect(Date.now() - usedAt()).toBeLessThan(60_000)
   })
 })
 

@@ -10,7 +10,7 @@ import { createLogger, describeError } from '@acorn/node-core/server/telemetry'
 import { nodeFetchRequestSchema, type NodeStatus, type NodeTransportError } from '@acorn/protocol/broker.ts'
 import { MAX_NODE_WS_MESSAGE_BYTES, wsFrameSchema, wsSubscriptionIntentSchema } from '@acorn/protocol/ws.ts'
 import { refusal } from './denylist'
-import type { SessionStore } from './sessions'
+import { IDLE_LIMIT_MS, type SessionStore } from './sessions'
 
 const log = createLogger('gateway')
 
@@ -27,12 +27,14 @@ const log = createLogger('gateway')
 const MAX_REQUEST_BYTES = 16 * 1024 * 1024
 const MAX_SIGN_IN_BYTES = 4 * 1024
 const COOKIE = 'acorn_session'
-// 400 days, the longest a browser keeps a cookie. A session lasts until someone revokes it.
-const COOKIE_MAX_AGE_S = 400 * 24 * 60 * 60
+// The browser drops the cookie when the gateway would refuse its session anyway. `GET /session`
+// sends it again, so a phone in use keeps it.
+const COOKIE_MAX_AGE_S = IDLE_LIMIT_MS / 1000
 // How often open sockets are checked against the session files, so a revoke closes one within a
 // second. A close with this code tells the phone it's signed out rather than offline.
 const SESSION_CHECK_MS = 500
 export const SIGNED_OUT_CLOSE_CODE = 4401
+const SESSION_TOUCH_MS = 60_000
 // A phone that leaves the network drops its socket without a close, and its event viewer would hold
 // one of the Node connection's viewer slots until TCP gave up.
 const PING_MS = 15_000
@@ -107,7 +109,7 @@ export type Gateway = {
   close(): Promise<void>
 }
 
-type Phone = { viewerId: string; session: string; answeredPing: boolean }
+type Phone = { viewerId: string; session: string; answeredPing: boolean; usedAt: number }
 
 const answer = (res: ServerResponse, status: number, code: string, message: string): void => {
   res
@@ -167,10 +169,14 @@ export function startGateway(options: {
   const phones = new Map<WebSocket, Phone>()
   let latest: NodeStatus | undefined
 
+  const cookieOf = (req: IncomingMessage): string | undefined =>
+    new RegExp(`(?:^|;\\s*)${COOKIE}=([A-Za-z0-9_-]+)`).exec(req.headers.cookie ?? '')?.[1]
   const sessionOf = (req: IncomingMessage): string | null => {
-    const id = new RegExp(`(?:^|;\\s*)${COOKIE}=([A-Za-z0-9_-]+)`).exec(req.headers.cookie ?? '')?.[1]
+    const id = cookieOf(req)
     return id ? sessions.use(id) : null
   }
+  const setCookie = (sessionId: string): string =>
+    `${COOKIE}=${sessionId}; HttpOnly; Secure; SameSite=Strict; Path=/; Max-Age=${COOKIE_MAX_AGE_S}`
 
   const signIn = async (req: IncomingMessage, res: ServerResponse): Promise<void> => {
     const body = await readBody(req, MAX_SIGN_IN_BYTES)
@@ -186,11 +192,7 @@ export function startGateway(options: {
       return answer(res, 401, 'sign_in_failed', "That code didn't work. Get a new one from the gateway.")
     }
     const sessionId = sessions.create(req.headers['user-agent'])
-    res
-      .writeHead(204, {
-        'set-cookie': `${COOKIE}=${sessionId}; HttpOnly; Secure; SameSite=Strict; Path=/; Max-Age=${COOKIE_MAX_AGE_S}`,
-      })
-      .end()
+    res.writeHead(204, { 'set-cookie': setCookie(sessionId) }).end()
   }
 
   const forward = async (
@@ -268,9 +270,13 @@ export function startGateway(options: {
       if (!session) return answer(res, 401, 'signed_out', 'Sign in to the gateway with a code.')
       if (isNode) return forward(req, res, url, requestId, session)
       // Which Node this gateway serves, so the phone can list it before its socket opens, and tell
-      // a signed-out phone from a gateway it can't reach.
+      // a signed-out phone from a gateway it can't reach. The phone asks each time it starts.
       res
-        .writeHead(200, { 'content-type': 'application/json', 'cache-control': 'no-store' })
+        .writeHead(200, {
+          'content-type': 'application/json',
+          'cache-control': 'no-store',
+          'set-cookie': setCookie(cookieOf(req)!),
+        })
         .end(JSON.stringify({ nodeId, label: options.label }))
       return
     }
@@ -322,7 +328,7 @@ export function startGateway(options: {
     log.info(`${req.method} ${req.url?.split('?')[0]} ${session ? 101 : 'refused'}`)
     if (!session) return void socket.destroy()
     wss.handleUpgrade(req, socket, head, (ws) => {
-      const phone: Phone = { viewerId: randomUUID(), session, answeredPing: true }
+      const phone: Phone = { viewerId: randomUUID(), session, answeredPing: true, usedAt: Date.now() }
       phones.set(ws, phone)
       broker.openViewer(nodeId, phone.viewerId)
       if (latest) send(ws, JSON.stringify({ status: latest }))
@@ -332,6 +338,11 @@ export function startGateway(options: {
           const message = isBinary ? null : phoneMessageSchema.safeParse(JSON.parse(String(data)))
           if (!message?.success) return
           const { frame, intent, cleanup } = message.data
+          // A phone that only uses its socket must keep its session, without a file write per message.
+          if (Date.now() - phone.usedAt >= SESSION_TOUCH_MS) {
+            phone.usedAt = Date.now()
+            sessions.touch(phone.session)
+          }
           broker.send(nodeId, frame, {
             viewerId: phone.viewerId,
             ...(intent ? { intent } : {}),

@@ -34,4 +34,4 @@ acorn mobile revoke ID
 ```
 
 `sessions` lists the signed-in phones, each with a 12-character ID. `revoke ID` ends one, and a running
-gateway signs that phone out within a second. Neither takes `--node` or any other option.
+gateway signs that phone out within a second. A session nobody uses for 30 days ends by itself. Neither takes `--node` or any other option.
