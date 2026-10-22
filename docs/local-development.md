@@ -1,8 +1,7 @@
 # Local development
 
-This page covers getting acorn running from a checkout: the environment, the dev loops, the native
-module, and the database commands. The agent drivers, profiling, and packaged stacks have their own
-pages.
+This page covers running acorn from a checkout: the environment, the dev loops, the native module,
+and the database commands. The agent drivers, profiling, and packaged stacks have their own pages.
 
 acorn is a pnpm workspace built with Turborepo. First-party packages are consumed as TypeScript
 source. `apps/node` and `apps/desktop` are the build roots. The Node's build entries are in

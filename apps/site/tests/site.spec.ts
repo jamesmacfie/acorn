@@ -41,7 +41,7 @@ const featureRoutes = routes.filter((route) => route.startsWith('/features/'))
 // Every claim on the landing page and the feature pages links to the docs page that owns it, so a
 // renamed page fails here.
 // shortcut: preview builds only, because most of those docs pages are drafts until their phases publish
-// them; run it on both builds once they're published (docs/future/marketing/20-launch.md).
+// them; run it on both builds once they're published.
 for (const route of ['/', '/download/', ...featureRoutes]) {
   test(`every link on ${route} goes to a page the build wrote`, async ({ page }) => {
     test.skip(!previewBuild, 'The docs pages these pages link to are drafts, which only a preview build has.')

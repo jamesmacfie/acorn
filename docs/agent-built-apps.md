@@ -7,8 +7,7 @@ no device asks to trust it. For one view of one plan, an agent uses a panel card
 ([dashboards](./dashboards.md#panels-from-a-conversation)).
 
 The first-party plugin `trellis` hosts apps (`plugins/trellis`). "App" is the product word. The code
-name keeps the plugin apart from the repository's `apps/` folder and from the desktop app. For the
-design and the phases still to come, read [agent-built panels and apps](./future/dynamic-ui/README.md).
+name keeps the plugin apart from the repository's `apps/` folder and from the desktop app.
 
 ## Files
 

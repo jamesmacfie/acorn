@@ -498,11 +498,6 @@ Each plugin landing page above has topic pages in a folder of the same name:
   [keeping the machine awake](./future/node-tray/07-keep-awake.md), and [acceptance on real
   machines](./future/node-tray/08-acceptance.md).
 
-## Responsiveness under load
-
-- [Keep the window responsive under load](./future/perf/README.md): what shipped, what's still open,
-  and [acceptance](./future/perf/10-acceptance.md).
-
 ## OpenCode harness proposal
 
 - [OpenCode as a contributed harness](./future/opencode.md), postponed.

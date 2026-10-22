@@ -75,8 +75,8 @@ standalone Node's import graph clean.
 `packages/openui-solid` draws OpenUI Lang programs with Solid. It's written to be published on its own,
 so it imports nothing from `@acorn/*` and nothing outside `@openuidev/lang-core`, `solid-js`, and `zod`,
 except Node built-ins in its tests. It has no JSX and no renderer target, so the desktop app and the
-terminal client each compile it for their own renderer. It stays private until
-[the dynamic UI programme](../future/dynamic-ui/README.md) decides to publish it.
+terminal client each compile it for their own renderer. It stays private until the owner decides to
+publish it.
 
 ## Graph shape
 

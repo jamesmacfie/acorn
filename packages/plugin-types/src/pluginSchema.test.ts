@@ -20,9 +20,8 @@ import { pluginManifestShape } from '@acorn/protocol/plugin/contract.ts'
 const HERE = dirname(fileURLToPath(import.meta.url))
 const SCHEMA_PATH = join(HERE, '..', 'acorn-plugin.schema.json')
 
-// The published location. Nothing serves it until the site in apps/site launches
-// (docs/future/marketing/20-launch.md), but the file a scaffold copies already points where its updates
-// will live.
+// The published location. Nothing serves it until the site in apps/site launches, but the file a
+// scaffold copies already points where its updates will live.
 const SCHEMA_URL = 'https://acorn.sh/schemas/acorn-plugin.schema.json'
 
 const generate = (): string =>

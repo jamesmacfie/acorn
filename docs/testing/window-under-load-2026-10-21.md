@@ -1,6 +1,6 @@
 # Window under load baseline, October 21, 2026
 
-This page is the baseline for [keeping the window responsive under load](../future/perf/README.md).
+This page is the baseline for keeping the window responsive under load, a plan deleted October 22, 2026.
 Every later phase compares against it. The numbers aren't taken yet. An agent-launched desktop window
 is always hidden, and the replay refuses a hidden window, so the runs below need the owner at the
 machine with the window in front. Fill in the tables, keep this method, and date any rerun.
