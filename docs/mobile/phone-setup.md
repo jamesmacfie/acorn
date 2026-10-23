@@ -26,11 +26,38 @@ access** off and on again in Acorn, which registers it again ([the phone channel
 ## Serve it yourself
 
 The account website's operator serves `apps/mobile/dist` under `/app/`, on the same origin as the account
-API, with a content security policy of `script-src 'self'; object-src 'none'; base-uri 'none';
-frame-ancestors 'none'; form-action 'self'`, plus a `frame-src` for the sandbox domain
-([below](#serve-the-sandbox-domain)). The build sets Vite's `base` to `/app/`, so every file and
-every route of the app is under that path and the website keeps its own pages at its root. Any path that
-has no extension answers with `index.html`.
+API. The build sets Vite's `base` to `/app/`, so every file and every route of the app is under that path
+and the website keeps its own pages at its root. Any path that has no extension answers with `index.html`.
+
+Send this content security policy with every file under `/app/`, with the relay's origin in `connect-src`.
+That's the scheme, host, and port of the relay address the account API gives, such as `wss://relay.example`:
+
+```
+default-src 'self'; script-src 'self' 'wasm-unsafe-eval'; style-src 'self' 'unsafe-inline';
+connect-src 'self' wss://relay.example; img-src 'self' data: blob: https:; object-src 'none';
+base-uri 'none'; frame-ancestors 'none'; form-action 'self'
+```
+
+Each allowance is there because the app uses it:
+
+- `'wasm-unsafe-eval'`: the code highlighter compiles WebAssembly in a worker, and the worker's script
+  gets the policy too, as every file does. It allows no JavaScript built from text.
+- `'unsafe-inline'` in `style-src`: the app, its editor, and its terminal set styles as they run. Scripts
+  still come only from the app's own files.
+- `connect-src`: the app calls the account API on its own origin, and reaches a Node through the relay.
+- `img-src`: the editor previews a picture from a `blob:` address, and avatars and pictures in pull requests
+  come from other sites. A picture can't run code.
+
+The browser's console shows one violation at start-up: Zod tries `new Function` once to choose how it
+checks schemas, and falls back when the policy refuses. Don't add `'unsafe-eval'` for it.
+
+With no `frame-src`, `default-src` allows frames only from the app's own origin, and the app makes none.
+A build with a sandbox domain or previews needs a `frame-src` for each
+([the sandbox domain](#serve-the-sandbox-domain), [previews](#serve-previews)).
+
+To check the policy after a change to the app, send the candidate as `Content-Security-Policy-Report-Only`
+beside the real header. Then sign in, open a Node, open a task's panes, and read the console in Safari and
+in a Chromium browser.
 
 The app calls `/account/v1` on its own origin and needs nothing else from the host, so any host with a
 trusted name that also answers the account API serves it. Build it with `pnpm --filter @acorn/mobile build`.
