@@ -31,14 +31,17 @@
 .settings-rail > .ui-input { flex: none; }
 .settings-rail-list { flex: 1; min-height: 0; overflow-y: auto; display: flex; flex-direction: column; gap: 1px; }
 .settings-rail-group { display: flex; flex-direction: column; gap: 1px; }
-/* The group label a list column draws (primitives.css § SectionHeader), inset to the rail's items. */
+/* A rule between groups, so a heading reads as the start of a section and not as one more row. */
+.settings-rail-group + .settings-rail-group { margin-top: var(--space-4); border-top: var(--chrome-divider); }
+/* The group label a list column draws (primitives.css § SectionHeader), inset to the rail's items. A
+   step smaller than the items, since at the same size the capitals alone didn't tell them apart. */
 .settings-rail-heading {
-  font-size: var(--label-size);
+  font-size: var(--fs-xs);
   font-weight: var(--label-weight);
   text-transform: var(--label-transform);
   letter-spacing: var(--label-tracking);
   color: var(--text-muted);
-  padding: var(--space-5) var(--space-4) var(--space-2);
+  padding: var(--space-6) var(--space-4) var(--space-3);
 }
 .settings-rail-item {
   display: flex;
