@@ -105,6 +105,68 @@ A phone's device that nobody uses for 30 days is revoked the next time it asks. 
 The list is a denylist because the phone draws the desktop's own panes, which read most of the Node's
 routes. An allowlist would be stricter, and it needs every route those panes use named first.
 
+## Previews
+
+A task's running app reaches a phone as a page the phone's browser loads from the Node itself, because a
+page can't come from bytes on this channel: a page on the app's address would run with the phone's
+session. The page is a frame of the phone app, on a name of its own, over TLS that the Node ends. The relay
+passes the bytes on by name and reads only the server name in the first record
+([the relay's preview listener](../../apps/relay/PROTOCOL.md#preview-streams)).
+
+| Part | Where it lives |
+| --- | --- |
+| The relay's listener | `apps/relay/src/relay.ts`, `apps/relay/src/clientHello.ts` |
+| The names | `packages/protocol/src/transport/relay.ts` |
+| The certificate and its renewal | `packages/node-core/src/server/transport/preview/certificate.ts`, `acme.ts` |
+| The server on a Node, and who may load it | `.../preview/previewServer.ts`, `grants.ts` |
+| The proxy and its rules | `packages/node-core/src/server/proxy/loopbackProxy.ts`, `loopbackRoute.ts` |
+| The phone's pane | `plugins/preview/src/client/PreviewPhonePane.tsx` |
+
+**Names.** A preview is `<preview>.<node>.<preview domain>`. `<node>` is the first 32 hex characters of the
+SHA-256 of `acorn-preview-node:` and the Node's ID. The account service, the relay, and the Node each
+compute it. `<preview>` is 32 random hex characters for one open preview. Neither names a task, because the
+relay sees the name, and a certificate log publishes the Node's.
+
+**The certificate.** A Node with Remote access on and `ACORN_ACCOUNT_URL` set orders a wildcard certificate
+for `*.<node>.<preview domain>` over ACME with a DNS-01 challenge. It asks the account service where
+previews are served and which authority to use, and has the service publish the challenge's TXT record
+([the account API](../account-api/previews.md)). The key is made on the Node and never leaves it. The Node
+keeps the certificate in `<data root>/previews/` and renews it when a third of its life is left. A Node
+without an account service, or one whose service has no preview domain, serves no previews.
+
+**Opening one.** A phone asks as a paired device:
+
+```text
+POST /v1/p/preview/tasks/:taskId/proxy/__acorn/open        { "ancestor": "https://app.example" }
+200 { "url": "https://<preview>.<node>.<domain>/__acorn/preview?key=<key>" }
+```
+
+A task's token gets `403`. The task has to have an address on the Node's own loopback (`404 no_preview`
+otherwise). While the Node can't serve one it answers `503 preview_unavailable`, with the reason in
+`details.reason`: `off` (no Remote access), `unsupported` (the service has no preview domain), `starting`
+(no certificate yet), or `expired` (it ran out and couldn't be renewed).
+
+**Who may load it.** The first request, `GET /__acorn/preview?key=…`, spends the one-time key, sets a
+`__Host-` cookie with `SameSite=None; Secure; HttpOnly; Partitioned`, and redirects to `/`. Every other
+request needs the cookie. A grant lasts 12 hours, ends when the device that opened it is revoked or the
+Node restarts, and at most eight are open at once. A name nobody opened gets a bare `403`. A known name
+without its cookie gets `403` and a page that tells its parent `acorn-preview:cookie-blocked`.
+
+**Safari.** A frame from another site can't keep that cookie in Safari. The pane hears the message above,
+asks for a second address with no `ancestor`, and offers it as a button that opens the preview as a page of
+its own, where the cookie belongs to the page. Other browsers stay in the frame.
+
+**What the page may do.** Every answer adds
+`default-src 'self' 'unsafe-inline' 'unsafe-eval' data: blob:; connect-src 'self' wss://<host>; form-action 'self'; base-uri 'self'; object-src 'none'; frame-ancestors <ancestor, or 'none'>`,
+so the page reaches its own origin and nothing on the phone's network. The pane's frame has no
+`allow-top-navigation`. A page can still send its own frame elsewhere, which no policy the Node sends can stop, so the
+phone app's `frame-src` must name the preview domain and nothing else ([serve previews](../mobile/phone-setup.md#serve-previews)).
+The proxy connects only to the Node's own loopback, refuses the Node's port,
+follows no redirect, drops `Authorization` and the grant cookie, and takes a WebSocket upgrade, for hot
+reload, only from the page's own origin.
+
+**What the relay learns.** The Node's label, the random preview label, and when each connection opened.
+
 ## Trust
 
 - **The website serves the code.** The account website could ship a phone app that reads what the phone

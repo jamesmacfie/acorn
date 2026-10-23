@@ -115,6 +115,7 @@
     "ALL /v1/p/gitlab/projects/*",
     "ALL /v1/p/notes/workspaces/:wsId/notes",
     "ALL /v1/p/notes/workspaces/:wsId/notes/*",
+    "ALL /v1/p/preview/tasks/:taskId/proxy/*",
     "ALL /v1/p/terminal/sessions/:sid/*",
     "ALL /v1/p/trellis/*",
     "ALL /v1/p/workflows/defs",

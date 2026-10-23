@@ -114,6 +114,8 @@ pnpm --filter @acorn/relay start
 | `ACORN_RELAY_PORT` | The port. | `8443` |
 | `ACORN_RELAY_HOST` | The address to bind. | `0.0.0.0` |
 | `ACORN_RELAY_TLS_CERT` and `ACORN_RELAY_TLS_KEY` | PEM files, to serve `wss://` directly. | Unset, which serves `ws://`. |
+| `ACORN_RELAY_PREVIEW_DOMAIN` | A host name to take browsers' TLS connections on, for a Node's previews. | Unset, which serves none. |
+| `ACORN_RELAY_PREVIEW_PORT` | The port for those connections. | `443` |
 
 To run it as a container, build `apps/relay/Dockerfile` from the repository root and pass the same
 variables to `docker run`:
@@ -127,11 +129,21 @@ On a public network, serve `wss://`, either with a certificate and key or behind
 terminates TLS. Plain `ws://` still carries only the Nodes' TLS, but it sends the credential in the
 clear.
 
+## Previews
+
+With `ACORN_RELAY_PREVIEW_DOMAIN` set, the relay also listens for TLS on that domain. It reads the server name in
+a browser's first record, finds the Node that name belongs to, and passes the connection on as a `preview` stream.
+The Node ends the TLS, so the relay needs no certificate for the domain
+([previews on a phone](./relay/phone-channel.md#previews), [the protocol](../apps/relay/PROTOCOL.md#preview-streams)).
+Point a wildcard DNS record for the domain at the relay. Previews also need an account service that publishes
+each Node's DNS challenge, so a relay with a static credential serves none that a Node can use.
+
 ## What the relay can and can't see
 
 The relay knows routes, stream IDs and kinds, connection times, and byte counts. It doesn't hold a
 key to any Node's TLS, so it can't read routes, bodies, tokens, or terminal output. A relay breach
-gives away who connected when, not what they did.
+gives away who connected when, not what they did. On a preview domain it also sees each server name, which
+holds the Node's label and the preview's random one.
 
 In self-hosted mode, a holder of the credential can register any route. That can take a route from your Node, which is a
 denial of service, but not an impersonation: the client pins the Node's certificate, and a different

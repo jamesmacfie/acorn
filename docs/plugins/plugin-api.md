@@ -99,7 +99,7 @@ There are two node context types, declared in `packages/node-core/src/server/plu
 - `NodePluginContext` is what a plugin loaded from disk receives. It has one member per contribution
   kind the loaded tier has.
 - `CompiledNodePluginContext` adds what only a plugin compiled into this binary gets:
-  `routes.register` with a live Hono instance, `tools`, `contextSections`, `events.channel`,
+  `routes.register` with a live Hono instance, `routes.loopback`, `tools`, `contextSections`, `events.channel`,
   `events.streams`, and `search`, plus the compiled shapes of `core` and `schedules`.
   [Contribution kinds](../contribution-kinds.md) says why, kind by kind.
 
@@ -120,6 +120,24 @@ skips them, so a context left over from a reload keeps logging under its own nam
 throwing. A logger that throws would break the rule that telemetry never fails the work it
 describes ([telemetry](../telemetry.md)). Reading the telemetry stream is the separate `telemetry`
 core facet.
+
+## Loopback routes
+
+`ctx.routes.loopback({ prefix, target })` shows one of the Node's own loopback ports to a paired device, such as a
+task's dev server. `target(params)` gets the route's path parameters and answers a port, or `null` for none. The
+plugin supplies the port and nothing else. Core owns the rules (`packages/node-core/src/server/proxy/`):
+
+- Only a paired device may use it. A task's token and the Node's own service get `403`.
+- It connects to `127.0.0.1`, then `::1`, at the port. It resolves no name, and refuses the Node's own port.
+- It streams both ways, follows no redirect, and rewrites a `Location` on the dev server's own address into a
+  path. It drops `Authorization`, `x-acorn-internal`, and the preview grant cookie, sets `Host` to
+  `localhost:<port>`, and rewrites `Origin` and `Referer` from the caller's origin to the dev server's.
+
+Core mounts `/v1/p/<plugin><prefix>/*` for them. It also mounts `POST /v1/p/<plugin><prefix>/__acorn/open`, which opens
+the same port as a preview a phone's browser can load. The preview plugin registers it at
+`/tasks/:taskId/proxy`. A loaded plugin has no `loopback`, the way it has no `register`. A WebSocket upgrade on the
+authenticated route isn't taken yet. A phone's page reaches the dev server's hot reload socket through its own
+preview name instead.
 
 ## Hono and drizzle cross into tier 1 on purpose
 

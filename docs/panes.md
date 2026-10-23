@@ -25,6 +25,7 @@ These panes ship with acorn:
 | `docker` | 75 | The task's containers |
 | `http` | 76 | A loaded plugin's tree: an API request client for this task |
 | `preview` | 80 | The browser preview |
+| `preview-phone` | 80 | The same app on a phone, in a frame the Node serves through the relay ([previews on a phone](./relay/phone-channel.md#previews)) |
 | `linear` | 90 | A loaded plugin's tree: the linked issue, the selected row, or a content-link target |
 | `rollbar` | 100 | A loaded plugin's tree: the linked item |
 

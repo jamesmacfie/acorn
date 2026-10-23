@@ -66,6 +66,7 @@
       "memory/data/memories",
       "notes",
       "preview",
+      "preview/tasks/:taskId/proxy",
       "terminal",
       "terminal/data/runs",
       "trellis",
@@ -375,7 +376,8 @@
     },
     "preview": {
       "routes": [
-        "preview"
+        "preview",
+        "preview/tasks/:taskId/proxy"
       ],
       "capabilities": [
         "preview.urls"

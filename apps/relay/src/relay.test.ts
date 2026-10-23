@@ -69,6 +69,7 @@ describe('the relay', () => {
     expect(await upgradeStatus(open(relayUrls.connect(url(), ROUTE, 'tls')))).toBe(404)
     expect(await upgradeStatus(open(relayUrls.connect(url(), 'Not_A_Route', 'tls')))).toBe(400)
     expect(await upgradeStatus(open(relayUrls.connect(url(), ROUTE, 'TLS!')))).toBe(400)
+    expect(await upgradeStatus(open(relayUrls.connect(url(), ROUTE, 'preview')))).toBe(400)
   })
 
   it('joins a client to the Node and carries bytes both ways, unchanged', async () => {

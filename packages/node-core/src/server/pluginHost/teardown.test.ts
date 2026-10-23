@@ -130,6 +130,11 @@ const PROBES: Record<string, Probe> = {
     register: (ctx) => ctx.routes.fetch(() => new Response(), { prefix: '/fetch' }),
     present: () => routeAt('/fetch'),
   },
+  'routes.loopback': {
+    register: (ctx) => ctx.routes.loopback({ prefix: '/loopback', target: async () => null }),
+    present: () => routeAt('/loopback'),
+    compiledOnly: true,
+  },
   'tools.register': {
     register: (ctx) =>
       ctx.tools.register({

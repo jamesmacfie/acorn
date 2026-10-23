@@ -73,9 +73,11 @@ export class RouteRegistry {
   }
 }
 
-// The mount path createApp() hands to Hono for one contribution.
+// Where a plugin's prefix mounts: the path createApp() hands to Hono for a contribution.
+export const pluginMountPath = (plugin: string, prefix: string): string => `${PLUGIN_NAMESPACE}/${plugin}${prefix}`
+
 export function routeMountPath(contribution: RouteContribution): string {
-  return `${PLUGIN_NAMESPACE}/${contribution.plugin}${contribution.prefix}`
+  return pluginMountPath(contribution.plugin, contribution.prefix)
 }
 
 const registry = new RouteRegistry()

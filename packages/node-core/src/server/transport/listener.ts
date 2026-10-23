@@ -2,8 +2,9 @@ import { createAdaptorServer, type Http2Bindings, type HttpBindings, type Server
 import type { NodeKeys, ServiceEndpoint } from '@acorn/protocol/serviceProtocol.ts'
 import { createServer as createHttpsServer } from 'node:https'
 import type { ChannelSocket } from '@acorn/channel/secure.ts'
+import type { DeviceService } from '../auth/deviceTokens'
 import { execFileSync } from 'node:child_process'
-import { resolve } from 'node:path'
+import { join, resolve } from 'node:path'
 import { createApp } from '../index'
 import { makeBindings, type RuntimeBindings } from '../bindings'
 import { CapabilityRegistry } from '../pluginHost/capabilities'
@@ -11,9 +12,11 @@ import { type DataRoot } from '../storage/dataRoot'
 import { resolveDatabasePath } from '../storage/paths'
 import { configuredPort, devDataDir } from './listenerConfig'
 import { advertisedHosts } from './advertise'
-import { relaySettings, type RelayControl } from './relaySettings'
+import { accountServiceUrl, relaySettings, type RelayControl } from './relaySettings'
 import { ensureCert } from './tls'
 import { attachWsHub, disposeWsHub, type WsHub } from './wsHub'
+import type { PreviewControl } from './preview/previewControl'
+import type { PreviewHandle } from './preview/start'
 import type { RelayTunnel } from './relayTunnel'
 import type { Env } from '../bindings'
 import { createLogger, describeError } from '../telemetry/logger'
@@ -182,7 +185,7 @@ export function startListener(
       // Relayed clients name the Node by its route, which is its ID, and no port (docs/relay.md). The
       // tunnel loads only when there are settings, so a Node with none runs none of its code. The
       // account plugin turns remote access on and off through the same control.
-      const control = relayControl(
+      const { control, previews } = relayControl(
         server as unknown as import('node:https').Server,
         allowedHosts,
         root.nodeId,
@@ -191,9 +194,11 @@ export function startListener(
             fetch(request, { incoming: { socket: {} }, browserChannel: true } as unknown as HttpBindings),
           ),
         ),
+        { dir: join(root.dir, 'previews'), ownPort: address.port, devices: runtime.DEVICES },
       )
       relayControls.set(server, control)
       runtime.RELAY = control
+      runtime.PREVIEWS = previews
       if (relay) void control.apply(relay)
       root.recordPort(address.port)
       log.info(`listening on https://127.0.0.1:${address.port}`)
@@ -215,32 +220,48 @@ export function startListener(
   })
 }
 
-// Start and stop this listener's relay tunnel. Changes run one at a time, because the tunnel's module
-// loads on demand and a quick off-then-on mustn't leave two tunnels holding one route.
+// Start and stop this listener's relay tunnel, and the previews that ride on it. Changes run one at a time,
+// because the tunnel's module loads on demand and a quick off-then-on mustn't leave two tunnels holding one
+// route. Previews need an account service to name their domain and publish their DNS challenge, so they run
+// only with `ACORN_ACCOUNT_URL` set.
 function relayControl(
   server: import('node:https').Server,
   allowedHosts: Set<string>,
   nodeId: string,
   serveBrowser: (socket: ChannelSocket, host: string) => void,
-): RelayControl {
+  previewOptions: { dir: string; ownPort: number; devices: DeviceService },
+): { control: RelayControl; previews: PreviewControl } {
   let tunnel: RelayTunnel | undefined
+  let preview: PreviewHandle | undefined
   let queue = Promise.resolve()
-  return {
+  const control: RelayControl = {
     apply: (settings) =>
       (queue = queue.then(async () => {
         tunnel?.close()
-        tunnel = undefined
-        if (settings)
-          tunnel = (await import('./relayTunnel')).startRelayTunnel(
-            server,
-            settings,
+        preview?.close()
+        tunnel = preview = undefined
+        if (!settings) return
+        const accountUrl = accountServiceUrl()
+        if (accountUrl)
+          preview = (await import('./preview/start')).startPreview({
+            ...previewOptions,
             nodeId,
-            allowedHosts,
-            serveBrowser,
-          )
+            accountUrl,
+            credential: settings.credential,
+          })
+        const running = preview
+        tunnel = (await import('./relayTunnel')).startRelayTunnel(
+          server,
+          settings,
+          nodeId,
+          allowedHosts,
+          serveBrowser,
+          running && ((stream) => running.serve(stream)),
+        )
       })),
     state: () => tunnel?.state(),
   }
+  return { control, previews: { open: (request) => preview?.open(request) ?? { unavailable: 'off' } } }
 }
 
 // A phone's channel, loaded when the first one arrives. The Node's own router answers its requests, as

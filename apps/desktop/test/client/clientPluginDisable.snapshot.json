@@ -11,6 +11,7 @@
       "git",
       "notes",
       "preview",
+      "preview-phone",
       "terminal",
       "apps",
       "workflows"
@@ -407,7 +408,8 @@
     },
     "preview": {
       "panes": [
-        "preview"
+        "preview",
+        "preview-phone"
       ],
       "commands": [
         "preview.open"

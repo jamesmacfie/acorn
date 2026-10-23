@@ -32,6 +32,7 @@ import { ensureSessionKey } from './sessionKey'
 export { checkSessionKey, nodeKeyCustody } from './sessionKey'
 import type { NodeKeys } from '@acorn/protocol/serviceProtocol.ts'
 import { ensureCert } from './transport/tls'
+import type { PreviewControl } from './transport/preview/previewControl'
 import type { RelayControl } from './transport/relaySettings'
 import { chargeInterruptedModelCalls } from './modelProviders/grantSchema'
 
@@ -67,6 +68,8 @@ export type RuntimeBindings = {
   ADVERTISED_HOSTS: readonly string[]
   // The Node's relay tunnel, which the listener sets once it's bound (server/transport/listener.ts).
   RELAY?: RelayControl
+  // Opening a preview for a phone's browser (server/transport/preview). Set with the relay tunnel.
+  PREVIEWS?: PreviewControl
   BLOBS: BlobCache
   SESSION_ENC_KEY: string
   // Use-scoped credential access (server/core/secrets.ts), rather than the raw SESSION_ENC_KEY. It is

@@ -34,6 +34,9 @@ export const relayHost = (route: string): string => `${route}.relay.acorn`
 export const RELAY_TLS_STREAM = 'tls'
 // A phone browser's encrypted channel (docs/relay/phone-channel.md).
 export const RELAY_BROWSER_STREAM = 'browser'
+// A browser's TLS connection to one of the Node's preview names, which the Node ends
+// (apps/relay/PROTOCOL.md § Preview streams).
+export const RELAY_PREVIEW_STREAM = 'preview'
 export const relayStreamKindSchema = z.string().regex(/^[a-z][a-z0-9-]{0,31}$/)
 export const relayStreamIdSchema = z.string().regex(/^[0-9a-f]{32}$/)
 
@@ -75,3 +78,35 @@ export const RELAY_PING_INTERVAL_MS = 30_000
 export const RELAY_REPLACED = 4000
 // The close code a relay sends a Node whose relay credential the account service revoked.
 export const RELAY_REVOKED = 4001
+
+// --- Preview names (docs/relay/phone-channel.md § Previews) ---
+// A preview is `<preview>.<node>.<preview domain>`. The account service, the relay, and the Node each need a
+// Node's label and none can tell another, so all three compute it from the Node's ID.
+const encoder = new TextEncoder()
+
+// Opaque to anyone without the Node ID, and fixed for a Node. A certificate transparency log publishes
+// it, and the relay sees it, so it must not be the Node ID itself.
+export async function previewNodeLabel(nodeId: string): Promise<string> {
+  const digest = await crypto.subtle.digest('SHA-256', encoder.encode(`acorn-preview-node:${nodeId}`))
+  return Array.from(new Uint8Array(digest).slice(0, 16), (byte) => byte.toString(16).padStart(2, '0')).join('')
+}
+
+// A preview domain as the account service names it: a host name and an optional port, with no scheme.
+// The port is for a development flow, and a certificate and a server name never carry one.
+export function previewDomainHost(domain: string): string {
+  return domain.replace(/:\d+$/, '')
+}
+
+// The two labels a server name carries under the preview domain, or null when it isn't one.
+export function parsePreviewName(serverName: string, domainHost: string): { preview: string; node: string } | null {
+  const suffix = `.${domainHost}`
+  if (!serverName.endsWith(suffix)) return null
+  const labels = serverName.slice(0, -suffix.length).split('.')
+  const [preview, node] = labels
+  return labels.length === 2 && /^[a-z0-9-]{1,63}$/.test(preview!) && /^[a-z0-9-]{1,63}$/.test(node!)
+    ? { preview: preview!, node: node! }
+    : null
+}
+
+// What a client sends to publish an ACME DNS-01 answer: the base64url SHA-256 of a key authorization.
+export const ACME_CHALLENGE_VALUE = /^[A-Za-z0-9_-]{43}$/

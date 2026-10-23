@@ -395,6 +395,37 @@
       ],
       "additionalProperties": false
     },
+    "PreviewResponse": {
+      "type": "object",
+      "properties": {
+        "domain": {
+          "type": "string",
+          "minLength": 1
+        },
+        "acmeDirectory": {
+          "type": "string",
+          "format": "uri"
+        }
+      },
+      "required": [
+        "domain",
+        "acmeDirectory"
+      ],
+      "additionalProperties": false
+    },
+    "PreviewChallengeRequest": {
+      "type": "object",
+      "properties": {
+        "value": {
+          "type": "string",
+          "pattern": "^[A-Za-z0-9_-]{43}$"
+        }
+      },
+      "required": [
+        "value"
+      ],
+      "additionalProperties": false
+    },
     "RevokedCredentials": {
       "type": "object",
       "properties": {

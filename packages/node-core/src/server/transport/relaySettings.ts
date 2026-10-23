@@ -24,3 +24,15 @@ export type RelayControl = {
   apply(settings: RelaySettings | undefined): Promise<void>
   state(): RelayState | undefined
 }
+
+// The account service this Node asks for its preview domain and DNS challenge, from `ACORN_ACCOUNT_URL`. It is
+// the variable and the rule the sign-in plugin uses (plugins/account/src/server/config.ts), and a Node that
+// turned Remote access on through that plugin has it set. The relay credential goes to it, so plain `http`
+// is for a service on this computer only. Unset or not an address, there are no previews.
+export function accountServiceUrl(): string | undefined {
+  const text = process.env.ACORN_ACCOUNT_URL?.trim()
+  if (!text || !URL.canParse(text)) return undefined
+  const url = new URL(text)
+  const local = ['127.0.0.1', 'localhost', '[::1]'].includes(url.hostname)
+  return url.protocol === 'https:' || (url.protocol === 'http:' && local) ? url.origin : undefined
+}

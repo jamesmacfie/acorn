@@ -15,6 +15,7 @@ import {
   credentialClaimsSchema,
   deviceCodeResponseSchema,
   listNodesResponseSchema,
+  previewResponseSchema,
   registerNodeResponseSchema,
   revokedCredentialsSchema,
   ticketClaimsSchema,
@@ -340,6 +341,42 @@ describe('the account API', () => {
       const revoked = (await call('GET', accountPaths.revoked, {}, revokedCredentialsSchema)).data!
       expect(revoked.credentials).toContain(credential!.jti)
       await expectError(await ask(accountPaths.tickets, tokens.accessToken, nodeId), 404, 'not_found')
+    })
+  })
+
+  describe('previews', () => {
+    const challenge = (credential: string, body: unknown) =>
+      call('PUT', accountPaths.previewChallenge, { token: credential, body })
+    const value = 'a'.repeat(43)
+
+    it('names the preview domain and the certificate authority, or has none', async () => {
+      const answer = await call('GET', accountPaths.preview)
+      if (answer.status === 404) return expectError(answer, 404, 'not_found')
+      expect(previewResponseSchema.parse(answer.json).domain).not.toMatch(/^[a-z]+:\/\//)
+    })
+
+    it("publishes a Node's answer under its own name, and refuses anything else", async () => {
+      const preview = await call('GET', accountPaths.preview)
+      const { accessToken } = await signIn(`previewer-${randomUUID()}`)
+      const { relay } = (await register(accessToken, randomUUID())).data!
+      if (preview.status === 404) return expectError(await challenge(relay.credential, { value }), 404, 'not_found')
+
+      expect((await challenge(relay.credential, { value })).status).toBe(204)
+      await expectError(await challenge(relay.credential, { value: 'short' }), 400, 'invalid_request')
+      await expectError(await challenge(relay.credential, { value, name: 'x' }), 400, 'invalid_request')
+      // A person's access token is not a Node's credential.
+      await expectError(await challenge(accessToken, { value }), 401, 'invalid_token')
+      await expectError(await challenge('', { value }), 401, 'invalid_token')
+    })
+
+    it('refuses a credential that was replaced', async () => {
+      const preview = await call('GET', accountPaths.preview)
+      if (preview.status === 404) return
+      const { accessToken } = await signIn(`replacer-${randomUUID()}`)
+      const nodeId = randomUUID()
+      const old = (await register(accessToken, nodeId)).data!.relay.credential
+      await register(accessToken, nodeId)
+      await expectError(await challenge(old, { value }), 401, 'invalid_token')
     })
   })
 })

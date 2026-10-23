@@ -12,6 +12,7 @@
     "50 editor meta+shift+e",
     "75 docker -",
     "80 preview meta+shift+b",
+    "80 preview-phone -",
     "90 terminal -"
   ],
   "sources": [

@@ -9,6 +9,7 @@ import { openDataRoot, type DataRoot } from '../storage/dataRoot'
 import { makeRuntime, startListener, type Listener } from './listener'
 import { disposeWsHub } from './wsHub'
 import { mintInternalToken } from '../auth/internalTokens'
+import { startPreview } from './preview/start'
 import { startRelayTunnel } from './relayTunnel'
 
 // The tunnel dials out, so here it only records whether the listener started it, and keeps the relay
@@ -22,6 +23,11 @@ vi.mock('./relayTunnel', async () => {
     }),
   }
 })
+
+// Previews load a certificate and a server, so here the listener only has to start and stop them.
+vi.mock('./preview/start', () => ({
+  startPreview: vi.fn(() => ({ serve: vi.fn(), open: vi.fn(), close: vi.fn() })),
+}))
 
 // The listener's transport contract, asserted against a real socket: it speaks TLS with the
 // certificate it reports, that certificate validates for 127.0.0.1 (no `rejectUnauthorized: false`
@@ -154,6 +160,8 @@ describe('the loopback TLS listener', () => {
           root!.nodeId,
           expect.any(Set),
           expect.any(Function),
+          // No account service is named, so no previews.
+          undefined,
         ),
       )
       expect((await probe(relayed, '/v1/node', relayName(), {}, true)).status).toBe(200)
@@ -178,6 +186,45 @@ describe('the loopback TLS listener', () => {
     await runtime.RELAY!.apply(undefined)
     expect(runtime.RELAY!.state()).toBeUndefined()
     expect((await probe(listener, '/v1/node', relayName, {}, true)).status).toBe(403)
+  }, 30_000)
+
+  // A preview needs an account service to name its domain and publish its challenge, so a Node with relay
+  // settings and no service serves none, and says so when asked to open one.
+  it('starts previews with the tunnel only when an account service is named, and stops them with it', async () => {
+    const runtime = makeRuntime(root!)
+    opened.push(runtime.DB)
+    listener = await startListener(runtime, root!)
+    const settings = { url: 'ws://127.0.0.1:9', credential: 'relay-credential' }
+    const request = { deviceId: 'phone', ancestor: undefined, port: async () => 3000 }
+
+    await runtime.RELAY!.apply(settings)
+    expect(startPreview).not.toHaveBeenCalled()
+    expect(runtime.PREVIEWS!.open(request)).toEqual({ unavailable: 'off' })
+
+    process.env.ACORN_ACCOUNT_URL = 'http://127.0.0.1:9'
+    try {
+      await runtime.RELAY!.apply(settings)
+      expect(startPreview).toHaveBeenCalledWith(
+        expect.objectContaining({
+          accountUrl: 'http://127.0.0.1:9',
+          credential: 'relay-credential',
+          nodeId: root!.nodeId,
+          ownPort: listener.endpoint.port,
+          dir: join(root!.dir, 'previews'),
+        }),
+      )
+      const preview = vi.mocked(startPreview).mock.results[0]!.value
+      vi.mocked(startRelayTunnel).mock.calls.at(-1)![5]!({} as never)
+      expect(preview.serve).toHaveBeenCalledOnce()
+      runtime.PREVIEWS!.open(request)
+      expect(preview.open).toHaveBeenCalledWith(request)
+
+      await runtime.RELAY!.apply(undefined)
+      expect(preview.close).toHaveBeenCalledOnce()
+      expect(runtime.PREVIEWS!.open(request)).toEqual({ unavailable: 'off' })
+    } finally {
+      delete process.env.ACORN_ACCOUNT_URL
+    }
   }, 30_000)
 
   it('authenticates an internal token using the adapter socket peer', async () => {

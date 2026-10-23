@@ -27,3 +27,20 @@ export const previewPaneContribution: PaneLayoutContribution = {
   regions: { body: PreviewTaskPane },
   minWidth: 320,
 }
+
+const PreviewPhonePane = lazy(() => import('./PreviewPhonePane'))
+
+// The same app on a phone, in a frame the Node serves through the relay. The desktop's native view has no
+// narrow form, and this has no desktop one, so each host draws the one that fits.
+export const previewPhonePaneContribution: PaneLayoutContribution = {
+  id: 'preview-phone',
+  label: 'Preview',
+  glyph: 'globe',
+  description: 'The app running in this task',
+  order: 80,
+  requires: { plugin: 'preview' },
+  formFactor: ['narrow'],
+  when: (task) => previewConfigured(task.id),
+  layout: 'single',
+  regions: { body: PreviewPhonePane },
+}

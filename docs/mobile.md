@@ -94,8 +94,9 @@ so the phone never writes a layout. The bottom bar draws the desktop switcher's 
 from the same panes and markers, with the label under the icon. It scrolls sideways when the panes
 don't fit.
 
-A pane's `requires` and `when` decide whether it's in the bar. Preview needs the `preview` seam
-group, so it never is. A pane whose `when` waits on data, such as Workflows, joins the bar when its
+A pane's `requires` and `when` decide whether it's in the bar. The desktop's Preview pane needs the `preview` seam
+group, so it never is. The phone draws a Preview pane of its own, `preview-phone`, that frames the page the Node
+serves ([previews on a phone](./relay/phone-channel.md#previews)). A pane whose `when` waits on data, such as Workflows, joins the bar when its
 data loads. A link to one waits for it rather than opening another pane.
 
 Each time the Node is reachable, the phone reads its plugin roster with `refreshNodePlugins`. A host

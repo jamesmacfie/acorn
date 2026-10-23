@@ -3,6 +3,7 @@
 import type { NodePlugin, PluginFetchHandler } from '@acorn/plugin-api/node'
 import { TERMINAL_RUN_TARGETS } from '@acorn/plugin-terminal/contract/runTargets.ts'
 import { PREVIEW_URLS } from '../contract/urls'
+import { loopbackPort } from '../server/loopbackPort'
 import { createPreviewUrlRuntime, type PreviewUrlRuntime } from '../server/previewUrls'
 
 export const previewPlugin = (): NodePlugin => {
@@ -45,6 +46,14 @@ export const previewPlugin = (): NodePlugin => {
       ctx.routes.fetch(serveUrl, {
         prefix: '',
         note: '/tasks/:taskId/url — resolved preview home; /configured — which tasks have one',
+      })
+
+      // The task's app, through this Node to a paired device, and to a phone's browser on a name of its own
+      // (docs/relay/phone-channel.md § Previews). Core decides who may use it and what the page may do.
+      ctx.routes.loopback({
+        prefix: '/tasks/:taskId/proxy',
+        note: "/tasks/:taskId/proxy/* — the task's app on this Node's loopback; /tasks/:taskId/proxy/__acorn/open — an address a phone's browser can load",
+        target: async ({ taskId }) => loopbackPort((await urls!.forTask(taskId!))?.url),
       })
 
       ctx.events.on('run:changed', (event) => {

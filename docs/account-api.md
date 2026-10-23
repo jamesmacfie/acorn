@@ -66,6 +66,8 @@ An error answers `{ "error": "<code>", "message": "<optional text>" }`:
 | `DELETE /account/v1/nodes/{nodeId}` | Plugin | Access token | Removes a Node and revokes its relay credential. |
 | `POST /account/v1/tickets` | Plugin, phone | Access token, or a browser's cookie | A relay ticket for one of the account's Nodes. |
 | `POST /account/v1/assertions` | Plugin, phone | Access token, or a browser's cookie | An account assertion for one of the account's Nodes. |
+| `GET /account/v1/preview` | Node | None | Where previews are served, and the certificate authority that domain allows. |
+| `PUT /account/v1/preview/challenge` | Node | The Node's relay credential | Publishes the DNS answer a certificate authority looks for. |
 | `GET /account/v1/browser/sign-in` | Phone | None | Signs a browser in on the service's page and sends it back. |
 
 An access token goes in `Authorization: Bearer <token>`. The relay checks tickets and credentials with
@@ -113,6 +115,11 @@ person is signed in as an account, for the Node it names. A Node accepts one in 
 another computer, when its subject is the Node's owner account
 ([pairing by approval](./api-reference/transport.md#pairing-by-approval)). No assertion ever acts as a
 device token.
+
+### Previews
+
+`GET /preview` and `PUT /preview/challenge` let a Node serve a task's app to a phone's browser under a preview
+domain ([previews](./account-api/previews.md)).
 
 ## Signed tokens
 

@@ -1,5 +1,5 @@
 import { z } from 'zod'
-import { relayRouteSchema } from '../transport/relay.ts'
+import { ACME_CHALLENGE_VALUE, relayRouteSchema } from '../transport/relay.ts'
 import { accountKeysSchema } from './accountKeys.ts'
 
 export { accountKeysSchema, type AccountKeys } from './accountKeys.ts'
@@ -21,6 +21,8 @@ export const accountPaths = {
   node: (nodeId: string): string => `${ACCOUNT_API_PREFIX}/nodes/${nodeId}`,
   tickets: `${ACCOUNT_API_PREFIX}/tickets`,
   assertions: `${ACCOUNT_API_PREFIX}/assertions`,
+  preview: `${ACCOUNT_API_PREFIX}/preview`,
+  previewChallenge: `${ACCOUNT_API_PREFIX}/preview/challenge`,
   // Where the phone app sends a person to sign in on the service's own page. It takes `?next=<path on
   // the service's own origin>` and sends the browser back there with a session cookie.
   browserSignIn: `${ACCOUNT_API_PREFIX}/browser/sign-in`,
@@ -130,6 +132,18 @@ export const assertionRequestSchema = z.strictObject({ nodeId })
 export const assertionResponseSchema = z.object({ assertion: z.string().min(1), expiresAt: z.number().int() })
 export type AssertionResponse = z.infer<typeof assertionResponseSchema>
 
+// --- Preview: the names a Node serves its tasks' apps under, and the certificate for them ---
+
+// Where previews are served, and the certificate authority that domain's DNS zone allows. The domain is
+// a host name and an optional port, with no scheme.
+export const previewResponseSchema = z.object({ domain: z.string().min(1), acmeDirectory: z.string().url() })
+export type PreviewResponse = z.infer<typeof previewResponseSchema>
+
+// The answer to a DNS-01 challenge, published as the TXT record `_acme-challenge.<node label>.<domain>`. A
+// Node can set the record for its own label only, because the service takes the Node from its credential.
+export const previewChallengeRequestSchema = z.strictObject({ value: z.string().regex(ACME_CHALLENGE_VALUE) })
+export type PreviewChallengeRequest = z.infer<typeof previewChallengeRequestSchema>
+
 // Credentials removed on purpose. The relay polls it, and drops a Node that presents one.
 export const revokedCredentialsSchema = z.object({ credentials: z.array(z.string()) })
 
@@ -166,6 +180,8 @@ export const accountMessages = {
   TicketResponse: ticketResponseSchema,
   AssertionRequest: assertionRequestSchema,
   AssertionResponse: assertionResponseSchema,
+  PreviewResponse: previewResponseSchema,
+  PreviewChallengeRequest: previewChallengeRequestSchema,
   RevokedCredentials: revokedCredentialsSchema,
   Error: accountErrorSchema,
 } as const

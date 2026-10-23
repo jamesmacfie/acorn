@@ -15,7 +15,7 @@ vi.mock('@acorn/plugin-api/client', () => ({
   clientCapabilityId: (id: string) => id,
 }))
 vi.mock('./configuredStore', () => ({ previewConfigured: () => true, previewConfiguredSchedule: {} }))
-vi.mock('./paneContribution', () => ({ previewPaneContribution: {} }))
+vi.mock('./paneContribution', () => ({ previewPaneContribution: {}, previewPhonePaneContribution: {} }))
 
 it('retires hidden previews on Node switches and owner removal, and one preview on archive', async () => {
   const { previewClientPlugin } = await import('./index')

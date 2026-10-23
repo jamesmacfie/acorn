@@ -12,7 +12,7 @@ import {
 } from '@acorn/plugin-api/client'
 import { PREVIEW_RECIPE_SELECTION } from '@acorn/plugin-terminal/contract/previewSelection.ts'
 import { previewConfigured, previewConfiguredSchedule } from './configuredStore'
-import { previewPaneContribution } from './paneContribution'
+import { previewPaneContribution, previewPhonePaneContribution } from './paneContribution'
 import type { PreviewUrlState } from '../contract/urls'
 import { previewRecipeUrlRoute, previewUrlRoute } from '../shared/api'
 import { PREVIEW_TOOLBAR_ACTIONS_MAX } from '../contract/toolbarActions'
@@ -30,6 +30,7 @@ export const previewClientPlugin: ClientPlugin = {
       },
     })
     ctx.panes.register(previewPaneContribution)
+    ctx.panes.register(previewPhonePaneContribution)
     // Other plugins' controls in the address bar (./PreviewPane.tsx). One action, Reload, and no
     // navigation: a contributor never gets the page (docs/plugins/toolbar-actions.md).
     ctx.extensionPoints.register({

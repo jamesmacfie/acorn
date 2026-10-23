@@ -60,6 +60,29 @@ The sandbox holds no bundles and no secrets. The app posts the bytes, and the pa
 to its own host name, for a frame as for a tree. The page sets no `frame-ancestors` and doesn't check its parent's origin, because it can't name the app's
 origin. A stranger who frames it gets only code that is public under its own hash.
 
+## Serve previews
+
+A phone shows a task's running app in a frame, from the Node through the relay
+([previews on a phone](../relay/phone-channel.md#previews)). The names are `<preview>.<node>.<preview domain>`. To
+set one up:
+
+1. Pick a domain for previews. Use one that isn't a subdomain of the app's, so a page in a preview can't reach
+   the app's cookies. Safari then keeps the preview's cookie out of the frame, and the pane offers the preview
+   as a page of its own instead. A domain under the app's site embeds in Safari too, at the cost of that
+   separation.
+2. Point a wildcard DNS record, `*.<preview domain>`, at the relay, and run the relay with
+   `ACORN_RELAY_PREVIEW_DOMAIN` set to the domain ([run your own relay](../relay.md#previews)). The relay needs no certificate for it.
+3. Have the account service answer `GET /account/v1/preview` with the domain and a certificate authority, and
+   publish each Node's DNS challenge ([the account API](../account-api/previews.md)). The Node gets its own
+   certificate.
+4. Add `frame-src https://*.<preview domain>` to the app's content security policy, beside the sandbox's. That
+   directive does more than allow the frame: the browser checks it again each time the frame navigates, and it is
+   all that stops a page in a preview sending its own frame to another site, including one on the phone's network.
+   Name no other host.
+
+A Node needs Remote access on, so that it has a relay credential, and `ACORN_ACCOUNT_URL`, the account service
+it signed in to.
+
 ## Try the sandbox
 
 `pnpm dev:mobile` also serves the sandbox domain, as `localhost:4322` (`ACORN_SANDBOX_PORT` changes the port),

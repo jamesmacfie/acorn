@@ -49,6 +49,7 @@ the whole plugin system in one page.
 | [caching.md](./caching.md) | The client cache, its keys, and the serve-then-revalidate policy. |
 | [account-api.md](./account-api.md) | The account API: sign-in, Nodes, relay credentials, tickets, and assertions, its schemas, and the sign-in plugin. |
 | [account-api/browsers.md](./account-api/browsers.md) | How a browser served by the account website calls the API: the session cookie, its header, and sign-in. |
+| [account-api/previews.md](./account-api/previews.md) | The two routes a Node calls to serve previews under a preview domain: the domain, and the DNS challenge. |
 | [account-api/testing.md](./account-api/testing.md) | The stand-in account service and the conformance suite that holds every implementation to the schemas. |
 | [authentication.md](./authentication.md) | Device pairing, tokens, principals, and the internal-call scopes. |
 | [security.md](./security.md) | The trust boundaries, what is out of scope, and which page owns each control. |

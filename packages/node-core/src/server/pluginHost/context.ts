@@ -6,6 +6,8 @@
 // the rollback of everything registered here all stay in host.ts, because they are decisions about a
 // set of plugins and this is one plugin's surface. What it does own is the undo: every registration
 // below hands its disposer to `onUndo`, so teardown is one list (host.ts § clearRegistrations).
+import { Hono } from 'hono'
+import type { AppEnv } from '../middleware/auth'
 import type { CompiledCoreServices, CoreServices } from '../core'
 import type { Env } from '../bindings'
 import type {
@@ -47,7 +49,7 @@ import { contributeExtension, extensionsFor, openExtensionPoint } from './extens
 import { hookHandlersFor, registerHookHandler, registerHookPoint, runHook } from './hooks'
 import { DISCLOSED_NODE_POINTS, qualifiedExtensionPointId } from '@acorn/protocol/extensionPoints.ts'
 import { asContextSection, registerContextSection } from '../agentTools/contextSections'
-import { registerRoute, reserveHostDispatchedPath } from '../routes/registry'
+import { registerRoute, pluginMountPath, reserveHostDispatchedPath } from '../routes/registry'
 import { connectionProviderRegistry } from '../integrations/connectionProviders/registry'
 import { integrationProviderRegistry } from '../integrations/registry'
 import { modelProviderRegistry } from '../modelProviders/registry'
@@ -257,6 +259,20 @@ export function buildPluginContext(options: PluginContextOptions): HostPluginCon
             recordUndo(registerRoute({ plugin, prefix: opts?.prefix ?? '', router, note: opts?.note }).dispose),
       fetch: (handler, opts) =>
         recordUndo(registerRoute({ plugin, prefix: opts?.prefix ?? '', fetch: handler, note: opts?.note }).dispose),
+      // Compiled plugins only, for the reason `register` is: the router is a live object.
+      loopback: permissions
+        ? (undefined as never)
+        : ({ prefix, target, note }) =>
+            recordUndo(
+              registerRoute({
+                plugin,
+                prefix,
+                router: new Hono<AppEnv>().all('/*', async (c) =>
+                  (await import('../proxy/loopbackRoute')).serveLoopback(c, pluginMountPath(plugin, prefix), target),
+                ),
+                note,
+              }).dispose,
+            ),
     },
     // The owner is bound here, not passed by the plugin: a plugin cannot contribute a tool under another
     // plugin's name, and cannot remove another plugin's tools.

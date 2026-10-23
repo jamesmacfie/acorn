@@ -6,6 +6,7 @@ import type { DataFeedEvent } from '@acorn/protocol/eventFeeds.ts'
 import type { Cadence } from '@acorn/protocol/schedules.ts'
 import type { CompiledCoreServices, CoreServices } from '../core'
 import type { PluginDatabase } from '../plugins/storage'
+import type { LoopbackRouteOptions } from '../proxy/loopbackRoute'
 import type { ConnectionProviderContribution, IntegrationProviderContribution } from '../integrations/types'
 import type { ModelProviderAdapter } from '../modelProviders/types'
 import type { AgentToolContribution } from '../agentTools/registry'
@@ -137,6 +138,10 @@ type CompiledPluginRouteRegistry = PluginRouteRegistry & {
   // Built-ins only: this hands the host a live object from the plugin's realm, which is why it sits on
   // the compiled type and not on the one a loaded plugin is handed.
   register(router: Hono<AppEnv>, options?: PluginRouteOptions): void
+  // A route that shows one of this Node's loopback ports to a paired device (`loopbackRouter`). The
+  // plugin supplies the port. Core owns every rule that makes it safe, so a plugin can't loosen them, and a
+  // loaded plugin has no such route.
+  loopback(options: LoopbackRouteOptions): void
 }
 
 type PluginToolRegistry = {

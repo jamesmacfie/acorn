@@ -1,4 +1,5 @@
 import type { Server } from 'node:https'
+import type { Duplex } from 'node:stream'
 import { createWebSocketStream, WebSocket } from 'ws'
 import type { ChannelSocket } from '@acorn/channel/secure.ts'
 import {
@@ -7,6 +8,7 @@ import {
   RELAY_REPLACED,
   RELAY_REVOKED,
   RELAY_BROWSER_STREAM,
+  RELAY_PREVIEW_STREAM,
   RELAY_TLS_STREAM,
   relayControlMessageSchema,
   relayHost,
@@ -31,7 +33,9 @@ export type RelayTunnel = { close(): void; state(): RelayState }
 // one more connection to this Node's HTTPS server, entered by `emit('connection')`, so TLS, the Host
 // guard, auth, and the WebSocket upgrade run on it unchanged. A relayed socket has no peer address,
 // so a route that trusts loopback callers treats it as remote. A stream a phone's browser opened goes to
-// `serveBrowser` instead (./channel.ts), which runs its own encrypted handshake.
+// `serveBrowser` instead (./channel.ts), which runs its own encrypted handshake. A `preview` stream is a
+// browser's TLS connection to one of this Node's preview names, and goes to `servePreview`, a server of its
+// own (./preview/previewServer.ts). A Node without one refuses the kind.
 //
 // The relay Host joins `allowedHosts` for as long as the tunnel runs, so a Node with no tunnel answers
 // to no such name. This module loads only when there are settings, which keeps the relay protocol off
@@ -42,6 +46,7 @@ export function startRelayTunnel(
   route: string,
   allowedHosts: Set<string>,
   serveBrowser: (socket: ChannelSocket, host: string) => void,
+  servePreview?: (stream: Duplex) => void,
 ): RelayTunnel {
   const host = relayHost(route)
   allowedHosts.add(host)
@@ -60,7 +65,9 @@ export function startRelayTunnel(
     const message = relayControlMessageSchema.safeParse(parseJson(text))
     if (!message.success || message.data.type !== 'stream') return
     const { id, kind } = message.data
-    if (kind !== RELAY_TLS_STREAM && kind !== RELAY_BROWSER_STREAM) {
+    const serves =
+      kind === RELAY_TLS_STREAM || kind === RELAY_BROWSER_STREAM || (kind === RELAY_PREVIEW_STREAM && servePreview)
+    if (!serves) {
       ws.send(JSON.stringify({ type: 'refuse', id, reason: `This Node doesn't serve ${kind} streams.` }))
       return
     }
@@ -72,11 +79,11 @@ export function startRelayTunnel(
     streams.add(stream)
     stream.once('close', () => streams.delete(stream))
     stream.on('error', (error) => log.debug(`relay stream ${id} failed: ${error.message}`))
-    stream.once('open', () =>
-      kind === RELAY_BROWSER_STREAM
-        ? serveBrowser(stream, host)
-        : server.emit('connection', createWebSocketStream(stream)),
-    )
+    stream.once('open', () => {
+      if (kind === RELAY_BROWSER_STREAM) serveBrowser(stream, host)
+      else if (kind === RELAY_PREVIEW_STREAM) servePreview!(createWebSocketStream(stream))
+      else server.emit('connection', createWebSocketStream(stream))
+    })
   }
 
   const connect = (): void => {

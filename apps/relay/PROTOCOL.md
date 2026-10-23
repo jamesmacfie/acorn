@@ -69,7 +69,7 @@ open the stream:
 
 | Status | Meaning |
 | --- | --- |
-| 400 | The path, route, or kind is malformed. |
+| 400 | The path, route, or kind is malformed, or the kind is `preview`. |
 | 401 | The credential or ticket is missing, wrong, expired, or doesn't name this route or its owner. |
 | 404 | No Node holds that route. |
 | 502 | The Node refused the stream. |
@@ -85,8 +85,32 @@ it to the Node.
 | --- | --- |
 | `tls` | A TLS 1.3 connection to the Node's HTTPS server. Native clients use it. |
 | `browser` | A phone's browser, which runs its own encrypted handshake against the Node's channel key and then speaks the messages in [the phone channel](../../docs/relay/phone-channel.md). |
+| `preview` | A browser's TLS connection to one of the Node's preview names, which the Node ends. Only [the relay's preview listener](#preview-streams) opens one: a WebSocket client that asks for it gets `400`. |
 
 A Node refuses a kind it doesn't serve, with a `refuse` message on its control connection.
+
+## Preview streams
+
+A relay may listen for TLS on a preview domain, a host name it is configured with. A name under it has two
+labels before the domain: `<preview>.<node>.<domain>`. The `<node>` label is the first 32 lowercase hex
+characters of the SHA-256 of `acorn-preview-node:` followed by the route, so the relay, the Node, and an
+account service each compute it with no help. The `<preview>` label is the Node's business.
+
+1. The relay accepts a TCP connection and buffers until it holds the first TLS record, at most 16,389 bytes.
+   It reads the server name from the ClientHello and nothing else.
+2. It strips `.<domain>` from the name. What is left must be two labels, and the second must be the label of
+   a connected route. Anything else, and a connection that isn't TLS or that sends no complete record in 10
+   seconds, is closed with no answer.
+3. It asks that Node for a stream of kind `preview`, as it does for a client's stream. When the Node opens
+   its end, the relay writes the bytes it buffered to it first, so the Node reads the whole ClientHello. After
+   that it copies bytes both ways, as above.
+
+The relay holds no certificate and ends no TLS. The Node does, with a certificate for `*.<node>.<domain>`, so
+what crosses the relay after the first record is ciphertext. A browser's connection and the stream close
+together, whichever end closes first.
+
+The relay allows 32 open or waiting `preview` streams for one route, counted apart from the 256 in
+[Limits](#limits), because anyone who knows a name can open one. A connection over the limit is closed.
 
 ## Carry bytes
 
@@ -113,6 +137,7 @@ jitter. It starts over at 1 second once a connection opens.
 | --- | --- |
 | Largest message | 1 MiB |
 | Open and waiting streams for one route | 256 |
+| Open and waiting `preview` streams for one route | 32 |
 | Time for a Node to open its end of a stream | 10 seconds |
 
 A message over the limit closes that connection with code 1009.
@@ -126,4 +151,6 @@ change uses `/v2/`, and a relay serves each version its Nodes and clients still 
 ## What the relay knows
 
 The relay knows routes, stream IDs, stream kinds, connection times, and how many bytes cross each
-connection. It doesn't know the paths, methods, or bodies of the HTTP requests inside a stream.
+connection. It doesn't know the paths, methods, or bodies of the HTTP requests inside a stream. For a
+`preview` stream it also reads the server name, which holds the Node's label and a label the Node chose, so
+it learns which Node is being visited and when. It sees the name of every preview that is opened.

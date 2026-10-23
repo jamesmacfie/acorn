@@ -10,8 +10,10 @@ import {
   ACCOUNT_BROWSER_HEADER,
   accountPaths,
   assertionRequestSchema,
+  credentialClaimsSchema,
   deviceCodeRequestSchema,
   deviceCodeResponseSchema,
+  previewChallengeRequestSchema,
   registerNodeRequestSchema,
   TICKET_LIFETIME_SECONDS,
   ASSERTION_LIFETIME_SECONDS,
@@ -22,9 +24,11 @@ import {
   type Account,
   type AccountError,
   type ListNodesResponse,
+  type PreviewResponse,
   type TokenResponse,
 } from '@acorn/protocol/account.ts'
-import { generateSigningKey, signToken } from '@acorn/protocol/accountToken.ts'
+import { generateSigningKey, signToken, verifyToken } from '@acorn/protocol/accountToken.ts'
+import { previewDomainHost, previewNodeLabel } from '@acorn/protocol/relay.ts'
 
 // A small account service for the tests and `pnpm dev:agent` flows that need one
 // to exist (docs/account-api/testing.md § The stand-in). Like the control plane stub, it isn't a mock: every
@@ -53,6 +57,10 @@ export type AccountStub = {
   remove(nodeId: string): void
   /** A ticket for any account and Node, owned or not, so a test can show the relay refusing it. */
   forgeTicket(accountId: string, nodeId: string): Promise<string>
+  /** Where previews are served and which certificate authority to ask. `undefined` is a service with none. */
+  setPreview(preview: PreviewResponse | undefined): void
+  /** The TXT records Nodes have published, by name, which is what a certificate authority would look up. */
+  challenges(): ReadonlyMap<string, string>
   close(): Promise<void>
 }
 
@@ -94,6 +102,11 @@ export async function startAccountStub(options: AccountStubOptions = {}): Promis
   const revoked = new Set<string>()
   let relayUrl = 'ws://relay.invalid'
   let baseUrl = ''
+  let preview: PreviewResponse | undefined = {
+    domain: 'preview.acorn.test',
+    acmeDirectory: 'https://acme.invalid/directory',
+  }
+  const challenges = new Map<string, string>()
 
   // An account's ID has nothing to do with its login, as the hosted service's doesn't.
   const accounts = new Map<string, Account>()
@@ -273,6 +286,29 @@ export async function startAccountStub(options: AccountStubOptions = {}): Promis
     return c.json({ assertion, expiresAt })
   })
 
+  app.get(accountPaths.preview, (c) => (preview ? c.json(preview) : fail(c, 404, 'not_found')))
+
+  // The only route a Node's own credential opens. The record's name comes from the credential's Node, so a
+  // Node can't publish under another's label.
+  app.put(accountPaths.previewChallenge, async (c) => {
+    const credential = await verifyToken(
+      c.req.header('authorization')?.replace(/^Bearer /, '') ?? '',
+      'credential',
+      credentialClaimsSchema,
+      keys,
+      nowSeconds(),
+    )
+    if (!credential || revoked.has(credential.jti)) return fail(c, 401, 'invalid_token')
+    if (!preview) return fail(c, 404, 'not_found')
+    const body = await parse(c, previewChallengeRequestSchema)
+    if ('refusal' in body) return body.refusal
+    challenges.set(
+      `_acme-challenge.${await previewNodeLabel(credential.node)}.${previewDomainHost(preview.domain)}`,
+      body.data.value,
+    )
+    return c.body(null, 204)
+  })
+
   // Where the phone app sends a person to sign in. The stand-in signs in the one test account at once and
   // sends the browser back to a path on its own origin.
   app.get(accountPaths.browserSignIn, (c) => {
@@ -346,6 +382,8 @@ export async function startAccountStub(options: AccountStubOptions = {}): Promis
     },
     remove,
     forgeTicket: ticketFor,
+    setPreview: (next) => (preview = next),
+    challenges: () => challenges,
     close: () =>
       new Promise<void>((resolve) => {
         ;(server as unknown as Server).closeAllConnections()

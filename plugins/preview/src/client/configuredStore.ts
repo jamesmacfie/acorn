@@ -33,7 +33,9 @@ const same = (a: Record<string, boolean>, b: Record<string, boolean>): boolean =
 export const previewConfiguredSchedule: ClientScheduleContribution = {
   id: 'preview.configured',
   intervalMs: 120_000,
-  requires: { seam: 'preview' },
+  // Both panes read the answer: the desktop's, which a host with the seam draws, and the phone's. A host
+  // that has the Node's preview plugin has something to show it on.
+  requires: { plugin: 'preview' },
   run: async () => {
     let next: Record<string, boolean>
     try {
