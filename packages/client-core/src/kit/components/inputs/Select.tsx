@@ -55,13 +55,19 @@ function SelectList(props: {
   // membership is only knowable at the moment a key arrives (../../keys/collection.ts).
   const enabled = () => [...(listRef?.querySelectorAll<HTMLButtonElement>('.ui-menu-item:not([disabled])') ?? [])]
   const collection = createDomCollection({ selector: '.ui-menu-item' })
+  // The list sizes itself to its longest row. With a filter box, that row can be filtered out, so
+  // hold the width it opened at rather than shrinking and growing on every keystroke.
+  const [heldWidth, setHeldWidth] = createSignal<number>()
   // Opening on the current value is what the native control does, and it is what makes the arrow
   // keys mean "the next one" rather than "the second one". A filtered list skips this: typing is the
   // first thing you want to do there, so the box takes the caret from its own ref and the rows keep
   // the current value marked without holding focus.
   onMount(() =>
     queueMicrotask(() => {
-      if (filterable()) return
+      if (filterable()) {
+        setHeldWidth(listRef?.offsetWidth)
+        return
+      }
       const rows = enabled()
       const chosen = rows.findIndex((row) => row.dataset.value === props.value())
       rows[chosen < 0 ? 0 : chosen]?.focus()
@@ -77,7 +83,10 @@ function SelectList(props: {
           collection.attach(el)
         }}
         class="ui-popover ui-select-list"
-        style={props.popover.surfaceStyle()}
+        style={{
+          ...props.popover.surfaceStyle(),
+          ...(heldWidth() === undefined ? {} : { width: `${heldWidth()}px` }),
+        }}
         onKeyDown={(event) => {
           // From the filter box the rows are somewhere to go, not somewhere you already are: Enter
           // takes the top match and ArrowDown steps into the list. Every other key is typing, and

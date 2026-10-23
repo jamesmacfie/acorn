@@ -128,7 +128,7 @@ export type AnchoredPopover = {
   toggle: () => void
   close: () => void
   show: () => void
-  position: () => { top: number; left: number; width?: number }
+  position: () => { top: number; left: number; width?: number; minWidth?: number }
   /** Ref for the floating element. Outside-click needs it: it lives outside the anchor's subtree. */
   setSurface: (element: HTMLElement | undefined) => void
   /** Inline style for the floating element: position: fixed plus the measured offsets. */
@@ -138,8 +138,8 @@ export type AnchoredPopover = {
 export function createAnchoredPopover(opts: {
   anchor: () => AnchorTarget | undefined
   placement?: () => Placement
-  /** Surface width. `'anchor'` pins the surface to the trigger's width, so a long option label wraps
-   *  inside the list instead of a list wider than the control it hangs off. A number is a fixed
+  /** Surface width. `'anchor'` makes the trigger's width the floor and lets the surface grow to fit
+   *  its longest row, so a list opened under a narrow trigger doesn't wrap every label. A number is a fixed
    *  `max(trigger, n)`, which is what Picker was tuned against, where a list that changed width on
    *  every keystroke of the filter would be worse. */
   minWidth?: number | 'anchor'
@@ -160,7 +160,10 @@ export function createAnchoredPopover(opts: {
     setUncontrolled(next)
     opts.onOpenChange?.(next)
   }
-  const [pos, setPos] = createSignal<{ top: number; left: number; width?: number }>({ top: 0, left: 0 })
+  const [pos, setPos] = createSignal<{ top: number; left: number; width?: number; minWidth?: number }>({
+    top: 0,
+    left: 0,
+  })
   let surface: HTMLElement | undefined
 
   const reposition = () => {
@@ -197,7 +200,7 @@ export function createAnchoredPopover(opts: {
     setPos({
       ...placed,
       ...(minWidth === 'anchor'
-        ? { width: rect.width }
+        ? { minWidth: rect.width }
         : typeof minWidth === 'number'
           ? { width: Math.max(rect.width, minWidth) }
           : {}),
@@ -290,6 +293,7 @@ export function createAnchoredPopover(opts: {
         top: `${p.top}px`,
         left: `${p.left}px`,
         ...(p.width === undefined ? {} : { width: `${p.width}px` }),
+        ...(p.minWidth === undefined ? {} : { 'min-width': `${p.minWidth}px` }),
       }
     },
   }

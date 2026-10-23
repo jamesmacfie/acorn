@@ -140,16 +140,16 @@ textarea.ui-input[data-grow] { flex: 1; min-height: 0; resize: none; }
    in the DOM as the value store; see kit/components/inputs/Select.tsx for why. */
 .ui-select-native { display: none; }
 /* The surface caps its height and the rows scroll inside it, so a filter box stays put instead of
-   scrolling away from the list it is narrowing. */
-.ui-select-list { max-height: min(60vh, 420px); }
+   scrolling away from the list it is narrowing. It is at least as wide as the trigger and grows to
+   fit its longest row, up to a cap past which a label wraps. */
+.ui-select-list { max-height: min(60vh, 420px); max-width: min(92vw, 360px); }
 /* The filter box a long list grows. Reached by position rather than by a class, because the kit
    hands no class to anything, not even to itself. */
 .ui-select-list > .ui-input { flex: none; margin-bottom: var(--space-3); }
 .ui-select-options { overflow-y: auto; }
 .ui-select-nomatch { margin: 0; padding: var(--space-2) var(--space-4); font-size: var(--fs-sm); }
-/* The list is exactly as wide as the trigger, so a label longer than that wraps onto a second line
-   rather than the list growing past the control it opened under. Rows get vertical padding because
-   a wrapped one is taller than the single-line row height. */
+/* A label longer than the capped list wraps onto a second line. Rows get vertical padding because a
+   wrapped one is taller than the single-line row height. */
 .ui-select-list .ui-menu-item { padding: var(--space-2) var(--space-4); }
 .ui-select-list .ui-menu-label { overflow-wrap: anywhere; }
 .ui-select-list .ui-menu-item[aria-selected='true'] { background: var(--bg-selected); }
