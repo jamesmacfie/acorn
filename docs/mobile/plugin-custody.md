@@ -68,7 +68,7 @@ build calls it once.
 
 `pnpm --filter @acorn/mobile build` first runs `apps/mobile/scripts/build-first-party.mjs`. It builds the roster in
 `scripts/bundled-plugins.mjs` with the function the desktop and the standalone Node use, hashes each client bundle, and
-writes `apps/mobile/first-party-bundles.json`, which Git ignores. `vite.config.ts` hands the file to the app as
+writes `first-party-bundles.json` in the phone's folder, which Git ignores. `vite.config.ts` hands the file to the app as
 `__ACORN_FIRST_PARTY_BUNDLES__`, and only the custody chunk reads it, so the first screen doesn't grow. `pnpm dev:mobile`
 runs the same script, so a Node started from the same checkout matches.
 

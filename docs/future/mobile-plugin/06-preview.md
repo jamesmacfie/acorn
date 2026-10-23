@@ -66,9 +66,8 @@ Decisions and deviations:
 
 Found and left alone:
 
-- `docPaths.test.ts` fails on a checkout where the phone hasn't been built, because two docs cite
-  `apps/mobile/first-party-bundles.json`, which `pnpm --filter @acorn/mobile build` writes and Git ignores. It came with
-  phase 4.
+- `docPaths.test.ts` failed on a checkout where the phone hadn't been built, because two docs cited the
+  path of the generated `first-party-bundles.json`. The coordinator fixed the docs when it merged the programme.
 
 What later work needs to know:
 

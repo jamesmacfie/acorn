@@ -12,7 +12,7 @@ What landed:
   acceptance the desktop records for its own bundles. `trustBundledClientPlugins` now calls it, so the desktop and the
   phone build one acceptance the one way. `bundledPluginTrust.test.ts` is unchanged.
 - `apps/mobile/scripts/build-first-party.mjs` builds the roster with `buildBundledPlugins`, hashes each client bundle, and
-  writes the acceptances to `apps/mobile/first-party-bundles.json` (ignored by Git). `pnpm --filter @acorn/mobile build`
+  writes the acceptances to `first-party-bundles.json` in the phone's folder (ignored by Git). `pnpm --filter @acorn/mobile build`
   runs it first, and so does `pnpm dev:mobile`. `vite.config.ts` hands the file to the app as
   `__ACORN_FIRST_PARTY_BUNDLES__`. Six bundles carry: agent-cost, database, http, linear, rollbar, and
   sentry-telemetry. model-providers has no client.

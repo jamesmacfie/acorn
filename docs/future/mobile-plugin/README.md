@@ -1,7 +1,9 @@
 # Run installed plugins, the terminal, and Preview on the phone
 
-Date: October 23, 2026. Status: proposed. Implementation not started. Where a file here disagrees
-with a shipped contract, the owning reference document wins.
+Date: October 23, 2026. Status: all six phases built on the open side. Still to do: the real-device
+checkpoints, the hosted-service steps, Runn's opt-in in its own repository, and phase 6's staging
+certificate check. Each phase file's completion note says what landed and what's left. Where a file
+here disagrees with a shipped contract, the owning reference document wins.
 
 This programme plans the rest of the plugin UI on the phone: plugins installed on a Node, such as
 Database, HTTP, and Runn, the terminal, plugins that paint their own iframe, and Preview through the
