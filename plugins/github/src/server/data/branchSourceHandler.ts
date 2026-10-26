@@ -43,7 +43,9 @@ export function branchDescription(base: DataSourceDescription): DataSourceDescri
   }
 }
 
-/** The plugin owns the provider relation; core owns the scoped local Git read. */
+/** The plugin owns the provider relation; core owns the scoped local Git read. It reads core through
+ *  `invoke` rather than a declared input on purpose: docs/data-sources/derived-sources.md § Limits and
+ *  known gaps says why. */
 export function createBranchSourceHandler(invoke: SourceInvoker): PluginFetchHandler {
   return async (request, context) => {
     try {

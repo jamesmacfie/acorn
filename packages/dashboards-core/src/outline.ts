@@ -384,6 +384,27 @@ export function emptyRunReason(plan: PanelPlan, stages: readonly PlanStageCount[
   return `The step "${stageWords(plan, plan.stages[emptied]!).title}" removed all ${plural(counts[emptied]!.input, 'row')}.`
 }
 
+/** Where a filter step ran, in plain words, from a run's diagnostics. Undefined when the run doesn't
+ *  say, as a Node from before the diagnostic doesn't, so a client makes no claim. A source that stopped
+ *  early is named, because a filter the panel applies can only see the records that came back. */
+export function describeFilterRun(run: DashboardRun | undefined, path: string): string | undefined {
+  const filter = run?.diagnostics.filters?.find((entry) => entry.path === path)
+  if (!filter) return undefined
+  const partial = run!.diagnostics.sources.filter(
+    (source) => source.completeness && !['complete', 'bounded'].includes(source.completeness.kind),
+  )
+  if (filter.appliedBy === 'source') {
+    const label = run!.diagnostics.sources.find((source) => source.id === filter.source)?.label ?? 'The source'
+    return partial.some((source) => source.id === filter.source)
+      ? `${label} applies this filter as it reads. It stopped before its last match, so more records may match.`
+      : `${label} applies this filter as it reads.`
+  }
+  const cut = partial.map((source) => source.label).join(', ')
+  return partial.length
+    ? `The panel applies this filter to the records it read. ${cut} returned only some of ${partial.length === 1 ? 'its' : 'their'} records, so this filter couldn't check the rest.`
+    : 'The panel applies this filter to the records it read.'
+}
+
 /** One part per bound column, for the columns inspector. */
 export const columnParts = (plan: PanelPlan): PlanPart[] =>
   plan.columns.map((column, index) => ({

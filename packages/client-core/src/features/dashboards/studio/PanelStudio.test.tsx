@@ -124,6 +124,7 @@ let turnReply: () => Promise<unknown>
 let catalog: unknown[]
 let runProblems: unknown[]
 let runSources: unknown[]
+let runRows: unknown[]
 const onClose = vi.fn()
 const settle = async (times = 3) => {
   for (let index = 0; index < times; index += 1) await new Promise((resolve) => setTimeout(resolve, 0))
@@ -160,6 +161,7 @@ beforeEach(() => {
   catalog = []
   runProblems = [{ path: '/stages/0', message: 'Filter names an unavailable column: title.', severity: 'error' }]
   runSources = []
+  runRows = []
   onClose.mockReset()
   requests.mockReset()
   requests.mockImplementation(async (path, options) => {
@@ -170,7 +172,7 @@ beforeEach(() => {
     if (path.endsWith('/dashboards/run'))
       return {
         plan: structuredClone(opened),
-        rows: [],
+        rows: runRows,
         groups: [],
         diagnostics: {
           problems: runProblems,
@@ -464,5 +466,72 @@ describe('PanelStudio', () => {
     await settle()
     expect(document.body.textContent).not.toContain('Reviewing AI proposal')
     expect(row('Keep where Title is "y"')).toBeUndefined()
+  })
+
+  it("marks the proposal's own problems on its outline, and drops them when it is set aside", async () => {
+    opened = filtered
+    // Each run reports a problem on a second step. Only the proposal has one, so the plan's own outline
+    // can't show it, and the proposed outline shows it on the step the proposal adds.
+    runProblems = [{ path: '/stages/1', message: 'Filter names an unavailable column: size.', severity: 'error' }]
+    const added: PanelPlan['stages'][number] = {
+      op: 'filter',
+      where: {
+        kind: 'comparison',
+        left: { address: { from: 'item', pointer: '/title' } },
+        operator: 'eq',
+        right: { address: { from: 'literal', value: 'y' } },
+      },
+    }
+    turnReply = async () => ({
+      state: 'proposal',
+      base: filtered,
+      baseRevision: 1,
+      candidate: { ...filtered, stages: [...filtered.stages, added] },
+      summary: 'Adds a filter.',
+      diff: [],
+      problems: [],
+      context: [{ role: 'user', content: 'Add a filter' }],
+      usage: { requests: 1, inputTokens: 1, outputTokens: 1 },
+      providerId: 'p',
+      modelId: 'm',
+    })
+    mount('d1')
+    await settle(6)
+    expect(document.querySelector('[aria-label="Has a problem"]')).toBeNull()
+    button('Ask AI')!.click()
+    await settle()
+    const field = document.querySelector<HTMLTextAreaElement>('.dash-studio-dock textarea')!
+    field.value = 'Add a filter'
+    field.dispatchEvent(new Event('input', { bubbles: true }))
+    await settle()
+    button('Send')!.click()
+    await settle(8)
+
+    const proposed = row('Keep where Title is "y"')!
+    expect(proposed.querySelector('[aria-label="The proposal has a problem here"]')).not.toBeNull()
+    expect(row('Keep where Title is "x"')!.querySelector('[aria-label="The proposal has a problem here"]')).toBeNull()
+    expect(document.querySelector('[aria-label="Has a problem"]')).toBeNull()
+
+    button('Discard')!.click()
+    await settle()
+    expect(document.querySelector('[aria-label="The proposal has a problem here"]')).toBeNull()
+  })
+
+  it("asks the AI about a column from the preview's header, focused on that column", async () => {
+    opened = { ...filtered, stages: [], view: { kind: 'table' } }
+    runProblems = []
+    runRows = [{ id: 'one', values: { title: 'Ship it' }, records: [] }]
+    mount('d1')
+    await settle(6)
+    const trigger = document.querySelector<HTMLButtonElement>('.dash-studio-preview [aria-label="Actions for Title"]')!
+    trigger.click()
+    await settle()
+    ;[...document.querySelectorAll<HTMLElement>('[role="menuitem"]')]
+      .find((entry) => entry.textContent === 'Ask AI about this')!
+      .click()
+    await settle()
+    const field = document.querySelector<HTMLTextAreaElement>('.dash-studio-dock textarea')!
+    expect(field.value).toBe('About Title: ')
+    expect(document.activeElement).toBe(field)
   })
 })

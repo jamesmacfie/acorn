@@ -59,6 +59,7 @@ export default function StudioOutline(props: {
   inputs: PlanInputs
   stageCounts: readonly PlanStageCount[]
   sourceCounts: DashboardRun['diagnostics']['sources']
+  /** The plan's problems, or while a proposal is under review, the proposed plan's own. */
   problems: readonly PlanProblem[]
   selected?: PlanPartKey
   onSelect: (key: PlanPartKey) => void
@@ -107,6 +108,12 @@ export default function StudioOutline(props: {
     return stage && `${stage.input} → ${stage.output}`
   }
   const partProblems = (key: OutlineRow['key']) => problems()[key as PlanPartKey] ?? []
+  // Under review the marks are the proposal's, so they say so rather than pass for the plan's own.
+  const problemMark = () => (props.review ? 'The proposal has a problem here' : 'Has a problem')
+  const problemTip = (key: OutlineRow['key']) =>
+    partProblems(key)
+      .map((problem) => (props.review ? `In the proposal: ${problem.message}` : problem.message))
+      .join('\n') || undefined
   const pick = (key: string): void => {
     if (!key.startsWith('removed:')) props.onSelect(key as PlanPartKey)
   }
@@ -192,11 +199,7 @@ export default function StudioOutline(props: {
                     density="compact"
                     variant="stacked"
                     onPress={() => pick(part.key)}
-                    tip={
-                      partProblems(part.key)
-                        .map((problem) => problem.message)
-                        .join('\n') || undefined
-                    }
+                    tip={problemTip(part.key)}
                     leading={<Icon name={part.icon} />}
                     meta={
                       <>
@@ -208,7 +211,7 @@ export default function StudioOutline(props: {
                           )}
                         </Show>
                         <Show when={partProblems(part.key).length}>
-                          <Icon name="triangle-alert" title="Has a problem" />
+                          <Icon name="triangle-alert" title={problemMark()} />
                         </Show>
                         <Show when={part.change !== 'removed' && count(part as PlanPart)}>
                           {(text) => (

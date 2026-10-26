@@ -10,6 +10,7 @@ import { IconButton } from '../../../kit/components/inputs/IconButton'
 import { Inline } from '../../../kit/components/layout/Inline'
 import { COLS, sizePresets, type Rect } from '../layout'
 import PanelBody from '../views/PanelBody'
+import type { PanelViewProps } from '../views/props'
 
 // The studio's live preview: the panel's own body, in the card a placed panel uses, at the width and
 // height it would have on the dashboard (docs/dashboards/mapping-and-editor.md § The generated editor).
@@ -37,6 +38,7 @@ export default function StudioPreview(props: {
   onRefresh: () => void
   onSelectPart: (key: PlanPartKey) => void
   onEditTitle: () => void
+  askAboutColumn?: PanelViewProps['askAboutColumn']
   /** Why a run that worked has no rows, shown in place of the empty view. */
   emptyReason?: string
   /** Set while a proposal is under review. `plan` and `run` are the side showing, and `beforeRows` is
@@ -140,6 +142,7 @@ export default function StudioPreview(props: {
                       {...(props.plan.group?.[0] ? { groupBy: props.plan.group[0].column } : {})}
                       provenance={props.plan.sources.length > 1}
                       onSelectPart={props.onSelectPart}
+                      {...(props.askAboutColumn ? { askAboutColumn: props.askAboutColumn } : {})}
                     />
                   </Show>
                 )}

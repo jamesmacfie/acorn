@@ -4,7 +4,12 @@ import { createQuery, useQueryClient } from '@tanstack/solid-query'
 import { panelPlanSchema, type DashboardView, type PanelPlan } from '@acorn/protocol/dashboards.ts'
 import type { AuthoringTurnResult } from '@acorn/protocol/authoring.ts'
 import { eventChord, isTypingTarget } from '@acorn/protocol/keybindings.ts'
-import { describePanelPlan, type PlanProblem, type SourceFailure } from '@acorn/dashboards-core/plan.ts'
+import {
+  describePanelPlan,
+  type DashboardRun,
+  type PlanProblem,
+  type SourceFailure,
+} from '@acorn/dashboards-core/plan.ts'
 import {
   columnParts,
   diffOutline,
@@ -257,28 +262,39 @@ export default function PanelStudio(props: {
   // The proposal under review runs as its own draft preview, so Before and After switch without a wait.
   const proposedPreview = previewRun(() => store.review()?.merged)
   const proposedRun = createMemo(() => (proposedPreview.data ? copy(proposedPreview.data) : undefined))
-  /** Nothing before a source is picked, so a blank panel doesn't open on a list of errors. The run and
-   *  the Node's validator can report the same problem, so each message shows once. */
-  const problems = createMemo((): PlanProblem[] => {
-    if (!plan().sources.length) return []
-    const result = parsed()
+  /** A plan's problems in plain words: where it fails its schema, then what its run reported. Nothing
+   *  before a source is picked, so a blank panel doesn't open on a list of errors. The run and the
+   *  Node's validator can report the same problem, so each message shows once. */
+  const wordProblems = (content: PanelPlan, shown: DashboardRun | undefined): PlanProblem[] => {
+    if (!content.sources.length) return []
+    const result = content === plan() ? parsed() : panelPlanSchema.safeParse(content)
     const schema = result.success
       ? []
       : result.error.issues.map((issue) => {
           const path = `/${issue.path.map(String).join('/')}`
-          return { path, severity: 'error' as const, message: `${planPartLabel(plan(), path)} is incomplete.` }
+          return { path, severity: 'error' as const, message: `${planPartLabel(content, path)} is incomplete.` }
         })
-    const reported = [...new Map((run()?.diagnostics.problems ?? []).map((entry) => [entry.message, entry])).values()]
+    const reported = [...new Map((shown?.diagnostics.problems ?? []).map((entry) => [entry.message, entry])).values()]
     // A source's failure reads in the words the placed panel uses; anything else names its part.
     return [
       ...schema,
       ...reported.map((entry) => ({
         ...entry,
         message: entry.failure
-          ? describeSourceFailure(entry.failure, contextFor({ ...entry, failure: entry.failure }).names).message
-          : `${planPartLabel(plan(), entry.path)}: ${entry.message}`,
+          ? describeSourceFailure(
+              entry.failure,
+              failureContext({ ...entry, failure: entry.failure }, content, catalogSources(), connections()).names,
+            ).message
+          : `${planPartLabel(content, entry.path)}: ${entry.message}`,
       })),
     ]
+  }
+  const problems = createMemo(() => wordProblems(plan(), run()))
+  /** The proposed plan's own problems, for its outline under review. They go when review ends, as the
+   *  proposal is applied or set aside, and the plan's own problems show again. */
+  const proposalProblems = createMemo(() => {
+    const current = store.review()
+    return current ? wordProblems(current.merged, proposedRun()) : []
   })
   /** The plugins in development mode this panel reads, and the last run's numbers for their sources. */
   const developing = createMemo(() => {
@@ -824,7 +840,7 @@ export default function PanelStudio(props: {
                 inputs={outlineInputs()}
                 stageCounts={(review() ? proposedRun() : run())?.diagnostics.stages ?? []}
                 sourceCounts={(review() ? proposedRun() : run())?.diagnostics.sources ?? []}
-                problems={review() ? [] : problems()}
+                problems={review() ? proposalProblems() : problems()}
                 selected={store.selected()}
                 onSelect={select}
                 onAdd={addPart}
@@ -853,6 +869,14 @@ export default function PanelStudio(props: {
                           if (parts().some((part) => part.key === key)) select(key)
                         }}
                         onEditTitle={() => setEditingTitle(true)}
+                        {...(review()
+                          ? {}
+                          : {
+                              askAboutColumn: {
+                                columns: plan().columns.map((column) => column.id),
+                                onAsk: (column: string) => inspectorContext.askAi(`column:${column}`),
+                              },
+                            })}
                         {...(emptyReason() ? { emptyReason: emptyReason() } : {})}
                         {...(review()
                           ? {

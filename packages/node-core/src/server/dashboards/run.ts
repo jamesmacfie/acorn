@@ -58,10 +58,17 @@ function fieldCanBeUnknown(source: PlanSource, pointer: string): boolean {
   return false
 }
 
-function plannedQuery(query: DataSourceQuery, plan: PanelPlan, source: PlanSource): DataSourceQuery {
-  if (plan.sources.find((entry) => entry.id === source.instanceId)?.role !== 'primary') return query
+/** The query a source reads with: the plan's leading filters it can apply itself, and the final sort
+ *  and limit when nothing else changes the rows. `filters` holds the indexes of the steps it took. */
+function plannedQuery(
+  query: DataSourceQuery,
+  plan: PanelPlan,
+  source: PlanSource,
+): { query: DataSourceQuery; filters: number[] } {
+  const filters: number[] = []
+  if (plan.sources.find((entry) => entry.id === source.instanceId)?.role !== 'primary') return { query, filters }
   let next = query
-  for (const stage of plan.stages) {
+  for (const [index, stage] of plan.stages.entries()) {
     if (stage.op !== 'filter') break
     const where = stage.where
     if (
@@ -79,6 +86,7 @@ function plannedQuery(query: DataSourceQuery, plan: PanelPlan, source: PlanSourc
     if (fieldCanBeUnknown(source, binding.field) && !['missing', 'present', 'eq'].includes(where.operator)) continue
     const pushed = { ...where, left: { ...where.left, address: { from: 'item' as const, pointer: binding.field } } }
     next = { ...next, predicate: next.predicate ? { kind: 'all', predicates: [next.predicate, pushed] } : pushed }
+    filters.push(index)
   }
   if (plan.sources.length === 1 && plan.stages.length === 0 && !query.take && plan.limit && plan.sort?.length) {
     const sort = plan.sort.flatMap((item) => {
@@ -91,8 +99,22 @@ function plannedQuery(query: DataSourceQuery, plan: PanelPlan, source: PlanSourc
     })
     if (sort.length === plan.sort.length) next = { ...next, sort, take: plan.limit }
   }
-  return next
+  return { query: next, filters }
 }
+
+/** Where each filter step ran, by the source instance that applied it as it read. A step no source
+ *  took ran on the rows the panel had. */
+const filterDiagnostics = (plan: PanelPlan, applied: Map<number, string>): DashboardRun['diagnostics']['filters'] =>
+  plan.stages.flatMap((stage, index) => {
+    if (stage.op !== 'filter') return []
+    const source = applied.get(index)
+    return [
+      {
+        path: `/stages/${index}`,
+        ...(source ? { appliedBy: 'source' as const, source } : { appliedBy: 'panel' as const }),
+      },
+    ]
+  })
 
 /** Where a source's problem points: at the input's binding when an input is at fault and the plan
  *  holds the query inline, so the studio marks the input's row, and at the source otherwise. */
@@ -270,6 +292,8 @@ export async function runDashboard(
   const sources: PlanSource[] = []
   const sourceDiagnostics: DashboardRun['diagnostics']['sources'] = []
   let uncoveredWindow = false
+  // Set once the sources are read, so a run that stopped before reading claims nothing about its filters.
+  let filters: DashboardRun['diagnostics']['filters']
   const started = Date.now()
   for (const entry of plan.sources) {
     if (entry.reference.kind === 'supplied') {
@@ -411,6 +435,11 @@ export async function runDashboard(
           gaps,
         )
         rows = sortPlanRows(plan, staged.rows).slice(0, plan.limit ?? 5000)
+        // The dataset's SQL applies every filter before the summary, across all its rows.
+        filters = filterDiagnostics(
+          plan,
+          new Map(plan.stages.slice(0, summary.stageIndex).map((_, index) => [index, source.instanceId])),
+        )
         counts = [
           {
             path: `/stages/${summary.stageIndex}`,
@@ -443,6 +472,7 @@ export async function runDashboard(
         problems,
         sources: sourceDiagnostics,
         stages: counts,
+        ...(filters ? { filters } : {}),
         evaluationTime,
         plugins: ['core'],
         accounts: [],
@@ -453,14 +483,19 @@ export async function runDashboard(
   if (!problems.some((problem) => problem.severity === 'error')) {
     // Every source reads at once, and the loop below settles them in plan order, so the problems and
     // the budgets come out as they did when each read waited for the one before.
+    const applied = new Map<number, string>()
     const readSource = async (source: PlanSource): Promise<DataSourceResult> => {
       const reference = plan.sources.find((entry) => entry.id === source.instanceId)!.reference
-      source.query = plannedQuery(source.query, plan, source)
+      const planned = plannedQuery(source.query, plan, source)
+      source.query = planned.query
+      // Supplied rows ignore the query, so the panel applies every filter on them.
+      if (reference.kind !== 'supplied') for (const index of planned.filters) applied.set(index, source.instanceId)
       return reference.kind === 'supplied'
         ? suppliedRead(reference, args.mode, evaluationTime)
         : sharedRead(env, source, args.mode, evaluationTime, runInvocation)
     }
     const reads = await Promise.allSettled(sources.map(readSource))
+    filters = filterDiagnostics(plan, applied)
     for (const [position, source] of sources.entries()) {
       if (Date.now() - started > MAX_RUN_MS) {
         problems.push({ path: '/sources', message: 'Run time budget exceeded.', severity: 'error' })
@@ -559,6 +594,7 @@ export async function runDashboard(
       problems,
       sources: sourceDiagnostics,
       stages: staged.counts,
+      ...(filters ? { filters } : {}),
       evaluationTime,
       asOf: sourceDiagnostics.reduce<number | undefined>(
         (oldest, source) =>

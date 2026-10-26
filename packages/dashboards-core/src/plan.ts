@@ -109,6 +109,10 @@ export type DashboardRun = {
       development?: DataSourceResult['development']
     }[]
     stages: PlanStageCount[]
+    /** Where each filter step ran: `source` when that source instance applied it as it read, before
+     *  any limit of its own, and `panel` when the panel applied it to the records it got. A Node from
+     *  before October 2026 omits this, and a client then makes no claim about where a filter ran. */
+    filters?: ({ path: string } & ({ appliedBy: 'source'; source: string } | { appliedBy: 'panel' }))[]
     evaluationTime: number
     asOf?: number
     plugins: string[]

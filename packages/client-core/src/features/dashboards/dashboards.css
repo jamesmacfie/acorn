@@ -548,6 +548,14 @@
   min-height: 0;
 }
 
+/* A studio preview's column header: the name, then its menu, kept on one line so a narrow preview
+   doesn't push the menu under the name. */
+.dash-table-head {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  white-space: nowrap;
+}
 .dash-board-column-head {
   display: flex;
   align-items: center;
