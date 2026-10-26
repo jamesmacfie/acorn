@@ -1,7 +1,62 @@
 # Phase 5: only official plugins
 
-Date: October 26, 2026, from the October 17, 2026 plan. Status: not started. Depends on
+Date: October 26, 2026, from the October 17, 2026 plan. Status: done. Depends on
 [phase 4](./04-ship-the-dsn-in-release-builds.md).
+
+## Completion note
+
+Landed on October 26, 2026.
+
+What landed:
+
+- `TelemetryBatch` has `official: readonly string[]`, in `packages/plugin-types` and in protocol's
+  schema. The collector holds the list and puts it on every batch. `setOfficialTelemetryOwners` sets
+  it.
+- The loader marks a loaded plugin `official` when it's bundled (an `installed` ownership row and no
+  lockfile), doesn't shadow a built-in, and still hashes to the fingerprint that row recorded
+  (`matchesBundledFingerprint` in `bundled.ts`). The flag rides on `LoadedPluginBinding`.
+- The plugin host publishes the compiled-in plugins plus every official binding. It does this once
+  at boot, after each reload commit, and after an uninstall.
+- The team's target carries `officialOnly: true`. With it, the exporter keeps only records whose
+  owner is `core` or in `official`, after redaction and before envelope building. A connection and
+  `ACORN_SENTRY_DSN` get every owner's records.
+- The test kit takes `official: true` to name the plugin under test in the list. The published
+  surface snapshot gained `TelemetryBatch.official`.
+- Docs: a section named "Only official plugins" in `docs/integrations/sentry/the-acorn-teams-dsn.md`,
+  a paragraph on the batch's fields in `docs/telemetry/plugins-and-sinks.md`, and the test kit option
+  in `docs/plugin-authoring/testing.md`. On the site, one or two sentences each on the Sentry
+  telemetry, Telemetry and privacy, and Privacy policy pages.
+
+Decisions and deviations:
+
+- The exporter keys off an explicit `officialOnly` on the target, not `settings === TEAM_SETTINGS`.
+  The flag says what it does, and an identity check on a settings object would break the first time
+  someone copied it.
+- The loader hashes each bundled package again at every load instead of trusting the ownership row.
+  The row is written at boot, and a package can be edited after that and then reloaded. That's one
+  extra hash per bundled package per load, eight packages on the bundled roster.
+- Records are judged one at a time, so a mixed trace keeps its core spans and loses the plugin's,
+  with no re-parenting. An error in core that a bad plugin caused arrives as `core` and goes. So does
+  the loader's own failure line when a shadowing package throws on load, because core's `plugins`
+  logger writes it.
+- The exporter doesn't count what it drops for being unofficial. A `sentry.dropped` reason for it
+  would be easy to add if anyone wants to see the volume.
+- A client-only plugin compiled into the renderer has no node half, so it isn't in the list, and its
+  records don't reach the team. Every literal owner the renderer uses today is `core` or a node
+  built-in such as `agents`, so nothing is lost.
+- The desktop helper runs its own collector with an empty list. Its records go to the node, which
+  holds the real list, so that doesn't matter.
+
+Checked by tests only: the collector's list on batches, the loader's flag against a real reconcile
+(bundled, shadowed, then edited), the host's list through boot, reload, and uninstall, the
+exporter's filter on a mixed trace, and the plugin's team path with an unofficial owner. No release
+build or live Sentry project was used.
+
+For later phases:
+
+- When official plugins move to their own repository, change the loader's test for `official` to
+  read the installer's lock file for the acorn organization's releases. Nothing else needs to move.
+- The two arch-test failures from the base commit remain: links to the deleted workflows gaps doc.
 
 ## Goal
 

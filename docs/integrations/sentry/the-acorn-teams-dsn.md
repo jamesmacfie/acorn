@@ -55,5 +55,25 @@ exporter ignores the settings page and uses `TEAM_SETTINGS`
 | Events | As breadcrumbs on errors only |
 | Task IDs as tags | Off |
 
+## Only official plugins
+
+The team's project takes records only from core and from plugins acorn ships unmodified. A half-built
+plugin someone installed would otherwise fill it with its own errors.
+
+Every record's `attrs.owner` is `core` or a plugin id, stamped by the host. An id alone doesn't prove
+where the code came from: a folder install can take a bundled plugin's id, and an edited bundled
+package keeps it. So core puts `official` on every batch. It lists the compiled-in plugins, and each
+loaded plugin that's bundled with acorn (no lockfile), doesn't shadow a built-in, and still matches
+the fingerprint reconciliation recorded. The loader hashes the package again at each load, and the
+plugin host republishes the list after every boot, reload, and uninstall.
+
+The team's target carries `officialOnly`, and the exporter drops every record whose owner is neither
+`core` nor in `official`, after redaction and before it builds envelopes. Each record is judged on its
+own. In a trace that starts in core and passes through an unofficial plugin, the core spans go and the
+plugin's don't, and nothing is re-parented, so Sentry shows the gap as untracked time. An error a bad
+plugin causes inside core arrives as `core` and goes, because it's core's to harden against.
+
+A Settings connection and `ACORN_SENTRY_DSN` get every owner's records, as before.
+
 The client can't be trusted to cap its own cost. The team's Sentry project has spike protection on
 and a rate limit on its client key, and the exporter honours `X-Sentry-Rate-Limits`.

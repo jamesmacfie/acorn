@@ -55,6 +55,11 @@ export function init(ctx: NodePluginContext) {
 }
 ```
 
+A batch carries the Node's `node` id, its `version`, and `official`: the plugin ids whose code acorn
+shipped unmodified ([only official plugins](../integrations/sentry/the-acorn-teams-dsn.md#only-official-plugins)).
+A sink that reports somewhere the owner doesn't run can keep only records whose `attrs.owner` is
+`core` or in that list.
+
 A sink sees everything from every owner, which is why it's a grant and not a default, and why the trust
 prompt draws it high ([telemetry sinks](../security/plugin-node-realm.md#telemetry-sinks)).
 

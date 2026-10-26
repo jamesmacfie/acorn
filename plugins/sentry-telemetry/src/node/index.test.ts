@@ -53,7 +53,7 @@ const throwAndRecord = (ctx: Awaited<ReturnType<typeof world>>['ctx']) => {
   }
 }
 
-async function world(options: { connected?: boolean; environment?: string; team?: string } = {}) {
+async function world(options: { connected?: boolean; environment?: string; team?: string; official?: boolean } = {}) {
   // Always stated, so a developer's own `ACORN_SENTRY_DSN` never leaks into a test.
   vi.stubEnv('ACORN_SENTRY_DSN', options.environment)
   // What build-plugin.mjs writes in for the tag build. Source has no constant at all.
@@ -62,6 +62,7 @@ async function world(options: { connected?: boolean; environment?: string; team?
     plugin: sentryTelemetryPlugin(),
     permissions: await declaredPermissions(),
     userId: OWNER,
+    official: options.official ?? false,
   })
   if (options.connected !== false) {
     await seedProviderConnection(ctx.db, PROVIDER_ID, OWNER, DSN, ctx.encryptionKey, 'api-key')
@@ -258,7 +259,7 @@ describe('the sentry-telemetry plugin', () => {
       ctx.core.prefs.write(OWNER, SHARE_KEY, JSON.stringify(on))
 
     it('sends a thrown error to the team, tagged production, under the fixed policy', async () => {
-      const { ctx, plugin, readSource } = await world({ connected: false, team: TEAM_DSN })
+      const { ctx, plugin, readSource } = await world({ connected: false, team: TEAM_DSN, official: true })
       try {
         expect(await readSource()).toEqual({ environment: null, shareable: true })
         await share(ctx, true)
@@ -270,6 +271,21 @@ describe('the sentry-telemetry plugin', () => {
         expect(new Set(postedUrls())).toEqual(new Set([TEAM_URL]))
         expect(postedError()).toMatchObject({ environment: 'production', release: expect.stringMatching(/^acorn@.+/) })
         expect(itemTypes()).not.toContain('log')
+      } finally {
+        await plugin.dispose?.()
+        ctx.cleanup()
+      }
+    })
+
+    it("keeps a plugin that isn't official out of the team's project", async () => {
+      // The same error from the same unofficial plugin still reaches ACORN_SENTRY_DSN, above.
+      const { ctx, plugin } = await world({ connected: false, team: TEAM_DSN })
+      try {
+        await share(ctx, true)
+        throwAndRecord(ctx)
+        expect(ctx.recorded.length).toBeGreaterThan(0)
+        await new Promise((resolve) => setTimeout(resolve, 20))
+        expect(globalThis.fetch).not.toHaveBeenCalled()
       } finally {
         await plugin.dispose?.()
         ctx.cleanup()

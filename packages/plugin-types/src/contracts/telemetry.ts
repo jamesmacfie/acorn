@@ -87,5 +87,9 @@ export type CoreTelemetryService = {
 export type TelemetryBatch = {
   node: string
   version: string
+  /** Plugin ids whose code this node can vouch for: the compiled-in plugins, and bundled packages
+   *  that nothing shadows and whose bytes still match what the app shipped. A record whose `owner`
+   *  is `core` or one of these came from code the acorn team wrote. */
+  official: readonly string[]
   records: readonly HostOwned<'protocol/telemetry.TelemetryRecord'>[]
 }

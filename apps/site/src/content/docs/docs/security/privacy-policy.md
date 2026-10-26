@@ -7,7 +7,7 @@ sources:
   - plugins/sentry-telemetry/src/node/index.ts
   - plugins/sentry-telemetry/src/shared/settings.ts
   - plugins/sentry-telemetry/src/tree/settings.tsx
-checked: '6342cfd0e'
+checked: '6fec87ef7'
 ---
 
 This policy covers what the acorn team receives from the acorn app, who processes it for us, and how
@@ -28,6 +28,8 @@ With both on, your Node sends its errors, with stack traces, and one trace in tw
 name, a time, a few labels, the acorn version, and the error's cleaned message and stack. It never
 holds prompts, agent output, file contents, diffs, terminal output, request bodies, full paths,
 credentials, or your account ID ([Telemetry and privacy](/docs/security/telemetry-and-privacy/#what-never-leaves-the-machine)).
+Records come only from acorn itself and the plugins it ships, unchanged. A plugin you installed or
+edited sends nothing to us.
 
 We use the records only to find and fix bugs in acorn, and we don't sell or share them.
 

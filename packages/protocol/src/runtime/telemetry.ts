@@ -178,6 +178,8 @@ export const TELEMETRY_BATCH_MAX_BYTES = 1024 * 1024
 export const telemetryBatchSchema = z.object({
   node: z.string(),
   version: z.string(),
+  // Filled by the node's plugin host (packages/plugin-types/src/contracts/telemetry.ts says what counts).
+  official: z.array(z.string()).readonly(),
   records: z.array(telemetryRecordSchema),
 })
 export type TelemetryBatch = z.infer<typeof telemetryBatchSchema>

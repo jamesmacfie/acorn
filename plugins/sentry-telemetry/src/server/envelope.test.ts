@@ -16,7 +16,12 @@ const TRACE = 'a'.repeat(32)
 const OTHER_TRACE = 'b'.repeat(32)
 const hex16 = (seed: string) => seed.repeat(16).slice(0, 16)
 
-const batchOf = (records: TelemetryRecord[]): TelemetryBatch => ({ node: 'node-1', version: '1.0.0', records })
+const batchOf = (records: TelemetryRecord[]): TelemetryBatch => ({
+  node: 'node-1',
+  version: '1.0.0',
+  official: [],
+  records,
+})
 
 // Ids are the one thing a test cannot match, so it supplies them: `id-1`, `id-2`, in call order.
 const options = (overrides: Partial<EnvelopeOptions> = {}): EnvelopeOptions => {

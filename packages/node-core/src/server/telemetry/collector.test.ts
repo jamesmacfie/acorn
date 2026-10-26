@@ -9,6 +9,7 @@ import {
   recordDuration,
   resetTelemetryForTest,
   runWithTelemetry,
+  setOfficialTelemetryOwners,
   startSpan,
   startTelemetry,
   stopTelemetry,
@@ -131,6 +132,17 @@ describe('when a sink is subscribed and the preference is on', () => {
     flushTelemetry()
     expect(sink.records()).toHaveLength(1)
     expect(sink.batches[0]).toMatchObject({ node: 'node-1', version: '9' })
+  })
+
+  it('names the official plugins on every batch, as last told', async () => {
+    const sink = await enable()
+    setOfficialTelemetryOwners(['rollbar', 'agents'])
+    emitEvent('core', 'tick')
+    flushTelemetry()
+    setOfficialTelemetryOwners(['agents'])
+    emitEvent('core', 'tick')
+    flushTelemetry()
+    expect(sink.batches.map((batch) => batch.official)).toEqual([['agents', 'rollbar'], ['agents']])
   })
 
   it('stamps the owner the host passed and drops one the emitter claimed', async () => {

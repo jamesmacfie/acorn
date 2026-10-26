@@ -27,7 +27,12 @@ const line = (body: string): TelemetryRecord => ({
   body,
   attrs: { owner: 'core' },
 })
-const batch = (records: TelemetryRecord[]): TelemetryBatch => ({ node: 'node-1', version: '1.0.0', records })
+const batch = (records: TelemetryRecord[]): TelemetryBatch => ({
+  node: 'node-1',
+  version: '1.0.0',
+  official: [],
+  records,
+})
 
 const logger = (): Logger => ({ debug: vi.fn(), info: vi.fn(), warn: vi.fn(), error: vi.fn() })
 const telemetry = (): PluginTelemetry =>
@@ -206,6 +211,56 @@ describe('the exporter', () => {
     expect(world.fetch).toHaveBeenCalledTimes(2)
     const bodies = world.fetch.mock.calls.map((call) => String((call[1] as RequestInit).body))
     expect(bodies.map(itemTypeOf)).toEqual(['event', 'log'])
+  })
+
+  it("keeps only core's and official plugins' records for a target that asks", async () => {
+    const span = (spanId: string, owner: string, parentSpanId?: string): TelemetryRecord => ({
+      kind: 'span',
+      traceId: 'a'.repeat(32),
+      spanId,
+      ...(parentSpanId ? { parentSpanId } : {}),
+      name: `${owner}.work`,
+      start: NOW,
+      durationMs: 10,
+      status: 'ok',
+      attrs: { owner },
+    })
+    // One trace that starts in core and passes through a folder install shadowing `linear`.
+    const mixed = {
+      ...batch([
+        span('1'.repeat(16), 'core'),
+        span('2'.repeat(16), 'linear', '1'.repeat(16)),
+        span('3'.repeat(16), 'rollbar', '1'.repeat(16)),
+        { ...failure('LinearError'), attrs: { owner: 'linear' } },
+      ]),
+      official: ['rollbar'],
+    }
+    const spanOwners = (fetch: Harness['fetch']) =>
+      fetch.mock.calls
+        .map((call) => String((call[1] as RequestInit).body))
+        .filter((body) => itemTypeOf(body) === 'transaction')
+        .flatMap((body) => {
+          const transaction = JSON.parse(body.split('\n')[2])
+          return [transaction, ...transaction.spans].map((item) => item.data?.owner ?? item.tags?.owner)
+        })
+
+    const team = harness({ target: async () => ({ ...TARGET, officialOnly: true }) })
+    const teamExporter = createExporter(team.deps)
+    teamExporter.accept(mixed)
+    await teamExporter.settled()
+    const teamBodies = team.fetch.mock.calls.map((call) => String((call[1] as RequestInit).body))
+    expect(teamBodies.map(itemTypeOf)).toEqual(['transaction'])
+    expect(teamBodies.join('\n')).not.toContain('linear')
+    expect(spanOwners(team.fetch).sort()).toEqual(['core', 'rollbar'])
+
+    // A connection or ACORN_SENTRY_DSN gets every owner's records.
+    const own = harness()
+    const ownExporter = createExporter(own.deps)
+    ownExporter.accept(mixed)
+    await ownExporter.settled()
+    const ownBodies = own.fetch.mock.calls.map((call) => String((call[1] as RequestInit).body))
+    expect(ownBodies.map(itemTypeOf).sort()).toEqual(['event', 'transaction'])
+    expect(ownBodies.join('\n')).toContain('LinearError')
   })
 
   it('returns from accept without waiting for the post', () => {

@@ -97,6 +97,7 @@ type CollectorState = {
   readPref: (() => Promise<boolean>) | null
   node: string
   version: string
+  official: readonly string[]
   dropped: number
   truncated: number
   refused: number
@@ -123,6 +124,7 @@ const state: CollectorState = {
   readPref: null,
   node: 'unknown',
   version: '0',
+  official: [],
   dropped: 0,
   truncated: 0,
   refused: 0,
@@ -677,7 +679,12 @@ export function flushTelemetry(): void {
     }
     if (state.ring.length === 0) return
     state.lastFlushAt = Date.now()
-    const batch: TelemetryBatch = { node: state.node, version: state.version, records: state.ring }
+    const batch: TelemetryBatch = {
+      node: state.node,
+      version: state.version,
+      official: state.official,
+      records: state.ring,
+    }
     state.ring = []
     for (const sink of [...state.sinks.keys()]) {
       try {
@@ -816,6 +823,12 @@ function applyPreference(on: boolean): void {
   }
 }
 
+/** Which plugin ids every later batch names as official (`TelemetryBatch.official`). The plugin host
+ *  calls this whenever the set of running plugins changes, because only it knows where each came from. */
+export function setOfficialTelemetryOwners(ids: readonly string[]): void {
+  state.official = [...ids].sort()
+}
+
 /**
  * Called once per boot, after `createCoreServices` and before `initPlugins`, so a plugin can
  * subscribe from its own `init`.
@@ -882,6 +895,7 @@ export function resetTelemetryForTest(): void {
   state.startedAt = Date.now()
   state.lastFlushAt = null
   state.suspendedAt = 0
+  state.official = []
   disarm()
 }
 

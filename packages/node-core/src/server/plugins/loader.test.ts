@@ -6,8 +6,10 @@ import { fileURLToPath } from 'node:url'
 import { DatabaseSync } from 'node:sqlite'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { PLUGIN_API_MAJOR } from './manifest'
+import { reconcileBundledPlugins } from './bundled'
 import {
   installedPluginInfo,
+  loadedPluginBinding,
   loadExternalPlugins,
   pluginInstallDir,
   readClientBundle,
@@ -155,6 +157,28 @@ describe('loading a plugin', () => {
     install('rollbar', manifest('rollbar'), BUNDLE('rollbar'))
     const { loaded } = await loadExternalPlugins(root, { builtins: ['rollbar', 'github'] })
     expect(loaded[0].shadowsBuiltin).toBe(true)
+  })
+
+  it("calls a bundled package official only while it is unshadowed and its bytes are the app's", async () => {
+    const bundledRoot = mkdtempSync(join(tmpdir(), 'acorn bundled-'))
+    try {
+      mkdirSync(join(bundledRoot, 'linear', 'dist'), { recursive: true })
+      writeFileSync(join(bundledRoot, 'linear', 'acorn-plugin.json'), JSON.stringify(manifest('linear')))
+      writeFileSync(join(bundledRoot, 'linear', 'dist', 'node.js'), BUNDLE('linear'))
+      install('ntfy', manifest('ntfy'), BUNDLE('ntfy'))
+      expect(reconcileBundledPlugins(root, bundledRoot).installed).toEqual(['linear'])
+
+      const fresh = await loadExternalPlugins(root, { builtins: [] })
+      const official = (entries: typeof fresh.loaded) =>
+        entries.filter((entry) => loadedPluginBinding(entry).official).map((entry) => entry.manifest.id)
+      expect(official(fresh.loaded)).toEqual(['linear'])
+      expect(official((await loadExternalPlugins(root, { builtins: ['linear'] })).loaded)).toEqual([])
+
+      writeFileSync(join(pluginInstallDir(root), 'linear', 'dist', 'node.js'), `${BUNDLE('linear')}// edited\n`)
+      expect(official((await loadExternalPlugins(root, { builtins: [] })).loaded)).toEqual([])
+    } finally {
+      rmSync(bundledRoot, { recursive: true, force: true })
+    }
   })
 })
 

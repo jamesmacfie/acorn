@@ -64,7 +64,7 @@ describe('the record shapes', () => {
   })
 
   it('carries the node and the version on the batch, not on every record', () => {
-    const batch = telemetryBatchSchema.safeParse({ node: 'node-1', version: '1.0.0', records: [] })
+    const batch = telemetryBatchSchema.safeParse({ node: 'node-1', version: '1.0.0', official: [], records: [] })
     expect(batch.success).toBe(true)
   })
 })

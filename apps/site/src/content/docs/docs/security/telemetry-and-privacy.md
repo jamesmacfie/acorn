@@ -8,7 +8,7 @@ sources:
   - plugins/sentry-telemetry/src/tree/settings.tsx
   - plugins/sentry-telemetry/src/shared/settings.ts
   - plugins/sentry-telemetry/src/node/index.ts
-checked: '6342cfd0e'
+checked: '6fec87ef7'
 ---
 
 This page covers acorn's telemetry: the timings, logs, and errors it can collect about itself, the
@@ -100,6 +100,9 @@ The switch appears only in a release build, and only when you haven't connected 
 project or set `ACORN_SENTRY_DSN`. Either of those takes priority, and then nothing goes to the team.
 A build from source, a fork, the terminal client's standalone Node, and the CLI never send to the
 team.
+
+Only records from acorn itself and the plugins it ships go to the team. A plugin you installed, or a
+built-in one you edited, sends nothing there, though it still reaches your own project.
 
 While you share, acorn ignores the settings on that page and sends a fixed set:
 

@@ -23,6 +23,7 @@ import {
 import { PluginMigrationsError, pluginMigrationsChain } from './migrations'
 import { openPluginDb } from './storage'
 import { readBundledPluginState } from './bundledState'
+import { matchesBundledFingerprint } from './bundled'
 import { disposeUnstartedPlugin, isolateNodePlugin } from './isolation'
 import { hasPendingPluginReview } from './pendingReview'
 import type { PackageSkill } from './skills'
@@ -46,6 +47,8 @@ export type LoadedPlugin = {
   plugin: NodePlugin
   dir: string
   shadowsBuiltin: boolean
+  // The app's bundled bytes, unshadowed and unedited (../pluginHost/context.ts § LoadedPluginBinding).
+  official?: true
   migrationsFolder: string | null
   storage: PluginStorage
   // Read and checked here, once per load, so the host registers bytes it has already seen
@@ -87,6 +90,7 @@ export const loadedPluginBinding = (entry: LoadedPlugin): LoadedPluginBinding =>
   // The package directory, for the one manifest path the host has to resolve on someone else's
   // behalf: a harness's ACP adapter entry (../pluginHost/host.ts).
   dir: entry.dir,
+  ...(entry.official ? { official: entry.official } : {}),
 })
 
 // Every package on disk whose manifest parsed, whether or not it has a node half to run. Devices get
@@ -571,8 +575,21 @@ async function loadEntry(
   // Installed only now. A package whose node half declared itself and then failed to import is
   // broken, not client-only, and distributing the UI of a plugin whose routes will never exist would
   // put a row on every paired device claiming a plugin that is not running anywhere.
+  const shadowsBuiltin = builtins.has(manifest.id)
+  // Hashed here rather than trusted from the ownership row, because the package can change after boot
+  // reconciliation wrote that row.
+  const official = !shadowsBuiltin && entry.bundled && matchesBundledFingerprint(dataRoot, manifest.id, dir)
   return {
-    loaded: { manifest, plugin, dir, shadowsBuiltin: builtins.has(manifest.id), migrationsFolder, storage, skills },
+    loaded: {
+      manifest,
+      plugin,
+      dir,
+      shadowsBuiltin,
+      ...(official ? { official: true as const } : {}),
+      migrationsFolder,
+      storage,
+      skills,
+    },
     installed: entry,
   }
 }

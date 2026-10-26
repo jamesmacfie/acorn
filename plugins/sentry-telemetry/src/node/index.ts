@@ -98,7 +98,13 @@ export const sentryTelemetryPlugin = (): NodePlugin => {
               : null
           }
           if (!teamDsn || (await ctx.core.prefs.read(userId, SHARE_KEY)) !== 'true') return null
-          return { dsn: teamDsn, environment: 'production', release: `acorn@${nodeVersion}`, settings: TEAM_SETTINGS }
+          return {
+            dsn: teamDsn,
+            environment: 'production',
+            release: `acorn@${nodeVersion}`,
+            settings: TEAM_SETTINGS,
+            officialOnly: true,
+          }
         },
         settings: async () => {
           const userId = ctx.core.identity.active()
