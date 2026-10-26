@@ -55,6 +55,9 @@ export type EnvelopeOptions = {
   /** From the connection's `config`, and absent when the owner left the field blank. */
   environment?: string
   release?: string
+  /** The build within a release, `<platform>-<arch>`. Each OS builds its own bundles, and Sentry
+   *  looks up a source map by release and dist together. */
+  dist?: string
   /** A 32-character hex id, for the envelope-level `event_id` and for records with no trace of
    *  their own. Injected so a test can read the output rather than match it. */
   newId: () => string
@@ -367,6 +370,7 @@ function errorEnvelope(
           tags: tagsFrom(failure.attrs),
           server_name: batch.node,
           ...(options.release ? { release: options.release } : {}),
+          ...(options.dist ? { dist: options.dist } : {}),
           ...(options.environment ? { environment: options.environment } : {}),
         },
       },

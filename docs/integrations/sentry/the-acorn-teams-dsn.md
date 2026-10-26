@@ -1,8 +1,8 @@
 # The acorn team's DSN
 
 This page covers how a release build reports to the acorn team's own Sentry project: where the DSN
-comes from, the consent switch, and the fixed policy. [Sentry](../sentry.md) owns the exporter and its
-connection.
+comes from, the consent switch, the fixed policy, and the source maps that make its stacks readable.
+[Sentry](../sentry.md) owns the exporter and its connection.
 
 ## The resolution order
 
@@ -77,3 +77,34 @@ A Settings connection and `ACORN_SENTRY_DSN` get every owner's records, as befor
 
 The client can't be trusted to cap its own cost. The team's Sentry project has spike protection on
 and a rate limit on its client key, and the exporter honours `X-Sentry-Rate-Limits`.
+
+## Readable stacks
+
+Every bundle ships minified, so a tag build uploads source maps to Sentry and ships none. The
+**Upload source maps to Sentry** step in `.github/workflows/build-desktop.yml` runs for a `v*` tag
+when the repository secret `SENTRY_AUTH_TOKEN` and the repository variables `SENTRY_ORG` and
+`SENTRY_PROJECT` are set. A fork, a manual run, or a repository without them builds no maps and skips
+the step.
+
+The workflow sets `ACORN_RELEASE_SOURCEMAPS` for that case. With it, the desktop build writes hidden
+source maps for the renderer, the helper, and each bundled plugin, and staging keeps the Node
+service's maps. The step runs `sentry-cli` through `npx`, pinned to one version. It adds a debug ID
+to each staged file and its map, then uploads the maps under three names:
+
+| Staged folder | Uploaded as |
+| --- | --- |
+| `apps/desktop/dist/helper` | `app:///helper/<file>` |
+| `apps/desktop/dist/bundled-plugins` | `app:///plugins/<id>/dist/<file>` |
+| `apps/desktop/dist/client` | `~/<file>`, which matches the renderer's `app://acorn/` and `http://app.localhost/` |
+
+Each upload names release `acorn@<desktop version>` and dist `<platform>-<arch>`, such as
+`darwin-arm64`. Every OS builds its own bytes, and Sentry looks up a map by release and dist
+together. The step then deletes every map. `verifyResources` in
+`apps/desktop/scripts/bundle-inventory.mjs` fails the bundle check on any `.map` file in the packaged
+app. The token stays in that one step's environment.
+
+The exporter builds its own events, so nothing sends Sentry the debug IDs an SDK would. It matches
+the uploads by name instead. `parseStack` renames a frame whose path ends in `helper/<file>.js` or
+`plugins/<id>/dist/<file>.js` to the name above, wherever the app is installed. Every error event
+carries the dist beside its release. The Node service and the plugins' Node halves read cleanly this
+way. A plugin's client bundle runs on its own `app-plugin://` origin and gets no uploaded name.

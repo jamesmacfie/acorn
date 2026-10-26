@@ -66,7 +66,8 @@ inherits the shell's environment. You can also put it in the desktop's `.env` fi
 A release build can carry the acorn team's DSN. The exporter uses it last, after a connection and
 `ACORN_SENTRY_DSN`, and only when **Collect timings, logs, and errors on this node** and **Share with
 the acorn team** are both on. [The acorn team's DSN](./sentry/the-acorn-teams-dsn.md) covers the
-build secret, the consent switch, and the fixed policy it sends under.
+build secret, the consent switch, the fixed policy it sends under, and the source maps a tag build
+uploads.
 
 ## Sentry issues
 

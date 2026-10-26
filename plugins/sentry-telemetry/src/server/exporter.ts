@@ -149,7 +149,8 @@ export function createExporter(deps: ExporterDeps): Exporter {
       settings,
       newId: deps.newId,
       ...(target.environment ? { environment: target.environment } : {}),
-      ...(target.release ? { release: target.release } : {}),
+      // The tag build uploads each platform's source maps under this dist (.github/workflows/build-desktop.yml).
+      ...(target.release ? { release: target.release, dist: `${process.platform}-${process.arch}` } : {}),
     })) {
       if (limitedNow(envelope.category)) {
         dropped(1, 'rate-limited', envelope.category)

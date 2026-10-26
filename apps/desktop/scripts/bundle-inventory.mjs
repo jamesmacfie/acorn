@@ -45,6 +45,11 @@ export function verifyResources(pkg, resources, fail, rewritten = () => false) {
       fail(`the bundle ships helper/node_modules/${path}, which the runtime file policy omits.`)
     }
   }
+  // The tag build uploads its source maps to Sentry and deletes them before packaging
+  // (.github/workflows/build-desktop.yml). A map in the bundle means that step didn't run to the end.
+  for (const file of filesUnder(resources)) {
+    if (file.endsWith('.map')) fail(`the bundle ships a source map: ${relative(resources, file)}.`)
+  }
   const pluginRoot = join(resources, 'plugins')
   const plugins = existsSync(pluginRoot) ? readdirSync(pluginRoot) : []
   if (plugins.length === 0) fail('the bundle ships no bundled plugins.')

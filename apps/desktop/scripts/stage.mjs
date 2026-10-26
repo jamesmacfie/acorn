@@ -35,8 +35,14 @@ need(resolve(HELPER, 'helper.js'), 'run `pnpm run build:helper` first.')
 rmSync(resolve(HELPER, 'chunks'), { recursive: true, force: true })
 // The chunk graph and source maps are build metadata, not something the helper runs. The graph feeds
 // scripts/size-report.mjs; the maps stay in apps/node/dist for reading a packaged stack
-// (docs/local-development/packaged-stacks.md § Find the source line).
-cpSync(dist, HELPER, { recursive: true, filter: (path) => !path.endsWith('startup-graph.json') && !path.endsWith('.map') })
+// (docs/local-development/packaged-stacks.md § Find the source line). The tag build copies the maps
+// too, so it can upload them beside the staged files and delete them before packaging
+// (.github/workflows/build-desktop.yml).
+const keepMaps = !!process.env.ACORN_RELEASE_SOURCEMAPS
+cpSync(dist, HELPER, {
+  recursive: true,
+  filter: (path) => !path.endsWith('startup-graph.json') && (keepMaps || !path.endsWith('.map')),
+})
 stageRuntimeDependencies(PKG, HELPER, target)
 
 // The installed command runs the headless CLI under the same pinned Node runtime as the desktop.

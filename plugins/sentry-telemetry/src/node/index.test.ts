@@ -269,7 +269,11 @@ describe('the sentry-telemetry plugin', () => {
 
         await vi.waitFor(() => expect(postedError()).toBeDefined())
         expect(new Set(postedUrls())).toEqual(new Set([TEAM_URL]))
-        expect(postedError()).toMatchObject({ environment: 'production', release: expect.stringMatching(/^acorn@.+/) })
+        expect(postedError()).toMatchObject({
+          environment: 'production',
+          release: expect.stringMatching(/^acorn@.+/),
+          dist: `${process.platform}-${process.arch}`,
+        })
         expect(itemTypes()).not.toContain('log')
       } finally {
         await plugin.dispose?.()

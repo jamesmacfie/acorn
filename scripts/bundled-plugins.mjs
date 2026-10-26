@@ -22,7 +22,14 @@ export function buildBundledPlugins(output) {
     try {
       execFileSync(
         process.execPath,
-        [resolve(ROOT, 'apps/node/scripts/build-plugin.mjs'), id, '--package-root', output],
+        [
+          resolve(ROOT, 'apps/node/scripts/build-plugin.mjs'),
+          id,
+          '--package-root',
+          output,
+          // The tag build's maps for Sentry, deleted before packaging (.github/workflows/build-desktop.yml).
+          ...(process.env.ACORN_RELEASE_SOURCEMAPS ? ['--sourcemap'] : []),
+        ],
         { cwd: resolve(ROOT, 'apps/node'), stdio: 'inherit' },
       )
     } catch (error) {

@@ -6,8 +6,9 @@ name: Build the desktop app
 # Called by ci.yml for `v*` tags and manual dispatches, after the Linux suite passes for the same
 # commit. Ordinary pushes get the unsigned desktop suite there instead of an installer.
 #
-# Both secrets are optional here so a missing key reaches the check step below, which says how to
-# create one, rather than failing the call with a bare "secret required" error.
+# The signing secrets are optional here so a missing key reaches the check step below, which says how
+# to create one, rather than failing the call with a bare "secret required" error. The Sentry ones are
+# optional because a fork has neither, and builds without them.
 on:
   workflow_call:
     secrets:
@@ -16,6 +17,8 @@ on:
       TAURI_SIGNING_PRIVATE_KEY_PASSWORD:
         required: false
       ACORN_SENTRY_DSN:
+        required: false
+      SENTRY_AUTH_TOKEN:
         required: false
 
 permissions:
@@ -51,6 +54,11 @@ jobs:
     defaults:
       run:
         shell: bash
+    # Hidden source maps for the Sentry upload below: a `v*` tag with the token and both variables set.
+    # A fork, a manual run, or a repository without them builds no maps and skips the upload. This is
+    # a yes or no, never the token, which only the upload step sees.
+    env:
+      ACORN_RELEASE_SOURCEMAPS: ${{ startsWith(github.ref, 'refs/tags/v') && secrets.SENTRY_AUTH_TOKEN != '' && vars.SENTRY_ORG != '' && vars.SENTRY_PROJECT != '' && '1' || '' }}
     steps:
       - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
         with:
@@ -94,8 +102,9 @@ jobs:
           key: node-runtime-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('node-runtime.json') }}
 
       # The node service, the bundled plugins, the helper, the bridge, the migration chains and the
-      # pinned runtime, then the renderer and its startup budget checks. Built once: the tests below
-      # run against this output and the bundler packages it unchanged.
+      # pinned runtime, then the renderer and its startup budget checks. Built once: the Sentry step
+      # below adds debug ids when it runs, then the tests run against this output and the bundler
+      # packages it unchanged.
       - name: Build the bundle inputs
         # The acorn team's DSN, written into the sentry-telemetry bundle for a `v*` tag only, so a
         # manual run from a branch reports nowhere. It can only send, and it's a secret so it stays
@@ -103,6 +112,29 @@ jobs:
         env:
           ACORN_SENTRY_RELEASE_DSN: ${{ startsWith(github.ref, 'refs/tags/v') && secrets.ACORN_SENTRY_DSN || '' }}
         run: pnpm --filter @acorn/desktop run build
+
+      # Gives every staged file a debug id, uploads the maps for this release and platform, then
+      # deletes them. The exporter names the same release and dist, and calls a packaged Node file by
+      # the name it's uploaded under (docs/integrations/sentry/the-acorn-teams-dsn.md § Readable
+      # stacks). The token can write releases across the organization, so it's in this step's
+      # environment and no other. The bundle check fails if any map is left behind.
+      - name: Upload source maps to Sentry
+        if: env.ACORN_RELEASE_SOURCEMAPS == '1'
+        working-directory: apps/desktop/dist
+        env:
+          SENTRY_AUTH_TOKEN: ${{ secrets.SENTRY_AUTH_TOKEN }}
+          SENTRY_ORG: ${{ vars.SENTRY_ORG }}
+          SENTRY_PROJECT: ${{ vars.SENTRY_PROJECT }}
+        run: |
+          set -euo pipefail
+          sentry() { npx --yes @sentry/cli@3.8.2 "$@"; }
+          release="acorn@$(node -p 'require("../package.json").version')"
+          dist="$(node -p 'process.platform + "-" + process.arch')"
+          sentry sourcemaps inject --ignore node_modules helper client bundled-plugins
+          sentry sourcemaps upload --release "$release" --dist "$dist" --ignore node_modules --url-prefix 'app:///helper' helper
+          sentry sourcemaps upload --release "$release" --dist "$dist" --url-prefix 'app:///plugins' bundled-plugins
+          sentry sourcemaps upload --release "$release" --dist "$dist" --url-prefix '~' client
+          find helper client bundled-plugins -name '*.map' -delete
 
       - name: Test plugin database preparation
         run: pnpm --filter @acorn/node-core test src/server/plugins/pluginDbFiles.test.ts

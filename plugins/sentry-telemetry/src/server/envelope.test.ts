@@ -96,6 +96,13 @@ describe('errors', () => {
     expect(payload.exception.values[0].stacktrace.frames).toHaveLength(1)
   })
 
+  it("names the dist beside the release, so Sentry finds that platform's source maps", () => {
+    expect(payloadOf(buildEnvelopes(batchOf([failure]), options({ dist: 'darwin-arm64' }))[0]).dist).toBe(
+      'darwin-arm64',
+    )
+    expect(payloadOf(buildEnvelopes(batchOf([failure]), options())[0])).not.toHaveProperty('dist')
+  })
+
   it('leaves the stack off when the owner turned stacks off', () => {
     const settings = { ...DEFAULT_SETTINGS, stacks: false }
     // The record still carries one here; `redactRecord` is what strips it, and the builder simply

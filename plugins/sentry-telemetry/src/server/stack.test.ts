@@ -13,8 +13,8 @@ describe('parseStack', () => {
   it('reads the function, the file, the line and the column', () => {
     expect(parseStack(STACK).at(-1)).toEqual({
       function: 'refresh',
-      filename: '<data>/plugins/github/dist/node.js',
-      abs_path: '<data>/plugins/github/dist/node.js',
+      filename: 'app:///plugins/github/dist/node.js',
+      abs_path: 'app:///plugins/github/dist/node.js',
       lineno: 120,
       colno: 11,
       in_app: true,
@@ -28,6 +28,22 @@ describe('parseStack', () => {
       'listOnTimeout',
       'async runOnce',
       'refresh',
+    ])
+  })
+
+  it('names a packaged file the way its source map was uploaded, wherever the app is installed', () => {
+    const stack = [
+      'Error: boom',
+      '    at openDataRoot (file:///Applications/Acorn.app/Contents/Resources/helper/chunks/storage-B09q.js:1:3409)',
+      '    at boot (C:\\Program Files\\Acorn\\helper\\service.js:1:20)',
+      '    at sync (file://~/Applications/Acorn.app/Contents/Resources/plugins/rollbar/dist/node.js:4:5)',
+      '    at next (~/src/acorn/apps/desktop/src/helper/helperMain.ts:9:1)',
+    ].join('\n')
+    expect(parseStack(stack).map((frame) => frame.abs_path)).toEqual([
+      '~/src/acorn/apps/desktop/src/helper/helperMain.ts',
+      'app:///plugins/rollbar/dist/node.js',
+      'app:///helper/service.js',
+      'app:///helper/chunks/storage-B09q.js',
     ])
   })
 
