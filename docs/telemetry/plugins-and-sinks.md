@@ -67,10 +67,14 @@ sinks too.
 ## The Sentry sink
 
 `plugins/sentry-telemetry` is the sink that ships. It's a loaded plugin in the bundled roster, so it's
-on every machine and does nothing until the switch is on and a Sentry DSN is connected in Settings →
-Services, or set in `ACORN_SENTRY_DSN` ([the DSN from the environment](../integrations/sentry.md#the-dsn-from-the-environment)). [integrations.md](../integrations/sentry.md#sentry) owns the connection. Its settings page holds
+on every machine and does nothing until the switch is on and it has a DSN. It takes the first of: a
+Sentry DSN connected in Settings → Services, `ACORN_SENTRY_DSN` in the environment
+([the DSN from the environment](../integrations/sentry.md#the-dsn-from-the-environment)), or the
+acorn team's DSN that a release build carries, once the person turns on **Share with the acorn team**
+([the acorn team's DSN](../integrations/sentry/the-acorn-teams-dsn.md)). [integrations.md](../integrations/sentry.md#sentry) owns the connection. Its settings page holds
 what only it can decide: a trace sample rate, which of the five kinds to send, whether to include
-stacks, and whether to send `task.id` as a tag.
+stacks, and whether to send `task.id` as a tag. The team's DSN ignores that page and uses a fixed
+policy sized for many installs.
 
 | Record | Sentry item |
 | --- | --- |

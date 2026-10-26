@@ -10,7 +10,7 @@ import {
   traceKept,
   type EnvelopeOptions,
 } from './envelope'
-import { DEFAULT_SETTINGS } from '../shared/settings'
+import { DEFAULT_SETTINGS, TEAM_SETTINGS } from '../shared/settings'
 
 const TRACE = 'a'.repeat(32)
 const OTHER_TRACE = 'b'.repeat(32)
@@ -419,6 +419,24 @@ describe('logs and events', () => {
       level: 'info',
       body: 'ws.shed',
     })
+  })
+
+  it('keeps events as breadcrumbs only under the team policy', () => {
+    const event: TelemetryRecord = { kind: 'event', at: 4, name: 'ws.shed', attrs: { channel: 'tasks' } }
+    expect(buildEnvelopes(batchOf([event]), options({ settings: TEAM_SETTINGS }))).toEqual([])
+
+    const failure: TelemetryRecord = {
+      kind: 'error',
+      at: 5,
+      name: 'RangeError',
+      message: 'stack',
+      level: 'error',
+      handled: true,
+      attrs: {},
+    }
+    const envelopes = buildEnvelopes(batchOf([event, failure]), options({ settings: TEAM_SETTINGS }))
+    expect(envelopes).toHaveLength(1)
+    expect(payloadOf(envelopes[0]).breadcrumbs.values[0]).toMatchObject({ category: 'ws.shed' })
   })
 
   it('keeps interaction work as an error breadcrumb without exporting a standalone log', () => {

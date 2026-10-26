@@ -8,7 +8,7 @@ import {
 } from '@acorn/plugin-api/testkit'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { sentryTelemetryPlugin } from './index'
-import { PROVIDER_ID, SETTINGS_KEY } from '../shared/settings'
+import { PROVIDER_ID, SETTINGS_KEY, SHARE_KEY } from '../shared/settings'
 
 // The whole path, through the real host: a plugin context built by the same code the node builds
 // one with, a real connection row, the real collector, and a fake `fetch` at the far end
@@ -17,6 +17,8 @@ const PACKAGE_ROOT = fileURLToPath(new URL('../../', import.meta.url))
 const OWNER = 'owner-1'
 const DSN = 'https://abc123@o42.ingest.us.sentry.io/1234567'
 const ENV_DSN = 'https://def456@o7.ingest.de.sentry.io/7654321'
+const TEAM_DSN = 'https://fed789@o9.ingest.us.sentry.io/9999999'
+const TEAM_URL = 'https://o9.ingest.us.sentry.io/api/9999999/envelope/'
 
 // The grant this suite runs under is the one the manifest declares, so dropping `telemetry`,
 // `prefs` or `identity` from acorn-plugin.config.mjs fails here rather than at the next boot.
@@ -51,9 +53,11 @@ const throwAndRecord = (ctx: Awaited<ReturnType<typeof world>>['ctx']) => {
   }
 }
 
-async function world(options: { connected?: boolean; environment?: string } = {}) {
+async function world(options: { connected?: boolean; environment?: string; team?: string } = {}) {
   // Always stated, so a developer's own `ACORN_SENTRY_DSN` never leaks into a test.
   vi.stubEnv('ACORN_SENTRY_DSN', options.environment)
+  // What build-plugin.mjs writes in for the tag build. Source has no constant at all.
+  if (options.team !== undefined) vi.stubGlobal('__ACORN_SENTRY_RELEASE_DSN__', options.team)
   const ctx = makeTestNodeContext({
     plugin: sentryTelemetryPlugin(),
     permissions: await declaredPermissions(),
@@ -214,7 +218,7 @@ describe('the sentry-telemetry plugin', () => {
         expect(new Set(postedUrls())).toEqual(new Set(['https://o42.ingest.us.sentry.io/api/1234567/envelope/']))
         expect(postedError()?.environment).toBeUndefined()
         // The page has nothing to say about the environment while the connection overrides it.
-        expect(await readSource()).toEqual({ environment: null })
+        expect(await readSource()).toEqual({ environment: null, shareable: false })
       } finally {
         await plugin.dispose?.()
         ctx.cleanup()
@@ -224,7 +228,7 @@ describe('the sentry-telemetry plugin', () => {
     it('tells the settings page where records go, without the key', async () => {
       const { ctx, plugin, readSource } = await world({ connected: false, environment: ENV_DSN })
       try {
-        expect(await readSource()).toEqual({ environment: 'o7.ingest.de.sentry.io/7654321' })
+        expect(await readSource()).toEqual({ environment: 'o7.ingest.de.sentry.io/7654321', shareable: false })
       } finally {
         await plugin.dispose?.()
         ctx.cleanup()
@@ -239,9 +243,101 @@ describe('the sentry-telemetry plugin', () => {
         const about = warnings.filter((record) => record.kind === 'log' && record.body.includes('ACORN_SENTRY_DSN'))
         expect(about).toHaveLength(1)
         expect(JSON.stringify(ctx.recorded)).not.toContain('not-a-dsn-secret')
-        expect(await readSource()).toEqual({ environment: null })
+        expect(await readSource()).toEqual({ environment: null, shareable: false })
         await new Promise((resolve) => setTimeout(resolve, 20))
         expect(globalThis.fetch).not.toHaveBeenCalled()
+      } finally {
+        await plugin.dispose?.()
+        ctx.cleanup()
+      }
+    })
+  })
+
+  describe("with the acorn team's DSN built in", () => {
+    const share = (ctx: Awaited<ReturnType<typeof world>>['ctx'], on: boolean) =>
+      ctx.core.prefs.write(OWNER, SHARE_KEY, JSON.stringify(on))
+
+    it('sends a thrown error to the team, tagged production, under the fixed policy', async () => {
+      const { ctx, plugin, readSource } = await world({ connected: false, team: TEAM_DSN })
+      try {
+        expect(await readSource()).toEqual({ environment: null, shareable: true })
+        await share(ctx, true)
+        ctx.log.warn('a line the fixed policy never sends')
+        throwAndRecord(ctx)
+        expect(ctx.recorded.length).toBeGreaterThan(0)
+
+        await vi.waitFor(() => expect(postedError()).toBeDefined())
+        expect(new Set(postedUrls())).toEqual(new Set([TEAM_URL]))
+        expect(postedError()).toMatchObject({ environment: 'production', release: expect.stringMatching(/^acorn@.+/) })
+        expect(itemTypes()).not.toContain('log')
+      } finally {
+        await plugin.dispose?.()
+        ctx.cleanup()
+      }
+    })
+
+    it('sends nothing until the owner shares', async () => {
+      const { ctx, plugin } = await world({ connected: false, team: TEAM_DSN })
+      try {
+        throwAndRecord(ctx)
+        expect(ctx.recorded.length).toBeGreaterThan(0)
+        await new Promise((resolve) => setTimeout(resolve, 20))
+        expect(globalThis.fetch).not.toHaveBeenCalled()
+      } finally {
+        await plugin.dispose?.()
+        ctx.cleanup()
+      }
+    })
+
+    it('sends nothing while collection is off, even when shared', async () => {
+      const { ctx, plugin } = await world({ connected: false, team: TEAM_DSN })
+      try {
+        await share(ctx, true)
+        vi.spyOn(ctx.core.telemetry, 'enabled').mockReturnValue(false)
+        throwAndRecord(ctx)
+        expect(ctx.recorded.length).toBeGreaterThan(0)
+        await new Promise((resolve) => setTimeout(resolve, 20))
+        expect(globalThis.fetch).not.toHaveBeenCalled()
+      } finally {
+        await plugin.dispose?.()
+        ctx.cleanup()
+      }
+    })
+
+    it('lets ACORN_SENTRY_DSN win, and hides the switch', async () => {
+      const { ctx, plugin, readSource } = await world({ connected: false, environment: ENV_DSN, team: TEAM_DSN })
+      try {
+        await share(ctx, true)
+        expect(await readSource()).toEqual({ environment: 'o7.ingest.de.sentry.io/7654321', shareable: false })
+        throwAndRecord(ctx)
+        expect(ctx.recorded.length).toBeGreaterThan(0)
+        await vi.waitFor(() => expect(postedError()).toBeDefined())
+        expect(postedUrls()).not.toContain(TEAM_URL)
+      } finally {
+        await plugin.dispose?.()
+        ctx.cleanup()
+      }
+    })
+
+    it('lets a Settings connection win, and hides the switch', async () => {
+      const { ctx, plugin, readSource } = await world({ team: TEAM_DSN })
+      try {
+        await share(ctx, true)
+        expect(await readSource()).toEqual({ environment: null, shareable: false })
+        throwAndRecord(ctx)
+        expect(ctx.recorded.length).toBeGreaterThan(0)
+        await vi.waitFor(() => expect(postedError()).toBeDefined())
+        expect(postedUrls()).not.toContain(TEAM_URL)
+      } finally {
+        await plugin.dispose?.()
+        ctx.cleanup()
+      }
+    })
+
+    it('offers no switch in a build with an empty DSN', async () => {
+      const { ctx, plugin, readSource } = await world({ connected: false, team: '' })
+      try {
+        expect(await readSource()).toEqual({ environment: null, shareable: false })
       } finally {
         await plugin.dispose?.()
         ctx.cleanup()
@@ -252,7 +348,7 @@ describe('the sentry-telemetry plugin', () => {
   it('with ACORN_SENTRY_DSN unset, tells the settings page nothing', async () => {
     const { ctx, plugin, readSource } = await world({ connected: false })
     try {
-      expect(await readSource()).toEqual({ environment: null })
+      expect(await readSource()).toEqual({ environment: null, shareable: false })
     } finally {
       await plugin.dispose?.()
       ctx.cleanup()

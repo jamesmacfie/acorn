@@ -28,7 +28,7 @@ covers:
   - telemetry
   - sentry-telemetry
   - storage
-checked: '84e7ddfef'
+checked: '6342cfd0e'
 ---
 
 This page lists every setting in **Settings** > **Machines**. **Nodes** is stored on **This device**,
@@ -103,6 +103,10 @@ Nothing to set ([The audit log](/docs/security/the-audit-log/)).
 The Sentry export plugin's page: which kinds of record go to your Sentry project, and how much detail.
 It's stored on the Node, and its settings are listed on
 [Telemetry and privacy](/docs/security/telemetry-and-privacy/#send-telemetry-to-sentry).
+
+In a release of the desktop app, the page also has **Share with the acorn team**, off by default. It
+sends errors and a sample of traces to the acorn team's Sentry project
+([Share with the acorn team](/docs/security/telemetry-and-privacy/#share-with-the-acorn-team)).
 
 ## Storage and memory
 

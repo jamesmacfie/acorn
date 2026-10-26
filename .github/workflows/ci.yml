@@ -172,6 +172,7 @@ jobs:
     secrets:
       TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
       TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
+      ACORN_SENTRY_DSN: ${{ secrets.ACORN_SENTRY_DSN }}
 
   # The Node-only archives, on the installers' triggers and behind the same gate.
   package-node:

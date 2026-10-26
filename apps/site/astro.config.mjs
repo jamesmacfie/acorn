@@ -209,6 +209,7 @@ export default defineConfig({
             'docs/security/the-preview-and-webviews',
             'docs/security/the-audit-log',
             'docs/security/telemetry-and-privacy',
+            'docs/security/privacy-policy',
             'docs/security/security-diagnostics',
             'docs/security/what-acorn-doesnt-protect-against',
           ],

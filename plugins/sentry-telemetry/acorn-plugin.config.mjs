@@ -60,8 +60,9 @@ export default {
       category: 'machines',
       settingsScope: 'node',
       order: 50,
-      // For search. The sections are the ones src/tree/settings.tsx draws.
-      keywords: ['sentry', 'telemetry', 'export', 'sample rate', 'dsn'],
+      // For search. The sections are the ones src/tree/settings.tsx always draws. **Share with the acorn
+      // team** is left out, because most builds don't carry the DSN it needs.
+      keywords: ['sentry', 'telemetry', 'export', 'sample rate', 'dsn', 'share', 'acorn team'],
       sections: [
         { id: 'sending', label: 'What to send', keywords: ['sample rate', 'traces', 'errors', 'logs', 'metrics', 'events'] },
         { id: 'detail', label: 'How much detail', keywords: ['stack traces', 'task ids', 'tags'] },

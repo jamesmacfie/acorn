@@ -15,6 +15,8 @@ on:
         required: false
       TAURI_SIGNING_PRIVATE_KEY_PASSWORD:
         required: false
+      ACORN_SENTRY_DSN:
+        required: false
 
 permissions:
   contents: read
@@ -95,6 +97,11 @@ jobs:
       # pinned runtime, then the renderer and its startup budget checks. Built once: the tests below
       # run against this output and the bundler packages it unchanged.
       - name: Build the bundle inputs
+        # The acorn team's DSN, written into the sentry-telemetry bundle for a `v*` tag only, so a
+        # manual run from a branch reports nowhere. It can only send, and it's a secret so it stays
+        # out of logs and forks. A fork, or a run without it, builds with none.
+        env:
+          ACORN_SENTRY_RELEASE_DSN: ${{ startsWith(github.ref, 'refs/tags/v') && secrets.ACORN_SENTRY_DSN || '' }}
         run: pnpm --filter @acorn/desktop run build
 
       - name: Test plugin database preparation

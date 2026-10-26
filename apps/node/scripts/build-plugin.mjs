@@ -164,7 +164,15 @@ try {
       plugins: [loadedPluginRequireShim()],
       resolve: { conditions: ['node'], mainFields: ['module', 'jsnext:main', 'jsnext'] },
       ssr: { noExternal: true },
-      define: { 'process.env': 'process.env' },
+      define: {
+        'process.env': 'process.env',
+        // The acorn team's DSN, from the tag build only (.github/workflows/build-desktop.yml). It reads
+        // a different name from the run-time ACORN_SENTRY_DSN, so a developer's own DSN in the shell
+        // never lands in a bundle.
+        ...(id === 'sentry-telemetry'
+          ? { __ACORN_SENTRY_RELEASE_DSN__: JSON.stringify(process.env.ACORN_SENTRY_RELEASE_DSN?.trim() ?? '') }
+          : {}),
+      },
       build: {
         target: 'node22',
         outDir: join(outDir, 'dist'),

@@ -9,7 +9,7 @@ sources:
   - plugins/sentry-telemetry/src/server/redact.ts
   - plugins/sentry-telemetry/src/tree/settings.tsx
   - plugins/sentry-telemetry/src/shared/settings.ts
-checked: 'f31f40b0a'
+checked: '6342cfd0e'
 ---
 
 import { Steps } from '@astrojs/starlight/components'
@@ -55,6 +55,15 @@ environment that starts the Node, and turn on **Collect timings, logs, and error
 Everything the Node sends is tagged with the environment `development`. **Settings** > **Machines** >
 **Sentry export** says "Sending to `<host>/<project>` from `ACORN_SENTRY_DSN`." A connection in
 **Services** takes priority over the variable.
+
+## Share with the acorn team
+
+A release of the desktop app also offers **Share with the acorn team** on **Settings** > **Machines** >
+**Sentry export**. It's off by default, and it appears only when you haven't connected a project or
+set `ACORN_SENTRY_DSN`. With it and telemetry on, the Node sends its errors and one trace in twenty to
+the acorn team's Sentry project, and ignores the choices below.
+[Telemetry and privacy](/docs/security/telemetry-and-privacy/#share-with-the-acorn-team) has what goes
+and what never does.
 
 ## Choose what's sent
 

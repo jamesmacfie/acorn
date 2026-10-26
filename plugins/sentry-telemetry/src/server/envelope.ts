@@ -548,7 +548,7 @@ export function buildEnvelopes(batch: TelemetryBatch, options: EnvelopeOptions):
       })
     }
   }
-  if (kinds.event) {
+  if (kinds.event && options.settings.eventLogs !== false) {
     // Also a log line, not only a breadcrumb: a breadcrumb is only ever seen next to an error, and
     // an event that never preceded one would otherwise leave no trace at all.
     for (const event of events) {

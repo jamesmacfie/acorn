@@ -54,9 +54,19 @@ While the variable is in use, the settings page says "Sending to `<host>/<projec
 route, which answers with the host and project ID and never the key. The route answers `null`
 while a connection overrides the variable.
 
+A value that doesn't parse still wins over the acorn team's DSN, so a broken variable sends nothing
+rather than falling through to the team.
+
 `pnpm dev` passes the variable through Turborepo's strict environment mode, and `pnpm dev:agent`
 inherits the shell's environment. You can also put it in the desktop's `.env` file
 ([local development](../local-development.md#environment)).
+
+## The acorn team's DSN
+
+A release build can carry the acorn team's DSN. The exporter uses it last, after a connection and
+`ACORN_SENTRY_DSN`, and only when **Collect timings, logs, and errors on this node** and **Share with
+the acorn team** are both on. [The acorn team's DSN](./sentry/the-acorn-teams-dsn.md) covers the
+build secret, the consent switch, and the fixed policy it sends under.
 
 ## Sentry issues
 

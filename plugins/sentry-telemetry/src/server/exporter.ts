@@ -27,8 +27,9 @@ import { postEnvelope, type FetchLike, type RateLimit } from './transport'
 import type { SentrySettings } from '../shared/settings'
 
 /** Where the DSN and the two non-secret fields beside it come from, resolved once per flush so
- *  disconnecting stops the export within one window. */
-export type SentryTarget = { dsn: SentryDsn; environment?: string; release?: string }
+ *  disconnecting stops the export within one window. `settings` replaces the owner's, for a DSN
+ *  whose policy isn't theirs to set. */
+export type SentryTarget = { dsn: SentryDsn; environment?: string; release?: string; settings?: SentrySettings }
 
 export type ExporterDeps = {
   fetch: FetchLike
@@ -126,7 +127,7 @@ export function createExporter(deps: ExporterDeps): Exporter {
     // No connection is the off state, and it is the ordinary one. Nothing is queued, so connecting
     // later does not send the last hour of a machine nobody had pointed at Sentry yet.
     if (stopped || !target) return
-    const settings = await deps.settings()
+    const settings = target.settings ?? (await deps.settings())
     if (stopped) return
     const clean = redactBatch(batch, { taskIds: settings.taskIds, stacks: settings.stacks })
     for (const envelope of buildEnvelopes(clean, {
