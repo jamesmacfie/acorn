@@ -32,8 +32,7 @@ These are decisions, not implementation details:
 
 The older `PanelMappingColumn.writeValue` remains part of the legacy mapping model. Published version
 2 plans use explicit `writeValues` on each enum choice, keyed by source instance. A choice with no
-declared value for that source cannot be a write target. None of this layer is reachable from a
-manifest.
+declared value for that source cannot be a write target. None of this layer is reachable from a manifest.
 
 ## The generated editor
 
@@ -142,8 +141,7 @@ the last rows (`emptyRunReason`). A number still draws its 0.
 
 `studio/studioStore.ts` owns the plan, the selection, undo, redo, and autosave. Each change is one
 undo step, typing within 600 ms is one step, and the stack holds 60 steps. Each change writes a
-device recovery copy, and a plan that passes its schema saves to the Node 750 ms after the last
-change.
+device recovery copy, and a plan that passes its schema saves to the Node 750 ms after the last change.
 
 The first source described creates one column per field with a display role (title, status,
 assignee, url, updated), or its first six fields if it declares no roles (`defaultPlanColumns`), and a
@@ -179,11 +177,13 @@ days. Validation reports JSON Pointer paths for missing or retyped bindings, inc
 sorts, groups, and view fields. A run leaves a changed column unavailable and reports a rebind notice;
 new enum values appear in an unmatched-value notice.
 
-The Node pushes supported filters to source queries only when their semantics match. It applies a
-source's own limit before panel filters, and warns when that order could hide rows. A final sort and
-limit may become a source `take` when no later stage changes the result. Per-provider scheduling,
-rate-limit backoff, and record, time, intermediate-row, and byte budgets bound reads. The sampler
-uses the same Node runner and the plan's stored time policy.
+The Node pushes a filter to a source only when their semantics match. The source applies it before its
+own limit, and the panel applies other filters after; `diagnostics.filters` records which. The step
+inspector says so with `describeFilterRun`, naming a source that returned only part of its records. An
+older Node's run, without the field, gets no claim. A final sort and limit may become a source `take`
+when no later stage changes the result. Per-provider scheduling, rate-limit backoff, and record, time,
+intermediate-row, and byte budgets bound reads. The sampler uses the same Node runner and the plan's
+stored time policy.
 
 Version 1 panels read through a pure upgrade with a fixed UTC policy. Saving a draft writes version
 2. Stored published version 1 bytes and digests remain unchanged.

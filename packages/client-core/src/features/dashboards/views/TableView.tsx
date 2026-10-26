@@ -3,6 +3,8 @@ import { Button, EmptyState, Table, TableCell, TableHead, TableRow } from '../..
 import Cell from './Cell'
 import { rowPress, type PanelViewProps } from './props'
 import RowControls, { openRowMenu } from './RowControls'
+import { RowActions } from '../../../kit/components/layout/RowActions'
+import { Menu } from '../../../kit/components/overlays/Menu'
 
 // The table view: columns are the projected fields, each cell drawn by its field's semantic type.
 //
@@ -32,9 +34,22 @@ export default function TableView(props: PanelViewProps) {
               <TableHead>
                 <Show when={props.onSelectPart} fallback={field.name}>
                   {(select) => (
-                    <Button size="sm" variant="bare" onPress={() => select()(`column:${field.id}`)}>
-                      {field.name}
-                    </Button>
+                    <span class="dash-table-head">
+                      <Button size="sm" variant="bare" onPress={() => select()(`column:${field.id}`)}>
+                        {field.name}
+                      </Button>
+                      <Show when={props.askAboutColumn?.columns.includes(field.id) && props.askAboutColumn}>
+                        {(ask) => (
+                          <RowActions ariaLabel={`Actions for ${field.name}`}>
+                            {(menu) => (
+                              <Menu.Item context={menu} onSelect={() => ask().onAsk(field.id)}>
+                                Ask AI about this
+                              </Menu.Item>
+                            )}
+                          </RowActions>
+                        )}
+                      </Show>
+                    </span>
                   )}
                 </Show>
               </TableHead>

@@ -108,8 +108,7 @@ The person approves the list in the trust prompt, under **Reads your data**. The
 plugin's inputs on its roster row, worded from the input source's registration and its owner, with an
 `approved` flag per input. The prompt appears for any row with an input the grant doesn't cover, even
 for a plugin with no client half, and on an update it leads with only those inputs.
-`/v1/core/plugins/:id/input-grant` holds the grant, behind the same device gate as the other plugin
-routes:
+`/v1/core/plugins/:id/input-grant` holds the grant, behind the same device gate as the other plugin routes:
 
 - `GET` returns the declared inputs, the stored grant, and `usage`: the published panels that bind
   each input, with their account ids. It reads every published plan, so call it when someone asks.
@@ -187,9 +186,10 @@ plugin** reloads it, and **Logs** opens its **Logs** tab. **Publish…** warns w
 
 ## Limits and known gaps
 
-- GitHub's local-branches source still owns the `github` provider and reads `core:local-branches`
-  through `ctx.dataSources.invoke`. Moving it onto inputs would break the account and parameters
-  that stored panels carry at the top level of its scope.
+- GitHub's local-branches source stays a compiled exception, decided October 26, 2026. It checks that
+  `scope.connectionId` is a connected GitHub account, reads `core:local-branches` through
+  `ctx.dataSources.invoke`, and stamps the account on records as `githubConnectionId`. Derived sources
+  refuse that top-level account, so inputs would change stored panels' digests.
 - Core sources registered with a core handler can't declare inputs. Nothing needs one.
 
 ## Why

@@ -44,6 +44,9 @@ export type PanelViewProps = {
   /** The panel studio's preview only: a column header selects its column, and a group header selects
    *  the arrange part. A placed panel leaves it off, so its headers keep their own behaviour. */
   onSelectPart?: (key: PlanPartKey) => void
+  /** The panel studio's preview only, outside a proposal review: a header of one of `columns` opens a
+   *  menu that asks the authoring AI about that plan column. */
+  askAboutColumn?: { columns: readonly string[]; onAsk: (column: string) => void }
 }
 
 /** A row's press handler: only when the row declares a verb and the host can run it. */

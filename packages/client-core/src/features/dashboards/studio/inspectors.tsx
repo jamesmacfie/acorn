@@ -39,6 +39,7 @@ import {
   availableViews,
   heatmapAxes,
   countsByPart,
+  describeFilterRun,
   planSummary,
   problemsByPart,
   SOURCE_ICON,
@@ -971,6 +972,13 @@ function StageInspector(props: InspectorProps) {
             {(counted) => (
               <Text emphasis="muted">
                 {`${plural(counted().input, 'row')} in · ${plural(counted().output, 'row')} out`}
+              </Text>
+            )}
+          </Show>
+          <Show when={describeFilterRun(context.run(), `/stages/${index()}`)}>
+            {(words) => (
+              <Text emphasis="muted" wrap>
+                {words()}
               </Text>
             )}
           </Show>
