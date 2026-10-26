@@ -9,8 +9,8 @@ to exist. Read it as a pressure test for the seams in
 ## Before assigning an integration
 
 Reviewed October 8, 2026. This is dated research, not a list of confirmed product gaps.
-GitHub Actions data sources and Sentry telemetry are implemented; neither proves every CI journey
-or a Sentry issue browser. Recheck the relevant source, tools, and owning docs before selecting a candidate.
+GitHub Actions data sources, Sentry telemetry, and a rail of Sentry issues are implemented; none
+proves every CI journey or every Sentry action. Recheck the relevant source, tools, and owning docs before selecting a candidate.
 
 For a selected integration, write a separate handoff that names user journeys, provider authority,
 contribution contracts, failure behavior, and acceptance. Do not give the whole survey to a developer
@@ -112,11 +112,10 @@ beside the editor in a task, `CollectionContribution` for dashboard rows,
 
 ### Observability, errors, and logs
 
-- Sentry, the integration. Issues scoped to a service, a source-mapped stack trace, assign, resolve,
-  link to a task: the Rollbar shape, under the id `sentry`, needing an organisation token. The
-  export half already ships as `sentry-telemetry`, which is a sink rather than an integration and
-  holds only a DSN ([integrations.md](../integrations.md) § Sentry). The two stay separate because
-  they disclose different things.
+- Sentry, the integration. The rail of a project's unresolved issues ships as `sentry`, and the
+  export half as `sentry-telemetry` ([Sentry](../integrations/sentry.md)). Still open: a
+  source-mapped stack trace, assign, resolve, and link to a task, which
+  [acorn-sentry](./acorn-sentry/README.md) plans.
 - Bugsnag, Honeybadger, Airbrake, Raygun. The rollbar shape again.
 - Datadog. Log search, the APM service map, monitor state, an embedded dashboard, and a latency and
   error-rate row.

@@ -88,7 +88,7 @@ sends it in the Node's start message, never its environment ([Node keys](./secur
 | `ACORN_PROMPT_BUNDLED_PLUGIN_TRUST=1` | Shows the trust dialog for the app's own bundled packages, which a development build otherwise accepts as a packaged build does. |
 | `ACORN_PERF=1` | Prints boot and request timing. See [profiling](./local-development/profiling.md). |
 | `ACORN_ACCOUNT_URL` | The account service that **Settings** > **Account** signs in to. Unset, the Node offers no sign-in and no remote access. Use `https://account.trolley-problem.app` for the hosted service, or the address `pnpm dev:account` prints for a stand-in. See [the account API](./account-api.md). |
-| `ACORN_SENTRY_DSN` | Sends this Node's telemetry to that Sentry project, tagged `development`, once **Collect timings, logs, and errors on this node** is on. A Sentry connection in Settings wins over it. See [the DSN from the environment](./integrations/sentry.md#the-dsn-from-the-environment). |
+| `ACORN_SENTRY_DSN`, `ACORN_SENTRY_TOKEN`, `ACORN_SENTRY_ORG`, `ACORN_SENTRY_PROJECT`, `ACORN_SENTRY_URL` | The DSN sends this Node's telemetry to that Sentry project, tagged `development`, once **Collect timings, logs, and errors on this node** is on. The token, organization, and project, set together, list that project's unresolved issues in the rail. The address picks the region and defaults to `https://sentry.io`. A Sentry connection in Settings wins over each set. See [the DSN from the environment](./integrations/sentry.md#the-dsn-from-the-environment) and [credentials from the environment](./integrations/sentry.md#credentials-from-the-environment). |
 
 ## Develop the headless CLI
 

@@ -251,6 +251,7 @@ export default defineConfig({
             'docs/built-in-plugins/notes',
             'docs/built-in-plugins/preview',
             'docs/built-in-plugins/rollbar',
+            'docs/built-in-plugins/sentry',
             'docs/built-in-plugins/sentry-telemetry',
             'docs/built-in-plugins/terminal',
             'docs/built-in-plugins/workflows',

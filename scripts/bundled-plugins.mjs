@@ -9,7 +9,7 @@ import { fileURLToPath } from 'node:url'
 import { runPnpm } from './run-pnpm.mjs'
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..')
-const BUNDLED_PLUGINS = ['agent-cost', 'database', 'http', 'linear', 'model-providers', 'rollbar', 'sentry-telemetry']
+const BUNDLED_PLUGINS = ['agent-cost', 'database', 'http', 'linear', 'model-providers', 'rollbar', 'sentry', 'sentry-telemetry']
 
 // Replaces `output` with one loaded package per roster entry and returns the ids it built.
 export function buildBundledPlugins(output) {

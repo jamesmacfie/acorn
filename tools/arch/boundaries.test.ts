@@ -649,6 +649,7 @@ describe('architecture boundaries', () => {
       'plugins/database/src/tree',
       'plugins/linear/src/tree',
       'plugins/rollbar/src/tree',
+      'plugins/sentry/src/tree',
       'plugins/sentry-telemetry/src/tree',
     ]
     const offences: string[] = []
