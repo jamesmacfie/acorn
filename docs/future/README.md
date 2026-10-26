@@ -27,7 +27,6 @@ Dated delivery evidence belongs in `docs/testing/` or the dated security reviews
 | --- | --- | --- |
 | [bundle.md](./bundle.md) | Container coordination, desktop TUI embedding, and macOS signing. Platform archives, Windows operation support, and the installer belong to [node-tray/](./node-tray/README.md). | Standalone CLI/TUI staging and certificate generation implemented. Release delivery remains proposed. |
 | [compiled-tier.md](./compiled-tier.md) | Assess plugin migration candidates, reproduce retained cleanup reports, and finish loaded-package acceptance. | Standing assessment refreshed October 8, 2026. No migration scheduled. |
-| [dashboards-gaps.md](./dashboards-gaps.md) | A live check of the filter notes and AI review controls, the relations inspector, and the Workflows dock. | Filter diagnostics, AI review controls, and the branch-source decision done October 26, 2026. |
 | [integration-ideas.md](./integration-ideas.md) | Research catalogue for selecting integrations and checking contribution coverage. | Research, not an implementation specification. Recheck each candidate before assigning work. |
 | [kimi.md](./kimi.md) | An external Kimi harness package and optional usage/auth probes. | Proposed. No Kimi implementation in this checkout. Other external harnesses already exercise the contribution contract. |
 | [opencode.md](./opencode.md) | An external OpenCode harness package beside Claude Code and Codex, through `opencode acp`. | Postponed October 19, 2026, until OpenCode is installed and signed in. The tool result cap, memory change notes, and `run_script` from the same review were implemented October 19, 2026. |
@@ -78,7 +77,8 @@ These plans remain in Git history. Use their reference owners for implemented be
 | `editor-files.md`, removed October 8, 2026 | [File renderers](../editor/file-renderers.md). The renderer catalogue and the rectangle design remain in Git history. |
 | `workspace-icons.md`, removed October 8, 2026 | [Workspace icons](../workspaces-and-tasks/workspace-icons.md). |
 | `test-feedback.md`, removed October 8, 2026 | [Testing](../testing.md). Broader excluded performance ideas remain in Git history, not assigned requirements. |
-| `dashboards/`, removed October 8, 2026 | [Dashboard reference](../dashboards.md), [derived sources](../data-sources/derived-sources.md), and [remaining work](./dashboards-gaps.md). |
+| `dashboards/`, removed October 8, 2026 | [Dashboard reference](../dashboards.md) and [derived sources](../data-sources/derived-sources.md). |
+| `dashboards-gaps.md`, removed October 26, 2026 | [The panel editor](../dashboards/mapping-and-editor.md) and [derived sources](../data-sources/derived-sources.md#limits-and-known-gaps). Its unassigned leftovers, a relations inspector review and a Workflows dock, remain in Git history. |
 | Six Editor phase plans, removed October 8, 2026 | [Editor reference](../editor.md), [dated completion records](../testing/editor-delivery-2026-10-08.md), and [checks still to run](../testing/editor-phase06-follow-up-2026-10-08.md). |
 
 ## Retired folders

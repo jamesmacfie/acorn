@@ -102,7 +102,6 @@ the whole plugin system in one page.
 | [agent-tools.md](./agent-tools.md) | Agent tool contributions, permissions, the MCP projection, managed-session orchestration, and workflow tools. |
 | [dashboards.md](./dashboards.md) | Published dashboard panels over typed data sources, placements, datasets, coverage, and measure history. |
 | [agent-built-apps.md](./agent-built-apps.md) | Apps an agent builds in a conversation: OpenUI Lang programs over dashboard plans, their files, tools, checks, cards, and what they can reach. |
-| [Dashboard followups](./future/dashboards-gaps.md) | What remains after the studio and derived sources: a live check of the October 26 followups, the relations inspector, and the Workflows dock. |
 | [integrations.md](./integrations.md) | Connections, providers, the external-item store, and project links. |
 | [data-sources.md](./data-sources.md) | Typed source registration, scoped invocation, completeness, and client query caching. |
 | [github-integration.md](./github-integration.md) | Pull requests, reviews, checks, the mirror, and the importer. |
