@@ -41,7 +41,7 @@ For later phases:
 - A new run-time variable for the `sentry` plugin (phase 2) needs the same three things: an
   `env` grant, a `passThroughEnv` entry on `dev`, and a reason in `apps/site/src/data/plugins.ts`.
 - Two failures were already on the base commit (f31f40b0a), and this phase leaves them alone. The
-  arch tests flag links to the deleted `docs/future/workflows-gaps.md`. The site's Playwright search
+  arch tests flag links to the deleted `workflows-gaps.md`. The site's Playwright search
   test for "Show workspace rail" ranks `/docs/using/workspaces-and-projects/` first.
 
 ## Goal

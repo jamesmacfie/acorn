@@ -1,6 +1,6 @@
 # Sentry: issues in the rail, and telemetry from environment variables
 
-Date: October 17, 2026. Revised October 26, 2026. Status: proposed. Implementation not started.
+Date: October 17, 2026. Revised October 26, 2026. Status: all six phases implemented October 27, 2026. Each phase doc opens with its completion note.
 
 This folder plans two Sentry plugins. The exporter, `sentry-telemetry`, already ships. It sends a
 Node's own telemetry to whatever DSN someone pastes into Settings. This programme lets the exporter

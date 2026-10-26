@@ -70,7 +70,7 @@ For later phases:
 - The standalone Node archive and the CLI carry no DSN. `build-node.yml` never sets the variable.
   That's the README's open question, still open.
 - The same arch-test failure from the base commit remains: links to the deleted
-  `docs/future/workflows-gaps.md`. It hides the anchor check, which passes with it filtered out.
+  `workflows-gaps.md`. It hides the anchor check, which passes with it filtered out.
 
 ## Goal
 
