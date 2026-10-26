@@ -26,8 +26,8 @@ It's part of [plugin authoring](../plugin-authoring.md).
    `node_modules`, so keep these out of runtime code.
 
 3. Install the folder on a Node with the local-path source
-   ([install a hand-written package](./installing-a-hand-written-package.md)), restart the Node, and
-   accept the bundle when the device asks.
+   ([install a hand-written package](./installing-a-hand-written-package.md)), and accept the bundle
+   when the device asks. The Node starts it without a restart.
 
 4. Open a task and run **Open My widget** from the command palette. The pane's button calls the Node
    route at `/v1/p/my-widget/greeting` through the bridge and updates the host-drawn tree with the

@@ -102,4 +102,4 @@ Desktop TUI embedding can proceed separately from standalone release publication
 - Inspect the packer, desktop staging, command installation, runtime pin, and generated dependency policy.
 - Check supported platform triples and native-module loading on matching runners.
 - Recheck the pairing API and Windows token storage before adding an operator command.
-- Keep browser access and relay work in [remote access](./remote.md) and [cloud](./cloud/README.md).
+- Keep relay work in [remote access](./remote-access/README.md) and [cloud](./cloud/README.md).

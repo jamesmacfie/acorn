@@ -90,6 +90,6 @@ Three constraints in the code keep that move additive:
 3. `providerNodeId`, not the endpoint, is the control plane's identity for a Node, so a record
    survives being reached from somewhere else.
 
-[Remote access](../future/remote.md) is the design that moves the credential. Until then, don't take
+No design moves the credential off the local Node. Until one does, don't take
 the shortcut of a client-side provider. It would put the credential in the renderer, which is what all
 three constraints exist to prevent.

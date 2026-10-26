@@ -25,7 +25,7 @@ adopts it, and works on it like any remote Node. One person per team.
 - The Node image from [phase 1](./01-node-image.md).
 - From [remote access](../remote-access/README.md): the account service and website, the sign-in
   plugin `plugins/account`, relay tickets, and the hosted relay
-  ([remote access phase 2](../remote-access/02-accounts.md)).
+  ([the account API](../../account-api.md)).
 - Enrollment v1 in `packages/node-core/src/server/enrollment.ts`, with its schema in
   `packages/protocol/src/device/enrollment.ts` and a stub control plane in
   `packages/node-core/src/testkit/controlPlaneStub.ts`.

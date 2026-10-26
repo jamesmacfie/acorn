@@ -1,7 +1,7 @@
 # Identity, grants, and roles
 
 Status: proposed, 2026-09-29. Revised October 22, 2026, when accounts and sign-in moved to
-[remote access](../remote-access/accounts.md). This file covers how a person proves to a hosted
+[the account API](../../account-api.md). This file covers how a person proves to a hosted
 Node who they are and what role they hold, and how that authority is taken away. Today acorn has no
 accounts at all ([authentication](../../authentication.md)). Every paired device is the Node's
 single owner. Hosted Nodes need a second authority path for people, and local Nodes must not
@@ -9,7 +9,7 @@ change.
 
 ## Accounts and sign-in
 
-[Remote access](../remote-access/accounts.md) owns accounts, sign-in from each client, and the
+[The account API](../../account-api.md) owns accounts, sign-in from each client, and the
 sign-in plugin on each local Node. Cloud adds two things to them:
 
 - Better Auth's organization plugin maps to acorn teams, with custom roles `admin`, `member`, and

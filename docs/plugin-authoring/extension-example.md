@@ -56,8 +56,9 @@ bundle passes to `mountTree`. A `matches` pattern is an exact key, `prefix*`, or
 
 ## Install and try it
 
-Install the folder with the local-path source, restart the Node, and accept the bundle
-([install a hand-written package](./installing-a-hand-written-package.md)). Then, in a task:
+Install the folder with the local-path source and accept the bundle
+([install a hand-written package](./installing-a-hand-written-package.md)). The Node starts it
+without a restart. Then, in a task:
 
 1. Right-click a file in Editor's tree and choose **Add to review**. The row gains a mark, and
    **Open Review** lists the file.

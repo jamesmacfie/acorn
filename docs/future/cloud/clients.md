@@ -18,7 +18,7 @@ This file lists every client change, in the order the phases need them.
 
 ## Signing in
 
-[Remote access](../remote-access/accounts.md#the-sign-in-plugin) owns sign-in and the **Account**
+[The account API](../../account-api.md#the-sign-in-plugin) owns sign-in and the **Account**
 page in Settings. Cloud adds the account's teams to that page. **Sign out** also forgets every
 grant.
 
@@ -34,7 +34,7 @@ What changes in custody:
   pointer to the provider that issues its grants. Before each connection, and a minute before
   expiry, custody asks the provider for a fresh grant and relay ticket. Custody changes live in
   `packages/custody/src` beside `packages/custody/src/custody/deviceTokenStore.ts`.
-- **The relay socket factory.** See [relay](../remote-access/relay.md#what-changes-in-the-client).
+- **The relay socket factory.** See [relay](../../relay.md#the-client).
 - **A new connection reason.** A signed-out account or an expired membership shows as `offline`
   with a reason, not a new state. The broker's state vocabulary does not grow.
 

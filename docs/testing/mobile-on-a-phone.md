@@ -9,7 +9,16 @@ a device.
 
 The code and the pieces below were checked in WebKit and Chromium at 390 by 844, against throwaway standalone
 Nodes, a relay, and the stand-in account service, on October 22, 2026. None of it counts as a device
-result. The numbers are in [phase 4's evidence](../future/remote-access/04-phone.md#evidence).
+result. The relay ran on the same computer, so these times are costs of the code, not of a network. The
+phone writes each step as a `performance` measure named `acorn.channel.<step>`.
+
+| What | WebKit | Chromium |
+| --- | --- | --- |
+| First connection of a page: ticket, relay stream, handshake | 5-8 ms, 10-11 ms, 170-239 ms | 2-3 ms, 3-6 ms, 10 ms |
+| Later connections: handshake | 5-17 ms | 5 ms |
+| Back online after the network returns (retries 250 ms, doubling) | 929 ms | 768 ms |
+
+The first WebKit handshake includes loading the lazy chunk and making the first key pair.
 
 - The app signed in through the stand-in, paired with a Node by approval, and drew its workspaces.
 - A channel opened through a relay, and the relay's traffic held none of the requests or tokens in

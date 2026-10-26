@@ -12,7 +12,7 @@ Two topic pages hold the rest of the reasoning:
 - [The node half and bundled plugins](./extensibility/runtime.md): the worker realm and the plugins
   acorn ships as loaded packages.
 
-The plan for what comes next is in [where the plugin system is going](./future/ecosystem/where-this-is-going.md).
+The plan for plugin signing and discovery is in [sign plugin packages, then build discovery](./future/plugin-signing.md).
 
 ## The goal
 

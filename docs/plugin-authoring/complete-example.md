@@ -161,10 +161,10 @@ connected.then(async (context) => {
 ## Run it
 
 1. Install the folder with the local-path source
-   ([install a hand-written package](./installing-a-hand-written-package.md)).
-2. Restart the Node.
-3. Accept the bundle when the device asks.
-4. Open a task. **Hello** is in the task's pane switcher.
+   ([install a hand-written package](./installing-a-hand-written-package.md)). The Node starts it
+   without a restart.
+2. Accept the bundle when the device asks.
+3. Open a task. **Hello** is in the task's pane switcher.
 
 `packages/create-acorn-plugin/index.test.ts` type-checks this example outside the workspace against the
 packed `acorn-plugin-types`.

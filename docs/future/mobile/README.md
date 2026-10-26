@@ -5,8 +5,7 @@ docs shipped the same day, and its real-device acceptance is outstanding.
 
 This programme plans a mobile web app that reaches a Node and draws the same plugin UI the desktop
 draws, at phone width. It starts small: the things you want from your phone while agents work. Read
-this page before you pick up a phase. [Remote access](../remote.md) owns the wider design for
-browser sessions, custody, and push. This programme is the first slice of it.
+this page before you pick up a phase.
 
 ## What the first release does
 
@@ -114,5 +113,5 @@ features people use on a phone. A web app on a tailnet answers that question fir
 come later around the same bundle.
 
 Serving the app from the Node was the third. It needs browser sessions, origin checks, and a trusted
-certificate on the Node itself, which are the open decisions in [remote access](../remote.md). The
+certificate on the Node itself, which nobody has designed. The
 gateway lets the UI work start without them.

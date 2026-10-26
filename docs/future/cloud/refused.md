@@ -16,7 +16,7 @@ The relay carries encrypted bytes but cannot interpret them.
 
 The web app administers teams, roles, billing, Node inventory, and plugin policy. Desktop and TUI
 do the work. A browser workspace needs its own token custody, browser-valid TLS, and plugin UI
-sandbox. [Remote access](../remote.md#build-a-single-node-browser-host) records those costs.
+sandbox.
 The project and Node contracts must leave the future client possible.
 
 ## No execution-only worker for the first task Node
@@ -104,7 +104,7 @@ service. [Better Auth account linking](https://better-auth.com/docs/concepts/use
 Phase 1 gives a self-hosted Node a public address as a stepping stone. From phase 2 on, team Nodes,
 workers, and restore Nodes accept connections only through the relay. A public port on each worker
 would widen the attack surface, churn addresses every few minutes, and give two reachability paths to
-test instead of one. See [relay](../remote-access/relay.md#who-uses-it).
+test instead of one. See [relay](../../relay.md).
 
 ## No enrollment v1 for hosted Nodes
 

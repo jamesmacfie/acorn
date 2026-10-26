@@ -131,11 +131,13 @@ because a checkbox is how someone deletes a year of notes by reflex. A device pl
 which also drops every preference this device kept for it. Required plugins show no switch, and a
 bundled package shows neither **Update** nor uninstall.
 
-A page shows two activation facts. `disabled` is what will happen at the Node's next start, because
-routes, tables, and jobs are wired at init. `running` is what's happening now. Between saving a
-toggle and restarting the Node they can differ, and the page shows both, in the plugin's status and
-in a restart banner above the list. Install and update show the same banner, because a package on
-the Node's disk hasn't necessarily started.
+A page shows two activation facts. `disabled` is what the owner asked for, and `running` is what's
+happening now. A loaded plugin starts and stops in the running Node, so the two agree once the toggle
+saves ([starting and stopping without a restart](./dev-loop.md#starting-and-stopping-without-a-restart)).
+A compiled plugin wires its routes, tables, and jobs at init, so toggling one changes nothing until
+the Node restarts. Until then the page shows both facts, in the plugin's status and in a restart
+banner above the list. The banner also shows when a package on disk differs from the one running,
+such as a disk copy of a compiled plugin.
 
 ### Installing
 

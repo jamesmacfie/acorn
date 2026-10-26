@@ -128,7 +128,6 @@ import `@acorn/custody/rules` and nothing else from custody.
 - **Where the bytes go.** The worker factory reads the bytes from the phone's store and posts them to
   the relay page from phase 2. On the desktop, the renderer never sees a bundle's bytes. On the phone
   it does, because the page is the only process.
-  [Browser plugin custody](../remote.md#implement-browser-plugin-custody) accepts that.
 - **Lost storage.** A browser can clear IndexedDB. The phone treats a missing store as a device that
   has never seen the plugin, and prompts again.
 

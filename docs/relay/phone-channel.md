@@ -40,7 +40,7 @@ and the phone stops retrying, the way a changed certificate does for a native cl
 read only until the phone is paired, so a changed listing can't move a paired phone.
 
 A phone with no account has no list to take the key from, so it can't pair. Running the app against a
-self-hosted relay with no account isn't supported ([open question 4](../future/remote-access/04-phone.md#open-questions)).
+self-hosted relay with no account isn't supported ([open question 4](../future/remote-access/05-production.md#open-questions)).
 
 ## Open a channel
 

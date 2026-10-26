@@ -13,9 +13,9 @@ import { clientApp } from './clientApp'
 //
 // Every other module in the client reaches the bundle cache and the trust store through this one
 // file, never through the platform seam's `pluginCustody()` directly. It fronts the desktop helper's
-// content-addressed store, and a web client (docs/future/remote.md) would front IndexedDB plus
-// server-side per-user acknowledgements. The interface has to stay portable; letting the host object
-// leak through client code would make the storage the contract by accident.
+// content-addressed store, and the phone's IndexedDB store (docs/mobile/plugin-custody.md). The
+// interface has to stay portable; letting the host object leak through client code would make the
+// storage the contract by accident.
 //
 // Absent means "no host for third-party plugins here": a browser build, or a test. Every caller
 // treats that as "nothing installed", never as an error.

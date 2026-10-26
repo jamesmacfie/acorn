@@ -84,5 +84,5 @@ Document local cross-repository development beside the scripts that implement it
 
 - Recheck loaded manifests, workspace imports, builder usage, published entrypoints, and release owners.
 - Inspect `apps/desktop/scripts/stage.mjs` and bundled reconciliation before changing artifact sourcing.
-- Read [ecosystem distribution](./ecosystem/work-plan.md) for signing and discovery dependencies.
+- Read [plugin signing](./plugin-signing.md) for signing and discovery dependencies.
 - Run lint, affected owner and consumer suites, architecture checks, and clean packed-artifact acceptance.

@@ -100,7 +100,7 @@ Checked on October 23, 2026, at `74f2decc3`:
 | The `formFactor` default stays `['desktop']`. | A plugin's author decides that a surface works at phone width. |
 | The desktop and the terminal client behave as before. | They're the shipped clients. |
 | The phone's first screen stays under its ceiling. Code from this programme loads after the first frame. | [The phone's budget](../../frontend/startup-budget.md#the-phone). |
-| Hosted-side work goes through the published account API and static files built from this repository. | [Where the code lives](../remote-access/services.md#where-the-code-lives). |
+| Hosted-side work goes through the published account API and static files built from this repository. | [Where the code lives](../remote-access/README.md#where-the-code-lives). |
 
 ## The phases
 

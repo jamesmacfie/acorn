@@ -56,7 +56,6 @@ ask about it. The group's members load `pluginCustody.ts` on first use, after th
   and the relay page checks the bytes against its own host name before it starts them.
 
 On the phone the page is the only process, so the renderer can read a bundle's bytes. On the desktop it never does.
-[Browser plugin custody](../future/remote.md#implement-browser-plugin-custody) accepts that.
 
 ## First-party bundles
 

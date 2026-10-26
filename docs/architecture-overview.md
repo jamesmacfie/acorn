@@ -13,7 +13,7 @@ capabilities through the plugin API instead of importing core code.
 
 The desktop renderer and the terminal client share `@acorn/client-core`, the layouts, and the UI kit,
 so one UI implementation supports both. Desktop-only frames, webviews, and platform operations need a
-host requirement or a terminal fallback. The browser client is a [design proposal](./future/remote.md).
+host requirement or a terminal fallback. The phone app is the only browser client ([the mobile web app](./mobile.md)).
 
 ## Runtime topology
 

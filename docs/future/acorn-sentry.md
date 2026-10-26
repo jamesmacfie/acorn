@@ -129,7 +129,7 @@ Two edge cases:
 
 When official plugins move to their own repository ([split](./split.md)), "official" becomes
 "installed from the acorn organisation's releases", which the installer already records in its lock
-file. Package signing ([ecosystem](./ecosystem/README.md)) is the stronger check and replaces that
+file. Package signing ([plugin signing](./plugin-signing.md)) is the stronger check and replaces that
 when it ships.
 
 Acceptance: with a folder install shadowing `linear` and throwing on load, nothing owned by `linear`

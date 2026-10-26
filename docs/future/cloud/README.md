@@ -33,7 +33,7 @@ as a phase needs them.
 | [goals.md](./goals.md) | The problem, the business shape, goals and non-goals, the constraints no phase may break, and the terms used everywhere else. |
 | [architecture.md](./architecture.md) | Runtime topology, what each runtime owns, trust boundaries, the main flows, and every contract that changes. |
 | [services.md](./services.md) | Every deployable, where its code lives, environments, infrastructure, and service-to-service credentials. |
-| [identity.md](./identity.md) | Grants, enrollment v2, roles, route classification, and revocation. Accounts and sign-in are in [remote access](../remote-access/accounts.md). |
+| [identity.md](./identity.md) | Grants, enrollment v2, roles, route classification, and revocation. Accounts and sign-in are in [the account API](../../account-api.md). |
 | [projects-and-tasks.md](./projects-and-tasks.md) | Shared projects, snapshots, the attempt state machine, history transfer, and results. |
 | [memory.md](./memory.md) | Shared project memory, private memory per account, worker seeds and write forwarding, attribution, roles, and optional approval. Depends on phase 7. |
 | [archive.md](./archive.md) | The whole-root archive, verify-then-destroy, encryption, and restore with fresh credentials. |
@@ -48,7 +48,7 @@ as a phase needs them.
 | Phase | What is deployed at the end | Who can use it | Depends on |
 | --- | --- | --- | --- |
 | [1. Node image](./01-node-image.md) | A published acorn Node image, and a recipe to run one on the compute provider and pair it by hand. | Anyone who self-hosts. | Nothing. |
-| [2. Team Node](./02-team-node.md) | Teams with a region. Creating a team provisions its team Node behind the relay. Desktop and TUI use it with no pairing code. | Internal. | 1, and [remote access phase 2](../remote-access/02-accounts.md). |
+| [2. Team Node](./02-team-node.md) | Teams with a region. Creating a team provisions its team Node behind the relay. Desktop and TUI use it with no pairing code. | Internal. | 1, and [remote access](../remote-access/README.md), which is built. |
 | [3. Cloud task](./03-cloud-task.md) | Publish a project and run a task in the cloud from desktop or TUI, with history kept on the team Node. Manual stop. | Internal. | 2. |
 | [4. Archive](./04-archive.md) | Idle workers archive and disappear after five minutes. Plugin detail restores on demand. | Internal. | 3. |
 | [5. Isolation](./05-isolation.md) | A hardened worker: sandboxed task processes, brokered model keys, enforced egress, team policy. | Closed alpha: single-person teams, own keys. | 4. |
@@ -83,8 +83,8 @@ Each is also listed in the phase that first needs it. Making them early saves re
 1. The compute provider organization, with separate staging and production accounts.
 2. Who holds the credentials for staging and production infrastructure.
 
-The product name and domain are decided in
-[remote access phase 2](../remote-access/02-accounts.md#open-questions). The hosted service
+The product name and domain are open questions in
+[remote access phase 5](../remote-access/05-production.md#open-questions). The hosted service
 is closed source ([services](./services.md#where-the-code-lives)).
 
 ## Rules for every phase
@@ -123,7 +123,7 @@ These are the biggest unanswered questions. Each is listed in full in the phase 
   talks to a Node ([phase 6](./06-plugins.md#open-questions)).
 - Where the per-team archive key lives ([phase 4](./04-archive.md)).
 - Whether EU account metadata must stay in the EU
-  ([remote access phase 2](../remote-access/02-accounts.md#open-questions)).
+  ([remote access phase 5](../remote-access/05-production.md#open-questions)).
 
 ## Owning documents this programme extends
 
@@ -132,7 +132,7 @@ Before changing code, read [architecture overview](../../architecture-overview.m
 [Node enrollment](../../node-enrollment.md), [authentication](../../authentication.md),
 [plugin activation](../../plugins/activation.md), [node distribution](../../node-distribution.md),
 and [security](../../security.md). [Worker isolation](./isolation.md) owns phase 5's process and
-policy design. [Remote access](../remote.md) owns the future browser client.
+policy design.
 
 ## Verify before building
 

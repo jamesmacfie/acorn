@@ -28,7 +28,7 @@ until [the acceptance](../../testing/mobile-on-a-phone.md) passes.
   CLI.
 - Docs: a setup section in `docs/mobile.md`, `docs/cli/mobile.md` (deleted in remote access phase 4), the real-device results page
   `docs/testing/mobile-on-a-phone.md` with every row "Not yet run", and updates to the gateway page,
-  the closed kit, packaging, `docs/future/remote.md`, and the indexes.
+  the closed kit, packaging, `docs/future/remote.md` (deleted October 26, 2026), and the indexes.
 
 I checked what a desktop browser can in Chromium at 390 by 844, against a throwaway standalone Node and
 `acorn mobile` run from a copy of the packaged layout. The manifest parsed with no errors and Chrome
@@ -133,5 +133,5 @@ and OS versions and the date with the results in `docs/testing/`:
 Move the shipped behavior into reference pages: the app and its shell under a page beside
 [the terminal client](../../tui.md), the gateway in [security](../../security.md), and the
 form factor in [the closed kit](../../ui-design/closed-kit.md). Update
-[remote access](../remote.md) to say which of its decisions this programme answered and which remain.
+`docs/future/remote.md` (deleted October 26, 2026) to say which of its decisions this programme answered and which remain.
 Then trim this folder to what's left in [later](./later.md).

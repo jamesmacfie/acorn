@@ -1,7 +1,7 @@
 # Services, repositories, and environments
 
 Status: proposed, 2026-09-29. Revised October 22, 2026: the account service, website, sign-in
-plugin, and relay are built by [remote access](../remote-access/services.md), and this file lists
+plugin, and relay are built by [remote access](../remote-access/README.md), and this file lists
 what cloud adds to them. This file lists every deployable the programme adds, where its code
 should live, what it runs on, and how it reaches production. The choices marked _recommended_ are
 defaults a phase can overturn with a reason. The rest are open and listed as questions in the phase
@@ -26,9 +26,9 @@ history read model. A worker turns on attempt mode. A local Node turns on neithe
 
 ## Where the code lives
 
-Cloud follows the split [remote access](../remote-access/services.md#where-the-code-lives) decided on
+Cloud follows the split [remote access](../remote-access/README.md#where-the-code-lives) decided on
 October 22, 2026: the code that runs on people's machines is open, and the hosted service is closed.
-Docs here follow its rule for [referring to the hosted service](../remote-access/services.md#how-the-docs-refer-to-the-hosted-service).
+Docs here follow its rule for [referring to the hosted service](../remote-access/README.md#how-the-docs-refer-to-the-hosted-service).
 
 - **Open source, in this repository:** the Node image build, enrollment v2 and grant verification in
   `packages/node-core`, the history-transfer and archive code, the team additions to the sign-in

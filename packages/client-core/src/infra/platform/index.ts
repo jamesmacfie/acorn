@@ -227,8 +227,8 @@ export type PluginWebviews = {
 }
 
 // What the host holds for third-party plugins: the bundles it cached, and this device's decisions
-// about running them. The renderer sees this shape and never a path, so the storage can move from the
-// desktop to a browser (docs/future/remote.md).
+// about running them. The renderer sees this shape and never a path, so the desktop and the
+// phone's browser can store it differently (docs/mobile/plugin-custody.md).
 export type PluginTrustDecision = {
   pluginId: string
   hash: string

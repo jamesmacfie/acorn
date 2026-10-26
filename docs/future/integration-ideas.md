@@ -4,8 +4,7 @@ Status: research notes, 2026-08-21. Nothing here is planned or scheduled. This i
 tooling developers touch on a normal working day, written down so that the plugin and contribution
 contracts get designed against the whole space instead of against the six integrations that happen
 to exist. Read it as a pressure test for the seams in
-[docs/extensibility.md](../extensibility.md) and the fat-core position in
-[docs/future/ecosystem/blockers.md](./ecosystem/blockers.md), not as a roadmap.
+[docs/extensibility.md](../extensibility.md) and its fat-core position, not as a roadmap.
 
 ## Before assigning an integration
 
@@ -441,7 +440,7 @@ is fine. The same trust grant covering both is not. Keep this list beside
 
 **This catalogue is the fat-core pressure test.** The tempting move is to put the pipeline contract,
 the flag contract, and the queue contract in core, because every provider needs them.
-[docs/future/ecosystem/blockers.md](./ecosystem/blockers.md) already takes a position on that. The
+[Two tiers, permanently](../extensibility.md#two-tiers-permanently) already takes a position on that. The
 question this file asks is whether that position survives contact with 15 continuous integration
 providers who all want the same five fields.
 

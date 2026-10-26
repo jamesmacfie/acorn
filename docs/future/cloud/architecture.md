@@ -94,8 +94,8 @@ trust:
 
 | Flow | Summary | Detail |
 | --- | --- | --- |
-| Sign in | A client signs in to the account service through an OAuth device flow run by the sign-in plugin on the local Node. | [remote access accounts](../remote-access/accounts.md) |
-| Reach a hosted Node | The client asks for a grant and a relay ticket, dials the relay, and opens pinned TLS through it. | [relay](../remote-access/relay.md), [identity](./identity.md#grants) |
+| Sign in | A client signs in to the account service through an OAuth device flow run by the sign-in plugin on the local Node. | [the account API](../../account-api.md) |
+| Reach a hosted Node | The client asks for a grant and a relay ticket, dials the relay, and opens pinned TLS through it. | [relay](../../relay.md), [identity](./identity.md#grants) |
 | Publish a project | The member publishes a local project to the team. The team Node mints a team project ID, and the local Node stores the mapping. | [projects and tasks](./projects-and-tasks.md#shared-projects) |
 | Run a task in the cloud | The team Node reserves the task and attempt, the provisioner creates a worker, the worker enrolls, pulls its seed, and the client adopts it. | [projects and tasks](./projects-and-tasks.md#the-attempt-lifecycle) |
 | Keep history | The worker streams core and agent events to the team Node with sequence numbers. The team Node acknowledges each batch. | [projects and tasks](./projects-and-tasks.md#history-transfer) |
@@ -113,11 +113,11 @@ change cannot express the behavior, add a separately versioned contract. Put Nod
 | Contract | Addition | Owner | First phase |
 | --- | --- | --- | --- |
 | Container image | A published Node image with task tooling, running as a non-root user. | `apps/node` packaging | [1](./01-node-image.md) |
-| Account API | Teams, membership, inventory, and grant issuance, added to the [remote access](../remote-access/accounts.md) account API. | Account service | [2](./02-team-node.md) |
+| Account API | Teams, membership, inventory, and grant issuance, added to [the account API](../../account-api.md). | Account service | [2](./02-team-node.md) |
 | Enrollment v2 | No device token in the request. The reply carries the grant issuer's keys and a relay credential. | `@acorn/protocol` and the account service | [2](./02-team-node.md) |
 | Grant principal | A third principal kind on hosted Nodes: a person with a team role, from a verified grant. | `packages/node-core` auth | [2](./02-team-node.md) |
 | Grant custody | A client credential that expires and refreshes through the sign-in plugin, beside device tokens. | `@acorn/custody` | [2](./02-team-node.md) |
-| Relay transport | Built by remote access. Hosted Nodes get a relay credential in the enrollment v2 reply. | `packages/node-core` transport, `@acorn/custody` broker, relay | [remote access 1](../remote-access/01-relay.md), [2](./02-team-node.md) |
+| Relay transport | Built by remote access. Hosted Nodes get a relay credential in the enrollment v2 reply. | `packages/node-core` transport, `@acorn/custody` broker, relay | [the relay](../../relay.md), [2](./02-team-node.md) |
 | Project identity | Team project IDs, the local-to-team mapping, and execution location on a task. | Team Node, projected through `@acorn/protocol` | [3](./03-cloud-task.md) |
 | Attempt lifecycle | Reserve, provision, set up, route, stop, archive, restore, and reconcile, each idempotent. | Team Node orchestrator | [3](./03-cloud-task.md) |
 | History transfer | Ordered, resumable transfer of core and agent events and artifacts. | Core and the agents plugin | [3](./03-cloud-task.md) |

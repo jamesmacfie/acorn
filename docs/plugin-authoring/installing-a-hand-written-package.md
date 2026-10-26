@@ -19,7 +19,8 @@ and select the folder with **Choose…**. **Choose…** appears only when the No
 works on every build, packaged included.
 
 `linkLocal` (`server/plugins/installer.ts`) links the folder instead of copying it, so you edit in
-place and the next start runs what you edited. The path must be absolute. Uninstalling removes the
+place. To run an edit, turn the plugin's **Enabled** switch off and on, or use development mode,
+below. The path must be absolute. Uninstalling removes the
 link and doesn't follow it into your working tree. A folder is the one source acorn can't pin: the
 lockfile records no archive hash and no entrypoint digests, because the bytes keep changing by design
 ([installing from a folder](../security/plugin-install.md#installing-from-a-folder)).

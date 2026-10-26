@@ -159,6 +159,6 @@ fingerprint it bound, and that a Node booted without the variables writes nothin
   whether a Node is up asks the Node, with the credential it was given.
 - **No re-enrollment.** A Node with an attachment skips enrollment however the environment is set.
   Re-attaching is a detach and a fresh token.
-- **No relay.** Reaching a Node with no public address belongs to [remote access](./future/remote.md). A
+- **No relay.** Reaching a Node with no public address belongs to [the relay](./relay.md). A
   provider returns an endpoint without saying how it got it, so a relayed endpoint fits this protocol
   unchanged.

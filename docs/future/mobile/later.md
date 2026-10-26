@@ -3,9 +3,8 @@
 Date: October 17, 2026. Status: proposed. Not phased.
 
 These pieces wait until people use the [first release](./README.md). Each needs a decision from the
-owner before it becomes a phase. [Remote access to a browser host](../remote.md) owns the wider design
-for most of them. Moving phone sessions to the Node and reaching more than one Node moved to
-[remote access](../remote-access/phone.md) on October 22, 2026.
+owner before it becomes a phase. Moving phone sessions to the Node and reaching more than one Node moved to
+[the phone channel](../../relay/phone-channel.md) on October 22, 2026.
 
 ## Send notifications to a sleeping phone
 
@@ -14,8 +13,7 @@ delivery needs Web Push: the phone gives the Node a push subscription, and the N
 notification when the attention inbox gains an item. The notification carries no task content, only
 a count and the task's title, because it passes through Apple's or Google's push service. iOS
 delivers web push only to an app installed to the home screen. The Node owns the subscription, since
-each phone is its own device there once [remote access phase 4](../remote-access/04-phone.md)
-ships.
+each phone is its own device there ([the phone channel](../../relay/phone-channel.md#a-device-for-each-phone)).
 
 ## Reuse the narrow mode in the browser extension
 

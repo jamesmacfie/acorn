@@ -151,7 +151,7 @@ This plan assumes these defaults. The owner can change any of them:
 
 These stay with other plans:
 
-- Reaching a Node that has no reachable address belongs to the [relay](../remote-access/relay.md).
+- Reaching a Node that has no reachable address belongs to the [relay](../../relay.md).
   Until it exists, Tailscale or an SSH tunnel covers that case.
 - The preview pane on a remote Node is [the remote preview proxy](../split/10-remote-preview-proxy.md).
 - The browser extension pairs over loopback only, so it can't drive a remote Node

@@ -48,8 +48,7 @@ Model usage is not resold. Teams bring their own provider keys. For the pricing 
 ## Non-goals for the first release
 
 - A browser workspace. The web app administers accounts and infrastructure. It never shows code or
-  transcripts. The contracts must leave a future browser client possible
-  ([remote access](../remote.md#build-a-single-node-browser-host)).
+  transcripts. The contracts must leave a future browser client possible.
 - Continuous two-way sync of a local worktree with a cloud task. A snapshot goes up once. Results
   come back as a branch, pull request, or patch.
 - Sharing a person's local Node with their team. The relay lets an owner reach their own Node.
@@ -65,7 +64,7 @@ Each rule has an owning document. The cloud work extends those documents; it doe
 | --- | --- | --- |
 | A local Node with no account behaves exactly as it does today. No cloud code path runs when nothing is configured. | The open-source promise. | [architecture overview](../../architecture/control-plane.md) |
 | The control plane stores what it takes to find, vouch for, place, and bill a Node. It stores no task content: no code, prompts, transcripts, or plugin data. | Keeps the control plane replaceable and the trust story short. | [architecture overview](../../architecture/control-plane.md) |
-| The relay moves encrypted bytes and cannot read them. Clients keep pinning the Node's certificate end to end. | A relay compromise yields routing metadata, not work. | [relay](../remote-access/relay.md) |
+| The relay moves encrypted bytes and cannot read them. Clients keep pinning the Node's certificate end to end. | A relay compromise yields routing metadata, not work. | [relay](../../relay.md) |
 | Nodes stay independent. No shared database, no cross-Node transaction. The team Node reads worker history through explicit, versioned contracts. | The Node model every client and plugin is built on. | [architecture overview](../../architecture-overview.md) |
 | `/v1` routes, the `acorn-1` baseline, enrollment v1, and the meaning of a device token do not change in place. New behavior is additive or a new version. | Older clients and Nodes keep working. | [API reference](../../api-reference/versioning.md), [Node enrollment](../../node-enrollment.md#versioning) |
 | A plugin's client bundle runs on a device only after that device trusted its exact hash. Team approval does not trust code on anyone's machine. | The consent surface for third-party code. | [security](../../security/plugin-bundles.md) |
