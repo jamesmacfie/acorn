@@ -21,6 +21,7 @@ export function SentryIssueView(props: {
   refreshing: boolean
   refreshError: string
   onRefresh(): void
+  onOpen(url: string): void
 }) {
   const issue = () => props.issue
 
@@ -31,6 +32,9 @@ export function SentryIssueView(props: {
           {issue().title}
         </Heading>
         <ToolbarSpacer />
+        <Show when={issue().url}>
+          {(url) => <IconButton icon="arrow-up-right" label="Open in Sentry" onPress={() => props.onOpen(url())} />}
+        </Show>
         <IconButton
           icon="refresh-cw"
           label="Refresh issue"

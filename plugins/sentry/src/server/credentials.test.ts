@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
-import { ENV_CONNECTION_ID, readEnvironment } from './credentials'
+import { ENV_CONNECTION_ID } from '../shared/api'
+import { readEnvironment } from './credentials'
 
 const full = { ACORN_SENTRY_TOKEN: 'sntryu_secret', ACORN_SENTRY_ORG: 'acme', ACORN_SENTRY_PROJECT: 'web' }
 

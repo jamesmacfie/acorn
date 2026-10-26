@@ -1,9 +1,10 @@
-import { createSignal, onCleanup, onMount, Show } from 'solid-js'
-import { Button, EmptyState } from '@acorn/plugin-api/ui/tree'
+import { createSignal, For, onCleanup, onMount, Show } from 'solid-js'
+import { Button, DetailColumn, EmptyState, ListColumn, ListDetail, Row } from '@acorn/plugin-api/ui/tree'
 import type { AcornBridge } from '@acorn/plugin-api/ui/sdk'
-import { sentryIssueRoute, type SentryIssueDetail } from '../shared/api'
+import type { Task } from '@acorn/protocol/api.ts'
+import { sentryIssueRoute, type SentryIssueDetail, type SentryIssueSummary } from '../shared/api'
 import { parseSentryRailItemId, type SentryRailTarget } from '../shared/rail'
-import { failureReason } from './model'
+import { failureReason, targetKey, taskSentryTargets } from './model'
 import { SentryIssueView } from './SentryIssueView'
 
 type PageState =
@@ -11,11 +12,17 @@ type PageState =
   | { kind: 'loading' }
   | { kind: 'error'; title: string; detail: string; retry: () => void }
 
-/** What the host mounts this tree with: the rail row id of the issue beside the list. */
-export type SentryPaneProps = { item?: string }
+/** What the host mounts this tree with: the rail row id of the issue beside the list, or the task
+ *  whose linked issues the task pane draws. */
+export type SentryPaneProps = { taskId?: string; item?: string }
 
-/** One Sentry issue beside the rail list. The bridge is the only data seam. */
+/** One Sentry issue beside the rail list, or a task's linked issues. The bridge is the only data seam. */
 export function SentryPane(props: SentryPaneProps & { bridge: AcornBridge }) {
+  const [linked, setLinked] = createSignal<SentryRailTarget[]>([])
+  // The last read of each linked issue, for the list's titles and counts, keyed by `targetKey`.
+  const [summaries, setSummaries] = createSignal<Record<string, SentryIssueSummary>>({})
+  const remember = (summary: SentryIssueSummary) =>
+    setSummaries((known) => ({ ...known, [targetKey(summary)]: summary }))
   const [issue, setIssue] = createSignal<SentryIssueDetail | null>(null)
   const [page, setPage] = createSignal<PageState>({ kind: 'loading' })
   const [refreshing, setRefreshing] = createSignal(false)
@@ -38,6 +45,7 @@ export function SentryPane(props: SentryPaneProps & { bridge: AcornBridge }) {
     }
     try {
       const detail = await props.bridge.api.get<SentryIssueDetail>(sentryIssueRoute(target.connectionId, target.id))
+      remember(detail)
       if (!request.aborted) setIssue(detail)
     } catch (error) {
       if (request.aborted) return
@@ -64,10 +72,39 @@ export function SentryPane(props: SentryPaneProps & { bridge: AcornBridge }) {
     // The subject comes from the mount props, which are this slot's. The bridge is the bundle's.
     const selected = props.item ? parseSentryRailItemId(props.item) : null
     if (selected) void load(selected)
+    else if (props.taskId) void loadTask(props.taskId)
     else setPage({ kind: 'empty', title: 'Choose an issue' })
   })
 
-  return (
+  const loadTask = async (taskId: string): Promise<void> => {
+    let targets: SentryRailTarget[]
+    try {
+      const tasks = await props.bridge.api.get<Task[]>('/v1/core/tasks')
+      targets = taskSentryTargets(tasks.find((task) => task.id === taskId))
+    } catch (error) {
+      setPage({
+        kind: 'error',
+        title: "Couldn't load this task",
+        detail: failureReason(error),
+        retry: () => void loadTask(taskId),
+      })
+      return
+    }
+    setLinked(targets)
+    const [first, ...rest] = targets
+    if (!first) {
+      setPage({ kind: 'empty', title: 'This task has no Sentry issues' })
+      return
+    }
+    // The first is drawn, and the rest are read for the list's counts. A row that fails to read keeps
+    // its id, and picking it says why.
+    for (const target of rest) {
+      props.bridge.api.get<SentryIssueDetail>(sentryIssueRoute(target.connectionId, target.id)).then(remember, () => {})
+    }
+    await load(first)
+  }
+
+  const body = () => (
     <Show when={issue()} fallback={<PageStatus state={page()} />}>
       {(detail) => (
         <SentryIssueView
@@ -75,8 +112,37 @@ export function SentryPane(props: SentryPaneProps & { bridge: AcornBridge }) {
           refreshing={refreshing()}
           refreshError={refreshError()}
           onRefresh={() => void load(detail(), true)}
+          onOpen={(url) => void props.bridge.ui.openUrl(url)}
         />
       )}
+    </Show>
+  )
+
+  // A task linking several issues gets a list column, as Rollbar's task pane does. `split` with two
+  // column nodes, because a tree's props are JSON and can't carry an element.
+  return (
+    <Show when={linked().length > 1} fallback={body()}>
+      <ListDetail split listWidth="narrow" selection={issue() ? targetKey(issue()!) : null}>
+        <ListColumn label="Linked Sentry issues">
+          <For each={linked()}>
+            {(target) => {
+              const known = () => summaries()[targetKey(target)]
+              return (
+                <Row
+                  density="compact"
+                  selected={issue() ? targetKey(issue()!) === targetKey(target) : false}
+                  onPress={() => void load(target)}
+                  meta={known()?.count.toLocaleString()}
+                  tip={known()?.title}
+                >
+                  {known()?.title ?? target.id}
+                </Row>
+              )
+            }}
+          </For>
+        </ListColumn>
+        <DetailColumn scroll>{body()}</DetailColumn>
+      </ListDetail>
     </Show>
   )
 }

@@ -148,6 +148,55 @@ describe('the rail', () => {
   })
 })
 
+describe('making a task from an issue', () => {
+  it("seeds a connection's row with a task linked to the issue", async () => {
+    stubSentry(() =>
+      Response.json([{ ...issue('7', '2026-10-25T00:00:00Z'), permalink: 'https://acme.sentry.io/issues/7/' }]),
+    )
+    const response = await rail([row('c1', 'web')], null, [{ connectionId: 'c1' }])
+    const [item] = ((await response.json()) as { items: { task?: unknown }[] }).items
+    expect(item!.task).toMatchObject({
+      origin: 'sentry',
+      title: 'Issue 7',
+      link: { connectionId: 'c1', identifier: '7', ref: { displayId: '7', url: 'https://acme.sentry.io/issues/7/' } },
+    })
+  })
+
+  it('offers no task for an issue read through the environment, which has no connection to link', async () => {
+    stubSentry(issuesByProject)
+    const [item] = ((await (await rail([], environment, [])).json()) as { items: { task?: unknown }[] }).items
+    expect(item).not.toHaveProperty('task')
+  })
+})
+
+describe('palette search', () => {
+  const search = (rows: Row[], links: { connectionId: string }[], query: string) =>
+    createSentryFetch(environment, projects(links))(
+      new Request(`http://sentry.test/palette/issues${query}`),
+      contextWith(rows),
+    )
+
+  it("finds an issue by title in the routed project's connections", async () => {
+    stubSentry(() =>
+      Response.json([
+        { ...issue('1', '2026-10-25T00:00:00Z'), title: 'TypeError: boom' },
+        { ...issue('2', '2026-10-24T00:00:00Z'), title: 'Timeout' },
+      ]),
+    )
+    const response = await search([row('c1', 'web')], [{ connectionId: 'c1' }], '?projectId=project-1&q=boom')
+    expect(await response.json()).toEqual({
+      items: [expect.objectContaining({ id: 'c1:1', title: 'TypeError: boom', ref: 'WEB-1' })],
+    })
+  })
+
+  it('answers nothing without a routed project', async () => {
+    stubSentry(() => {
+      throw new Error('the palette asked Sentry with no project scope')
+    })
+    expect(await (await search([], [], '?q=boom')).json()).toEqual({ items: [] })
+  })
+})
+
 describe('an issue', () => {
   const read = (rows: Row[], connection: string) =>
     createSentryFetch(environment, projects([]))(

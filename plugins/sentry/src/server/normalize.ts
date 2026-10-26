@@ -37,6 +37,15 @@ const asCount = (value: unknown): number => {
   const n = typeof value === 'string' ? Number(value) : value
   return typeof n === 'number' && Number.isFinite(n) && n >= 0 ? n : 0
 }
+// Only an `https` address leaves here, because the client hands it to the browser.
+const asHttpsUrl = (value: unknown): string | null => {
+  const text = cleanString(value)
+  try {
+    return text && new URL(text).protocol === 'https:' ? text : null
+  } catch {
+    return null
+  }
+}
 // Timestamps are ISO 8601 strings.
 const asMillis = (value: unknown): number | null => {
   const at = typeof value === 'string' ? Date.parse(value) : NaN
@@ -61,6 +70,7 @@ export function normalizeIssue(connectionId: string, connectionLabel: string, ra
     userCount: asCount(issue.userCount),
     firstSeen: asMillis(issue.firstSeen),
     lastSeen: asMillis(issue.lastSeen),
+    url: asHttpsUrl(issue.permalink),
   }
 }
 

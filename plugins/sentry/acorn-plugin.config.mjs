@@ -9,8 +9,9 @@
 //
 // On the permissions:
 //
-//   core: ['projects:read'] — the rail reads which Sentry connections the routed project's workspace
-//     follows, as Rollbar's does.
+//   api: ['core.tasks:read'] — the task pane reads which issues the open task links to.
+//   core: ['projects:read'] — the rail and the palette read which Sentry connections the routed
+//     project's workspace follows, as Rollbar's do.
 //   secrets: false — the provider spends the owner's token through the connection seam, which lends
 //     it for the length of one call. `ctx.core.secrets` is never touched.
 //   net — Sentry's API hosts: the US region at sentry.io and us.sentry.io, the EU region at
@@ -30,7 +31,7 @@ export default {
     entry: './src/tree/index.tsx',
   },
   permissions: {
-    api: [],
+    api: ['core.tasks:read'],
     events: [],
     node: {
       core: ['projects:read'],
@@ -45,6 +46,18 @@ export default {
     // An issue drawn beside the rail list at `/p/:projectId`, with no task, as Rollbar's
     // `rollbar-item` is.
     frames: [{
+      // The task's linked issues. `providerId` makes it a linked-items view, which the host hides on a
+      // task with no Sentry link.
+      target: 'pane',
+      id: 'sentry',
+      label: 'Sentry',
+      glyph: 'brand:sentry',
+      order: 101,
+      formFactor: ['desktop', 'mobile'],
+      providerId: 'sentry',
+      layout: 'single',
+      regions: { body: { kind: 'remote', entry: 'pane' } },
+    }, {
       target: 'pane',
       id: 'sentry-issue',
       label: 'Sentry issue',
@@ -76,6 +89,21 @@ export default {
       emptyState: {
         message: 'No unresolved issues. Connect Sentry in Settings > Services and follow it here, or set ACORN_SENTRY_TOKEN, ACORN_SENTRY_ORG, and ACORN_SENTRY_PROJECT.',
       },
+    }],
+    // The routed project's unresolved issues, from the palette. `scope: 'project'` makes the host send
+    // the project the palette captured, and offer the command only where there is one. Picking a row
+    // navigates, as a rail row does.
+    commands: [{
+      id: 'find-issue',
+      title: 'Find a Sentry issue',
+      hint: 'unresolved issues in the linked Sentry projects',
+      keywords: ['error', 'exception', 'issue', 'sentry'],
+      category: 'navigation',
+      kind: 'search',
+      scope: 'project',
+      route: '/v1/p/sentry/palette/issues',
+      placeholder: 'Find a Sentry issue…',
+      onSelect: { verb: 'navigate', surface: 'sentry-issue' },
     }],
   },
 }

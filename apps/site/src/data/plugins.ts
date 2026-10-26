@@ -243,12 +243,14 @@ export const PLUGINS = {
   },
   sentry: {
     name: 'Sentry',
-    sentence: "Lists a Sentry project's unresolved issues in the rail, and shows each with its latest stack trace.",
+    sentence:
+      "Lists a Sentry project's unresolved issues in the rail, shows each with its latest stack trace, and starts a task from one.",
     icon: 'bug',
     ships: 'package',
     worksIn: both,
     docs: '/docs/built-in-plugins/sentry/',
     reasons: {
+      'api:core.tasks:read': 'Finds the issues the open task links to.',
       'node.core:projects:read': "Finds the Sentry connections the project you're in follows.",
       'node.net:sentry.io': "Reads issues and their latest events through Sentry's API.",
       'node.net:us.sentry.io': "Reads issues through Sentry's US address.",

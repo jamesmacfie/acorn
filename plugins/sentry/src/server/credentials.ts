@@ -1,13 +1,11 @@
 // Where a Sentry credential comes from: a connection made in Settings, or the environment that
 // started the node. A connection wins (docs/integrations/sentry.md § Credentials from the environment).
 import { isRecord, parseJson } from '@acorn/plugin-api/node'
+import { ENV_CONNECTION_ID } from '../shared/api'
 import { DEFAULT_SENTRY_URL, sentryHost, type SentryCredential } from './api'
 
 /** One credential the routes can read with, and the connection id its rail rows carry. */
 export type SentryTarget = SentryCredential & { connectionId: string; label: string }
-
-/** The connection id rows read through the environment carry. It has no row in `integrations`. */
-export const ENV_CONNECTION_ID = 'env'
 
 /** What `normalize` writes into a connection's `config`. */
 export type SentryConnectionConfig = { organization: string; project: string; host: string; projectId: string }

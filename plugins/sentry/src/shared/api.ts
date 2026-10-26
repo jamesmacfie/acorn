@@ -2,6 +2,10 @@
 // plugin owns its own wire surface (docs/architecture/node-api.md). Every field passed through the
 // allowlist in server/normalize.ts, so raw Sentry JSON never crosses this boundary.
 
+/** The connection id rows read through the environment carry. It has no row in `integrations`, so a
+ *  task can't link to one of its issues. */
+export const ENV_CONNECTION_ID = 'env'
+
 export type SentryIssueSummary = {
   /** A Settings connection's id, or `env` for the environment's credential. */
   connectionId: string
@@ -16,6 +20,8 @@ export type SentryIssueSummary = {
   userCount: number
   firstSeen: number | null
   lastSeen: number | null
+  /** The issue's page in Sentry, `https` only. */
+  url: string | null
 }
 
 export type SentryStackFrame = {

@@ -39,6 +39,7 @@ describe('normalizeIssue', () => {
         userCount: 7,
         firstSeen: '2026-10-01T00:00:00Z',
         lastSeen: '2026-10-26T00:00:00Z',
+        permalink: 'https://acme.sentry.io/issues/42/',
         assignedTo: { email: 'someone@example.com' },
       }),
     ).toEqual({
@@ -54,7 +55,12 @@ describe('normalizeIssue', () => {
       userCount: 7,
       firstSeen: Date.parse('2026-10-01T00:00:00Z'),
       lastSeen: Date.parse('2026-10-26T00:00:00Z'),
+      url: 'https://acme.sentry.io/issues/42/',
     })
+  })
+
+  it('keeps only an https permalink', () => {
+    expect(normalizeIssue('c1', 'label', { id: '1', permalink: 'javascript:alert(1)' })?.url).toBeNull()
   })
 
   it('drops an issue with no id', () => {

@@ -6,7 +6,7 @@ import { sentryPlugin } from '../node/index'
 const PACKAGE_ROOT = fileURLToPath(new URL('../../', import.meta.url))
 
 describe('sentry node plugin', () => {
-  it('registers its connection and its routes under the permissions it declares', async () => {
+  it('registers its integration and its routes under the permissions it declares', async () => {
     const config = await validatePluginConfig(PACKAGE_ROOT)
     if (!config.ok) throw new Error(config.reason)
     expect(config.manifest.permissions.node.env).toEqual([
@@ -17,11 +17,11 @@ describe('sentry node plugin', () => {
     ])
     const ctx = makeTestNodeContext({ plugin: sentryPlugin(), permissions: config.manifest.permissions.node })
     try {
-      const connection = vi.spyOn(ctx.providers, 'connection')
-      const routes = vi.spyOn(ctx.routes, 'fetch')
+      const integration = vi.spyOn(ctx.providers, 'integration')
       await sentryPlugin().init(ctx)
-      expect(connection.mock.calls[0]![0]).toMatchObject({ id: 'sentry', kind: 'error-tracker' })
-      expect(routes).toHaveBeenCalledOnce()
+      expect(integration).toHaveBeenCalledOnce()
+      expect(integration.mock.calls[0]![0]).toMatchObject({ id: 'sentry', kind: 'error-tracker' })
+      expect(integration.mock.calls[0]![1]).toBeTypeOf('function')
     } finally {
       ctx.cleanup()
     }

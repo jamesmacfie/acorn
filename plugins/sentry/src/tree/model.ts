@@ -1,4 +1,14 @@
+import type { Task } from '@acorn/protocol/api.ts'
 import type { SentryEvent } from '../shared/api'
+import type { SentryRailTarget } from '../shared/rail'
+
+/** The Sentry issues a task links to. A link's identifier is the issue's id. */
+export const taskSentryTargets = (task: Task | undefined): SentryRailTarget[] =>
+  (task?.links ?? []).flatMap((link) =>
+    link.providerId === 'sentry' ? [{ connectionId: link.connectionId, id: link.identifier }] : [],
+  )
+
+export const targetKey = (target: SentryRailTarget): string => `${target.connectionId}\u0000${target.id}`
 
 export function relativeTime(at: number | null, now = Date.now()): string {
   if (!at) return 'Not reported'

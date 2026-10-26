@@ -21,14 +21,17 @@ const inserted = (ops: TreeMutation[]): TreeNode[] => {
   return out
 }
 
-const mount = async (get: (route: string) => Promise<unknown>) => {
+const mount = async (
+  get: (route: string) => Promise<unknown>,
+  props: { item?: string; taskId?: string } = { item: 'env:42' },
+) => {
   const ops: TreeMutation[] = []
   const root = createRemoteRoot((batch) => ops.push(...batch))
   const bridge = { api: { get }, onSelect: () => () => {} } as unknown as AcornBridge
   solidTree(SentryPane)(bridge, {
     entry: 'pane',
     root,
-    props: () => ({ item: 'env:42' }),
+    props: () => props,
     onProps: () => {},
     onUnmount: () => {},
     host: {
@@ -41,33 +44,35 @@ const mount = async (get: (route: string) => Promise<unknown>) => {
   return { ops, root }
 }
 
+const detail: SentryIssueDetail = {
+  connectionId: 'env',
+  connectionLabel: 'Sentry · acme/web',
+  id: '42',
+  shortId: 'WEB-1',
+  title: 'TypeError: boom',
+  culprit: 'app/checkout',
+  level: 'error',
+  status: 'unresolved',
+  count: 1234,
+  userCount: 5,
+  firstSeen: null,
+  lastSeen: null,
+  url: 'https://acme.sentry.io/issues/42/',
+  latestEvent: {
+    id: 'e1',
+    occurredAt: null,
+    exceptionType: 'TypeError',
+    message: 'boom',
+    frames: [{ filename: 'src/checkout.ts', line: 3, column: 1, method: 'pay', code: [], inApp: true }],
+    environment: 'production',
+    release: null,
+    truncated: false,
+  },
+}
+
 describe('SentryPane', () => {
   it("draws the issue's latest event and stack", async () => {
     const routes: string[] = []
-    const detail: SentryIssueDetail = {
-      connectionId: 'env',
-      connectionLabel: 'Sentry · acme/web',
-      id: '42',
-      shortId: 'WEB-1',
-      title: 'TypeError: boom',
-      culprit: 'app/checkout',
-      level: 'error',
-      status: 'unresolved',
-      count: 1234,
-      userCount: 5,
-      firstSeen: null,
-      lastSeen: null,
-      latestEvent: {
-        id: 'e1',
-        occurredAt: null,
-        exceptionType: 'TypeError',
-        message: 'boom',
-        frames: [{ filename: 'src/checkout.ts', line: 3, column: 1, method: 'pay', code: [], inApp: true }],
-        environment: 'production',
-        release: null,
-        truncated: false,
-      },
-    }
     const { ops, root } = await mount(async (route) => {
       routes.push(route)
       return detail
@@ -87,6 +92,38 @@ describe('SentryPane', () => {
     const failure = inserted(ops).find((node) => node.type === 'EmptyState' && node.props.title)
     expect(failure?.props.title).toBe("Couldn't load this issue")
     expect(JSON.stringify(failure)).toContain(reason)
+    root.dispose()
+  })
+
+  it("lists a task's linked issues with their counts", async () => {
+    const routes: string[] = []
+    const task = {
+      id: 'task-1',
+      links: [
+        { providerId: 'sentry', connectionId: 'c1', identifier: '42' },
+        { providerId: 'sentry', connectionId: 'c1', identifier: '43' },
+        { providerId: 'rollbar', connectionId: 'r1', identifier: '9' },
+      ],
+    }
+    const { ops, root } = await mount(
+      async (route) => {
+        routes.push(route)
+        if (route === '/v1/core/tasks') return [task]
+        const id = new URL(route, 'http://x').pathname.split('/').at(-1)!
+        return { ...detail, connectionId: 'c1', id, title: `Issue ${id}`, count: Number(id) }
+      },
+      { taskId: 'task-1' },
+    )
+    await settle()
+    expect(routes.sort()).toEqual([
+      '/v1/core/tasks',
+      '/v1/p/sentry/issues/42?connection=c1',
+      '/v1/p/sentry/issues/43?connection=c1',
+    ])
+    // A row's count arrives as a patch once its issue has been read.
+    const rows = new Set(inserted(ops).flatMap((node) => (node.type === 'Row' ? [node.id] : [])))
+    const counts = ops.flatMap((op) => (op.op === 'patch' && rows.has(op.id) && op.props.meta ? [op.props.meta] : []))
+    expect(counts.sort()).toEqual(['42', '43'])
     root.dispose()
   })
 })

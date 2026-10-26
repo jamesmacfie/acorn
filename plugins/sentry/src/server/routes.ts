@@ -7,11 +7,12 @@ import {
   respondError,
   type RouteFailure,
 } from '@acorn/plugin-api/node'
-import type { SentryIssueSummary } from '../shared/api'
+import { ENV_CONNECTION_ID, type SentryIssueSummary } from '../shared/api'
 import { sentryRailItem } from '../shared/rail'
 import { issuePath, issuesPath, latestEventPath, sentryFetch } from './api'
-import { connectionConfig, ENV_CONNECTION_ID, type SentryTarget } from './credentials'
+import { connectionConfig, type SentryTarget } from './credentials'
 import { composeIssueDetail, normalizeEvent, normalizeIssue } from './normalize'
+import { sentrySearchItems } from './paletteSearch'
 
 const PROVIDER = 'sentry'
 
@@ -118,45 +119,65 @@ async function listIssues(target: SentryTarget): Promise<Answer<SentryIssueSumma
 const fail = (c: Context<AppEnv>, failure: RouteFailure) =>
   respondError(c, failure.status, failure.error, failure.detail)
 
-const createSentryRoutes = (environment: SentryTarget | null, projects?: ProjectScope) =>
-  new Hono<AppEnv>()
-    .get('/rail-items', async (c) => {
-      const wanted = await railScope(c.req.query('project'), projects)
-      if (!wanted) return c.json({ items: [] })
-      const answers = await eachTarget(c, environment, wanted, listIssues)
-      const issues = answers.flatMap((answer) => (answer.ok ? answer.value : []))
-      const failures = answers.flatMap((answer) => (answer.ok ? [] : [answer.failure]))
-      // One credential failing keeps the rows another returned. Only a total failure is an error.
-      if (failures.length && failures.length === answers.length) return fail(c, failures[0]!)
-      issues.sort((a, b) => (b.lastSeen ?? 0) - (a.lastSeen ?? 0))
-      return c.json({ items: issues.map(sentryRailItem) })
-    })
-    // The issue and its latest event. An issue whose event can't be read is still drawn without it.
-    .get('/issues/:issue', async (c) => {
-      const connectionId = c.req.query('connection')
-      if (!connectionId) return respondError(c, 400, 'bad_request')
-      const issueId = c.req.param('issue')
-      const [answer] = await eachTarget(
-        c,
-        environment,
-        (id) => id === connectionId,
-        async (target) => {
-          const [issue, event] = await Promise.all([
-            readJson(target, issuePath(target, issueId)),
-            readJson(target, latestEventPath(target, issueId)),
-          ])
-          if (!issue.ok) return issue
-          const summary = normalizeIssue(target.connectionId, target.label, issue.value)
-          if (!summary) return { ok: false, failure: unavailable(target) } as const
-          return {
-            ok: true,
-            value: composeIssueDetail(summary, event.ok ? normalizeEvent(event.value) : null),
-          } as const
-        },
-      )
-      if (!answer) return respondError(c, 403, 'provider_not_connected')
-      return answer.ok ? c.json(answer.value) : fail(c, answer.failure)
-    })
+const createSentryRoutes = (environment: SentryTarget | null, projects?: ProjectScope) => {
+  // The routed project's unresolved issues, newest first. One credential failing keeps the rows another
+  // returned. Only a total failure is an error.
+  const scopedIssues = async (
+    c: Context<AppEnv>,
+    projectId: string | undefined,
+  ): Promise<Answer<SentryIssueSummary[]>> => {
+    const wanted = await railScope(projectId, projects)
+    if (!wanted) return { ok: true, value: [] }
+    const answers = await eachTarget(c, environment, wanted, listIssues)
+    const failures = answers.flatMap((answer) => (answer.ok ? [] : [answer.failure]))
+    if (failures.length && failures.length === answers.length) return { ok: false, failure: failures[0]! }
+    const issues = answers.flatMap((answer) => (answer.ok ? answer.value : []))
+    issues.sort((a, b) => (b.lastSeen ?? 0) - (a.lastSeen ?? 0))
+    return { ok: true, value: issues }
+  }
+
+  return (
+    new Hono<AppEnv>()
+      .get('/rail-items', async (c) => {
+        const answer = await scopedIssues(c, c.req.query('project'))
+        return answer.ok ? c.json({ items: answer.value.map(sentryRailItem) }) : fail(c, answer.failure)
+      })
+      // The `Find a Sentry issue` command's rows. The palette sends the routed project as `projectId`.
+      // Sentry is read live, as the rail is, and the typed text only filters what comes back.
+      .get('/palette/issues', async (c) => {
+        const answer = await scopedIssues(c, c.req.query('projectId'))
+        return answer.ok
+          ? c.json({ items: sentrySearchItems(answer.value, c.req.query('q') ?? '') })
+          : fail(c, answer.failure)
+      })
+      // The issue and its latest event. An issue whose event can't be read is still drawn without it.
+      .get('/issues/:issue', async (c) => {
+        const connectionId = c.req.query('connection')
+        if (!connectionId) return respondError(c, 400, 'bad_request')
+        const issueId = c.req.param('issue')
+        const [answer] = await eachTarget(
+          c,
+          environment,
+          (id) => id === connectionId,
+          async (target) => {
+            const [issue, event] = await Promise.all([
+              readJson(target, issuePath(target, issueId)),
+              readJson(target, latestEventPath(target, issueId)),
+            ])
+            if (!issue.ok) return issue
+            const summary = normalizeIssue(target.connectionId, target.label, issue.value)
+            if (!summary) return { ok: false, failure: unavailable(target) } as const
+            return {
+              ok: true,
+              value: composeIssueDetail(summary, event.ok ? normalizeEvent(event.value) : null),
+            } as const
+          },
+        )
+        if (!answer) return respondError(c, 403, 'provider_not_connected')
+        return answer.ok ? c.json(answer.value) : fail(c, answer.failure)
+      })
+  )
+}
 
 /**
  * The plugin's routes over the portable carrier. `environment` is the credential read from the

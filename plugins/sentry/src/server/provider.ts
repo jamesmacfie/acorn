@@ -1,13 +1,16 @@
 // The Settings connection that holds a Sentry auth token.
 //
-// A `ConnectionProviderContribution`, not an integration one: this plugin reads issues live and
-// mirrors nothing, so it needs the connection form, encryption, and the project map, and none of the
-// item cache (docs/integrations/contributions.md § Connection and integration contributions).
+// An integration, because core stamps a task link only for a provider with external ids. It still
+// mirrors nothing: every route reads Sentry live, so it declares no resource and no codec, and the
+// capabilities that need a mirror stay off (docs/integrations/contributions.md § Connection and
+// integration contributions).
 import {
+  defaultBudgets,
+  externalIdsFor,
   isProviderOperationError,
   type ProviderProjectSource,
   ProviderOperationError,
-  publicConnectionProvider,
+  publicProvider,
 } from '@acorn/plugin-api/node'
 import {
   DEFAULT_SENTRY_URL,
@@ -51,7 +54,7 @@ async function checkProject(credential: SentryCredential): Promise<SentryApiProj
   return { id: String(project.id), slug: project.slug, ...(project.name ? { name: project.name } : {}) }
 }
 
-export const sentryProvider = publicConnectionProvider<SentryValidated>({
+export const sentryProvider = publicProvider<SentryValidated>({
   id: 'sentry',
   label: 'Sentry',
   glyph: 'brand:sentry',
@@ -136,7 +139,10 @@ export const sentryProvider = publicConnectionProvider<SentryValidated>({
       }
     },
   },
-  capabilities: { browse: true },
-  budgets: { maxConcurrentRequests: 4, maxConcurrentRequestsPerConnection: 2 },
+  capabilities: { comments: 'none', repoAffinity: 'none' },
+  externalIds: externalIdsFor('sentry'),
+  resources: [],
+  budgets: { ...defaultBudgets, maxConcurrentRequests: 4, maxConcurrentRequestsPerConnection: 2 },
+  memory: { linkedItems: true, mutations: [], triggers: [], summarize: 'none', acceptedWrites: false },
   projects: sentryProjectSource,
 })

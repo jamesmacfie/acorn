@@ -1,6 +1,6 @@
 ---
 title: Sentry
-description: Connect Sentry, list a project's unresolved issues in the rail, and read an issue's latest event and stack trace.
+description: Connect Sentry, list a project's unresolved issues in the rail, read an issue's latest event and stack trace, and start a task from one.
 sources:
   - docs/integrations/sentry.md
   - docs/integrations/project-sources.md
@@ -8,7 +8,9 @@ sources:
   - plugins/sentry/src/server/provider.ts
   - plugins/sentry/src/server/credentials.ts
   - plugins/sentry/src/tree/SentryIssueView.tsx
-checked: 'e88f2c559'
+  - plugins/sentry/src/shared/rail.ts
+  - plugins/sentry/src/server/paletteSearch.ts
+checked: '3c529e16d'
 ---
 
 import { Steps } from '@astrojs/starlight/components'
@@ -20,7 +22,7 @@ latest event and stack trace. It reads issues and changes nothing in Sentry. To 
 telemetry to Sentry, use [Sentry telemetry](/docs/built-in-plugins/sentry-telemetry/) instead.
 
 <PluginFacts id="sentry">
-  <Fragment slot="adds">The **Sentry issues** source in the left rail, and an issue's detail beside it.</Fragment>
+  <Fragment slot="adds">The **Sentry issues** source in the left rail, an issue's detail beside it, a **Sentry** task pane, and **Find a Sentry issue** in the command palette.</Fragment>
   <Fragment slot="needs">A Sentry auth token that can read issues, with the organization and project it reads, followed by a workspace or project.</Fragment>
 </PluginFacts>
 
@@ -61,10 +63,29 @@ unsetting them.
 The rail lists each unresolved issue, newest first, with its level, its title, and how many events it
 has. Click one to open it beside the list. The detail shows the culprit, the event and user counts,
 when the issue was first and last seen, and its latest event's message and stack trace, newest call
-first. The refresh button reads the issue again from Sentry.
+first. The refresh button reads the issue again from Sentry, and **Open in Sentry** opens the issue's
+page in your browser.
 
 Before acorn shows an event, it keeps only the message, the stack, the environment, and the release,
 and drops the rest, such as the user, the request, breadcrumbs, and each frame's variables.
+
+## Start a task from an issue
+
+Right-click an issue in the rail, and choose **Create task…**. **New task** creates a task with the
+issue's title. Sentry suggests no branch, so give it one. **Attach to task** links the issue to a task
+you have. [Tasks and worktrees](/docs/using/tasks-and-worktrees/#create-a-task-from-a-pull-request-or-an-issue)
+has the dialog.
+
+A task linked to an issue has a **Sentry** pane that shows it. A task that links several issues lists
+them in the pane, each with its event count.
+
+Starting a task needs a connection in Settings. An issue the rail reads from the environment variables
+offers no task, because a task's link has to name a connection.
+
+## Find an issue
+
+Open the command palette in a project and choose **Find a Sentry issue**. Type part of a title or a
+short ID such as `WEB-1`, and pick an issue to open it beside the rail.
 
 ## Settings
 
@@ -78,7 +99,7 @@ The terminal client draws the same rail source and issue detail. Connect Sentry 
 
 ## Limits
 
-- acorn reads Sentry. It doesn't resolve, assign, or comment on an issue, or start a task from one.
+- acorn reads Sentry. It doesn't resolve, assign, or comment on an issue.
 - The rail lists the newest 100 unresolved issues of each project, and reads them from Sentry each time.
 - An event shows at most 10 exceptions, 200 frames, 7 lines of code a frame, and 8 KiB a string.
 - acorn reaches `sentry.io` and `de.sentry.io` only, so a self-hosted Sentry doesn't work.
