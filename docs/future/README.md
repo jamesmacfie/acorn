@@ -12,6 +12,7 @@ Dated delivery evidence belongs in `docs/testing/` or the dated security reviews
 
 | Folder | Developer handoff | Status |
 | --- | --- | --- |
+| [acorn-sentry/](./acorn-sentry/README.md) | Six phases for Sentry: the exporter takes its DSN from `ACORN_SENTRY_DSN`, a new `sentry` plugin shows issues in the rail and links them to tasks, tag builds carry the team's DSN behind a second consent switch with fixed sampling, a filter keeps only core and unmodified official plugins, and source maps are uploaded. Also lists the other release secrets. | Proposed October 17, 2026. Revised October 26, 2026, to add the issues plugin and environment variables. Implementation not started. |
 | [cloud/](./cloud/README.md) | Nine phases for hosted team Nodes, cloud task workers, archives, isolation, policy, teams, and billing. Depends on remote-access/. | Proposed. Enrollment and provider contracts are implemented foundations; hosted services remain unbuilt. Revised October 22, 2026, when accounts and the relay moved to remote-access/. |
 | [mobile/](./mobile/README.md) | Six phases to a mobile web app: a gateway that gives a phone a session, a phone-shaped shell over client-core, a narrow mode switched from the root element, narrow layouts, **Needs you** and the agent conversation, and acceptance on real phones. | Proposed October 17, 2026. Phase 1, the gateway, shipped October 21, 2026. |
 | [mobile-plugin/](./mobile-plugin/README.md) | Six phases to bring the rest of the plugin UI to the phone: a terminal pane with extra keys, an origin of its own for each plugin bundle, plugin custody in the phone's browser, the first-party installed plugins, plugins that paint their own iframe, and Preview through the Node. | Proposed October 23, 2026. Implementation not started. |
@@ -24,7 +25,6 @@ Dated delivery evidence belongs in `docs/testing/` or the dated security reviews
 
 | File | Developer handoff | Status |
 | --- | --- | --- |
-| [acorn-sentry.md](./acorn-sentry.md) | Send opted-in errors and sampled traces from release builds to the acorn team's Sentry: a DSN injected at build time, a second consent switch, defaults sized for many installs, a filter that keeps only core and unmodified official plugins, and source map upload. Also lists the other release secrets. | Proposed October 17, 2026. Implementation not started. |
 | [bundle.md](./bundle.md) | Container coordination, desktop TUI embedding, and macOS signing. Platform archives, Windows operation support, and the installer belong to [node-tray/](./node-tray/README.md). | Standalone CLI/TUI staging and certificate generation implemented. Release delivery remains proposed. |
 | [compiled-tier.md](./compiled-tier.md) | Assess plugin migration candidates, reproduce retained cleanup reports, and finish loaded-package acceptance. | Standing assessment refreshed October 8, 2026. No migration scheduled. |
 | [dashboards-gaps.md](./dashboards-gaps.md) | Filter diagnostics, AI preview/review controls, and the GitHub branch-source decision. | Followups to the implemented studio and derived sources. Replaces the completed phase plans. |
