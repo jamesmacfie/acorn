@@ -206,7 +206,8 @@ for (const [name, { version }] of Object.entries(REVIEWED_PACKAGES)) {
 }
 // The terminal's Markdown renderer imports mermaid on first use and leaves a diagram as code when it is
 // absent (packages/client-core/src/kit/lib/rendering/mermaid.ts). The standalone install leaves it out.
-assertManifestCoversImports(join(TUI_APP, 'dist'), new Set([...standaloneRuntime, 'mermaid']))
+// @openuidev/lang-core imports ci-info inside a try and reports "not in CI" when it's missing, so it stays out too.
+assertManifestCoversImports(join(TUI_APP, 'dist'), new Set([...standaloneRuntime, 'mermaid', 'ci-info']))
 console.log('[pack-node] service and TUI runtime imports are declared')
 
 writeFileSync(

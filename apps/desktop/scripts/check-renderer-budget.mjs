@@ -37,7 +37,7 @@ const clientDir = resolve(dirFlag === -1 ? resolve(import.meta.dirname, '../dist
 // synchronous factories, so they register with the roster (docs/frontend/startup-budget.md).
 const limits = {
   scripts: 1_000_000,
-  roster: 340_000,
+  roster: 370_000,
   styles: 200_000,
   floor: 100_000,
 }

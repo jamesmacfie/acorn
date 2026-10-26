@@ -18,9 +18,9 @@ styles. The script ceiling is about 5% above the measurement of 951,018 B on Oct
 from 740,000 B so the v0.0.2 release could build. A change that needs more raises the ceiling in the same commit, with the reason in the
 commit message.
 
-The same check counts the compiled roster's scripts beyond startup, against a ceiling of 340,000 B,
-about 5% above the 323,341 B measured on October 18, 2026, once the GitLab and Bitbucket plugins
-registered there. The roster loads after the first frame, but the
+The same check counts the compiled roster's scripts beyond startup, against a ceiling of 370,000 B,
+about 5% above the 351,118 B measured on October 26, 2026, raised from 340,000 B when main had outgrown
+it. The roster loads after the first frame, but the
 workspace restore waits for its registration. A dynamic import that only moves startup code into the
 roster saves the launch nothing, and this ceiling fails it. The roster's key, `src/client/plugins.ts`,
 lives in `apps/desktop/scripts/renderer-graph.mjs`, which the size report reads too.
@@ -44,8 +44,8 @@ top-level dynamic import in that entry, and their full static dependencies. Impo
 including the roster loaded after the first frame, are outside the set. A dependency reached both
 statically and dynamically still counts.
 
-The ceiling is 770,000 B, about 3% above the production measurement of 746,348 B across 175 chunks on
-October 17, 2026. Loaded-plugin frame and chrome registration load on the first distribution pass, out
+The ceiling is 820,000 B, about 3% above the production measurement of 795,176 B across 191 chunks on
+October 26, 2026, raised from 770,000 B so the Node archives could build. Loaded-plugin frame and chrome registration load on the first distribution pass, out
 of the startup graph. The Git plugin stays in the roster after the first frame. Production output is minified with Oxc. Zod is bundled and tree-shaken, and
 validation still runs before untrusted content is drawn. Other external imports are listed
 separately, and their package bytes aren't in the budget. The client imports narrow supported

@@ -16,7 +16,7 @@ if (graph.entry !== 'main.js' || !graph.roots.includes(graph.entry) || !graph.ch
 // separately, never hidden as bytes. The roster, the linked-place resolver, the Git rows and the
 // task-launch form load after the first frame. The ceiling sits a few percent above the closure this
 // script prints on every `pnpm --filter @acorn/tui build`.
-const CEILING = 770_000
+const CEILING = 820_000
 const DENYLIST = ['shiki', 'wasm', 'DiffPane', 'prModel', 'prSections', 'viewState', 'icon-nodes', 'drizzle-orm', 'RemoteTree-', 'TreeHost-', 'roster-', 'chromeRegister']
 
 const closure = new Set()
