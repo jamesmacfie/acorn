@@ -258,6 +258,8 @@ export const PLUGINS = {
       'node.net:*.ingest.us.sentry.io': "Sends records to Sentry's US ingest address.",
       'node.net:*.ingest.de.sentry.io': "Sends records to Sentry's EU ingest address.",
       'node.net:sentry.io': 'Sends records to Sentry.',
+      'node.env:ACORN_SENTRY_DSN':
+        'Reads a DSN from the environment, for when you start the Node with one and skip the connection.',
     },
   },
   terminal: {

@@ -33,3 +33,27 @@ The exporter reads the DSN through `ctx.providers.withConnection` once per flush
 stops the export within one five-second window. [Credential handling](../security/credentials.md) has
 the posture, and [the Sentry sink](../telemetry/plugins-and-sinks.md#the-sentry-sink) has what the
 exporter does with a batch.
+
+## The DSN from the environment
+
+A developer can skip the Settings step. Set `ACORN_SENTRY_DSN` in the environment that starts the
+Node, turn on **Collect timings, logs, and errors on this node**, and the exporter sends to that
+project. It tags every record with environment `development` and release `acorn@<node version>`.
+The connection's `environment` and `release` fields apply only to a connection.
+
+A connection in Settings wins over the variable, so you can point at your own project without
+unsetting anything. A connection whose stored DSN no longer parses still wins, and sends nothing.
+
+The manifest names the variable in `permissions.node.env`, because a loaded plugin's worker sees no
+other environment ([the plugin realm](../security/plugin-node-realm.md)). The worker reads it once,
+at start. A value that doesn't parse as a DSN logs one warning that names the variable and never its
+value, and the exporter sends nothing to it.
+
+While the variable is in use, the settings page says "Sending to `<host>/<project>` from
+`ACORN_SENTRY_DSN`." It gets that line from the plugin's own `GET /v1/p/sentry-telemetry/source`
+route, which answers with the host and project ID and never the key. The route answers `null`
+while a connection overrides the variable.
+
+`pnpm dev` passes the variable through Turborepo's strict environment mode, and `pnpm dev:agent`
+inherits the shell's environment. You can also put it in the desktop's `.env` file
+([local development](../local-development.md#environment)).

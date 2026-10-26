@@ -5,6 +5,9 @@
 // This page is the sink's own three questions: how much, which kinds, and how much detail
 // (docs/telemetry/model.md § The switch).
 //
+// When the DSN comes from `ACORN_SENTRY_DSN` rather than a connection, the node half's `/source`
+// route says so, and the first section names where records go.
+//
 // Every control writes the whole settings object back through `bridge.state`, which is the
 // `plugin:sentry-telemetry:settings` preference row the node half reads on each flush. There is no
 // save button, because there is nothing here that is only half true between two keystrokes.
@@ -49,6 +52,9 @@ type RowId = 'rate' | keyof SentryKindSwitches | 'stacks' | 'taskIds'
 
 export default function SentrySettingsPage(props: { bridge: AcornBridge }) {
   const [loaded] = createResource(() => props.bridge.state.get<unknown>(SETTINGS_KEY))
+  const [source] = createResource(() =>
+    props.bridge.api.get<{ environment: string | null }>('/v1/p/sentry-telemetry/source').catch(() => null),
+  )
   // Seeded from the load and then edited in place. The resource is read once: a re-read on every
   // change would put the round trip between the click and the checkbox moving.
   const [edited, setEdited] = createSignal<SentrySettings | null>(null)
@@ -81,7 +87,11 @@ export default function SentrySettingsPage(props: { bridge: AcornBridge }) {
       <SettingsSection
         id="sending"
         label="What to send"
-        description="acorn sends nothing until you turn on Telemetry and connect Sentry in Services."
+        description={
+          source()?.environment
+            ? `Sending to ${source()?.environment} from ACORN_SENTRY_DSN.`
+            : 'acorn sends nothing until you turn on Telemetry and connect Sentry in Services.'
+        }
       >
         <SettingRow label="How many traces to send" error={errorOn('rate')}>
           <Select

@@ -7,7 +7,7 @@ sources:
   - docs/integrations/sentry.md
   - plugins/sentry-telemetry/src/tree/settings.tsx
   - plugins/sentry-telemetry/src/shared/settings.ts
-checked: 'c69c132e2'
+checked: 'f31f40b0a'
 ---
 
 This page covers acorn's telemetry: the timings, logs, and errors it can collect about itself, the
@@ -21,7 +21,7 @@ Telemetry has one switch per Node: **Collect timings, logs, and errors on this n
 
 Even on, nothing leaves the machine unless a plugin that sends records somewhere, called a _sink_, is
 installed and set up. acorn ships one sink, **Sentry export**, and it sends nothing until you connect a
-Sentry project. With the switch off, nothing is collected at all.
+Sentry project or start the Node with `ACORN_SENTRY_DSN` set. With the switch off, nothing is collected at all.
 
 The page's **What this node has collected** counts records since the Node started, without showing the
 records themselves, and says where they're sent.

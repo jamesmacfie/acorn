@@ -68,7 +68,7 @@ sinks too.
 
 `plugins/sentry-telemetry` is the sink that ships. It's a loaded plugin in the bundled roster, so it's
 on every machine and does nothing until the switch is on and a Sentry DSN is connected in Settings →
-Services. [integrations.md](../integrations/sentry.md#sentry) owns the connection. Its settings page holds
+Services, or set in `ACORN_SENTRY_DSN` ([the DSN from the environment](../integrations/sentry.md#the-dsn-from-the-environment)). [integrations.md](../integrations/sentry.md#sentry) owns the connection. Its settings page holds
 what only it can decide: a trace sample rate, which of the five kinds to send, whether to include
 stacks, and whether to send `task.id` as a tag.
 

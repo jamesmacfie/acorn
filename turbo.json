@@ -47,9 +47,12 @@
       // them and not the rest.
       "outputs": ["dist/**"]
     },
+    // Strict env mode would drop a developer's Sentry DSN before the desktop dev task starts the Node.
+    // `dev:agent` doesn't run through Turborepo, so it inherits the shell's environment already.
     "dev": {
       "cache": false,
-      "persistent": true
+      "persistent": true,
+      "passThroughEnv": ["ACORN_SENTRY_DSN"]
     },
     "lint": {
       "dependsOn": ["topo"]

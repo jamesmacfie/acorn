@@ -88,6 +88,7 @@ sends it in the Node's start message, never its environment ([Node keys](./secur
 | `ACORN_PROMPT_BUNDLED_PLUGIN_TRUST=1` | Shows the trust dialog for the app's own bundled packages, which a development build otherwise accepts as a packaged build does. |
 | `ACORN_PERF=1` | Prints boot and request timing. See [profiling](./local-development/profiling.md). |
 | `ACORN_ACCOUNT_URL` | The account service that **Settings** > **Account** signs in to. Unset, the Node offers no sign-in and no remote access. Use `https://account.trolley-problem.app` for the hosted service, or the address `pnpm dev:account` prints for a stand-in. See [the account API](./account-api.md). |
+| `ACORN_SENTRY_DSN` | Sends this Node's telemetry to that Sentry project, tagged `development`, once **Collect timings, logs, and errors on this node** is on. A Sentry connection in Settings wins over it. See [the DSN from the environment](./integrations/sentry.md#the-dsn-from-the-environment). |
 
 ## Develop the headless CLI
 
@@ -130,8 +131,7 @@ package resolves the same physical copy.
 `scripts/db.mjs` finds a migration chain by its `drizzle.config.ts`. Every plugin's config is one line
 that re-exports `plugins/drizzle.shared.ts`, which maps `./src/node/schema.ts` to `./migrations`. A new
 table-owning plugin adds that one-line file, plus `migrationsModule: import.meta.url` on its
-`NodePlugin`, so the host opens and migrates its database. [Data layer](./data-layer/migrations.md)
-covers migrations.
+`NodePlugin`, so the host opens and migrates its database ([migrations](./data-layer/migrations.md)).
 
 Edit the schema in its owning package, then run:
 

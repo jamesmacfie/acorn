@@ -1,5 +1,11 @@
 import { fileURLToPath } from 'node:url'
-import { makeTestNodeContext, seedProviderConnection, validatePluginConfig } from '@acorn/plugin-api/testkit'
+import type { PluginFetchHandler } from '@acorn/plugin-api/node'
+import {
+  makeTestNodeContext,
+  makeTestRequestContext,
+  seedProviderConnection,
+  validatePluginConfig,
+} from '@acorn/plugin-api/testkit'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { sentryTelemetryPlugin } from './index'
 import { PROVIDER_ID, SETTINGS_KEY } from '../shared/settings'
@@ -10,6 +16,7 @@ import { PROVIDER_ID, SETTINGS_KEY } from '../shared/settings'
 const PACKAGE_ROOT = fileURLToPath(new URL('../../', import.meta.url))
 const OWNER = 'owner-1'
 const DSN = 'https://abc123@o42.ingest.us.sentry.io/1234567'
+const ENV_DSN = 'https://def456@o7.ingest.de.sentry.io/7654321'
 
 // The grant this suite runs under is the one the manifest declares, so dropping `telemetry`,
 // `prefs` or `identity` from acorn-plugin.config.mjs fails here rather than at the next boot.
@@ -26,7 +33,27 @@ const posted = () =>
 
 const itemTypes = () => posted().map((body) => JSON.parse(body.split('\n')[1]).type as string)
 
-async function world(options: { connected?: boolean } = {}) {
+const postedUrls = () =>
+  (globalThis.fetch as unknown as ReturnType<typeof vi.fn>).mock.calls.map((call) => String(call[0]))
+
+/** The payload of the first `event` item posted, which is how an error record reaches Sentry. */
+const postedError = () => {
+  const body = posted().find((envelope) => JSON.parse(envelope.split('\n')[1]).type === 'event')
+  return body ? JSON.parse(body.split('\n')[2]) : undefined
+}
+
+const throwAndRecord = (ctx: Awaited<ReturnType<typeof world>>['ctx']) => {
+  try {
+    throw new TypeError('a test failure')
+  } catch (error) {
+    const thrown = error as Error
+    ctx.telemetry.error({ name: thrown.name, message: thrown.message, stack: thrown.stack, handled: true })
+  }
+}
+
+async function world(options: { connected?: boolean; environment?: string } = {}) {
+  // Always stated, so a developer's own `ACORN_SENTRY_DSN` never leaks into a test.
+  vi.stubEnv('ACORN_SENTRY_DSN', options.environment)
   const ctx = makeTestNodeContext({
     plugin: sentryTelemetryPlugin(),
     permissions: await declaredPermissions(),
@@ -39,21 +66,33 @@ async function world(options: { connected?: boolean } = {}) {
     'fetch',
     vi.fn(async () => new Response(null, { status: 200 })),
   )
+  let source: PluginFetchHandler | undefined
+  const registerRoute = ctx.routes.fetch
+  vi.spyOn(ctx.routes, 'fetch').mockImplementation((handler, routeOptions) => {
+    source = handler
+    registerRoute(handler, routeOptions)
+  })
   const plugin = sentryTelemetryPlugin()
   await plugin.init(ctx)
-  return { ctx, plugin }
+  const readSource = async () => {
+    const context = await makeTestRequestContext({ plugin: PROVIDER_ID, env: ctx.env })
+    return (await source!(new Request('http://node/source'), context)).json()
+  }
+  return { ctx, plugin, readSource }
 }
 
 afterEach(() => {
   vi.unstubAllGlobals()
+  vi.unstubAllEnvs()
+  vi.restoreAllMocks()
 })
 
 describe('the sentry-telemetry plugin', () => {
-  it('registers one connection provider and no routes', async () => {
+  it('registers one connection provider and no Hono routes', async () => {
     const { ctx, plugin } = await world()
     try {
-      // A loaded plugin gets no live Hono seam, and this one contributes no route either way: it
-      // reads the stream and posts, and shows nothing of its own.
+      // A loaded plugin gets no live Hono seam. Its one route is a fetch handler for the settings
+      // page.
       expect(ctx.routes.register).toBeUndefined()
       expect(ctx.core.telemetry.onBatch).toBeTypeOf('function')
     } finally {
@@ -131,6 +170,91 @@ describe('the sentry-telemetry plugin', () => {
       await new Promise((resolve) => setTimeout(resolve, 20))
       expect(globalThis.fetch).not.toHaveBeenCalled()
     } finally {
+      ctx.cleanup()
+    }
+  })
+
+  describe('with ACORN_SENTRY_DSN set', () => {
+    it('sends a thrown error to that project, tagged development', async () => {
+      const { ctx, plugin } = await world({ connected: false, environment: ENV_DSN })
+      try {
+        throwAndRecord(ctx)
+        expect(ctx.recorded.length).toBeGreaterThan(0)
+
+        await vi.waitFor(() => expect(postedError()).toBeDefined())
+        expect(postedUrls()).toContain('https://o7.ingest.de.sentry.io/api/7654321/envelope/')
+        expect(postedError()).toMatchObject({ environment: 'development', release: expect.stringMatching(/^acorn@.+/) })
+      } finally {
+        await plugin.dispose?.()
+        ctx.cleanup()
+      }
+    })
+
+    it('sends nothing while collection is off', async () => {
+      const { ctx, plugin } = await world({ connected: false, environment: ENV_DSN })
+      try {
+        vi.spyOn(ctx.core.telemetry, 'enabled').mockReturnValue(false)
+        throwAndRecord(ctx)
+        expect(ctx.recorded.length).toBeGreaterThan(0)
+        await new Promise((resolve) => setTimeout(resolve, 20))
+        expect(globalThis.fetch).not.toHaveBeenCalled()
+      } finally {
+        await plugin.dispose?.()
+        ctx.cleanup()
+      }
+    })
+
+    it('lets a Settings connection win', async () => {
+      const { ctx, plugin, readSource } = await world({ environment: ENV_DSN })
+      try {
+        throwAndRecord(ctx)
+        expect(ctx.recorded.length).toBeGreaterThan(0)
+
+        await vi.waitFor(() => expect(postedError()).toBeDefined())
+        expect(new Set(postedUrls())).toEqual(new Set(['https://o42.ingest.us.sentry.io/api/1234567/envelope/']))
+        expect(postedError()?.environment).toBeUndefined()
+        // The page has nothing to say about the environment while the connection overrides it.
+        expect(await readSource()).toEqual({ environment: null })
+      } finally {
+        await plugin.dispose?.()
+        ctx.cleanup()
+      }
+    })
+
+    it('tells the settings page where records go, without the key', async () => {
+      const { ctx, plugin, readSource } = await world({ connected: false, environment: ENV_DSN })
+      try {
+        expect(await readSource()).toEqual({ environment: 'o7.ingest.de.sentry.io/7654321' })
+      } finally {
+        await plugin.dispose?.()
+        ctx.cleanup()
+      }
+    })
+
+    it('warns once about a value that is not a DSN, never quoting it, and sends nothing', async () => {
+      const { ctx, plugin, readSource } = await world({ connected: false, environment: 'not-a-dsn-secret' })
+      try {
+        throwAndRecord(ctx)
+        const warnings = ctx.recorded.filter((record) => record.kind === 'log' && record.level === 'warn')
+        const about = warnings.filter((record) => record.kind === 'log' && record.body.includes('ACORN_SENTRY_DSN'))
+        expect(about).toHaveLength(1)
+        expect(JSON.stringify(ctx.recorded)).not.toContain('not-a-dsn-secret')
+        expect(await readSource()).toEqual({ environment: null })
+        await new Promise((resolve) => setTimeout(resolve, 20))
+        expect(globalThis.fetch).not.toHaveBeenCalled()
+      } finally {
+        await plugin.dispose?.()
+        ctx.cleanup()
+      }
+    })
+  })
+
+  it('with ACORN_SENTRY_DSN unset, tells the settings page nothing', async () => {
+    const { ctx, plugin, readSource } = await world({ connected: false })
+    try {
+      expect(await readSource()).toEqual({ environment: null })
+    } finally {
+      await plugin.dispose?.()
       ctx.cleanup()
     }
   })
