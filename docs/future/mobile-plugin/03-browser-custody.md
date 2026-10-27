@@ -23,7 +23,7 @@ What landed:
   nothing else in custody; and the phone may import `@acorn/custody/rules` and nothing else from custody.
 - Docs: [the phone's plugin custody](../../mobile/plugin-custody.md), the pointers in
   [plugin bundles](../../security/plugin-bundles.md) and [the mobile web app](../../mobile.md), and the removed
-  section in [mobile work after the first release](../mobile/later.md).
+  section in [what's left for the mobile web app](../mobile.md).
 
 Decisions and deviations:
 
@@ -186,7 +186,7 @@ checkpoints 2 and 3.
 
 - [Plugin bundles](../../security/plugin-bundles.md): custody in the phone's browser.
 - [The mobile web app](../../mobile.md#limits): remove "Loaded plugins don't run".
-- [Mobile work after the first release](../mobile/later.md): remove the "Run loaded plugins on a
+- [What's left for the mobile web app](../mobile.md): remove the "Run loaded plugins on a
   phone" section.
 
 ## Open questions

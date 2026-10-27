@@ -94,7 +94,7 @@ one prompts once.
   records. A Node on another release offers other hashes, and those prompt.
 - **Opt in surface by surface.** Add `formFactor: ['desktop', 'mobile']` to each task pane once it's
   been checked at phone width. Fix what doesn't fit in the shared component, not in the plugin
-  ([what holds across every phase](../mobile/README.md#what-holds-across-every-phase)).
+  ([narrow mode](../../mobile/narrow-mode.md)).
 
 ## In scope
 

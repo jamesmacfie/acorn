@@ -58,7 +58,7 @@ Three gaps hold these back, each in a different layer:
 - Keeping trust decisions on the Node. Consent stays per device
   ([plugin bundles](../../security/plugin-bundles.md#consent-is-per-device-and-per-bundle)).
 - Push, a native wrapper, and reaching more than one Node at a time.
-  [Mobile work after the first release](../mobile/later.md) and
+  [What's left for the mobile web app](../mobile.md) and
   [remote access](../remote-access/README.md) keep those.
 
 ## Starting point
