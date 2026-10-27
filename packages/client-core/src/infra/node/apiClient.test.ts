@@ -129,6 +129,19 @@ describe('requests to an unreachable node', () => {
     expect(attempted).toEqual([{ path: '/v1/core/workspaces', method: 'GET' }])
   })
 
+  // The broker pushes a status only on a change, so a window that missed one asks main again rather
+  // than refusing writes until a reload.
+  it('re-reads the fleet once before refusing a write to a node it holds no status for', async () => {
+    await ready(null)
+    const fleetList = vi.fn(() =>
+      Promise.resolve({ nodes: [node], statuses: [{ nodeId: 'n1', state: 'online' as const }] }),
+    )
+    window.acorn!.fleetList = fleetList
+    await expect(writeJson('/v1/core/workspaces', { method: 'POST', body: '{}' })).resolves.toEqual({ ok: true })
+    await expect(writeJson('/v1/core/workspaces', { method: 'POST', body: '{}' })).resolves.toEqual({ ok: true })
+    expect(fleetList).toHaveBeenCalledOnce()
+  })
+
   it.each(['online', 'degraded'] as const)('lets a mutation through when writes can land (%s)', async (state) => {
     // `degraded` is WS-down/HTTP-up: no live events, but a write still commits. Treating it as offline
     // would block every mutation for the whole time a socket is reconnecting.
