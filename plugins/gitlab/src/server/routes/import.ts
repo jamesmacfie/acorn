@@ -1,3 +1,4 @@
+import { stat } from 'node:fs/promises'
 import { isAbsolute, join } from 'node:path'
 import { and, eq } from 'drizzle-orm'
 import { Hono } from 'hono'
@@ -70,6 +71,14 @@ export const gitlabImport = (
           path = entry.path
         } else {
           if (!isAbsolute(entry.parentDir)) throw new Error('Clone parent directory must be absolute.')
+          // Checked first, because git would fail with "spawn git ENOENT" for a missing working folder.
+          if (
+            !(await stat(entry.parentDir).then(
+              (found) => found.isDirectory(),
+              () => false,
+            ))
+          )
+            throw new Error("That folder doesn't exist on this Node.")
           // The path comes from the server, which may be any host a person typed, so it's held to
           // GitLab's own path grammar before it names a folder or reaches git's arguments.
           if (!project.path.split('/').every((segment) => GITLAB_PATH_SEGMENT.test(segment)))

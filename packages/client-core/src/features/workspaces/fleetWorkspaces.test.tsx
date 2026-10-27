@@ -39,6 +39,7 @@ function mount(
   workspaces: FleetResult<Workspace[]>,
   prefs: FleetResult<Record<string, string>>,
   projects: FleetResult<Project[]>,
+  options?: Parameters<typeof createFleetWorkspaces>[0],
 ) {
   vi.mocked(createFleetQuery).mockImplementation((key) => {
     const query = key(undefined as never)
@@ -48,7 +49,7 @@ function mount(
     return [() => value] as never
   })
   dispose = render(() => {
-    const list = createFleetWorkspaces()
+    const list = createFleetWorkspaces(options)
     return <output>{JSON.stringify(list())}</output>
   }, host)
   return JSON.parse(host.querySelector('output')!.textContent!) as ReturnType<ReturnType<typeof createFleetWorkspaces>>
@@ -98,5 +99,15 @@ describe('fleet workspace resource', () => {
     )
     expect(result.entries).toEqual([])
     expect(result.unavailable).toEqual([unavailable(nodeB, 'projects failed')])
+  })
+
+  it('asks only the Nodes it is given, for every read', () => {
+    const empty = { rows: [], unavailable: [] }
+    mount(empty, empty, empty, { nodeIds: ['a'] })
+    expect(vi.mocked(createFleetQuery).mock.calls.map((call) => call[3])).toEqual([
+      { nodeIds: ['a'] },
+      { nodeIds: ['a'] },
+      { nodeIds: ['a'] },
+    ])
   })
 })

@@ -1,9 +1,8 @@
-import { createSignal, For, Show } from 'solid-js'
+import { createEffect, createSignal, For, on, Show } from 'solid-js'
 import { createQuery, useQueryClient } from '@tanstack/solid-query'
 import {
   activeNodeId,
   canAddProjectFromFolder,
-  canPickFolder,
   clientEvents,
   integrationsOptions,
   pickNodeFolder,
@@ -23,6 +22,7 @@ import {
   IconButton,
   Inline,
   Input,
+  NodePathForm,
   SettingRow,
   Stack,
   Text,
@@ -48,7 +48,8 @@ const githubAccount = (integrations: IntegrationsResponse | undefined) =>
   integrations?.integrations.find((integration) => integration.providerId === 'github')?.account?.label ?? null
 
 // One repository, one decision, taken immediately: the button is the action. Link folder and Clone
-// both open the folder picker on the spot; there is no third "defer" action
+// both ask for the folder on the spot, in the folder dialog or, where it can't browse the Node's disk,
+// in a folder field in the row. There is no third "defer" action
 // (docs/github-integration.md § Importing projects).
 //
 // Not the `wizard` layout. This is one screen, and the one place it appears in a wizard is first-run
@@ -60,7 +61,7 @@ export default function GithubImporter(props: ProjectImporterProps) {
   const githubReady = () => !!integrations.data && connectedGithub(integrations.data)
   const repos = createQuery(() => reposOptions(githubReady()))
   // The row AND the action, so the spinner lands on the button that was pressed. One import at a
-  // time: each of these opens a native folder dialog and shells out to git.
+  // time: each of these asks for a folder and shells out to git.
   const [running, setRunning] = createSignal<{ repoId: number; action: GithubImportAction } | null>(null)
   const busy = (repo: Repo, action: GithubImportAction) => running()?.repoId === repo.id && running()?.action === action
   const [error, setError] = createSignal('')
@@ -93,21 +94,52 @@ export default function GithubImporter(props: ProjectImporterProps) {
         project.github?.name.toLowerCase() === repo.name.toLowerCase(),
     )
 
+  // The row and action whose folder field is open, where the folder dialog can't browse the Node's
+  // disk. Clone starts with the last folder typed for Clone, so cloning a run of repositories into one
+  // folder types it once. Both belong to one Node, so both drop when the active Node changes.
+  const [typing, setTyping] = createSignal<{
+    repoId: number
+    action: GithubImportAction
+    nodeId: string | null
+  } | null>(null)
+  const [cloneDir, setCloneDir] = createSignal('')
+  createEffect(
+    on(
+      activeNodeId,
+      () => {
+        setTyping(null)
+        setCloneDir('')
+      },
+      { defer: true },
+    ),
+  )
+  const typingIn = (repo: Repo) => (typing()?.repoId === repo.id ? typing() : null)
+
   const importOne = async (repo: Repo, action: GithubImportAction) => {
     if (running()) return
     setError('')
+    const nodeId = activeNodeId()
     if (!canAddProjectFromFolder()) {
-      setError('Choose the local Node to import with a folder picker.')
+      setTyping({ repoId: repo.id, action, nodeId })
       return
     }
-    const nodeId = activeNodeId()
     // Ask for the folder before anything is written, so cancelling the dialog cancels the import
     // rather than leaving a half-made project behind.
     const path = await pickNodeFolder(nodeId)
-    if (!path) return
-    if (activeNodeId() !== nodeId || !canAddProjectFromFolder()) {
+    if (path) await send(repo, action, path, nodeId)
+  }
+
+  // Resolves true once the repository is imported, which is when the folder field closes.
+  const send = async (
+    repo: Repo,
+    action: GithubImportAction,
+    path: string,
+    nodeId: string | null,
+  ): Promise<boolean> => {
+    if (activeNodeId() !== nodeId) {
+      setTyping(null)
       setError('The active Node changed. Choose the folder again.')
-      return
+      return false
     }
     const item: GithubImportItem =
       action === 'map' ? { repoId: repo.id, action, path } : { repoId: repo.id, action, parentDir: path }
@@ -125,8 +157,10 @@ export default function GithubImporter(props: ProjectImporterProps) {
       const result = response.results[0]
       if (!result?.ok) {
         setError(result?.error ?? "Couldn't add that repository.")
-        return
+        return false
       }
+      setTyping(null)
+      if (action === 'clone') setCloneDir(path)
       await Promise.all([
         queryClient.invalidateQueries({ queryKey: projectsKey }),
         queryClient.invalidateQueries({ queryKey: workspacesKey }),
@@ -135,8 +169,10 @@ export default function GithubImporter(props: ProjectImporterProps) {
       // Name the project rather than leaving the host to infer it: a map onto an existing path-less
       // project repairs that row instead of adding one, and a before/after diff would miss it.
       props.onImported(result.projectId ? [result.projectId] : [])
+      return true
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : String(cause))
+      return false
     } finally {
       setRunning(null)
     }
@@ -166,59 +202,52 @@ export default function GithubImporter(props: ProjectImporterProps) {
           {(login) => <Text emphasis="muted">Connected as @{login()}.</Text>}
         </Show>
         <Show
-          when={canAddProjectFromFolder()}
+          when={!repos.isLoading}
           fallback={
-            <Text emphasis="muted">
-              {canPickFolder()
-                ? 'Choose the local Node to import from GitHub.'
-                : 'To choose a folder, use the desktop app.'}
-            </Text>
+            <EmptyState align="start" size="sm" busy>
+              Loading GitHub repositories…
+            </EmptyState>
           }
         >
           <Show
-            when={!repos.isLoading}
+            when={repos.data?.length}
             fallback={
-              <EmptyState align="start" size="sm" busy>
-                Loading GitHub repositories…
+              <EmptyState align="start" size="sm">
+                No repositories to show.
               </EmptyState>
             }
           >
-            <Show
-              when={repos.data?.length}
-              fallback={
-                <EmptyState align="start" size="sm">
-                  No repositories to show.
-                </EmptyState>
-              }
-            >
-              <Show when={error()}>{(text) => <Alert>{text()}</Alert>}</Show>
-              <Text emphasis="muted" wrap>
-                Clone asks where to put the copy. Link folder asks where your copy already is.
-              </Text>
-              <Input
-                kind="filter"
-                label="Filter repositories"
-                placeholder="Filter repositories…"
-                value={filter()}
-                onInput={setFilter}
-              />
-              <Show when={!shown().length}>
-                <EmptyState align="start" size="sm">
-                  Nothing matches that filter.
-                </EmptyState>
-              </Show>
-              <Stack gap="none">
-                <For each={shown()}>
-                  {(repo) => (
-                    // Adding the same repository twice is legal, since two clones of one repository
-                    // are a supported shape, so a row that already has a project keeps its buttons.
-                    <SettingRow
-                      label={`${repo.owner}/${repo.name}`}
-                      description={[
-                        repo.private ? 'Private' : 'Public',
-                        ...(projectFor(repo) ? [`Added as ${projectFor(repo)!.name}`] : []),
-                      ].join(' · ')}
-                    >
+            <Show when={!typing() && error()}>{(text) => <Alert>{text()}</Alert>}</Show>
+            <Text emphasis="muted" wrap>
+              Clone asks where to put the copy. Link folder asks where your copy already is.
+            </Text>
+            <Input
+              kind="filter"
+              label="Filter repositories"
+              placeholder="Filter repositories…"
+              value={filter()}
+              onInput={setFilter}
+            />
+            <Show when={!shown().length}>
+              <EmptyState align="start" size="sm">
+                Nothing matches that filter.
+              </EmptyState>
+            </Show>
+            <Stack gap="none">
+              <For each={shown()}>
+                {(repo) => (
+                  // Adding the same repository twice is legal, since two clones of one repository
+                  // are a supported shape, so a row that already has a project keeps its buttons.
+                  <SettingRow
+                    label={`${repo.owner}/${repo.name}`}
+                    description={[
+                      repo.private ? 'Private' : 'Public',
+                      ...(projectFor(repo) ? [`Added as ${projectFor(repo)!.name}`] : []),
+                    ].join(' · ')}
+                    layout={typingIn(repo) ? 'stacked' : 'inline'}
+                    error={typingIn(repo) ? error() || undefined : undefined}
+                  >
+                    <Stack gap="row">
                       <Inline gap="row">
                         <Button
                           variant="ghost"
@@ -239,11 +268,22 @@ export default function GithubImporter(props: ProjectImporterProps) {
                           Link folder
                         </Button>
                       </Inline>
-                    </SettingRow>
-                  )}
-                </For>
-              </Stack>
-            </Show>
+                      {/* Keyed, so pressing the other action opens a fresh field with its own start. */}
+                      <Show when={typingIn(repo)} keyed>
+                        {(open) => (
+                          <NodePathForm
+                            action={open.action === 'clone' ? 'Clone' : 'Link folder'}
+                            busy={!!running()}
+                            initial={open.action === 'clone' ? cloneDir() : ''}
+                            submit={(path) => send(repo, open.action, path, open.nodeId)}
+                          />
+                        )}
+                      </Show>
+                    </Stack>
+                  </SettingRow>
+                )}
+              </For>
+            </Stack>
           </Show>
         </Show>
       </Show>

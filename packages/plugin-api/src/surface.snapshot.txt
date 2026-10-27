@@ -68,7 +68,6 @@ client: brandMarkRegistry
 client: bytesOf
 client: cachedTaskScripts
 client: canAddProjectFromFolder
-client: canPickFolder
 client: clearLocal
 client: clientCapability
 client: clientCapabilityId
@@ -758,6 +757,7 @@ ui: Modal
 ui: ModalActions
 ui: ModalBody
 ui: ModelBackendPicker
+ui: NodePathForm
 ui: NonCodeRow
 ui: Only
 ui: Pane

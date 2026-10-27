@@ -49,15 +49,12 @@ workspace. The title line holds the page name, a scope chip, and the close butto
 **Esc** in its tip. The chip says **This device**, **Node: \<label\>**, **Workspace**, or
 **Project**, with the Node named when there's more than one.
 
-A page that reads and writes the Node in `context.scope.nodeId` sets `followsNodeSwitcher`, and its
-chip becomes a Node switcher when the fleet has two or more Nodes. The switcher is local to Settings.
-It starts on the active Node each time Settings opens and never changes `activeNodeId`, which would
-remount the shell on another Node's cache. Switching remounts the page, so nothing from one Node shows
-under another, and a form with changes asks first. Installed, Security and backup, Audit log,
-Schedules, Run history, Telemetry, and Storage and memory follow it. Storage and memory passes the
-switcher's Node to each section a plugin draws in its `core:storage` point, and Security and backup does the same for `core:security`. Every other Node page reads
-the active Node, because a compiled page uses the ambient API client and a loaded frame is pinned to
-the active Node, and its chip names that Node as text.
+Every Node, workspace, and project page reads the active Node, the one the top bar shows. With two or
+more Nodes paired, the chip on those pages is a Node selector. Picking a Node changes the active Node,
+the same switch the top bar makes, so a form with changes asks first. The switch remounts the shell on
+the other Node's cache. Settings stays open through it and reopens on the same page, so nothing from
+one Node shows under another, and the rail's workspaces and projects come from the new Node. With one
+Node, the chip names it as text.
 
 ### The page context
 

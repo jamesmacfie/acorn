@@ -35,20 +35,22 @@ describe('the surface health registry', () => {
     ])
   })
 
-  it('keeps the final reading of a disposed surface as retired, and nothing else from it', () => {
+  it('keeps the final reading of a disposed surface as retired, and nothing else from it', async () => {
     let observers = 2
     const probe = registerSurfaceHealth('timeline', () => ({ measurement: { activeObservers: observers } }))
-    // The owner's cleanups run before the registration's, so the final reading sees them done.
+    probe.dispose()
+    probe.dispose()
+    // A cleanup that runs after the registration's, in the same teardown, still counts.
     observers = 0
-    probe.dispose()
-    probe.dispose()
+    expect(surfaceHealthSnapshot().surfaces).toEqual([])
+    await Promise.resolve()
     const snapshot = surfaceHealthSnapshot()
     expect(snapshot.surfaces).toEqual([])
     expect(snapshot.retired.timeline?.measurement.activeObservers).toBe(0)
     expect(snapshot.retired.diff).toBeUndefined()
   })
 
-  it('reports checkpoints and teardown to the installed handler, and survives one that throws', () => {
+  it('reports checkpoints and teardown to the installed handler, and survives one that throws', async () => {
     const seen: [string, string][] = []
     setSurfaceHealthHandler((entry, checkpoint) => {
       seen.push([entry.kind, checkpoint])
@@ -58,6 +60,7 @@ describe('the surface health registry', () => {
     probe.checkpoint('ready')
     probe.dispose()
     probe.checkpoint('ready')
+    await Promise.resolve()
     expect(seen).toEqual([
       ['diff', 'ready'],
       ['diff', 'teardown'],

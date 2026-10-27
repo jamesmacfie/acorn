@@ -126,6 +126,48 @@ describe('core topbar', () => {
     expect(addButton()).toBeUndefined()
   })
 
+  it("names a workspace row without its node, because the host lists only the active node's", () => {
+    const value: TopbarProps = {
+      workspacesMode: 'on',
+      workspace: null,
+      workspaces: [{ id: 'w1', label: 'Default', nodeId: 'n1', nodeLabel: 'Laptop', projectCount: 1 }],
+      project: null,
+      projects: [],
+      projectPickerVisible: false,
+      projectPickerDisabled: false,
+      breadcrumb: [],
+      node: { id: 'n1', label: 'Laptop', state: 'online' },
+      nodes: [
+        { id: 'n1', label: 'Laptop', state: 'online' },
+        { id: 'n2', label: 'Build box', state: 'online' },
+      ],
+      account: null,
+      canAddProject: false,
+      slots: { right: 'minted-right' as SlotRef },
+      pickWorkspace: vi.fn(),
+      pickProject: vi.fn(),
+      pickNode: vi.fn(),
+      openSettings: vi.fn(),
+      navigate: vi.fn(),
+      clearCache: vi.fn(),
+      addProject: vi.fn(),
+    }
+    host = document.createElement('div')
+    document.body.append(host)
+    dispose = render(
+      () => (
+        <WithNestedChromeSlots slots={[]}>
+          <Topbar value={value} />
+        </WithNestedChromeSlots>
+      ),
+      host!,
+    )
+    host.querySelector<HTMLButtonElement>('.repo-picker button')?.click()
+    const popover = document.querySelector('.repo-picker-popover')
+    expect(popover?.textContent).toContain('Default')
+    expect(popover?.textContent).not.toContain('Laptop')
+  })
+
   it('labels the primary picker as Project and hides the second picker while off', () => {
     const value: TopbarProps = {
       workspacesMode: 'off',

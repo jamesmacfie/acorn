@@ -415,10 +415,6 @@ const extensionPoints: SearchDeclaration = {
 // Core's settings pages, placed in the rail's groups (docs/frontend/settings.md § Settings). Ids are
 // stable because callers deep-link by them: `openSettings('shortcuts')`, a notice target's page id,
 // the palette's rows. `order` counts within a group.
-//
-// The pages that name their node through `context.scope.nodeId` declare `followsNodeSwitcher`, so
-// the header's switcher is theirs. Every other node page reads the active node through the ambient API
-// client, and its header says so.
 export const CORE_SETTINGS_PAGES = [
   // General: this screen, not the node. Each is a device preference, like the theme.
   {
@@ -544,7 +540,6 @@ export const CORE_SETTINGS_PAGES = [
     scope: 'node',
     icon: 'calendar-clock',
     order: 10,
-    followsNodeSwitcher: true,
   },
   {
     id: 'datasets',
@@ -554,7 +549,6 @@ export const CORE_SETTINGS_PAGES = [
     scope: 'node',
     icon: 'database',
     order: 15,
-    followsNodeSwitcher: true,
   },
   {
     id: 'runs',
@@ -564,7 +558,6 @@ export const CORE_SETTINGS_PAGES = [
     scope: 'node',
     icon: 'clock',
     order: 20,
-    followsNodeSwitcher: true,
   },
 
   // Machines. Nodes is the device's fleet, so its scope is this device. Not `requires: 'desktop'`: the
@@ -580,7 +573,6 @@ export const CORE_SETTINGS_PAGES = [
     scope: 'node',
     icon: 'shield',
     order: 20,
-    followsNodeSwitcher: true,
   },
   {
     id: 'audit',
@@ -590,7 +582,6 @@ export const CORE_SETTINGS_PAGES = [
     scope: 'node',
     icon: 'scroll-text',
     order: 30,
-    followsNodeSwitcher: true,
   },
   // `telemetry.enabled` is a preference on the node rather than on this screen (docs/telemetry.md).
   {
@@ -601,7 +592,6 @@ export const CORE_SETTINGS_PAGES = [
     scope: 'node',
     icon: 'activity',
     order: 40,
-    followsNodeSwitcher: true,
   },
   // Memory and disk are facts about one machine. Core's page, with a section each plugin that holds
   // either contributes through CORE_STORAGE_POINT (docs/data-layer/backup-and-retention.md § What the node reports).
@@ -613,7 +603,6 @@ export const CORE_SETTINGS_PAGES = [
     scope: 'node',
     icon: 'hard-drive',
     order: 50,
-    followsNodeSwitcher: true,
   },
 
   // Plugins. Not `requires: 'desktop'`, for the same reason as Nodes. The node's plugins follow the
@@ -626,7 +615,6 @@ export const CORE_SETTINGS_PAGES = [
     scope: 'node',
     icon: 'puzzle',
     order: 10,
-    followsNodeSwitcher: true,
   },
   // What plugins put in this device's chrome: every rail source's icon, and the core surfaces a plugin
   // may draw instead.

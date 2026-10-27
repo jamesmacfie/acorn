@@ -1,3 +1,5 @@
+import { tmpdir } from 'node:os'
+import { join } from 'node:path'
 import { Hono } from 'hono'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { makeTestPluginDb, testGate, type AppEnv, type Env, type TestPluginDb } from '@acorn/plugin-api/testkit'
@@ -226,13 +228,13 @@ describe('a company GitLab server', () => {
     const app = new Hono<AppEnv>()
       .use('/api/*', ...testGate({ kind: 'device', userId: 'owner' } as Principal))
       .route('/api/import', gitlabImport(testDb.db, core, servers))
-    const clone = async (projectId: number) => {
+    const clone = async (projectId: number, parentDir = tmpdir()) => {
       const response = await app.fetch(
         new Request('http://acorn.test/api/import', {
           method: 'POST',
           headers: { 'content-type': 'application/json' },
           body: JSON.stringify({
-            projects: [{ host: 'gitlab.example.test', projectId, action: 'clone', parentDir: '/src' }],
+            projects: [{ host: 'gitlab.example.test', projectId, action: 'clone', parentDir }],
           }),
         }),
         {} as Env,
@@ -241,6 +243,11 @@ describe('a company GitLab server', () => {
     }
 
     expect(await clone(8)).toMatchObject({ ok: false, error: expect.stringContaining("won't clone") })
+    // A typed folder from a remote Node can name nothing; git would report that as a missing git.
+    expect(await clone(7, join(tmpdir(), 'acorn-no-such-folder'))).toMatchObject({
+      ok: false,
+      error: "That folder doesn't exist on this Node.",
+    })
     expect(cloned).toEqual([])
     expect(await clone(7)).toMatchObject({ ok: true })
     expect(cloned).toEqual([['clone', '--', `${COMPANY}/group/api.git`, 'api']])

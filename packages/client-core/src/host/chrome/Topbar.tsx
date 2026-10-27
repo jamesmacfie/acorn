@@ -12,7 +12,7 @@ export default function Topbar(own: { value?: unknown }) {
   const props = () => own.value as TopbarProps
   const workspaceResults = (query: string) => {
     const q = query.trim().toLowerCase()
-    return props().workspaces.filter((entry) => `${entry.label} ${entry.nodeLabel}`.toLowerCase().includes(q))
+    return props().workspaces.filter((entry) => entry.label.toLowerCase().includes(q))
   }
   const projectResults = (query: string) => {
     const q = query.trim().toLowerCase()
@@ -46,7 +46,7 @@ export default function Topbar(own: { value?: unknown }) {
             leading={(entry) => (
               <WorkspaceIdentity name={entry.label} appearance={entry.appearance} nodeId={entry.nodeId} />
             )}
-            rowLabel={(entry) => `${entry.label}${props().nodes.length > 1 ? ` · ${entry.nodeLabel}` : ''}`}
+            rowLabel={(entry) => entry.label}
             rowDescription={(entry) =>
               props().workspacesMode === 'off'
                 ? undefined

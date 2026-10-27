@@ -174,9 +174,9 @@ pages written with the shared kit and its own Notifications page, which shows th
 alert choice and the three event switches. Every other page is listed and says why to open it in the
 desktop app. See [terminal client](./tui/sources-and-settings.md) § Settings.
 
-Plugins are managed per Node. With more than one Node, the shell adds Fleet home, Node labels,
-aggregate Agent Center, attention, and search, Node-aware palette rows, and partial and offline
-states. [Client state and fleet behavior](./architecture/fleet.md) covers the rules.
+Plugins are managed per Node. With more than one Node, the shell adds a Node selector, Fleet home,
+Node labels, aggregate Agent Center, attention, and search, Node-aware palette rows, and partial and
+offline states. The workspace picker and Settings show only the selected Node. [Client state and fleet behavior](./architecture/fleet.md) covers the rules.
 
 ## Phone
 
