@@ -52,12 +52,13 @@ function group({ label, items }) {
 }
 
 // Search ranks a Markdown table's first column, which names the setting, field, or variable each row
-// describes, level with a heading, as ReferenceTable does for its rows. A heading's weight is 6 or 7.
+// describes, at Pagefind's top weight of 10, as ReferenceTable does for its rows. A heading's weight is
+// 6 or 7, and level with one, a settings label lost to a page with the label's words in its title.
 function rehypeWeightTableKeys() {
   const walk = (node) => {
     if (node.tagName === 'tr') {
       const first = node.children.find((child) => child.type === 'element')
-      if (first?.tagName === 'td') first.properties.dataPagefindWeight = '6'
+      if (first?.tagName === 'td') first.properties.dataPagefindWeight = '10'
     }
     node.children?.forEach(walk)
   }
