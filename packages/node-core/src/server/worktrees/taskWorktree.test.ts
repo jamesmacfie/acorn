@@ -72,6 +72,8 @@ describe('resolveTaskCwd core:worktree-created hook', () => {
     git(src, 'config', 'user.email', 't@a.test')
     git(src, 'config', 'user.name', 'T')
     git(src, 'config', 'commit.gpgsign', 'false')
+    // No detached `git maintenance run` after a commit: it can still be writing in .git while beforeEach copies it.
+    git(src, 'config', 'maintenance.auto', 'false')
     writeFileSync(join(src, 'f.txt'), 'x')
     git(src, 'add', 'f.txt')
     git(src, 'commit', '-m', 'init')

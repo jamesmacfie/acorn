@@ -287,6 +287,9 @@ describe('local diff over a real worktree', () => {
     execFileSync('git', ['init', '-q', '-b', 'main', template])
     g('config', 'user.email', 't@t.test')
     g('config', 'user.name', 'T')
+    // `git commit` otherwise starts a detached `git maintenance run`, which can still be writing in
+    // .git/objects while beforeEach copies it, and the copy fails with ENOENT. The copies inherit this.
+    g('config', 'maintenance.auto', 'false')
     mkdirSync(join(template, 'src'))
     writeFileSync(join(template, 'src', 'a.ts'), 'line1\nline2\nline3\n')
     g('add', '.')

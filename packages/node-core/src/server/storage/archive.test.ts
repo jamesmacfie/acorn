@@ -71,6 +71,8 @@ describe('archiveTask teardown ordering', () => {
     execFileSync('git', ['init', '-q', '-b', 'main', src])
     git(src, 'config', 'user.email', 't@t.test')
     git(src, 'config', 'user.name', 'T')
+    // No detached `git maintenance run` after a commit: it can still be writing in .git while beforeEach copies it.
+    git(src, 'config', 'maintenance.auto', 'false')
     writeFileSync(join(src, 'a.txt'), 'a')
     git(src, 'add', '.')
     git(src, 'commit', '-q', '-m', 'init')

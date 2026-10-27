@@ -45,6 +45,8 @@ describe('worktree branch source (docs/workspaces-and-tasks.md)', () => {
     execFileSync('git', ['init', '-q', '-b', 'main', src])
     git(src, 'config', 'user.email', 't@t.test')
     git(src, 'config', 'user.name', 'T')
+    // No detached `git maintenance run` after a commit: it can still be writing in .git while beforeEach copies it.
+    git(src, 'config', 'maintenance.auto', 'false')
     writeFileSync(join(src, 'a.txt'), '1')
     git(src, 'add', '.')
     git(src, 'commit', '-q', '-m', 'one')
