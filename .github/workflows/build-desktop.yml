@@ -109,8 +109,11 @@ jobs:
         # The acorn team's DSN, written into the sentry-telemetry bundle for a `v*` tag only, so a
         # manual run from a branch reports nowhere. It can only send, and it's a secret so it stays
         # out of logs and forks. A fork, or a run without it, builds with none.
+        # The hosted account service's address, so the app offers sign-in. It's public, so it's a
+        # repository variable. A fork, or a run without it, builds an app with no sign-in.
         env:
           ACORN_SENTRY_RELEASE_DSN: ${{ startsWith(github.ref, 'refs/tags/v') && secrets.ACORN_SENTRY_DSN || '' }}
+          ACORN_RELEASE_ACCOUNT_URL: ${{ vars.ACORN_RELEASE_ACCOUNT_URL }}
         run: pnpm --filter @acorn/desktop run build
 
       # Gives every staged file a debug id, uploads the maps for this release and platform, then

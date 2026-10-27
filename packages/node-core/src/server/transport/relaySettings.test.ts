@@ -1,4 +1,4 @@
-import { afterEach, describe, expect, it } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 import { accountServiceUrl, relaySettings } from './relaySettings'
 
 const original = {
@@ -61,5 +61,15 @@ describe('the account service previews ask', () => {
     expect(named('account.example')).toBeUndefined()
     expect(named('http://account.example')).toBeUndefined()
     expect(named('ftp://account.example')).toBeUndefined()
+  })
+
+  it("is the build's address when ACORN_ACCOUNT_URL is unset, and absent when it's set to empty", () => {
+    vi.stubGlobal('__ACORN_RELEASE_ACCOUNT_URL__', 'https://account.example')
+    try {
+      expect(named(undefined)).toBe('https://account.example')
+      expect(named('')).toBeUndefined()
+    } finally {
+      vi.unstubAllGlobals()
+    }
   })
 })

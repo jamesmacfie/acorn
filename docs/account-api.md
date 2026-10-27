@@ -155,9 +155,10 @@ in: no request leaves the Node, and no timer runs. Its routes load on their firs
 
 - **The connection.** The access token is an encrypted connection of the `account` provider, with the
   refresh token beside it. The host renews the token before it expires, so the plugin keeps no timer.
-  `ACORN_ACCOUNT_URL` names the service. A build without it offers no sign-in, as a build without a
-  GitHub client ID offers no GitHub connection. Plain `http` is accepted only for a service on this
-  computer.
+  `ACORN_ACCOUNT_URL` names the service. Unset, the Node uses the address its build carries: the release
+  workflows write in the `ACORN_RELEASE_ACCOUNT_URL` repository variable, and every other build carries
+  none. Set to empty, or with neither, the Node offers no sign-in. Plain `http` is accepted only for a
+  service on this computer.
 - **Settings → Account.** **Sign in** runs the device flow, and **Sign out** ends it. The page draws in
   the desktop and the terminal client, which prints the address and the code.
 - **Remote access.** The switch on that page registers the Node, records the relay and the owner in

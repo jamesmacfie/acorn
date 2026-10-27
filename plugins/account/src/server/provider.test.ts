@@ -1,5 +1,6 @@
 import { afterEach, beforeEach, expect, it, vi } from 'vitest'
 import { startAccountStub, type AccountStub } from '@acorn/plugin-api/testkit'
+import { accountUrl } from './config'
 import { accountProvider } from './provider'
 
 // The sign-in connection's own steps against the stand-in: the host calls `refresh` before the access
@@ -21,6 +22,19 @@ it('offers sign-in only when the build has an account service', () => {
   expect(accountProvider().connection.connectable).toBe(true)
   vi.stubEnv('ACORN_ACCOUNT_URL', '')
   expect(accountProvider().connection.connectable).toBe(false)
+})
+
+it("falls back to the build's address when ACORN_ACCOUNT_URL is unset, and an empty one turns it off", () => {
+  vi.stubGlobal('__ACORN_RELEASE_ACCOUNT_URL__', 'https://account.example.test')
+  try {
+    vi.stubEnv('ACORN_ACCOUNT_URL', undefined)
+    expect(accountProvider().connection.connectable).toBe(true)
+    expect(accountUrl()).toBe('https://account.example.test')
+    vi.stubEnv('ACORN_ACCOUNT_URL', '')
+    expect(accountProvider().connection.connectable).toBe(false)
+  } finally {
+    vi.unstubAllGlobals()
+  }
 })
 
 it('trades a refresh token for new tokens, and the old refresh token stops working', async () => {

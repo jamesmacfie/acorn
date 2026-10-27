@@ -6,7 +6,7 @@ name: Build the Node archives
 # Node from the extracted archive before it uploads it.
 #
 # Called by ci.yml for `v*` tags and manual dispatches, after the Linux suite passes for the same
-# commit. It needs no secrets.
+# commit. It needs no secrets, and reads the ACORN_RELEASE_ACCOUNT_URL repository variable.
 on:
   workflow_call:
 
@@ -69,9 +69,12 @@ jobs:
           path: ~/.cache/acorn/node-runtime
           key: node-runtime-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('node-runtime.json') }}
 
+      # The hosted account service's address, so the Node offers sign-in, from a repository variable as
+      # build-desktop.yml reads it. Without it, the archive's Node offers no sign-in.
       - name: Build the archive
         env:
           PLATFORM: ${{ matrix.platform }}
+          ACORN_RELEASE_ACCOUNT_URL: ${{ vars.ACORN_RELEASE_ACCOUNT_URL }}
         run: pnpm pack:node --platform "$PLATFORM"
 
       - name: Start a Node from the extracted archive

@@ -1,5 +1,5 @@
 import { lazyRouter, type NodePlugin } from '@acorn/plugin-api/node'
-import { accountProvider } from '../server/provider'
+import { accountProvider, configuredAccountUrl } from '../server/provider'
 
 // Signs a person in to an account service and registers this Node there (docs/account-api.md). It is
 // inert until someone signs in: the routes load on their first request, and nothing here opens a
@@ -15,7 +15,7 @@ export const accountPlugin = (): NodePlugin => ({
     )
     // Offered only where there is an account service to list from, as the sign-in is. Listing makes no
     // request until someone has signed in.
-    if (process.env.ACORN_ACCOUNT_URL?.trim()) {
+    if (configuredAccountUrl()) {
       const nodes = () => import('../server/nodes')
       ctx.providers.nodes({
         id: 'nodes',

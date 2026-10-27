@@ -56,6 +56,9 @@ export default defineConfig({
     'global.process.env': 'global.process.env',
     'globalThis.process.env': 'globalThis.process.env',
     __ACORN_BUILD__: JSON.stringify(buildVersion()),
+    // The hosted account service, from the release workflows only, so a release offers sign-in without
+    // setting ACORN_ACCOUNT_URL. Every other build carries none (plugins/account/src/server/provider.ts).
+    __ACORN_RELEASE_ACCOUNT_URL__: JSON.stringify(process.env.ACORN_RELEASE_ACCOUNT_URL?.trim() ?? ''),
   },
   build: {
     // Both deployments run a current Node: the desktop stages a pinned runtime

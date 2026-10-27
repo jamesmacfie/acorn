@@ -25,12 +25,18 @@ export type RelayControl = {
   state(): RelayState | undefined
 }
 
-// The account service this Node asks for its preview domain and DNS challenge, from `ACORN_ACCOUNT_URL`. It is
-// the variable and the rule the sign-in plugin uses (plugins/account/src/server/config.ts), and a Node that
-// turned Remote access on through that plugin has it set. The relay credential goes to it, so plain `http`
-// is for a service on this computer only. Unset or not an address, there are no previews.
+// Written in by apps/node/vite.config.ts; see plugins/account/src/server/provider.ts.
+declare const __ACORN_RELEASE_ACCOUNT_URL__: string | undefined
+
+// The account service this Node asks for its preview domain and DNS challenge, from `ACORN_ACCOUNT_URL` or
+// else the address the build carries. It is the variable, fallback, and rule the sign-in plugin uses
+// (plugins/account/src/server/config.ts), so a Node that turned Remote access on through that plugin has
+// one. The relay credential goes to it, so plain `http` is for a service on this computer only. Unset or
+// not an address, there are no previews.
 export function accountServiceUrl(): string | undefined {
-  const text = process.env.ACORN_ACCOUNT_URL?.trim()
+  const text =
+    process.env.ACORN_ACCOUNT_URL?.trim() ??
+    (typeof __ACORN_RELEASE_ACCOUNT_URL__ === 'string' ? __ACORN_RELEASE_ACCOUNT_URL__ : undefined)
   if (!text || !URL.canParse(text)) return undefined
   const url = new URL(text)
   const local = ['127.0.0.1', 'localhost', '[::1]'].includes(url.hostname)

@@ -1,10 +1,9 @@
-// The account service this Node signs in to, from `ACORN_ACCOUNT_URL`. There is no default, because
-// the service has no address until one is deployed: a build without one offers no sign-in, as a build
-// without a GitHub client ID offers no GitHub connection. Plain `http` is for a service on this
-// machine, such as the stand-in the dev flows run, because a token must not cross a network in the
-// clear.
+import { configuredAccountUrl } from './provider'
+
+// The account service this Node signs in to. Plain `http` is for a service on this machine, such as the
+// stand-in the dev flows run, because a token must not cross a network in the clear.
 export function accountUrl(): string {
-  const text = process.env.ACORN_ACCOUNT_URL?.trim() ?? ''
+  const text = configuredAccountUrl()
   if (!text) return ''
   if (!URL.canParse(text)) throw new Error(`ACORN_ACCOUNT_URL ${text} isn't an address.`)
   const url = new URL(text)
