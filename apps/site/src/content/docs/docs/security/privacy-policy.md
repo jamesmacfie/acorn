@@ -36,7 +36,7 @@ We use the records only to find and fix bugs in acorn, and we don't sell or shar
 ## Who processes it
 
 [Sentry](https://sentry.io), run by Functional Software, Inc., receives and stores the records for us.
-Sentry stores them in the data region chosen for the acorn team's Sentry organization, and keeps them
+Sentry stores them in its United States region, where the acorn team's organization lives, and keeps them
 for the retention period of that organization's plan. Sentry's own
 [privacy policy](https://sentry.io/privacy/) covers how it handles them.
 

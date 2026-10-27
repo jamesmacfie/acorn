@@ -117,7 +117,7 @@ export default function SentrySettingsPage(props: { bridge: AcornBridge }) {
         <SettingsSection
           id="sharing"
           label="Share with the acorn team"
-          description="Sends this node's errors, with their stacks, and one trace in twenty to the acorn team's project in Sentry, stored in the region that project uses. Prompts, agent output, file contents, terminal output, full paths, credentials, and your account ID never go. Collection under Telemetry has to be on too."
+          description="Sends this node's errors, with their stacks, and one trace in twenty to the acorn team's project in Sentry, stored in Sentry's United States region. Prompts, agent output, file contents, terminal output, full paths, credentials, and your account ID never go. Collection under Telemetry has to be on too."
         >
           <SettingRow label="Share with the acorn team" error={errorOn('share')}>
             <Checkbox
