@@ -126,6 +126,7 @@ export type ManagedAgentsBridge = {
     patch: { title?: string; archived?: boolean; lastReadSeq?: number; config?: Record<string, unknown> },
   ): Promise<AgentSession>
   fork(sessionId: string, title?: string): Promise<AgentSession>
+  btw(sessionId: string, requestedConfigOptions?: Record<string, string>): Promise<AgentSession>
   compact(sessionId: string): Promise<void>
   sessionMcp(sessionId: string): Promise<AgentSessionMcp>
   setSessionMcp(sessionId: string, enabled: string[]): Promise<AgentSessionMcp>
@@ -175,6 +176,7 @@ const exportQuerySchema = z.object({
   variant: z.enum(['original', 'redacted']).default('original'),
 })
 const forkBodySchema = z.object({ title: z.string().trim().min(1).max(500).optional() })
+const btwBodySchema = z.object({ requestedConfigOptions: z.record(z.string(), z.string()).optional() })
 const cancelBodySchema = z.object({ turnId: z.string().uuid().optional() })
 const implementPlanBodySchema = z.object({ itemId: z.string().min(1).max(2_000) })
 const attachmentQuerySchema = z.object({ taskId: z.string().uuid() })
@@ -252,6 +254,7 @@ export const managedAgents = new Hono<AppEnv>()
       '/sessions/:sessionId/implement-plan',
       '/sessions/:sessionId/requests/:requestId/resolve',
       '/sessions/:sessionId/fork',
+      '/sessions/:sessionId/btw',
       '/sessions/:sessionId/compact',
       '/sessions/:sessionId/regenerate-title',
       '/sessions/:sessionId/handoff-terminal',
@@ -566,6 +569,13 @@ export const managedAgents = new Hono<AppEnv>()
     const parsed = forkBodySchema.safeParse(await c.req.json().catch(() => ({})))
     if (!parsed.success) return respondError(c, 400, 'bad_request')
     return viaBridge(c, MANAGED_AGENTS, (bridge) => bridge.fork(c.req.param('sessionId'), parsed.data.title))
+  })
+  .post('/sessions/:sessionId/btw', async (c) => {
+    const parsed = btwBodySchema.safeParse(await c.req.json().catch(() => ({})))
+    if (!parsed.success) return respondError(c, 400, 'bad_request')
+    return viaBridge(c, MANAGED_AGENTS, (bridge) =>
+      bridge.btw(c.req.param('sessionId'), parsed.data.requestedConfigOptions),
+    )
   })
   .post('/sessions/:sessionId/compact', (c) =>
     viaBridge(c, MANAGED_AGENTS, async (bridge) => {

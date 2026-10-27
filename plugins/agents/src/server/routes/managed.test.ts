@@ -65,6 +65,7 @@ const METHODS = [
   'implementCodexPlan',
   'patchSession',
   'fork',
+  'btw',
   'compact',
   'regenerateTitle',
   'summarizeSession',
@@ -121,6 +122,7 @@ const executionControls = [
   ['PATCH', '/sessions/s1/turns/t1', { ordinal: 0 }, 'patchQueuedTurn'],
   ['POST', '/sessions/s1/requests/r1/resolve', { resolution: { decision: 'accept' } }, 'resolveRequest'],
   ['POST', '/sessions/s1/fork', {}, 'fork'],
+  ['POST', '/sessions/s1/btw', { requestedConfigOptions: { mode: 'plan' } }, 'btw'],
   ['POST', '/sessions/s1/compact', undefined, 'compact'],
   ['POST', '/sessions/s1/regenerate-title', undefined, 'regenerateTitle'],
   ['POST', '/sessions/s1/summarize', { backendId: 'harness:codex', context: 'For a handoff' }, 'summarizeSession'],
@@ -344,6 +346,7 @@ describe('a task-scoped credential is confined to its own agent sessions', () =>
       expect((await app.fetch(req(`/api/sessions/${sessionId}/artifacts`), {} as Env)).status).toBe(404)
       expect((await app.fetch(req(`/api/sessions/${sessionId}/cancel`, 'POST', {}), {} as Env)).status).toBe(404)
       expect((await app.fetch(req(`/api/sessions/${sessionId}/fork`, 'POST', {}), {} as Env)).status).toBe(403)
+      expect((await app.fetch(req(`/api/sessions/${sessionId}/btw`, 'POST', {}), {} as Env)).status).toBe(403)
       expect((await app.fetch(req(`/api/sessions/${sessionId}/compact`, 'POST'), {} as Env)).status).toBe(403)
       expect((await app.fetch(req(`/api/sessions/${sessionId}/regenerate-title`, 'POST'), {} as Env)).status).toBe(403)
       expect((await app.fetch(req(`/api/sessions/${sessionId}/handoff-terminal`, 'POST'), {} as Env)).status).toBe(403)

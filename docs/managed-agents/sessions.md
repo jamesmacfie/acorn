@@ -8,7 +8,7 @@ it gets a title. The runtime is in `plugins/agents/src/server/sessions/`.
 
 The paired desktop, terminal client, and headless CLI act with device authority. These actions need a
 device principal: create a session, import a transcript, change configuration, delete, create or edit
-a turn, implement a plan, fork, compact, generate a title, hand off to a terminal, resume, verify an
+a turn, implement a plan, fork, start a side question, compact, generate a title, hand off to a terminal, resume, verify an
 imported resume, and resolve a request. Service and task credentials get `403` before the runtime
 runs. A task credential can't answer its own permission, question, or elicitation request for a
 person.
@@ -81,6 +81,31 @@ The run pane also uses the IDs to find a running step's session, before the step
 change, or remove them. Dedicated MCP selection can change the server list after it checks Settings.
 A fork carries its source's identity and authority snapshots. `kind: 'workflow'` and the workflow
 config marker both exclude a session from managed delegation.
+
+## Side questions
+
+`POST /sessions/:id/btw` starts a side session that answers questions about its source while the
+source keeps working. The body is `{ requestedConfigOptions?: Record<string, string> }`. The new
+session runs on the source's harness and profile, with `parentSessionId` set to the source and
+`origin: { kind: 'btw', sourceSessionId }`. The route answers once the row is stored, and the harness
+starts behind it, as for any interactive create.
+
+Unlike a fork, a side question doesn't wait for the source's turn to end, and it never asks the harness
+for a native fork. It always copies the transcript from stored events (`buildForkContext`), so the copy
+holds the running turn's events up to the moment you ask, and nothing after. The copy goes on the side
+session's `config.pendingForkContext`, which the composer attaches to its first draft. Streamed text
+the Node hasn't stored yet, at most about 40 milliseconds of it, misses the copy. The copy keeps the
+last 200 events and 100,000 characters (`renderSessionConversation`), so a long session costs at most
+about 25,000 tokens a question. The source's queue, drafts, attention, and events stay as they were.
+
+The side session keeps its source's config, identity, and authority snapshots, the same as a fork.
+`requestedConfigOptions` replaces the source's, and the runtime applies it once the harness lists its
+options, as it does for an inline diff chat. A caller sends the harness's read-only permission value
+there. An unknown source gets `404`, and a source on an archived task gets the same refusal as a fork.
+
+`origin` is a union narrowed on `kind`: `inline-diff` for an inline diff chat, and `btw` for a side
+question. A session with any origin stays out of the main session list, and starts on the options it
+asked for rather than the owner's saved defaults.
 
 ## Roster reads
 

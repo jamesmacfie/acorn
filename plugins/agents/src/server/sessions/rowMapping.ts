@@ -1,5 +1,4 @@
 import type * as schema from '../../node/schema'
-import type { InlineDiffOrigin } from '../../contract/inlineDiff.ts'
 import type {
   AgentEventRecord,
   AgentGoalVerdict,
@@ -8,6 +7,7 @@ import type {
   AgentNormalizedEvent,
   AgentRequest,
   AgentSession,
+  AgentSessionOrigin,
   AgentSubagent,
   AgentTurn,
   AgentUsage,
@@ -28,7 +28,7 @@ export const mapAgentSession = (row: typeof schema.agentSessions.$inferSelect): 
   providerId: row.providerId,
   profileId: row.profileId,
   kind: row.kind as AgentSession['kind'],
-  origin: parseJson<InlineDiffOrigin | null>(row.originJson, null),
+  origin: parseJson<AgentSessionOrigin | null>(row.originJson, null),
   driverKind: row.driverKind,
   driverVersion: row.driverVersion,
   providerSessionRef: row.providerSessionRef,

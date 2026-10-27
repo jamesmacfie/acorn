@@ -327,7 +327,13 @@ export function createChangesModel(task: Task, pane: PaneModelContext & { paneSh
     const current = topology()
     const visible = (inline()?.sessionsForTask(task.id) ?? []).flatMap((session) => {
       const origin = session.origin
-      if (!origin || origin.source !== 'changes' || origin.scope !== scope() || session.archivedAt) return []
+      if (
+        origin?.kind !== 'inline-diff' ||
+        origin.source !== 'changes' ||
+        origin.scope !== scope() ||
+        session.archivedAt
+      )
+        return []
       if (current?.files.find((file) => file.path === origin.path)?.patchKey !== origin.patchKey) return []
       return [{ path: origin.path, side: origin.side, line: origin.line }]
     })
@@ -411,7 +417,12 @@ export function createChangesModel(task: Task, pane: PaneModelContext & { paneSh
             if (!origin || !inline()?.Card) return null
             const exists = inline()
               ?.sessionsForTask(task.id)
-              .some((session) => session.origin && sameInlineLine(session.origin, origin) && !session.archivedAt)
+              .some(
+                (session) =>
+                  session.origin?.kind === 'inline-diff' &&
+                  sameInlineLine(session.origin, origin) &&
+                  !session.archivedAt,
+              )
             return exists || (openInline() && sameInlineLine(openInline()!, origin)) ? origin : null
           },
           null,

@@ -568,7 +568,7 @@ export class ManagedAgentRuntime {
       // still starts on the owner's reasoning level. Not for a fork, which copies the snapshot with the
       // rest of its source's config and continues at the settings its source was running.
       const startsFromAgent = !!sessionCustomAgent(session.config) && !session.parentSessionId
-      if (session.kind === 'delegated' || session.origin?.kind === 'inline-diff' || startsFromAgent) {
+      if (session.kind === 'delegated' || session.origin || startsFromAgent) {
         const requested = session.config.requestedConfigOptions
         if (requested && typeof requested === 'object' && !Array.isArray(requested)) {
           const values = Object.fromEntries(
@@ -998,6 +998,33 @@ export class ManagedAgentRuntime {
         forkKind: providerForkRef ? 'provider-native' : 'acorn-context-copy',
         forkSourceSessionId: source.id,
         ...(pendingForkContext ? { pendingForkContext } : {}),
+      },
+    })
+  }
+
+  /**
+   * Starts a side session that can answer questions about `sessionId` while its turn runs. Unlike
+   * fork it never waits for the turn or asks the harness for a native fork: the copy is read from
+   * stored events, so it freezes the source as it is now and leaves the source's queue untouched.
+   */
+  async btw(sessionId: string, requestedConfigOptions?: Record<string, string>): Promise<AgentSession> {
+    const source = await this.store.requireSession(sessionId)
+    const pendingForkContext = await this.engine.forkContext(source)
+    const { requestedConfigOptions: _sourceRequested, ...config } = source.config
+    return this.acceptSession({
+      taskId: source.taskId,
+      providerId: source.providerId,
+      profileId: source.profileId,
+      title: `Side question: ${source.title}`,
+      kind: 'interactive',
+      origin: { kind: 'btw', sourceSessionId: source.id },
+      parentSessionId: source.id,
+      config: {
+        ...config,
+        forkKind: 'acorn-context-copy',
+        forkSourceSessionId: source.id,
+        pendingForkContext,
+        ...(requestedConfigOptions ? { requestedConfigOptions } : {}),
       },
     })
   }

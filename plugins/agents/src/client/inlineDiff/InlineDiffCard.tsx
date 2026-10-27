@@ -58,7 +58,10 @@ export default function InlineDiffCard(props: Props) {
   const matches = createMemo(() =>
     managedAgentStore
       .sessionsForTask(props.origin.taskId)
-      .filter((session) => session.origin && sameInlineLine(session.origin, props.origin) && !session.archivedAt)
+      .filter(
+        (session) =>
+          session.origin?.kind === 'inline-diff' && sameInlineLine(session.origin, props.origin) && !session.archivedAt,
+      )
       .sort((a, b) => b.createdAt - a.createdAt),
   )
   const session = createMemo(() =>
@@ -171,7 +174,7 @@ export default function InlineDiffCard(props: Props) {
         const context = firstTurn ? await props.loadContext().catch(() => props.origin.quote) : ''
         owner.check()
         const instruction =
-          target.origin?.access === 'read-only'
+          target.origin?.kind === 'inline-diff' && target.origin.access === 'read-only'
             ? 'Please answer without changing files or running write commands.\n\n'
             : ''
         prompt = firstTurn

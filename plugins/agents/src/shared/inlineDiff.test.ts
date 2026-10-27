@@ -38,4 +38,17 @@ describe('inline diff session origin', () => {
       createAgentSessionSchema.safeParse({ ...input, origin: { ...origin, source: 'pull-request' } }).success,
     ).toBe(false)
   })
+
+  it('accepts a btw origin only with its source session id', () => {
+    const input = { taskId: origin.taskId, providerId: 'codex', profileId: 'codex', kind: 'interactive', config: {} }
+    const sourceSessionId = '0c59631c-2f15-4f22-93af-e76e3b81e517'
+    expect(createAgentSessionSchema.safeParse({ ...input, origin: { kind: 'btw', sourceSessionId } }).success).toBe(
+      true,
+    )
+    expect(createAgentSessionSchema.safeParse({ ...input, origin: { kind: 'btw' } }).success).toBe(false)
+    expect(
+      createAgentSessionSchema.safeParse({ ...input, kind: 'workflow', origin: { kind: 'btw', sourceSessionId } })
+        .success,
+    ).toBe(false)
+  })
 })

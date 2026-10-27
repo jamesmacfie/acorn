@@ -204,6 +204,8 @@ export const managedAgentApi = {
   remove: (sessionId: string) => jsonWrite<AgentDeleteResult>(sessionRoute(sessionId), 'DELETE'),
   fork: (sessionId: string, title?: string) =>
     jsonWrite<AgentSession>(sessionRoute(sessionId, '/fork'), 'POST', title ? { title } : {}),
+  btw: (sessionId: string, requestedConfigOptions?: Record<string, string>) =>
+    jsonWrite<AgentSession>(sessionRoute(sessionId, '/btw'), 'POST', { requestedConfigOptions }),
   compact: (sessionId: string) => jsonWrite<{ ok: true }>(sessionRoute(sessionId, '/compact'), 'POST'),
   mcp: (sessionId: string) => readJson<AgentSessionMcp>(sessionRoute(sessionId, '/mcp')),
   setMcp: (sessionId: string, enabled: string[]) =>

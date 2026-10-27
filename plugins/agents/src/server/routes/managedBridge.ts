@@ -177,6 +177,7 @@ export function managedAgentsBridge(
       guarded(() => runtime.resolveRequest(sessionId, requestId, resolution, idempotencyKey)),
     patchSession: (sessionId, patch) => guarded(() => runtime.patchSession(sessionId, patch)),
     fork: (sessionId, title) => guarded(() => runtime.fork(sessionId, title)),
+    btw: (sessionId, requestedConfigOptions) => guarded(() => runtime.btw(sessionId, requestedConfigOptions)),
     compact: (sessionId) => guarded(() => runtime.compact(sessionId)),
     sessionMcp: (sessionId) => guarded(() => runtime.sessionMcp(sessionId)),
     setSessionMcp: (sessionId, enabled) => guarded(() => runtime.setSessionMcpServers(sessionId, enabled)),

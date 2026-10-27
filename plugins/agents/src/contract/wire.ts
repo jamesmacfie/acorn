@@ -451,13 +451,19 @@ export type AgentNormalizedEvent =
   | { type: 'error'; code: string; message: string; retryable: boolean }
   | { type: 'diagnostic'; level: 'info' | 'warning'; message: string }
 
+/** A side question asked beside a running session. The side session copies its source's transcript. */
+type BtwOrigin = { kind: 'btw'; sourceSessionId: string }
+
+/** Why a session exists apart from the managed-sessions list. Readers narrow on `kind`. */
+export type AgentSessionOrigin = InlineDiffOrigin | BtwOrigin
+
 export type AgentSession = {
   id: string
   taskId: string
   providerId: string
   profileId: string
   kind: AgentSessionKind
-  origin?: InlineDiffOrigin | null
+  origin?: AgentSessionOrigin | null
   driverKind: string
   driverVersion: string
   providerSessionRef: string | null

@@ -2,6 +2,7 @@ import { agentTelemetry, startAgentView } from './agentTelemetry'
 import { createMemo, createEffect, onCleanup, Show } from 'solid-js'
 import type { Task } from '@acorn/plugin-api/client'
 import type { AgentSession } from '../../contract/wire.ts'
+import type { InlineDiffOrigin } from '../../contract/inlineDiff.ts'
 import { AGENT_SESSION_POINT } from '@acorn/protocol/extensionPoints.ts'
 import { InlineAnnotationMarks } from '@acorn/plugin-api/ui/host'
 import {
@@ -102,6 +103,8 @@ export function AgentSidebarHeader(props: { task: Task; model: AgentPaneModel })
   return <SectionHeader count={model.taskSessions().length}>Agents</SectionHeader>
 }
 
+type InlineDiffSession = AgentSession & { origin: InlineDiffOrigin }
+
 /** A session or subagent row's tooltip. `updatedAt` rather than the newest event's time: the node
  *  rebroadcasts the row only when an event changes something else on it (`SessionFrames.rowChanged`),
  *  such as a turn ending or a subagent finishing, so a running one reads as of its last state change. */
@@ -187,7 +190,7 @@ export default function AgentTaskSidebar(props: { task: Task; model: AgentPaneMo
   const inlineSessions = createMemo(() =>
     model
       .taskSessions()
-      .filter((session) => session.origin?.kind === 'inline-diff')
+      .filter((session): session is InlineDiffSession => session.origin?.kind === 'inline-diff')
       .sort(compareSessions(sessionOrderFor(props.task.id, 'inline'))),
   )
   const inlineNeedsYou = createMemo(
