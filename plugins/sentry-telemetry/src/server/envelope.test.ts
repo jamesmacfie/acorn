@@ -10,13 +10,18 @@ import {
   traceKept,
   type EnvelopeOptions,
 } from './envelope'
-import { DEFAULT_SETTINGS } from '../shared/settings'
+import { DEFAULT_SETTINGS, TEAM_SETTINGS } from '../shared/settings'
 
 const TRACE = 'a'.repeat(32)
 const OTHER_TRACE = 'b'.repeat(32)
 const hex16 = (seed: string) => seed.repeat(16).slice(0, 16)
 
-const batchOf = (records: TelemetryRecord[]): TelemetryBatch => ({ node: 'node-1', version: '1.0.0', records })
+const batchOf = (records: TelemetryRecord[]): TelemetryBatch => ({
+  node: 'node-1',
+  version: '1.0.0',
+  official: [],
+  records,
+})
 
 // Ids are the one thing a test cannot match, so it supplies them: `id-1`, `id-2`, in call order.
 const options = (overrides: Partial<EnvelopeOptions> = {}): EnvelopeOptions => {
@@ -89,6 +94,13 @@ describe('errors', () => {
       mechanism: { type: 'auto.telemetry.acorn', handled: false },
     })
     expect(payload.exception.values[0].stacktrace.frames).toHaveLength(1)
+  })
+
+  it("names the dist beside the release, so Sentry finds that platform's source maps", () => {
+    expect(payloadOf(buildEnvelopes(batchOf([failure]), options({ dist: 'darwin-arm64' }))[0]).dist).toBe(
+      'darwin-arm64',
+    )
+    expect(payloadOf(buildEnvelopes(batchOf([failure]), options())[0])).not.toHaveProperty('dist')
   })
 
   it('leaves the stack off when the owner turned stacks off', () => {
@@ -419,6 +431,24 @@ describe('logs and events', () => {
       level: 'info',
       body: 'ws.shed',
     })
+  })
+
+  it('keeps events as breadcrumbs only under the team policy', () => {
+    const event: TelemetryRecord = { kind: 'event', at: 4, name: 'ws.shed', attrs: { channel: 'tasks' } }
+    expect(buildEnvelopes(batchOf([event]), options({ settings: TEAM_SETTINGS }))).toEqual([])
+
+    const failure: TelemetryRecord = {
+      kind: 'error',
+      at: 5,
+      name: 'RangeError',
+      message: 'stack',
+      level: 'error',
+      handled: true,
+      attrs: {},
+    }
+    const envelopes = buildEnvelopes(batchOf([event, failure]), options({ settings: TEAM_SETTINGS }))
+    expect(envelopes).toHaveLength(1)
+    expect(payloadOf(envelopes[0]).breadcrumbs.values[0]).toMatchObject({ category: 'ws.shed' })
   })
 
   it('keeps interaction work as an error breadcrumb without exporting a standalone log', () => {

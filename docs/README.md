@@ -369,7 +369,8 @@ Each feature landing page above has topic pages in a folder of the same name:
   providers](./integrations/model-providers.md), [Project
   sources](./integrations/project-sources.md), [Provider
   boundaries](./integrations/provider-boundaries.md), [Rollbar](./integrations/rollbar.md),
-  [Sentry](./integrations/sentry.md), [Connection settings](./integrations/settings.md).
+  [Sentry](./integrations/sentry.md) ([The acorn team's
+  DSN](./integrations/sentry/the-acorn-teams-dsn.md)), [Connection settings](./integrations/settings.md).
 - [data-sources.md](./data-sources.md): [Data source authoring
   controls](./data-sources/authoring-controls.md), [Source catalog](./data-sources/catalog.md), [Derived
   sources](./data-sources/derived-sources.md), [Provider data

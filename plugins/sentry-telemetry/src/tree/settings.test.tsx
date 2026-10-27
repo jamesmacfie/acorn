@@ -32,11 +32,22 @@ function applied(ops: TreeMutation[]): Map<string, TreeNode> {
   return nodes
 }
 
-function mount(stored: unknown) {
+function mount(
+  stored: unknown,
+  environment: string | null = null,
+  team: { shareable: boolean; shared?: unknown } = { shareable: false },
+) {
   const ops: TreeMutation[] = []
   const root = createRemoteRoot((batch) => ops.push(...batch))
   const set = vi.fn(async () => {})
-  const bridge = { state: { get: async () => stored, set } } as unknown as AcornBridge
+  const get = vi.fn(async (path: string) => {
+    if (path !== '/v1/p/sentry-telemetry/source') throw new Error(`no route ${path}`)
+    return { environment, shareable: team.shareable }
+  })
+  const bridge = {
+    state: { get: async (key: string) => (key === 'share' ? team.shared : stored), set },
+    api: { get },
+  } as unknown as AcornBridge
   solidTree(SentrySettingsPage)(bridge, {
     entry: 'settings',
     root,
@@ -119,6 +130,37 @@ describe('the Sentry export settings page', () => {
     const text = [...applied(page.ops).values()].map((node) => JSON.stringify(node.props)).join(' ')
     expect(text).toContain('turn on Telemetry')
     expect(text).toContain('connect Sentry in Services')
+    page.root.dispose()
+  })
+
+  it('names the project and the variable when the DSN comes from the environment', async () => {
+    const page = mount(null, 'o7.ingest.de.sentry.io/7654321')
+    await settle()
+    const sending = [...applied(page.ops).values()].find((node) => node.props.id === 'sending')
+    expect(sending?.props.description).toBe('Sending to o7.ingest.de.sentry.io/7654321 from ACORN_SENTRY_DSN.')
+    page.root.dispose()
+  })
+
+  it('offers Share with the acorn team, off, only when the node says the team DSN would be used', async () => {
+    const page = mount(null, null, { shareable: true })
+    await settle()
+    expect(page.checkbox('Share with the acorn team')?.props.checked).toBe(false)
+    const sharing = [...applied(page.ops).values()].find((node) => node.props.id === 'sharing')
+    expect(sharing?.props.description).toContain('errors')
+    expect(sharing?.props.description).toContain('Sentry')
+    page.press('Share with the acorn team', true)
+    await settle()
+    expect(page.set).toHaveBeenCalledWith('share', true)
+    expect(page.checkbox('Share with the acorn team')?.props.checked).toBe(true)
+    const sending = [...applied(page.ops).values()].find((node) => node.props.id === 'sending')
+    expect(sending?.props.description).toContain('fixed choices')
+    page.root.dispose()
+  })
+
+  it('shows a stored share as on', async () => {
+    const page = mount(null, null, { shareable: true, shared: true })
+    await settle()
+    expect(page.checkbox('Share with the acorn team')?.props.checked).toBe(true)
     page.root.dispose()
   })
 })

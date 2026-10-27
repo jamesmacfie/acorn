@@ -60,6 +60,18 @@ const packageFingerprint = (root: string): string => {
   return hash.digest('hex')
 }
 
+/** Whether the package at `dir` is still the exact bundle reconciliation recorded for `id`. False for
+ * anything an owner installed, edited, or built over it since. */
+export function matchesBundledFingerprint(dataRoot: string, id: string, dir: string): boolean {
+  const state = readBundledPluginState(dataRoot, id)
+  if (state?.status !== 'installed') return false
+  try {
+    return packageFingerprint(dir) === state.fingerprint
+  } catch {
+    return false
+  }
+}
+
 const packageManifest = (dir: string, expectedId: string): PluginManifest => {
   // The result form, so a bundled package that fails reconciliation names the field that broke
   // rather than saying "invalid". This sentence prints at boot and is the only account anyone gets

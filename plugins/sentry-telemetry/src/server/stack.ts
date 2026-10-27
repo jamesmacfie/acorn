@@ -14,6 +14,11 @@
 // The paths here have already been through core's scrubber, so a home directory reads as `~` and
 // the data root as `<data>` (docs/telemetry/model.md § What never leaves the machine).
 //
+// A packaged file's path depends on where the app is installed, so a packaged Node frame gets the
+// fixed name its source map was uploaded under, `app:///helper/…` or `app:///plugins/<id>/dist/…`
+// (docs/integrations/sentry/the-acorn-teams-dsn.md § Readable stacks). Renderer frames are URLs
+// already, and Sentry matches their path whatever the scheme and host.
+//
 // No acorn imports.
 
 export type SentryStackFrame = {
@@ -31,6 +36,14 @@ const FRAME = /^\s*at\s+(?:(?<fn>.+?)\s+\()?(?<loc>[^()]+?)\)?$/
 // WebKit writes `fn@app://acorn/file.js:1:2`, `@url:1:2`, and `fn@[native code]`.
 const WEBKIT_FRAME = /^(?<fn>.*?)@(?<loc>.+:\d+(?::\d+)?|\[native code\])$/
 const LOCATION = /^(?<file>.*?)(?::(?<line>\d+))?(?::(?<col>\d+))?$/
+// The last `helper/` or `plugins/<id>/dist/` in the path, as the packaged app and the data root lay
+// them out. Only `.js`, so a frame from TypeScript source run in a checkout keeps its real path.
+const PACKAGED = /^.*[\\/](helper|plugins[\\/][^\\/]+[\\/]dist)[\\/]([^:]+\.js)$/
+
+const uploadedName = (file: string): string => {
+  const packaged = PACKAGED.exec(file)
+  return packaged ? `app:///${packaged[1]}/${packaged[2]}`.replaceAll('\\', '/') : file
+}
 
 /** How many frames one error may carry. Sentry keeps 50 server-side, so more is bytes nobody sees. */
 const MAX_FRAMES = 50
@@ -51,9 +64,10 @@ export function parseStack(stack: string): SentryStackFrame[] {
     if (!file && !fn) continue
     const lineno = Number(location?.groups?.line)
     const colno = Number(location?.groups?.col)
+    const name = file && uploadedName(file)
     frames.push({
       ...(fn ? { function: fn } : {}),
-      ...(file ? { filename: file, abs_path: file } : {}),
+      ...(name ? { filename: name, abs_path: name } : {}),
       ...(Number.isFinite(lineno) ? { lineno } : {}),
       ...(Number.isFinite(colno) ? { colno } : {}),
       in_app: !!file && !file.includes('node_modules') && !file.startsWith('node:'),

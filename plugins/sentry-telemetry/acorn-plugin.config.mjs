@@ -28,6 +28,8 @@
 //   exec: false — nothing here spawns anything.
 //   net — the worker enforces these patterns for Sentry-hosted ingestion. A DSN names its own host,
 //     so `o<org>.ingest.<region>.sentry.io` is covered by one subdomain label under each pattern.
+//   env: ['ACORN_SENTRY_DSN'] — a developer's DSN, used when no connection exists, so their own node
+//     exports with no Settings step. A DSN can only send, so the worker seeing it widens nothing.
 export default {
   name: 'Sentry export',
   // The Sentry mark, as one SVG path's `d` in a 24 box. The host validates the grammar and registers
@@ -45,7 +47,7 @@ export default {
     // backed by `state.get` and `state.set`, which need no scope: a plugin's own state always is.
     api: [],
     events: [],
-    node: { core: ['telemetry', 'prefs', 'identity'], capabilities: [], secrets: false, exec: false, net: ['*.ingest.sentry.io', '*.ingest.us.sentry.io', '*.ingest.de.sentry.io', 'sentry.io'] },
+    node: { core: ['telemetry', 'prefs', 'identity'], capabilities: [], secrets: false, exec: false, net: ['*.ingest.sentry.io', '*.ingest.us.sentry.io', '*.ingest.de.sentry.io', 'sentry.io'], env: ['ACORN_SENTRY_DSN'] },
   },
   contributions: {
     // One surface. There is no pane and no rail source, because this plugin shows nothing: what it
@@ -58,8 +60,9 @@ export default {
       category: 'machines',
       settingsScope: 'node',
       order: 50,
-      // For search. The sections are the ones src/tree/settings.tsx draws.
-      keywords: ['sentry', 'telemetry', 'export', 'sample rate', 'dsn'],
+      // For search. The sections are the ones src/tree/settings.tsx always draws. **Share with the acorn
+      // team** is left out, because most builds don't carry the DSN it needs.
+      keywords: ['sentry', 'telemetry', 'export', 'sample rate', 'dsn', 'share', 'acorn team'],
       sections: [
         { id: 'sending', label: 'What to send', keywords: ['sample rate', 'traces', 'errors', 'logs', 'metrics', 'events'] },
         { id: 'detail', label: 'How much detail', keywords: ['stack traces', 'task ids', 'tags'] },

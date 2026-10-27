@@ -19,7 +19,12 @@ import { SCHEDULER } from '../server/schedules'
 import { Scheduler } from '../server/schedules/scheduler'
 import { buildPluginContext } from '../server/pluginHost/context'
 import { clearRegistrations, recordRegistrationUndo } from '../server/pluginHost/host'
-import { flushTelemetry, onTelemetryBatch, setTelemetryPref } from '../server/telemetry/collector'
+import {
+  flushTelemetry,
+  onTelemetryBatch,
+  setOfficialTelemetryOwners,
+  setTelemetryPref,
+} from '../server/telemetry/collector'
 import { pluginRequestContext } from '../server/pluginHost/requestContext'
 import type {
   CompiledNodePluginContext,
@@ -66,6 +71,9 @@ export type TestNodeContextOptions = {
   // built with nothing seeded has had no boot to mint one. Pass it where the plugin reads the owner
   // off `ctx` rather than off a request: an agent tool, a workflow step, a telemetry sink.
   userId?: string
+  // Name the plugin under test in every batch's `official` list, as the host does for an unedited
+  // bundled package. For a telemetry sink that treats official owners differently.
+  official?: boolean
 }
 
 // The context, plus the handles a test needs to set the world up around it. Flat rather than
@@ -131,6 +139,8 @@ export function makeTestNodeContext(options: TestNodeContextOptions): TestNodeCo
   // record per emit and is the same bargain `startTelemetry` makes.
   const records: TelemetryRecord[] = []
   setTelemetryPref(true)
+  // Set either way, so one context's answer doesn't leak into the next test's.
+  setOfficialTelemetryOwners(options.official ? [name] : [])
   const recorder = onTelemetryBatch((batch) => records.push(...batch.records), name)
 
   const env = testEnv({ DB: core.db, SECRETS: secrets })

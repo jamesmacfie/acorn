@@ -22,13 +22,14 @@ Test code crosses the same seam as production code, through `@acorn/plugin-api/t
 plugin context with a cast. A forged context can't fail when the host's context changes, so the test
 stays green against a shape that no longer exists.
 
-`makeTestNodeContext({ plugin, permissions?, events?, migrations?, userId? })` isn't a mock. It calls the same
+`makeTestNodeContext({ plugin, permissions?, events?, migrations?, userId?, official? })` isn't a mock. It calls the same
 `server/pluginHost/context.ts` the host calls at boot, over a temporary data root, so which tier a test
 gets is the host's decision. Its `cleanup()` runs the host's registration rollback. `userId` binds the
 machine identity, because a context with nothing seeded has no owner and
 `ctx.core.identity.active()` answers null. Pass it where the plugin reads the owner from `ctx`, such
 as an agent tool, a workflow step, or a telemetry sink. `events` is the manifest's `permissions.events`,
-which `ctx.events.on` checks for a loaded plugin, so pass it for a plugin that listens.
+which `ctx.events.on` checks for a loaded plugin, so pass it for a plugin that listens. `official: true`
+names the plugin in every batch's `official` list, for a sink that treats official owners differently.
 
 `makeTestRequestContext` does the same for a loaded plugin's fetch handler: the real
 `PluginRequestContext`, with canned answers for provider calls a test can't make. The testkit also has

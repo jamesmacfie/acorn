@@ -536,6 +536,9 @@ importers:
       '@acorn/plugin-rollbar':
         specifier: workspace:*
         version: link:../../plugins/rollbar
+      '@acorn/plugin-sentry':
+        specifier: workspace:*
+        version: link:../../plugins/sentry
       '@acorn/plugin-sentry-telemetry':
         specifier: workspace:*
         version: link:../../plugins/sentry-telemetry
@@ -2381,6 +2384,34 @@ importers:
       vitest:
         specifier: ^4.1.11
         version: 4.1.11(@types/node@26.0.0)(@vitest/coverage-v8@4.1.11)(jsdom@30.0.1(@noble/hashes@2.4.0))(vite@8.0.16(@types/node@26.0.0)(esbuild@0.28.1)(jiti@2.7.0)(tsx@4.22.4)(yaml@2.9.1))
+
+  plugins/sentry:
+    dependencies:
+      '@acorn/plugin-api':
+        specifier: workspace:*
+        version: link:../../packages/plugin-api
+      '@acorn/protocol':
+        specifier: workspace:*
+        version: link:../../packages/protocol
+      hono:
+        specifier: 4.13.11
+        version: 4.13.11
+      solid-js:
+        specifier: 'catalog:'
+        version: 1.9.13(patch_hash=65eea923f4f776eef56b57c5a42dec9302a3bca00326a0b1bd5334b155da2169)
+    devDependencies:
+      '@types/node':
+        specifier: ^26.0.0
+        version: 26.0.0
+      typescript:
+        specifier: ^6.0.3
+        version: 6.0.3
+      vite:
+        specifier: ^8.0.16
+        version: 8.3.4(@types/node@26.0.0)(esbuild@0.28.1)(jiti@2.7.0)(tsx@4.22.4)(yaml@2.9.1)
+      vitest:
+        specifier: ^4.1.11
+        version: 4.1.11(@types/node@26.0.0)(@vitest/coverage-v8@4.1.11)(jsdom@30.0.1(@noble/hashes@2.4.0))(vite@8.3.4(@types/node@26.0.0)(esbuild@0.28.1)(jiti@2.7.0)(tsx@4.22.4)(yaml@2.9.1))
 
   plugins/sentry-telemetry:
     dependencies:

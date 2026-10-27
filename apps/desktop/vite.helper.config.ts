@@ -24,6 +24,9 @@ export default defineConfig({
     target: 'node24',
     ssr: true,
     minify: 'oxc',
+    // Only for the tag build, which uploads the maps to Sentry and deletes them before packaging
+    // (.github/workflows/build-desktop.yml).
+    sourcemap: process.env.ACORN_RELEASE_SOURCEMAPS ? 'hidden' : false,
     // The notices file is an asset, and an SSR build drops emitted assets without this.
     ssrEmitAssets: true,
     rollupOptions: {

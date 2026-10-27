@@ -1190,6 +1190,7 @@ acorn-plugin-types: member TaskRunConfig.repoConfigHash
 acorn-plugin-types: member TaskRunConfig.repoTargetIds
 acorn-plugin-types: member TaskRunConfig.targets
 acorn-plugin-types: member TelemetryBatch.node
+acorn-plugin-types: member TelemetryBatch.official
 acorn-plugin-types: member TelemetryBatch.records
 acorn-plugin-types: member TelemetryBatch.version
 acorn-plugin-types: member TelemetryErrorInput.attrs

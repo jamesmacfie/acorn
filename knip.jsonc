@@ -87,7 +87,7 @@
     // A type-level test declares its assertions as types nothing imports.
     "**/*.test-d.ts": ["exports", "types"],
     // `acorn-plugin.config.mjs` names the factory as a string (`factory: 'httpPlugin'`).
-    "plugins/{database,http,linear,model-providers,nodes-file,rollbar,sentry-telemetry}/src/node/index.ts": ["exports"],
+    "plugins/{database,http,linear,model-providers,nodes-file,rollbar,sentry,sentry-telemetry}/src/node/index.ts": ["exports"],
     // The account API's published contract. The hosted account service, which lives in another
     // repository, imports its names, so a name nothing here imports is still in use.
     "packages/protocol/src/device/account.ts": ["exports", "types"],

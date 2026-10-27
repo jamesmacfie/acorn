@@ -17,6 +17,7 @@ import { declareBrowserHandoffs } from './browserHandoffs'
 import { declareCodeHost } from './codeHosts'
 import type { HostPluginContext, NodePlugin, PluginStorage } from './types'
 import { createLogger, describeError } from '../telemetry/logger'
+import { setOfficialTelemetryOwners } from '../telemetry/collector'
 import { registerManifestRuntimeContributions } from './runtimeContributions'
 import {
   registerManifestSchedules,
@@ -166,6 +167,14 @@ export async function initPlugins(
   const loadedBindings = new Map(options.loaded ?? [])
   // Compiled into this binary, so there is no copy on disk to load, swap or drop at runtime.
   const builtins = new Set(plugins.filter((plugin) => !options.loaded?.has(plugin.name)).map((plugin) => plugin.name))
+  // Told again whenever a binding changes, so a package reloaded over a bundled one stops counting at
+  // once. A shadowed built-in is in `loadedBindings`, not `builtins`, and its binding is never official.
+  const publishOfficialOwners = (): void =>
+    setOfficialTelemetryOwners([
+      ...builtins,
+      ...[...loadedBindings].filter(([, binding]) => binding.official).map(([name]) => name),
+    ])
+  publishOfficialOwners()
   // A missing env is a composition-root wiring bug, not a plugin's fault, so it is raised here, before
   // anything starts and there is a graph to unwind.
   const requireEnv = (name: string): Env => {
@@ -628,6 +637,7 @@ export async function initPlugins(
     if (!enabled.includes(name)) enabled.push(name)
     contexts.set(name, candidateCtx)
     loadedBindings.set(name, next.binding)
+    publishOfficialOwners()
     const committedRow = roster.find((entry) => entry.name === name)
     if (committedRow) {
       if (next.plugin.emits?.length) committedRow.emits = next.plugin.emits
@@ -677,6 +687,7 @@ export async function initPlugins(
     const index = roster.findIndex((entry) => entry.name === name)
     if (reason === 'removed') {
       loadedBindings.delete(name)
+      publishOfficialOwners()
       disabled.delete(name)
       if (index >= 0) roster.splice(index, 1)
     } else {

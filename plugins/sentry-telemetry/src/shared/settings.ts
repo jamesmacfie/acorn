@@ -25,6 +25,9 @@ export type SentrySettings = {
   stacks: boolean
   /** Send the `task.id` attribute as a Sentry tag. Off drops it from every record on the way out. */
   taskIds: boolean
+  /** Send events as info logs as well as breadcrumbs on an error. Absent means yes. The page never
+   *  shows or stores it, so only `TEAM_SETTINGS` turns it off. */
+  eventLogs?: boolean
 }
 
 /** Everything on, nothing sampled away. A single-user tool produces little, and the owner turning
@@ -34,6 +37,17 @@ export const DEFAULT_SETTINGS: SentrySettings = {
   kinds: { span: true, log: true, event: true, metric: true, error: true },
   stacks: true,
   taskIds: true,
+}
+
+/** What goes to the acorn team's project, whatever the page says. The defaults above assume one
+ *  person's data, and this is sized for many installs. Sentry's spike protection and the client
+ *  key's rate limit are the real cost cap, because a client can't be trusted to limit itself. */
+export const TEAM_SETTINGS: SentrySettings = {
+  sampleRate: 0.05,
+  kinds: { span: true, log: false, event: true, metric: false, error: true },
+  stacks: true,
+  taskIds: false,
+  eventLogs: false,
 }
 
 const bool = (value: unknown, fallback: boolean): boolean => (typeof value === 'boolean' ? value : fallback)
@@ -69,6 +83,10 @@ export function parseSettings(raw: unknown): SentrySettings {
 
 /** The preference key both halves use, relative to the plugin's own namespace. */
 export const SETTINGS_KEY = 'settings'
+
+/** The preference key for **Share with the acorn team**. A row of its own, because it decides where
+ *  records go rather than what the page sends. Only a stored `true` means yes. */
+export const SHARE_KEY = 'share'
 
 /** The provider id, which is also the plugin id. One connection holds the DSN. */
 export const PROVIDER_ID = 'sentry-telemetry'

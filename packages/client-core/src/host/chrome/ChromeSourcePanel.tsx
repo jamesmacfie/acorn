@@ -136,7 +136,13 @@ export function ChromeSourceList(props: ChromeSourcePanelProps) {
   const trackingTask = (item: PluginRailItem): Task | undefined => {
     const link = item.task?.link
     if (!link) return undefined
-    const ref = { providerId: props.descriptor.providerId, displayId: link.identifier, connectionId: link.connectionId }
+    // A source with no `providerId` still links as its plugin, because promotion only accepts a
+    // connection the plugin owns.
+    const ref = {
+      providerId: props.descriptor.providerId ?? props.pluginId,
+      displayId: link.identifier,
+      connectionId: link.connectionId,
+    }
     return (tasks.data ?? []).find((task) => task.status === 'active' && taskTracksRef(task, ref))
   }
   const openTask = (task: Task): void => {

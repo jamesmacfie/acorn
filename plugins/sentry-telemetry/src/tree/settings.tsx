@@ -5,16 +5,23 @@
 // This page is the sink's own three questions: how much, which kinds, and how much detail
 // (docs/telemetry/model.md § The switch).
 //
+// When the DSN comes from `ACORN_SENTRY_DSN` rather than a connection, the node half's `/source`
+// route says so, and the first section names where records go. When the build carries the acorn
+// team's DSN and nothing overrides it, the same route says so, and the page adds **Share with the
+// acorn team**. That switch is its own preference row, and while it's on the team's fixed policy
+// replaces everything else on this page.
+//
 // Every control writes the whole settings object back through `bridge.state`, which is the
 // `plugin:sentry-telemetry:settings` preference row the node half reads on each flush. There is no
 // save button, because there is nothing here that is only half true between two keystrokes.
-import { createResource, createSignal } from 'solid-js'
+import { createResource, createSignal, Show } from 'solid-js'
 import { Checkbox, Select, SettingRow, SettingsSection } from '@acorn/plugin-api/ui/tree'
 import type { AcornBridge } from '@acorn/plugin-api/ui/sdk'
 import {
   DEFAULT_SETTINGS,
   parseSettings,
   SETTINGS_KEY,
+  SHARE_KEY,
   type SentryKindSwitches,
   type SentrySettings,
 } from '../shared/settings'
@@ -45,10 +52,19 @@ const rateValue = (rate: number): string =>
   ).value
 
 /** Which row a write came from, so its error is drawn beside that row and nowhere else. */
-type RowId = 'rate' | keyof SentryKindSwitches | 'stacks' | 'taskIds'
+type RowId = 'rate' | keyof SentryKindSwitches | 'stacks' | 'taskIds' | 'share'
 
 export default function SentrySettingsPage(props: { bridge: AcornBridge }) {
   const [loaded] = createResource(() => props.bridge.state.get<unknown>(SETTINGS_KEY))
+  const [source] = createResource(() =>
+    props.bridge.api
+      .get<{ environment: string | null; shareable: boolean }>('/v1/p/sentry-telemetry/source')
+      .catch(() => null),
+  )
+  const [sharedLoad] = createResource(() => props.bridge.state.get<unknown>(SHARE_KEY))
+  const [sharedEdit, setSharedEdit] = createSignal<boolean | null>(null)
+  const shared = (): boolean => sharedEdit() ?? (sharedLoad.state === 'ready' && sharedLoad() === true)
+  const sharing = (): boolean => Boolean(source()?.shareable) && shared()
   // Seeded from the load and then edited in place. The resource is read once: a re-read on every
   // change would put the round trip between the click and the checkbox moving.
   const [edited, setEdited] = createSignal<SentrySettings | null>(null)
@@ -75,14 +91,46 @@ export default function SentrySettingsPage(props: { bridge: AcornBridge }) {
     }
   }
 
+  async function share(checked: boolean) {
+    const previous = shared()
+    setSharedEdit(checked)
+    setFailure(null)
+    try {
+      await props.bridge.state.set(SHARE_KEY, checked)
+    } catch (err) {
+      setSharedEdit(previous)
+      setFailure({ row: 'share', message: err instanceof Error ? err.message : 'Could not save this choice' })
+    }
+  }
+
+  const sendingDescription = (): string => {
+    const environment = source()?.environment
+    if (environment) return `Sending to ${environment} from ACORN_SENTRY_DSN.`
+    if (sharing()) return 'While you share with the acorn team, acorn uses its own fixed choices, not these.'
+    return 'acorn sends nothing until you turn on Telemetry and connect Sentry in Services.'
+  }
+
   // The host's header already names the page, so the tree starts at its first section.
   return (
     <>
-      <SettingsSection
-        id="sending"
-        label="What to send"
-        description="acorn sends nothing until you turn on Telemetry and connect Sentry in Services."
-      >
+      <Show when={source()?.shareable}>
+        <SettingsSection
+          id="sharing"
+          label="Share with the acorn team"
+          description="Sends this node's errors, with their stacks, and one trace in twenty to the acorn team's project in Sentry, stored in Sentry's United States region. Prompts, agent output, file contents, terminal output, full paths, credentials, and your account ID never go. Collection under Telemetry has to be on too."
+        >
+          <SettingRow label="Share with the acorn team" error={errorOn('share')}>
+            <Checkbox
+              switch
+              ariaLabel="Share with the acorn team"
+              checked={shared()}
+              onChange={(checked: boolean) => void share(checked)}
+            />
+          </SettingRow>
+        </SettingsSection>
+      </Show>
+
+      <SettingsSection id="sending" label="What to send" description={sendingDescription()}>
         <SettingRow label="How many traces to send" error={errorOn('rate')}>
           <Select
             label="How many traces to send"

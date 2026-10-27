@@ -55,6 +55,11 @@ export function init(ctx: NodePluginContext) {
 }
 ```
 
+A batch carries the Node's `node` id, its `version`, and `official`: the plugin ids whose code acorn
+shipped unmodified ([only official plugins](../integrations/sentry/the-acorn-teams-dsn.md#only-official-plugins)).
+A sink that reports somewhere the owner doesn't run can keep only records whose `attrs.owner` is
+`core` or in that list.
+
 A sink sees everything from every owner, which is why it's a grant and not a default, and why the trust
 prompt draws it high ([telemetry sinks](../security/plugin-node-realm.md#telemetry-sinks)).
 
@@ -67,10 +72,14 @@ sinks too.
 ## The Sentry sink
 
 `plugins/sentry-telemetry` is the sink that ships. It's a loaded plugin in the bundled roster, so it's
-on every machine and does nothing until the switch is on and a Sentry DSN is connected in Settings →
-Services. [integrations.md](../integrations/sentry.md#sentry) owns the connection. Its settings page holds
+on every machine and does nothing until the switch is on and it has a DSN. It takes the first of: a
+Sentry DSN connected in Settings → Services, `ACORN_SENTRY_DSN` in the environment
+([the DSN from the environment](../integrations/sentry.md#the-dsn-from-the-environment)), or the
+acorn team's DSN that a release build carries, once the person turns on **Share with the acorn team**
+([the acorn team's DSN](../integrations/sentry/the-acorn-teams-dsn.md)). [integrations.md](../integrations/sentry.md#sentry) owns the connection. Its settings page holds
 what only it can decide: a trace sample rate, which of the five kinds to send, whether to include
-stacks, and whether to send `task.id` as a tag.
+stacks, and whether to send `task.id` as a tag. The team's DSN ignores that page and uses a fixed
+policy sized for many installs.
 
 | Record | Sentry item |
 | --- | --- |

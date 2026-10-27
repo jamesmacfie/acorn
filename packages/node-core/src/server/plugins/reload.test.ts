@@ -20,6 +20,13 @@ import { CapabilityRegistry, capabilityId } from '../pluginHost/capabilities'
 import { BIND_CAPABILITY_CALLER } from '@acorn/protocol/plugin/ids.ts'
 import { dispatchPluginFetch } from '../pluginHost/fetchRoute'
 import { clearRegistrations, initPlugins, type PluginReloadRequest } from '../pluginHost/host'
+import {
+  emitEvent,
+  flushTelemetry,
+  onTelemetryBatch,
+  resetTelemetryForTest,
+  setTelemetryPref,
+} from '../telemetry/collector'
 import type { CompiledNodePluginContext, NodePlugin, PluginStorage } from '../pluginHost/types'
 
 const PLUGIN = 'acme'
@@ -316,6 +323,43 @@ describe('starting and stopping a loaded plugin without a restart', () => {
     expect(row(host)).toMatchObject({ state: 'active' })
     expect(host.roster.filter((entry) => entry.name === PLUGIN)).toHaveLength(1)
     await host.dispose()
+  })
+
+  it('tells telemetry which plugins are official as their bindings come and go', async () => {
+    // What the next batch a sink receives says, read the way a sink reads it.
+    const officialNow = () => {
+      let seen: readonly string[] = []
+      setTelemetryPref(true)
+      const sink = onTelemetryBatch((batch) => {
+        seen = batch.official
+      })
+      emitEvent('core', 'probe')
+      flushTelemetry()
+      sink.dispose()
+      return seen
+    }
+    const compiled: NodePlugin = { name: 'compiled', init: () => {} }
+    const official = { ...binding, official: true as const }
+    try {
+      const host = await initPlugins([compiled, acme('bundled').plugin], {
+        ...hostOptions(),
+        loaded: new Map([[PLUGIN, official]]),
+      })
+      expect(officialNow()).toEqual(['acme', 'compiled'])
+
+      await host.reload(PLUGIN, { plugin: acme('edited').plugin, binding })
+      expect(officialNow()).toEqual(['compiled'])
+
+      await host.reload(PLUGIN, { plugin: acme('bundled again').plugin, binding: official })
+      expect(officialNow()).toEqual(['acme', 'compiled'])
+
+      await host.unload(PLUGIN, 'removed')
+      expect(officialNow()).toEqual(['compiled'])
+      await host.dispose()
+    } finally {
+      clearRegistrations('compiled')
+      resetTelemetryForTest()
+    }
   })
 
   it('stops a removed plugin: routes, tools, context and roster row all go', async () => {

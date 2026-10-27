@@ -19,7 +19,7 @@
 // would be a second copy of the records on disk, in a table with none of the audit trail's closed
 // vocabulary. A restart loses the collector window and every queued envelope.
 import { setTimeout as delay } from 'node:timers/promises'
-import type { Logger, PluginTelemetry, TelemetryBatch } from '@acorn/plugin-api/node'
+import type { Logger, PluginTelemetry, TelemetryBatch, TelemetryRecord } from '@acorn/plugin-api/node'
 import { buildEnvelopes, type SentryDataCategory, type SentryEnvelope } from './envelope'
 import { redactBatch } from './redact'
 import type { SentryDsn } from './dsn'
@@ -27,8 +27,16 @@ import { postEnvelope, type FetchLike, type RateLimit } from './transport'
 import type { SentrySettings } from '../shared/settings'
 
 /** Where the DSN and the two non-secret fields beside it come from, resolved once per flush so
- *  disconnecting stops the export within one window. */
-export type SentryTarget = { dsn: SentryDsn; environment?: string; release?: string }
+ *  disconnecting stops the export within one window. `settings` replaces the owner's, for a DSN
+ *  whose policy isn't theirs to set. `officialOnly` keeps only records owned by core or by a plugin
+ *  the batch names as official, so a half-built plugin can't fill a project its owner doesn't run. */
+export type SentryTarget = {
+  dsn: SentryDsn
+  environment?: string
+  release?: string
+  settings?: SentrySettings
+  officialOnly?: true
+}
 
 export type ExporterDeps = {
   fetch: FetchLike
@@ -60,6 +68,13 @@ export type Exporter = {
   /** Everything accepted so far, converted and posted. Tests await this; nothing else calls it. */
   settled(): Promise<void>
   dispose(): void
+}
+
+/** Each record on its own, with no re-parenting: a core span whose child came from an unofficial
+ *  plugin keeps its place, and Sentry shows the gap as untracked time. */
+function officialRecords(batch: TelemetryBatch): TelemetryRecord[] {
+  const official = new Set(['core', ...batch.official])
+  return batch.records.filter((record) => official.has(String(record.attrs.owner)))
 }
 
 export function createExporter(deps: ExporterDeps): Exporter {
@@ -126,14 +141,16 @@ export function createExporter(deps: ExporterDeps): Exporter {
     // No connection is the off state, and it is the ordinary one. Nothing is queued, so connecting
     // later does not send the last hour of a machine nobody had pointed at Sentry yet.
     if (stopped || !target) return
-    const settings = await deps.settings()
+    const settings = target.settings ?? (await deps.settings())
     if (stopped) return
-    const clean = redactBatch(batch, { taskIds: settings.taskIds, stacks: settings.stacks })
+    const redacted = redactBatch(batch, { taskIds: settings.taskIds, stacks: settings.stacks })
+    const clean = target.officialOnly ? { ...redacted, records: officialRecords(redacted) } : redacted
     for (const envelope of buildEnvelopes(clean, {
       settings,
       newId: deps.newId,
       ...(target.environment ? { environment: target.environment } : {}),
-      ...(target.release ? { release: target.release } : {}),
+      // The tag build uploads each platform's source maps under this dist (.github/workflows/build-desktop.yml).
+      ...(target.release ? { release: target.release, dist: `${process.platform}-${process.arch}` } : {}),
     })) {
       if (limitedNow(envelope.category)) {
         dropped(1, 'rate-limited', envelope.category)

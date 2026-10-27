@@ -32,7 +32,8 @@ winpty and ConPTY sources, and the staged app never rebuilds the addon. A node-p
 change requires review of the policy and its target fixtures.
 The Node build minifies with Oxc and keeps function and class names. It writes hidden source maps and
 a chunk graph, `startup-graph.json`, into `apps/node/dist`. Staging and the standalone tarball leave
-both out. `apps/node/scripts/check-service-budget.mjs` runs after the build and fails it when `service.js`
+both out, except in a tag build that uploads the maps to Sentry and deletes them before packaging
+([readable stacks](../integrations/sentry/the-acorn-teams-dsn.md#readable-stacks)). `apps/node/scripts/check-service-budget.mjs` runs after the build and fails it when `service.js`
 and its static imports pass a byte ceiling. It reads the chunk graph, so formatting can't change what
 it counts. Both builds write the license text of every bundled
 package beside their output, as `THIRD-PARTY-NOTICES.txt` and `helper-THIRD-PARTY-NOTICES.txt`.

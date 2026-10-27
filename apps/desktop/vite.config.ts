@@ -68,6 +68,9 @@ export default defineConfig({
   build: {
     outDir: resolve(import.meta.dirname, 'dist/client'),
     emptyOutDir: true,
+    // Only for the tag build, which uploads the maps to Sentry and deletes them before packaging
+    // (.github/workflows/build-desktop.yml).
+    sourcemap: process.env.ACORN_RELEASE_SOURCEMAPS ? 'hidden' : false,
     rollupOptions: {
       input: resolve(import.meta.dirname, 'index.html'),
       // Importing a kit component module does nothing that matters unless one of its components is

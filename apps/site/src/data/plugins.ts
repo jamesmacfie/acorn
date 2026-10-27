@@ -241,6 +241,27 @@ export const PLUGINS = {
       'node.net:api.rollbar.com': "Reads errors and their occurrences through Rollbar's API.",
     },
   },
+  sentry: {
+    name: 'Sentry',
+    sentence:
+      "Lists a Sentry project's unresolved issues in the rail, shows each with its latest stack trace, and starts a task from one.",
+    icon: 'bug',
+    ships: 'package',
+    worksIn: both,
+    docs: '/docs/built-in-plugins/sentry/',
+    reasons: {
+      'api:core.tasks:read': 'Finds the issues the open task links to.',
+      'node.core:projects:read': "Finds the Sentry connections the project you're in follows.",
+      'node.net:sentry.io': "Reads issues and their latest events through Sentry's API.",
+      'node.net:us.sentry.io': "Reads issues through Sentry's US address.",
+      'node.net:de.sentry.io': "Reads issues through Sentry's EU address.",
+      'node.env:ACORN_SENTRY_TOKEN':
+        'Reads an auth token from the environment, for when you start the Node with one and skip the connection.',
+      'node.env:ACORN_SENTRY_ORG': "Reads the organization that token's issues come from.",
+      'node.env:ACORN_SENTRY_PROJECT': 'Reads the project whose issues the rail lists.',
+      'node.env:ACORN_SENTRY_URL': "Reads which Sentry region to ask, if it isn't the US one.",
+    },
+  },
   'sentry-telemetry': {
     name: 'Sentry telemetry',
     sentence: "Sends the Node's own errors, logs, and timings to your Sentry project, when you turn it on.",
@@ -258,6 +279,8 @@ export const PLUGINS = {
       'node.net:*.ingest.us.sentry.io': "Sends records to Sentry's US ingest address.",
       'node.net:*.ingest.de.sentry.io': "Sends records to Sentry's EU ingest address.",
       'node.net:sentry.io': 'Sends records to Sentry.',
+      'node.env:ACORN_SENTRY_DSN':
+        'Reads a DSN from the environment, for when you start the Node with one and skip the connection.',
     },
   },
   terminal: {

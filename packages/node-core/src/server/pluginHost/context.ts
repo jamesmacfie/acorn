@@ -144,6 +144,9 @@ export type LoadedPluginBinding = {
   // absolute one. Host-side only: this is a path on the node's filesystem and must never reach a route
   // (server/plugins/loader.ts § InstalledPluginInfo).
   dir?: string
+  // The app's own bundled bytes, unshadowed and unedited, so its telemetry may reach the acorn team's
+  // Sentry project (../telemetry/collector.ts § setOfficialTelemetryOwners).
+  official?: true
 }
 
 export type PluginContextOptions = {

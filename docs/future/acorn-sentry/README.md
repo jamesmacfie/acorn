@@ -1,6 +1,6 @@
 # Sentry: issues in the rail, and telemetry from environment variables
 
-Date: October 17, 2026. Revised October 26, 2026. Status: proposed. Implementation not started.
+Date: October 17, 2026. Revised October 26, 2026. Status: all six phases implemented October 27, 2026. Each phase doc opens with its completion note.
 
 This folder plans two Sentry plugins. The exporter, `sentry-telemetry`, already ships. It sends a
 Node's own telemetry to whatever DSN someone pastes into Settings. This programme lets the exporter
@@ -53,6 +53,7 @@ hurt, which is unlikely while installs are few.
 | `ACORN_SENTRY_URL` | `sentry`, at run time | A developer's environment. Defaults to `https://sentry.io`. | No |
 | `SENTRY_AUTH_TOKEN` | `sentry-cli`, in the tag build | Repository secret | Yes. Can write releases across the organization. |
 | `SENTRY_ORG`, `SENTRY_PROJECT` | `sentry-cli`, in the tag build | Repository variables | No |
+| `ACORN_RELEASE_SOURCEMAPS` | The desktop build, which writes hidden source maps for the upload | The tag build, set to `1` when the token and both variables exist | No |
 
 The build reads a different name from the run-time one on purpose. A developer with
 `ACORN_SENTRY_DSN` in their shell who runs a desktop build doesn't bake it into the bundle.

@@ -26,8 +26,9 @@ pnpm --filter @acorn/node build:plugin rollbar -- --package-root /tmp/maps --sou
 pnpm --filter @acorn/node locate-stack -- --dist /tmp/maps/rollbar/dist < stack.txt
 ```
 
-Source maps never ship in the installer or the standalone tarball, and no build step uploads them
-anywhere. Sending maps to an error tracker needs release credentials and its own verified CI step.
+Source maps never ship in the installer or the standalone tarball. A tag build uploads the desktop
+app's maps to the acorn team's Sentry project, so a stack there already shows source lines. For more
+information, see [Readable stacks](../integrations/sentry/the-acorn-teams-dsn.md#readable-stacks).
 
 The packaged Node sends the same numbers, and what it measures on disk, as byte gauges
 ([shipped bytes](../telemetry/runtimes.md#shipped-bytes)).

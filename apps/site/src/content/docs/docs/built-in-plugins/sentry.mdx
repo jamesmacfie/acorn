@@ -1,0 +1,105 @@
+---
+title: Sentry
+description: Connect Sentry, list a project's unresolved issues in the rail, read an issue's latest event and stack trace, and start a task from one.
+sources:
+  - docs/integrations/sentry.md
+  - docs/integrations/project-sources.md
+  - plugins/sentry/acorn-plugin.config.mjs
+  - plugins/sentry/src/server/provider.ts
+  - plugins/sentry/src/server/credentials.ts
+  - plugins/sentry/src/tree/SentryIssueView.tsx
+  - plugins/sentry/src/shared/rail.ts
+  - plugins/sentry/src/server/paletteSearch.ts
+checked: '3c529e16d'
+---
+
+import { Steps } from '@astrojs/starlight/components'
+import Checkpoint from '../../../../components/Checkpoint.astro'
+import PluginFacts from '../../../../components/PluginFacts.astro'
+
+The Sentry plugin brings a Sentry project's unresolved issues into acorn's left rail, each with its
+latest event and stack trace. It reads issues and changes nothing in Sentry. To send acorn's own
+telemetry to Sentry, use [Sentry telemetry](/docs/built-in-plugins/sentry-telemetry/) instead.
+
+<PluginFacts id="sentry">
+  <Fragment slot="adds">The **Sentry issues** source in the left rail, an issue's detail beside it, a **Sentry** task pane, and **Find a Sentry issue** in the command palette.</Fragment>
+  <Fragment slot="needs">A Sentry auth token that can read issues, with the organization and project it reads, followed by a workspace or project.</Fragment>
+</PluginFacts>
+
+## Set it up
+
+<Steps>
+
+1. In Sentry, open **Settings** > **Personal Tokens**, and create a token with `event:read` and
+   `project:read`.
+
+2. In acorn, open **Settings** > **Services**, click **Add connection**, and choose **Sentry**.
+
+3. Paste the token in **Auth token**, and enter the **Organization slug** and **Project slug**. For an
+   organization in the EU region, enter `https://de.sentry.io` in **Sentry address**. Click **Connect**.
+   acorn reads the project with the token before it saves it.
+
+4. On the connection's page, under **Where it shows up**, choose the Sentry project, choose the
+   workspace or project that should follow it, and click **Follow**.
+
+   <Checkpoint>**Sentry issues** in the left rail lists the project's unresolved issues.</Checkpoint>
+
+</Steps>
+
+A connection reads one Sentry project, so connect once for each project you want to see.
+
+## Skip the connection
+
+If you start the Node yourself, set `ACORN_SENTRY_TOKEN`, `ACORN_SENTRY_ORG`, and
+`ACORN_SENTRY_PROJECT` in its environment instead. For the EU region, also set `ACORN_SENTRY_URL` to
+`https://de.sentry.io`. The rail then lists that project's issues in every project, with no Settings
+step. All three must be set, and the Node reads them when it starts.
+
+A Sentry connection in Settings wins over the variables, so you can point at another project without
+unsetting them.
+
+## Read an issue
+
+The rail lists each unresolved issue, newest first, with its level, its title, and how many events it
+has. Click one to open it beside the list. The detail shows the culprit, the event and user counts,
+when the issue was first and last seen, and its latest event's message and stack trace, newest call
+first. The refresh button reads the issue again from Sentry, and **Open in Sentry** opens the issue's
+page in your browser.
+
+Before acorn shows an event, it keeps only the message, the stack, the environment, and the release,
+and drops the rest, such as the user, the request, breadcrumbs, and each frame's variables.
+
+## Start a task from an issue
+
+Right-click an issue in the rail, and choose **Create task…**. **New task** creates a task with the
+issue's title. Sentry suggests no branch, so give it one. **Attach to task** links the issue to a task
+you have. [Tasks and worktrees](/docs/using/tasks-and-worktrees/#create-a-task-from-a-pull-request-or-an-issue)
+has the dialog.
+
+A task linked to an issue has a **Sentry** pane that shows it. A task that links several issues lists
+them in the pane, each with its event count.
+
+Starting a task needs a connection in Settings. An issue the rail reads from the environment variables
+offers no task, because a task's link has to name a connection.
+
+## Find an issue
+
+Open the command palette in a project and choose **Find a Sentry issue**. Type part of a title or a
+short ID such as `WEB-1`, and pick an issue to open it beside the rail.
+
+## Settings
+
+The connection's page under **Settings** > **Services** holds its **Name**, **Replace key**, an
+**Enabled** switch, **Where it shows up**, and **Disconnect**
+([Settings: Connections](/docs/settings/connections/#services)).
+
+## In the terminal
+
+The terminal client draws the same rail source and issue detail. Connect Sentry from the desktop app.
+
+## Limits
+
+- acorn reads Sentry. It doesn't resolve, assign, or comment on an issue.
+- The rail lists the newest 100 unresolved issues of each project, and reads them from Sentry each time.
+- An event shows at most 10 exceptions, 200 frames, 7 lines of code a frame, and 8 KiB a string.
+- acorn reaches `sentry.io` and `de.sentry.io` only, so a self-hosted Sentry doesn't work.

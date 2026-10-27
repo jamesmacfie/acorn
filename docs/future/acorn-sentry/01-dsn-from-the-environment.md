@@ -1,6 +1,48 @@
 # Phase 1: the DSN from the environment
 
-Date: October 26, 2026. Status: not started.
+Date: October 26, 2026. Status: done.
+
+## Completion note
+
+Landed on October 26, 2026.
+
+What landed:
+
+- The manifest grants `env: ['ACORN_SENTRY_DSN']`. The worker reads the variable once in `init`.
+- `target()` tries the Settings connection first. With none, it uses the environment's DSN with
+  environment `development` and release `acorn@<batch.version>`. A value that doesn't parse logs one
+  warning naming the variable and sends nothing.
+- The settings page's first section reads "Sending to `<host>/<project>` from `ACORN_SENTRY_DSN`."
+  when the variable is in use.
+- `turbo.json` passes the variable through to the `dev` task. Turborepo's strict env mode dropped
+  it, so `pnpm dev` needed this. `dev:agent` and the desktop helper already pass it through.
+- Docs: `docs/integrations/sentry.md` (a section named "The DSN from the environment"),
+  `docs/local-development.md`, `docs/telemetry/plugins-and-sinks.md`, two site pages, and the
+  permission's reason in `apps/site/src/data/plugins.ts`. The site's plugin-page test requires a
+  reason for every permission.
+
+Decisions and deviations:
+
+- The settings frame can't see the environment, so the node half registers one fetch route,
+  `GET /v1/p/sentry-telemetry/source`. It answers `{ environment: "<host>/<project>" }`, or `null`
+  while a connection overrides the variable. It never returns the key.
+- A connection whose stored DSN no longer parses still wins over the environment and sends nothing.
+  The visitor returns `null` for it, so only "no usable connection" falls back to the variable.
+- `target()` has no batch, so the plugin keeps the last `batch.version` it saw in `onBatch`. Every
+  batch passes there before the exporter asks for a target, and the version is constant per process.
+- I didn't rewrap or rewrite other site pages that cite the changed files. Install, the home page,
+  and Settings: Machines say nothing this phase makes untrue.
+
+For later phases:
+
+- Phase 4 reads a different name, `ACORN_SENTRY_RELEASE_DSN`, at build time. The run-time
+  `ACORN_SENTRY_DSN` is in the `dev` task's `passThroughEnv` only, not in any build task, so it
+  can't leak into a bundle through Turborepo.
+- A new run-time variable for the `sentry` plugin (phase 2) needs the same three things: an
+  `env` grant, a `passThroughEnv` entry on `dev`, and a reason in `apps/site/src/data/plugins.ts`.
+- Two failures were already on the base commit (f31f40b0a), and this phase leaves them alone. The
+  arch tests flag links to the deleted `workflows-gaps.md`. The site's Playwright search
+  test for "Show workspace rail" ranks `/docs/using/workspaces-and-projects/` first.
 
 ## Goal
 

@@ -1,6 +1,6 @@
 ---
 title: Tasks and worktrees
-description: Start a task from scratch or from GitHub, Linear, or Rollbar, and how its Git worktree works.
+description: Start a task from scratch or from GitHub, Linear, Rollbar, or Sentry, and how its Git worktree works.
 sources:
   - docs/workspaces-and-tasks/task-creation.md
   - docs/workspaces-and-tasks/worktrees.md
@@ -11,7 +11,7 @@ sources:
   - packages/client-core/src/host/chrome/ChromeSourcePanel.tsx
   - plugins/github/src/client/PullList.tsx
   - plugins/git/src/client/WorktreeBrowse.tsx
-checked: '1d9bd200d'
+checked: '3c529e16d'
 ---
 
 This page covers creating a task, from scratch or from a pull request or issue, how and where its Git
@@ -46,12 +46,13 @@ A task can start from something you already track, and it stays linked to it:
 - **GitHub.** In the GitHub source's list of pull requests, right-click a pull request and choose
   **Create task**, or click **Create task** in the pull request's pane. The task checks out the pull
   request's branch. If a task already has that pull request, the menu offers **Open task** instead.
-- **Linear and Rollbar.** In the source's list, right-click an issue or an item and choose **Create
-  task…**. A dialog offers **New task**, with a **Title**, a **Branch**, and **Skip setup script**, or
-  **Attach to task**, which links the item to a task you already have.
+- **Linear, Rollbar, and Sentry.** In the source's list, right-click an issue or an item and choose
+  **Create task…**. A dialog offers **New task**, with a **Title**, a **Branch**, and **Skip setup
+  script**, or **Attach to task**, which links the item to a task you already have.
 
 A Linear or Rollbar source shows in the rail only when the workspace follows one of that service's
-projects. You link them on the connection's page under **Settings** > **Services**.
+projects. You link them on the connection's page under **Settings** > **Services**. A Sentry issue
+offers a task only through a connection made there, not one read from the environment variables.
 
 ## When the worktree is made, and where
 
