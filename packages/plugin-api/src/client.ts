@@ -242,7 +242,8 @@ export type { WorkspacesMode } from '@acorn/protocol/workspacesMode.ts'
 export { activeNodeId, nodeReady, setActiveNode } from '@acorn/client-core/infra/node/activeNode.ts'
 export { createFleetQuery } from '@acorn/client-core/infra/node'
 export { nodes, nodeState } from '@acorn/client-core/infra/node/fleet.ts'
-export { previewUrlForClient, remotePreviewBlocked } from '@acorn/client-core/infra/node'
+export { previewTarget, previewUrlForClient, remotePreviewBlocked } from '@acorn/client-core/infra/node'
+export type { PreviewBlockedReason } from '@acorn/client-core/infra/node'
 
 // ── Agent context and references ──────────────────────────────────────────────────────────────
 export { contextSnapshot } from '@acorn/client-core/features/agent'
@@ -251,8 +252,8 @@ export type { ReferenceTargetContribution } from '@acorn/client-core/features/ag
 
 // ── The platform seam ─────────────────────────────────────────────────────────────────────────
 // What the host provides, as opposed to what the node provides. A plugin gets the groups it has a
-// legitimate use for: the native folder dialog, the file dialogs, the host-owned preview view, and
-// the loopback listener a sign-in returns to. The folder dialog comes only as `pickNodeFolder`,
+// legitimate use for: the native folder dialog, the file dialogs, the host-owned preview view and the
+// listener that shows a remote Node's preview in it, and the loopback listener a sign-in returns to. The folder dialog comes only as `pickNodeFolder`,
 // because every plugin folder so far is a Node's. Transport, fleet and plugin custody stay core's
 // business.
 export {
@@ -260,6 +261,7 @@ export {
   formFactor,
   oauthCallback,
   pickFiles,
+  previewProxy,
   previewViews,
   saveFile,
 } from '@acorn/client-core/infra/platform'

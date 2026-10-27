@@ -8,6 +8,7 @@ export {
   formFactor,
   pickFiles,
   pickFolder,
+  previewProxy,
   previewViews,
   recoveryActions,
   reportResponsiveness,

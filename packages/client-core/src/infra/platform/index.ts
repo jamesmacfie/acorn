@@ -204,6 +204,16 @@ export type PreviewViews = {
   onEvent(cb: (state: PreviewState) => void): () => void
 }
 
+// A remote Node's preview, shown through a listener of this computer's own (docs/shell/bridge-and-broker.md §
+// Previews). `open` answers the listener's origin and the address to load first, which sets its cookie and goes
+// on to `path`. The task's preview then uses that listener until `PreviewViews.evict` or `evictAll` closes both.
+// `onBlocked` reports a navigation the shell refused, such as a link to another address.
+// Absent where the shell's webview wasn't checked for it, which is anywhere but macOS.
+export type PreviewProxy = {
+  open(nodeId: string, taskId: string, path: string): Promise<{ origin: string; entry: string }>
+  onBlocked(cb: (state: { taskId: string; url: string }) => void): () => void
+}
+
 // Host-owned page surface for an accepted loaded plugin. The sandboxed plugin frame never sees this;
 // PluginWebview and its broker are the only callers.
 type PluginWebviewState = {
@@ -359,6 +369,7 @@ type AcornPreload = {
   notify?: Notify
   visibility?: HostVisibility
   preview?: PreviewViews
+  previewProxy?: PreviewProxy
   webview?: PluginWebviews
 }
 
@@ -467,6 +478,7 @@ export const desktopExtras = (): DesktopExtras | null => {
 export const recoveryActions = (): RecoveryActions | null => acornGlobal()?.recovery ?? null
 export const oauthCallback = (): OauthCallback | null => acornGlobal()?.oauthCallback ?? null
 export const previewViews = (): PreviewViews | null => acornGlobal()?.preview ?? null
+export const previewProxy = (): PreviewProxy | null => acornGlobal()?.previewProxy ?? null
 export const pluginWebviews = (): PluginWebviews | null => acornGlobal()?.webview ?? null
 
 // The native folder dialog, as two calls rather than a nullable object, because the probe decides

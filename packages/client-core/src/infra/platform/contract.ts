@@ -14,6 +14,7 @@ import {
   deviceConfigBridge,
   pluginWebviews,
   previewViews,
+  previewProxy,
   recoveryActions,
   rendererLayer,
   type RendererLayer,
@@ -28,6 +29,7 @@ import {
   type DeviceConfigBridge,
   type PluginWebviews,
   type PreviewViews,
+  type PreviewProxy,
   type RecoveryActions,
 } from './index'
 
@@ -145,6 +147,8 @@ const GROUPS = {
       'onEvent',
     ]),
   },
+  // Checked by its members alone: calling `open` would start a listener on a real host.
+  previewProxy: { resolve: previewProxy, members: members<PreviewProxy>()(['open', 'onBlocked']) },
   webviews: {
     resolve: pluginWebviews,
     members: members<PluginWebviews>()([

@@ -67,13 +67,17 @@ export async function serveLoopback(
   // socket to read it from, and has no business proxying either.
   const ownPort = c.env.incoming?.socket.localPort
   if (!ownPort) return respondError(c, 501, 'proxy_unavailable')
-  const { proxyHttp } = await import('./loopbackProxy')
-  return proxyHttp(c.req.raw, {
-    port,
-    ownPort,
-    publicOrigin: c.req.header('origin') ?? '',
-    mount: mountWith(mount, params),
-  })
+  const { proxyHttp, proxyUpgrade } = await import('./loopbackProxy')
+  const options = { port, ownPort, publicOrigin: c.req.header('origin') ?? '', mount: mountWith(mount, params) }
+  // A dev server's live reload socket. The caller is a paired device, such as the desktop's helper, which
+  // holds the token a page can't send and checks the page's origin itself.
+  const upgrade = c.env.upgrade
+  if (upgrade) {
+    upgrade.taken = true
+    await proxyUpgrade(c.env.incoming!, upgrade.socket, upgrade.head, options)
+    return c.body(null)
+  }
+  return proxyHttp(c.req.raw, options)
 }
 
 // The mount with this request's parameters filled in, which is the part of the path the app never sees.

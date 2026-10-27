@@ -108,7 +108,7 @@ so a request that never gets a socket still fails. Both fail with a `TimeoutErro
 renderer can tell a timeout from another failure.
 
 The broker buffers each response before it crosses to the renderer, so ordinary responses are capped
-at 64 MiB. A plugin bundle download has the bundle format's 8 MiB limit, the unverified pairing probe
+at 64 MiB. A preview's responses don't cross to the renderer and aren't buffered (see [Previews](#previews)). A plugin bundle download has the bundle format's 8 MiB limit, the unverified pairing probe
 16 KiB, and the pinned pairing result 64 KiB. Each limit rejects an oversized `Content-Length` before
 reading, and counts chunks when the length is absent or wrong. A response limit error fails that read
 and doesn't mean the Node is offline.
@@ -125,6 +125,36 @@ The helper forwards one Node's frames. It reads which Node is active from the re
 `node-fetch` and `node-send` name a Node, and the last one named is active
 (`apps/desktop/src/helper/helperServer.ts`). Other Nodes' frames are dropped before they cross the
 process boundary, except `node-status`, which the fleet list needs for every Node.
+
+### Previews
+
+A remote Node's preview reaches a desktop webview through the helper, not the renderer. The renderer's
+`previewProxy.open(nodeId, taskId, path)` sends `preview-open`. The helper starts a listener for that
+task on `127.0.0.1:0` (`packages/custody/src/broker/previewProxy.ts`) and answers `{ origin, entry }`.
+Each preview is its own origin, so one task's page can't call another task's. The listener:
+
+- Answers only when `Host` is exactly `127.0.0.1:<port>`, which stops DNS rebinding.
+- Needs its own secret in an `HttpOnly`, `SameSite=Strict` cookie. The entry,
+  `/__acorn/preview?key=<secret>&to=<path>`, sets the cookie and redirects to the app's start page on
+  the same origin. A browser tab, or another process on this computer, has no cookie and gets `403`.
+- Adds `default-src 'self' 'unsafe-inline' 'unsafe-eval' data: blob:; connect-src 'self'; form-action 'self';
+  base-uri 'self'; object-src 'none'; frame-ancestors 'none'` to every response, beside any policy the app
+  sends. Dev servers inject inline scripts and evaluate modules, which is why the script sources are wide.
+- Forwards to the Node's loopback route for the task, `/v1/p/preview/tasks/:taskId/proxy/*`. It refuses
+  a path that leaves that route once `..` is resolved. It drops its own cookie, `Authorization`, and
+  `x-acorn-internal`, and it doesn't let the app set a cookie with its cookie's name.
+- Streams both ways, so Server-Sent Events reach the page, and takes a WebSocket upgrade from the page's
+  own origin for the dev server's live reload.
+
+`NodeBroker.previewTransport` gives each preview its own pool of six sockets, pinned like the others.
+WebKit opens six connections to one origin, so a dev build's hundreds of requests don't queue behind the
+app's own. The broker adds the bearer, which never leaves it. Once the Node is forgotten, revoked, or
+moved to another address or certificate, the listener answers `410`.
+
+`preview-open` is idempotent for a task, so a pane that asks again keeps its page and origin.
+`preview-close`, which the bridge sends when the pane evicts the preview, closes the listener and its
+live reload sockets. So do forgetting the Node and closing the window, because previews belong to the
+renderer connection that opened them (`apps/desktop/src/helper/rendererConnection.ts`).
 
 ### Fleet membership
 

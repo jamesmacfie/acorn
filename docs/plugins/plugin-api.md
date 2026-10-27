@@ -135,9 +135,14 @@ plugin supplies the port and nothing else. Core owns the rules (`packages/node-c
 
 Core mounts `/v1/p/<plugin><prefix>/*` for them. It also mounts `POST /v1/p/<plugin><prefix>/__acorn/open`, which opens
 the same port as a preview a phone's browser can load. The preview plugin registers it at
-`/tasks/:taskId/proxy`. A loaded plugin has no `loopback`, the way it has no `register`. A WebSocket upgrade on the
-authenticated route isn't taken yet. A phone's page reaches the dev server's hot reload socket through its own
-preview name instead.
+`/tasks/:taskId/proxy`. A loaded plugin has no `loopback`, the way it has no `register`.
+
+The route takes a WebSocket upgrade for the same caller, and pipes it to the dev server byte for byte. The Node's
+listener hands any upgrade that isn't `/v1/events` to the app like a request, so the Host check, sign-in, and route
+matching apply to it (`server/transport/listener.ts`). Only a loopback route takes the socket. Anything else gets
+its answer's status, such as `403` for a task token. The desktop's helper uses this for a remote Node's preview
+([the bridge and broker](../shell/bridge-and-broker.md#previews)). A phone's page reaches the hot reload socket
+through its own preview name instead.
 
 ## Hono and drizzle cross into tier 1 on purpose
 

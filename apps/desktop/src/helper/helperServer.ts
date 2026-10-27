@@ -33,6 +33,7 @@ import {
   type WireFetchRequest,
 } from '../shell/wire'
 import { installSchema, pluginDecisions, removeSchema } from '@acorn/custody/plugins'
+import { previewProxyRoute } from '@acorn/plugin-preview/contract/routes.ts'
 import { createLogger, describeError } from '@acorn/node-core/server/telemetry'
 
 import { createRendererWatchdog } from './rendererWatchdog'
@@ -173,6 +174,7 @@ export function startHelperServer(
   const oauthListenerId = (raw: unknown): string => z.strictObject({ id: z.uuid() }).parse(raw).id
 
   const decisions = pluginDecisions(helper.pluginCache, helper.pluginTrust, log)
+  const previewTask = z.strictObject({ nodeId: z.string().min(1), taskId: z.string().min(1) })
 
   const handlers: Record<HelperMethod, (params: unknown, owner: RendererConnection) => unknown | Promise<unknown>> = {
     'config-read': () => helper.config.read(),
@@ -394,6 +396,16 @@ export function startHelperServer(
       const { pluginId } = removeSchema.parse(raw)
       helper.pluginCache.removeDevice(pluginId)
       helper.pluginTrust.forgetDevGrant(pluginId, { kind: 'device' })
+    },
+    // A remote Node's preview through a listener of its own (docs/shell/bridge-and-broker.md § Previews).
+    // `path` is the app's start page, where the entry goes once it has set the listener's cookie.
+    'preview-open': (raw, owner) => {
+      const { nodeId, taskId, path } = previewTask.extend({ path: z.string().startsWith('/').default('/') }).parse(raw)
+      return owner.openPreview(nodeId, taskId, previewProxyRoute(taskId), path)
+    },
+    'preview-close': (raw, owner) => {
+      const { nodeId, taskId } = previewTask.parse(raw)
+      owner.closePreview(nodeId, taskId)
     },
     'plugins-dev-grant': decisions.devGrant,
     'plugins-trust-record': decisions.trustRecord,

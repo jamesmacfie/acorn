@@ -149,6 +149,18 @@ export function startListener(
     internalCredentials: runtime.INTERNAL_CREDENTIALS,
     allowedHosts,
     devices: runtime.DEVICES,
+    // Through the app like a request, so the Host guard, sign-in, and the route's own rules apply. Only a
+    // loopback route takes the socket (proxy/loopbackRoute.ts). Any other upgrade gets its answer's status.
+    upgrade: async (req, socket, head) => {
+      const upgrade = { socket, head, taken: false }
+      const answer = await fetch(
+        new Request(`https://${req.headers.host}${req.url}`, { headers: req.headers as Record<string, string> }),
+        { incoming: req, upgrade } as unknown as HttpBindings,
+      )
+      // Nobody reads the body, and a streamed one would otherwise stay open.
+      void answer.body?.cancel()
+      if (!upgrade.taken) socket.end(`HTTP/1.1 ${answer.status} \r\nConnection: close\r\n\r\n`, () => socket.destroy())
+    },
   })
 
   // Binding is asynchronous. Resolve only once listening so callers can safely reach the origin without a

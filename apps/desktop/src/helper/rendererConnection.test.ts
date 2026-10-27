@@ -4,7 +4,9 @@ import type { Helper } from '@acorn/custody/runtime'
 import type { NodeFetchRequest, NodeFetchResponse } from '@acorn/protocol/broker.ts'
 import { encodeIdFrame, decodeIdFrame } from '@acorn/protocol/ws.ts'
 import type { HelperReply } from '../shell/wire'
+import type { NodeBroker } from '@acorn/custody/broker'
 import { startHelperServer, type HelperServer } from './helperServer'
+import { RendererConnection } from './rendererConnection'
 
 type Held = { request: NodeFetchRequest; resolve(value: NodeFetchResponse): void; reject(error: Error): void }
 const servers: HelperServer[] = []
@@ -255,5 +257,44 @@ describe('renderer socket ownership', () => {
     b.ws.close()
     await waitFor(() => b.ws.readyState === WebSocket.CLOSED)
     expect(f.aborted).toHaveLength(1)
+  })
+})
+
+// A remote Node's previews belong to the renderer that opened them (docs/shell/bridge-and-broker.md § Previews).
+describe('previews', () => {
+  const connection = () => {
+    const closed: string[] = []
+    const broker = {
+      previewTransport: (nodeId: string) => ({ request: () => null, close: () => void closed.push(nodeId) }),
+      abort: () => {},
+      closeViewer: () => {},
+    }
+    return { owner: new RendererConnection(broker as unknown as NodeBroker), closed }
+  }
+  const settled = () => new Promise((resolve) => setTimeout(resolve, 20))
+
+  it('opens one listener per task, and gives each start page its own entry', async () => {
+    const { owner } = connection()
+    const first = await owner.openPreview('n1', 't1', '/route', '/')
+    const again = await owner.openPreview('n1', 't1', '/route', '/app')
+    expect(again.origin).toBe(first.origin)
+    expect(again.entry).toMatch(/&to=%2Fapp$/)
+    expect((await owner.openPreview('n1', 't2', '/route', '/')).origin).not.toBe(first.origin)
+    owner.close()
+  })
+
+  it('closes a preview when its pane does, when its Node is forgotten, and when the renderer goes', async () => {
+    const { owner, closed } = connection()
+    await owner.openPreview('n1', 't1', '/route', '/')
+    await owner.openPreview('n2', 't1', '/route', '/')
+    await owner.openPreview('n3', 't1', '/route', '/')
+    owner.closePreview('n1', 't1')
+    owner.forget('n2')
+    await settled()
+    expect(closed).toEqual(['n1', 'n2'])
+    owner.close()
+    await settled()
+    expect(closed).toEqual(['n1', 'n2', 'n3'])
+    await expect(owner.openPreview('n1', 't1', '/route', '/')).rejects.toThrow(/closed/)
   })
 })

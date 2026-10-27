@@ -4,6 +4,9 @@ import { latestSignal, type LatestSignal } from '@acorn/client-core/kit/lib/late
 
 export type WebviewState = { key: string; url: string; loading: boolean; canGoBack: boolean; canGoForward: boolean }
 
+// The preview family: a local Node's `preview:<taskId>` and a remote Node's `remote-preview:<nodeId>:<taskId>`.
+export const isPreviewKey = (key: string): boolean => key.startsWith('preview:') || key.startsWith('remote-preview:')
+
 // Register before ensure can replay state. Observers join synchronously and leave synchronously,
 // even though Tauri's listener registration crosses an asynchronous boundary.
 const observers = new Set<(state: WebviewState) => void>()
@@ -43,7 +46,7 @@ export function webviewOperation<T>(key: string, command: string, args: object =
   const entry = lifetime(key)
   const owned = entry.owner.signal
   const previews = previewOwner.signal
-  const retirement = key.startsWith('preview:') ? previewRetirement : undefined
+  const retirement = isPreviewKey(key) ? previewRetirement : undefined
   const current = () => !owned.aborted && (!retirement || !previews.aborted)
   const result = entry.tail.then(async () => {
     if (!current()) return false
@@ -67,7 +70,7 @@ export function evictPreviews(): void {
   previewOwner.next()
   const pending = [previewRetirement]
   for (const [key, entry] of lifetimes) {
-    if (!key.startsWith('preview:')) continue
+    if (!isPreviewKey(key)) continue
     entry.owner.next()
     pending.push(entry.tail)
   }

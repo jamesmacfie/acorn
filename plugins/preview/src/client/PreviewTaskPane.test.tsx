@@ -9,17 +9,35 @@ import { paneRegistry, type Disposable } from '@acorn/plugin-api/testkit/client'
 
 const [nodeId, setNodeId] = createSignal<string | null>('node-a')
 const read = vi.fn(async (_url: string, _options: unknown): Promise<unknown> => null)
+// The local Node unless a test says otherwise.
+let target: (url: string, nodeId: string | null) => unknown = (url) => ({ kind: 'direct', url })
+const open = vi.fn(async (_nodeId: string, _taskId: string, _path: string) => ({
+  origin: 'http://127.0.0.1:50000',
+  entry: 'http://127.0.0.1:50000/__acorn/preview?key=k&to=%2F',
+}))
+const blockedListeners: ((state: { taskId: string; url: string }) => void)[] = []
 vi.mock('@acorn/plugin-api/client', () => ({
   activeNodeId: () => nodeId(),
   onPluginFrame: () => () => {},
-  previewUrlForClient: (url: string | null) => url,
+  previewProxy: () => ({ open, onBlocked: (cb: never) => (blockedListeners.push(cb), () => {}) }),
+  previewTarget: (url: string, nodeId: string | null) => target(url, nodeId),
   readJson: (url: string, options: unknown) => read(url, options),
   remotePreviewBlocked: () => false,
 }))
 // The page itself is a native view the shell positions, and is not what this file is about.
 vi.mock('./PreviewPane', () => ({
-  default: (props: { taskId: string; url: string | null }) => (
-    <span class="page" data-url={props.url ?? ''}>
+  default: (props: {
+    taskId: string
+    url: string | null
+    blockedReason?: string | null
+    blockedNavigation?: string | null
+  }) => (
+    <span
+      class="page"
+      data-url={props.url ?? ''}
+      data-blocked={props.blockedReason ?? ''}
+      data-refused={props.blockedNavigation ?? ''}
+    >
       {props.taskId}
     </span>
   ),
@@ -38,6 +56,9 @@ beforeEach(() => {
   document.body.append(host)
   registration = paneRegistry.register(previewPaneContribution)
   read.mockReset().mockResolvedValue(null)
+  open.mockClear()
+  blockedListeners.length = 0
+  target = (url) => ({ kind: 'direct', url })
   setNodeId('node-a')
 })
 
@@ -73,4 +94,31 @@ it('binds same-ID task reads to the originating Node and rejects late URLs', asy
   complete({ taskId: 'same', url: 'http://localhost:3000', source: 'config' })
   await new Promise((resolve) => setTimeout(resolve, 0))
   expect(host.querySelector('.page')?.getAttribute('data-url')).toBe('')
+})
+
+const page = () => host.querySelector('.page')!
+
+it("loads a remote Node's app through its listener, opened once for the task", async () => {
+  target = (_url, nodeId) => ({ kind: 'proxied', nodeId, path: '/app' })
+  read.mockResolvedValue({ taskId: 'remote', url: 'http://localhost:5173/app', source: 'config' })
+  const Pane = pane()
+  disposers.push(render(() => <Pane task={task('remote')} />, host))
+  await vi.waitFor(() => expect(page().getAttribute('data-url')).toMatch(/__acorn\/preview/), { timeout: 5_000 })
+  expect(open).toHaveBeenCalledExactlyOnceWith('node-a', 'remote', '/app')
+
+  // A navigation the shell refused shows its address, for this task only.
+  for (const listener of blockedListeners) listener({ taskId: 'other', url: 'http://192.168.1.1/' })
+  expect(page().getAttribute('data-refused')).toBe('')
+  for (const listener of blockedListeners) listener({ taskId: 'remote', url: 'http://192.168.1.1/' })
+  expect(page().getAttribute('data-refused')).toBe('http://192.168.1.1/')
+})
+
+it('says why a remote address is blocked, and opens nothing', async () => {
+  target = () => ({ kind: 'blocked', reason: 'not-loopback' })
+  read.mockResolvedValue({ taskId: 'remote', url: 'http://192.168.1.1/', source: 'config' })
+  const Pane = pane()
+  disposers.push(render(() => <Pane task={task('remote')} />, host))
+  await vi.waitFor(() => expect(page().getAttribute('data-blocked')).toBe('not-loopback'), { timeout: 5_000 })
+  expect(page().getAttribute('data-url')).toBe('')
+  expect(open).not.toHaveBeenCalled()
 })

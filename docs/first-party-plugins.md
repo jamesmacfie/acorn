@@ -115,6 +115,9 @@ import missing from its list and on a listed import that's gone. Add the reason 
   terminal client (`platform.ts`), and the browser's native bridge (`browser/bridge.ts`) read the relay
   ticket route from account's `routes.ts`, so custody asks a Node for a ticket. Custody is a library and
   names no plugin's route, so each app passes it in.
+- **Desktop and preview.** The desktop helper (`helperServer.ts`) reads the task's proxy route from preview's
+  `routes.ts`, so a remote Node's preview listener knows where to forward. Custody names no plugin's route,
+  for the same reason as the ticket route.
 - **Desktop and terminal.** `TaskView.tsx` opens a terminal profile through `sessionsClient`, the create
   and list half of terminal's client, so the shell can't write to, attach to, or kill a session.
 - **Extension and agents.** The sidebar draws a session's state with `runtimeState`, marks the Agents

@@ -107,7 +107,14 @@ export type RuntimeBindings = {
 // `browserChannel` is set on a request that came through a phone's encrypted channel
 // (server/transport/channel.ts). It has no socket, so the Node can't tell it from any relayed peer by
 // its address, and a route that treats a phone differently reads this.
-export type Env = RuntimeBindings & Partial<HttpBindings> & { browserChannel?: true }
+//
+// `upgrade` is set on a WebSocket upgrade the listener hands to the app (server/transport/listener.ts). A
+// route that takes the socket sets `taken`, and the listener answers any other upgrade with its status.
+export type Env = RuntimeBindings &
+  Partial<HttpBindings> & {
+    browserChannel?: true
+    upgrade?: { socket: import('node:stream').Duplex; head: Buffer; taken: boolean }
+  }
 
 // Immutable file and patch bodies keyed by content (docs/caching.md § Immutable blob cache). One
 // file per key under `dir`; keys are `filebody:<sha>` and `patch:sha256:<hex>` (plugins/github/src/server/blobKeys.ts),

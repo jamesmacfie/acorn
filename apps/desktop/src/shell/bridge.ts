@@ -2,7 +2,14 @@ import type { OverlayPresentation } from '@acorn/client-core/infra/platform'
 import { invoke } from '@tauri-apps/api/core'
 import { installExternalLinks } from './externalLinks'
 import { listen } from '@tauri-apps/api/event'
-import { evictPreviews, evictWebview, onWebviewState, webviewOperation, type WebviewState } from './webviewTransport'
+import {
+  evictPreviews,
+  evictWebview,
+  isPreviewKey,
+  onWebviewState,
+  webviewOperation,
+  type WebviewState,
+} from './webviewTransport'
 import type { NodeTransportError } from '@acorn/protocol/broker.ts'
 import { decodeIdFrame, type WsSendOptions } from '@acorn/protocol/ws.ts'
 import { apiRouteNamespace } from '@acorn/protocol/telemetry.ts'
@@ -250,13 +257,27 @@ const onEvent = <T>(name: string, handler: (payload: T) => void): (() => void) =
 }
 
 // ── Host-owned webviews ───────────────────────────────────────────────────────────────────────────
-// Both seam groups project onto one Rust command set. Preview keys are `preview:<taskId>`; plugin
+// Both seam groups project onto one Rust command set. Preview keys are `preview:<taskId>`, or
+// `remote-preview:<nodeId>:<taskId>` once `previewProxy.open` has given the task a remote Node's listener. Plugin
 // surfaces already arrive as `plugin:...` keys and pass through unchanged.
 
 type WebviewBlocked = { key: string; url: string; host: string }
 
 const overlayEpoch = invoke<number | null>('overlay_begin').catch(() => null)
-const previewKey = (taskId: string): string => `preview:${taskId}`
+// Which remote Node each task's preview is through. A Node switch evicts every preview, so a task has one kind or
+// the other, and evicting it closes the listener too.
+const remotePreviews = new Map<string, string>()
+const previewKey = (taskId: string): string => {
+  const nodeId = remotePreviews.get(taskId)
+  return nodeId ? `remote-preview:${nodeId}:${taskId}` : `preview:${taskId}`
+}
+const evictPreview = (taskId: string): void => {
+  evictWebview(previewKey(taskId))
+  const nodeId = remotePreviews.get(taskId)
+  if (!nodeId) return
+  remotePreviews.delete(taskId)
+  tell('preview-close', { nodeId, taskId })
+}
 
 // CSS viewport dimensions let the shell convert zoomed CSS pixels into native logical points.
 const setBounds = (key: string, rect: { x: number; y: number; width: number; height: number }): void =>
@@ -481,16 +502,36 @@ const acorn = {
       void webviewOperation(previewKey(taskId), 'webview_load', { url }).catch(() => undefined),
     command: (taskId: string, action: string) =>
       void webviewOperation(previewKey(taskId), 'webview_command', { action }).catch(() => undefined),
-    evict: (taskId: string) => evictWebview(previewKey(taskId)),
-    evictAll: evictPreviews,
+    evict: evictPreview,
+    evictAll: () => {
+      evictPreviews()
+      for (const [taskId, nodeId] of remotePreviews) tell('preview-close', { nodeId, taskId })
+      remotePreviews.clear()
+    },
     onEvent: (
       cb: (state: { taskId: string; url: string; loading: boolean; canGoBack: boolean; canGoForward: boolean }) => void,
     ) =>
-      onWebviewState(
-        ({ key, ...rest }) => cb({ taskId: key.slice('preview:'.length), ...rest }),
-        (key) => key.startsWith('preview:'),
-      ),
+      // Neither family's ids carry a colon (src-tauri/src/webviews.rs), so the task's is the last segment.
+      onWebviewState(({ key, ...rest }) => cb({ taskId: key.slice(key.lastIndexOf(':') + 1), ...rest }), isPreviewKey),
   },
+
+  // A remote Node's preview, through a helper listener of its own (docs/shell/bridge-and-broker.md § Previews).
+  // macOS only, because only WebKit's switch for WebRTC was checked (src-tauri/src/webviews.rs).
+  previewProxy:
+    ((globalThis as { __ACORN_PLATFORM__?: string }).__ACORN_PLATFORM__ ?? 'darwin') === 'darwin'
+      ? {
+          open: async (nodeId: string, taskId: string, path: string) => {
+            if (remotePreviews.get(taskId) !== nodeId) evictPreview(taskId)
+            const opened = await call<{ origin: string; entry: string }>('preview-open', { nodeId, taskId, path })
+            remotePreviews.set(taskId, nodeId)
+            return opened
+          },
+          onBlocked: (cb: (state: { taskId: string; url: string }) => void) =>
+            onEvent<WebviewBlocked>('acorn:webview-blocked', ({ key, url }) => {
+              if (key.startsWith('remote-preview:')) cb({ taskId: key.slice(key.lastIndexOf(':') + 1), url })
+            }),
+        }
+      : undefined,
 
   // Host-owned page surfaces for accepted loaded plugins. The manifest host allowlist rides on
   // `ensure` and is checked again in Rust, which is the second of the two independent checks

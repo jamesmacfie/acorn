@@ -1,7 +1,84 @@
 # Phase 10: show a remote Node's preview through the Node
 
-Date: October 15, 2026. Status: proposed. Depends on [phase 9](./09-remote-preview.md), whose spike
-decided this design and holds the measurements behind it.
+Date: October 15, 2026. Status: built October 27, 2026, on branch `preview`. The checks that need the
+real desktop webview are still open (see the completion note). Depends on [phase 9](./09-remote-preview.md),
+whose spike decided this design and holds the measurements behind it.
+
+## Completion note
+
+October 27, 2026, on branch `preview`. The shipped pages are [host-owned webviews](../../shell/webviews.md#a-remote-nodes-preview),
+[the bridge and broker](../../shell/bridge-and-broker.md#previews), and
+[loopback routes](../../plugins/plugin-api.md#loopback-routes). They win where this plan disagrees.
+
+What landed:
+
+- **The Node.** The hub hands any upgrade that isn't `/v1/events` to the listener, and the listener sends it
+  through the app like a request (`transport/listener.ts`, `transport/wsHub.ts`). So the Host check, sign-in,
+  and route matching apply, and only a loopback route takes the socket (`proxy/loopbackRoute.ts`). Anything
+  else gets its answer's status. `proxyUpgrade` now strips the route's mount from the path. This added
+  305 bytes to the Node service graph: 1,939,324 of 1,939,500 in a local build.
+- **The helper.** `openPreviewListener` (`packages/custody/src/broker/previewProxy.ts`), one listener per
+  task's preview, and `NodeBroker.previewTransport`, a pinned pool of six sockets that adds the bearer
+  itself. `preview-open` and `preview-close` in the helper. Previews belong to the renderer connection,
+  so forgetting the Node or closing the window closes them. The preview plugin names its route in
+  `plugins/preview/src/contract/routes.ts`.
+- **The shell.** The `remote-preview:<nodeId>:<taskId>` family in `webviews.rs`, with its exact-origin policy,
+  the WebRTC switch, and Rust tests for the key format, the policy, the family, and an object without
+  the switch.
+- **The client.** `previewTarget` answers `direct`, `proxied`, or `blocked` with a reason. `previewProxy`
+  (`open`, `onBlocked`) is in the platform contract, the Tauri bridge (macOS only), and the contract
+  tests. The pane shows why a preview is blocked, and an address the shell refused, with a copy button.
+
+Decisions and deviations:
+
+- **The upgrade goes through the app, not a registry in the hub.** A registry would have needed its own
+  route matching and its own copy of the sign-in rules, in the boot graph. Sending the upgrade through
+  `app.fetch` reuses all of them, and costs a few hundred bytes.
+- **The entry carries the start page.** `preview-open` takes `{ nodeId, taskId, path }`, and the entry is
+  `/__acorn/preview?key=<secret>&to=<path>`. So one listener serves any start page, and a change of address
+  on the Node doesn't change the page's origin.
+- **`previewProxy` has `onBlocked`, and closing is `PreviewViews.evict`.** The pane already evicts a preview
+  when it stops showing it, so a separate close would be a second way to say the same thing.
+- **The Rust test can't touch a real `WKPreferences`.** WebKit kills a process that uses it off the main
+  thread, and Rust tests run on other threads. The test checks that an object without the switch is
+  refused. The switch itself has to be checked in the running app.
+
+Acceptance, October 27, 2026, on `pnpm dev:remote` (the container Node at `https://localhost:4317`, macOS 27 on
+James's Mac):
+
+- **Passed: a task token gets 403.** A live task token, read from a task terminal's shell inside the
+  container, got `403` from `/v1/p/preview/tasks/:taskId/proxy/` for a plain request and for an upgrade. The
+  same token got `200` from that task's `/url` route, so the refusal is the proxy's rule.
+- **Passed: the Node refuses its own port and other hosts.** A recipe address of `http://localhost:4317/`
+  got `403` and "That port belongs to this Node." through the helper listener. `http://192.168.1.8:47999/`
+  got `404` `no_preview` from the Node, and the client blocks it first with its own message.
+- **Passed: the listener's gate.** Without the cookie, with `Host` set to `localhost:<port>` or
+  `evil.example:<port>`, or with a wrong key, the listener answered `403`. A link from another site, in
+  the same WebKit profile, got `403`, because the cookie is `SameSite=Strict`. A second WebKit browser
+  with its own profile got `403`.
+- **Passed, in headless WebKit: the app loads and live reload works.** This ran the branch's broker and
+  listener in a script on the Mac, pinned to the container Node, with Playwright's WebKit 1.64.1 in place
+  of the webview. The Vite React app loaded in 59 to 182 ms over six cold loads, median 72 ms, 10
+  requests each. Twenty page-driven reloads took 35 to 109 ms, median 45 ms, in the same document. A file
+  written in the container by `docker exec` updated the heading in the same document, with no page
+  refresh. No real network path was available, so there is no figure for one.
+- **Passed, in headless WebKit: the content policy.** The phase 9 probe page, aimed at a probe server on
+  the Mac at `127.0.0.1`, `localhost`, and `192.168.1.8`, made no request to it from `fetch`, images,
+  scripts, style sheets, iframes, beacons, EventSource, WebSocket, forms, or a redirect of any of those.
+  Without the shell, three things did reach it: `window.open`, a top-level navigation, and WebRTC's STUN
+  packets. Those are the shell's to stop.
+- **Open: everything that needs the real webview.** The screen was locked, so the session window reported
+  itself hidden and the pane never appeared. Still to run with the screen unlocked, in the
+  `remote-preview` view:
+  - The app loads in the pane.
+  - The probe page reaches the probe server with nothing, including WebRTC, top-level navigation, and
+    `window.open`.
+  - `typeof RTCPeerConnection` is `undefined` in a proxied page.
+  - A refused navigation shows its address with a copy button.
+  - The pane's two blocked messages read correctly.
+
+  Then remove this plan, and move its row in [the split programme](./README.md) and
+  [future plans](../README.md) to their completed lists.
 
 ## Goal
 

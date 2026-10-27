@@ -8,7 +8,8 @@ import {
   toast,
   visibleElementRect,
 } from '@acorn/plugin-api/client'
-import { Button, EmptyState, IconButton, Input, Rectangle, Spinner, Toolbar } from '@acorn/plugin-api/ui'
+import type { PreviewBlockedReason } from '@acorn/plugin-api/client'
+import { Alert, Button, EmptyState, IconButton, Input, Rectangle, Spinner, Toolbar } from '@acorn/plugin-api/ui'
 import { Slot } from '@acorn/plugin-api/ui/host'
 import {
   PREVIEW_TOOLBAR_ACTIONS_POINT,
@@ -24,6 +25,10 @@ export default function PreviewPane(props: {
   projectId?: string
   url: string | null
   remoteBlocked: boolean
+  /** Why nothing is loaded, when `remoteBlocked`. The default is a computer that can't show a remote page. */
+  blockedReason?: PreviewBlockedReason | null
+  /** An address the page tried to open and the shell refused, such as a link off the app. */
+  blockedNavigation?: string | null
   resolving?: boolean
   resolutionFailed?: boolean
   retryResolution?: () => void
@@ -164,8 +169,8 @@ export default function PreviewPane(props: {
       return { ok: true }
     }
 
-  const copyAddr = () => {
-    void navigator.clipboard.writeText(addr())
+  const copy = (address: string) => {
+    void navigator.clipboard.writeText(address)
     toast('Copied the page address')
   }
 
@@ -173,10 +178,16 @@ export default function PreviewPane(props: {
     <>
       {/* No "needs the desktop app" fallback: the pane's `requires: { seam: 'preview' }` means a host
           without the seam never offers it (./PreviewTaskPane.tsx). */}
-      <Show when={props.remoteBlocked}>
+      <Show when={props.remoteBlocked && props.blockedReason === 'not-loopback'}>
+        <EmptyState title="This address isn't an app on the Node">
+          acorn shows another computer's app only when its address is plain http on that computer's own localhost, such
+          as http://localhost:5173. Change the address in the project's Preview settings.
+        </EmptyState>
+      </Show>
+      <Show when={props.remoteBlocked && props.blockedReason !== 'not-loopback'}>
         <EmptyState title="Preview works on this computer only">
-          A page from another computer could reach your local network, so acorn doesn't load it here. Open acorn on that
-          computer to preview it.
+          A page from another computer could reach your local network, and acorn can keep it from doing that only on a
+          Mac. Open acorn on that computer to preview it.
         </EmptyState>
       </Show>
       <Show when={!props.remoteBlocked && (failed() || props.resolutionFailed)}>
@@ -236,7 +247,7 @@ export default function PreviewPane(props: {
               if (event.key === 'Enter') go()
             }}
           />
-          <IconButton icon="copy" label="Copy page address" disabled={!addr()} onPress={copyAddr} />
+          <IconButton icon="copy" label="Copy page address" disabled={!addr()} onPress={() => copy(addr())} />
           <IconButton
             icon="code-xml"
             label="Show developer tools"
@@ -271,6 +282,17 @@ export default function PreviewPane(props: {
             <Spinner label="Loading page" />
           </Show>
         </Toolbar>
+      </Show>
+      <Show when={!props.remoteBlocked && props.url && props.blockedNavigation}>
+        {(address) => (
+          <Alert
+            tone="warn"
+            variant="banner"
+            actions={<IconButton icon="copy" label="Copy the blocked address" onPress={() => copy(address())} />}
+          >
+            The page tried to open {address()}, which isn't part of the app, so acorn didn't load it.
+          </Alert>
+        )}
       </Show>
       {/* A WebContentsView is somebody else's pixels, so it is a rectangle: the kit owns the box and
           the way in and out of it with the keyboard, and the shell positions the view over `mount`. */}

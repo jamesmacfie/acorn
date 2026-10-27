@@ -428,6 +428,57 @@ describe('broker TLS pinning', () => {
   })
 })
 
+// One preview's own pool (./previewProxy.ts): pinned, signed by the broker, and shut once the Node goes.
+describe('broker preview transport', () => {
+  const answered = (req: import('node:http').ClientRequest | null) =>
+    new Promise<number>((resolve, reject) => {
+      if (!req) return reject(new Error('no request'))
+      req.once('response', (res) => (res.resume(), resolve(res.statusCode!)))
+      req.once('error', reject)
+      req.end()
+    })
+
+  it('signs a request over the pinned connection, and answers null once the Node is forgotten or moved', async () => {
+    const { origin } = await listen(true)
+    const broker = makeBroker()
+    const node = { nodeId: 'n1', label: 'remote', endpoint: origin, local: false, token: 't1', fingerprint, certPem }
+    broker.upsert(node)
+    const transport = broker.previewTransport('n1')
+    expect(await answered(transport.request('/v1/p/preview/tasks/a/proxy/', { method: 'GET', headers: {} }))).toBe(200)
+    expect(requestTo('/v1/p/preview/tasks/a/proxy/').headers.authorization).toBe('Bearer t1')
+    // Another path on the same origin is the caller's to refuse. Another origin never gets the bearer.
+    expect(transport.request('//elsewhere.test/', { method: 'GET', headers: {} })).toBeNull()
+
+    // A re-paired Node's new token is used. A Node at another address isn't this preview's any more.
+    broker.upsert({ ...node, token: 't2' })
+    await answered(transport.request('/v1/p/preview/tasks/a/proxy/again', { method: 'GET', headers: {} }))
+    expect(requestTo('/v1/p/preview/tasks/a/proxy/again').headers.authorization).toBe('Bearer t2')
+    broker.upsert({ ...node, endpoint: origin.replace('127.0.0.1', 'localhost') })
+    expect(transport.request('/', { method: 'GET', headers: {} })).toBeNull()
+    broker.remove('n1')
+    expect(transport.request('/', { method: 'GET', headers: {} })).toBeNull()
+    transport.close()
+    expect(() => broker.previewTransport('n1')).toThrow(/Unknown node/)
+  })
+
+  it('refuses a certificate that does not match the pin', async () => {
+    const { origin } = await listen(true)
+    const broker = makeBroker()
+    broker.upsert({
+      nodeId: 'n1',
+      label: 'remote',
+      endpoint: origin,
+      local: false,
+      token: 't',
+      fingerprint: 'ab'.repeat(32),
+      certPem,
+    })
+    const transport = broker.previewTransport('n1')
+    await expect(answered(transport.request('/v1/node', { method: 'GET', headers: {} }))).rejects.toThrow()
+    transport.close()
+  })
+})
+
 describe('broker WebSocket', () => {
   it('closes an oversized node frame before forwarding or parsing it', async () => {
     const { origin, server } = await listen(false)

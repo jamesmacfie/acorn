@@ -7,9 +7,9 @@ preview behavior or a webview policy. It's part of [desktop shell](../shell.md).
 ## Host-owned webviews
 
 `apps/desktop/src-tauri/src/webviews.rs` owns every child webview: the browser preview pane and
-loaded-plugin webview pages. The two differ only by a policy function and a key prefix. Keys are
-`preview:<taskId>` and `plugin:<pluginId>:<nodeId>:<surface>[:<taskId>]`, and the Node ID keeps each
-Node's page storage and navigation separate. The prefix and key shape are validated, because they
+loaded-plugin webview pages. They differ only by a policy function and a key prefix. Keys are
+`preview:<taskId>`, `remote-preview:<nodeId>:<taskId>`, and `plugin:<pluginId>:<nodeId>:<surface>[:<taskId>]`,
+and the Node ID keeps each Node's page storage and navigation separate. The prefix and key shape are validated, because they
 select the policy. A ceiling of 32 webviews caps what a renderer bug that ensures in a loop can cost.
 Child webviews deny `window.open`.
 
@@ -21,11 +21,32 @@ nothing is visible. On macOS, the main renderer composites above the page throug
 overlap hides the page. `incognito(true)` gives each child its own temporary data store.
 
 Local-Node preview is one kept-alive webview per task, limited to HTTP and HTTPS URLs without
-credentials, with chrome the renderer draws. Remote-Node preview is unavailable: the native webview
-has no network policy for page subrequests, so a remote page could reach services on your private
-network. The pane says so, and evicts a view when its Node becomes remote. Only the positively
-identified local Node may create previews. In development, the preview's DevTools button targets the
-child webview and reapplies its bounds after WebKit opens the inspector.
+credentials, with chrome the renderer draws. Only the positively identified local Node's address goes
+to the webview as it is. In development, the preview's DevTools button targets the child webview and
+reapplies its bounds after WebKit opens the inspector.
+
+### A remote Node's preview
+
+A remote Node's app loads through a listener the helper opens for that task
+([the bridge and broker](./bridge-and-broker.md#previews)), on `http://127.0.0.1:<port>`. Its view is a
+`remote-preview:<nodeId>:<taskId>` key, which shares the preview family's one visible view. Three things
+confine the page, and each covers what the others can't:
+
+- **Navigation.** The view's policy is the exact origin of its home, and only when that host is
+  `127.0.0.1` with a port. A link, a redirect, or a frame going anywhere else is refused, and the shell
+  emits `acorn:webview-blocked`. The pane shows the refused address with a copy button. wry asks the
+  policy for subframes too.
+- **Requests.** The listener adds a content security policy to every response that holds the page's
+  own requests to its origin.
+- **WebRTC.** A peer connection ignores that policy. Before the first navigation, `create` turns off
+  WebKit's private `WKPreferences` setting `_peerConnectionEnabled` through `with_webview`, and reads it back.
+  If WebKit doesn't have the setting, `create` refuses the view, so a WebKit update fails closed. A
+  proxied page has no `RTCPeerConnection`.
+
+Only macOS has the switch, so the bridge offers `previewProxy` there and nowhere else. On Windows and
+Linux, and for a remote address that isn't plain `http` on the Node's own loopback, the pane says why
+it shows nothing. Evicting a remote preview closes its listener too, and a Node switch evicts every
+preview.
 
 Other plugins can add up to four controls after the preview's address bar, and ask it to reload the
 page on screen. They never get the page or a way to navigate. See [toolbar
@@ -89,7 +110,12 @@ browser automation is `plugins/browser`, which runs Playwright on the Node.
 
 ## The preview URL
 
-The preview home belongs to the Node. `preview.urls` resolves, in order, a layout recipe's selected
+The preview home belongs to the Node. `previewTarget` (`packages/client-core/src/infra/node/previewUrl.ts`)
+decides how it reaches the webview: `direct` for the local Node, `proxied` for an app on a remote Node's
+loopback, or `blocked` with a reason. `remotePreviewBlocked` and `previewUrlForClient` stay for plugins
+until the next plugin API major.
+
+`preview.urls` resolves, in order, a layout recipe's selected
 target URL, the running default target, and the project's URL, port, or script setting, with script
 discovery on the Node in the task worktree. The pane reads `/v1/p/preview/tasks/:id/url` and reads
 again on `plugin:preview:url-changed { taskId, url, source }`, where `url` and `source` are `null` when

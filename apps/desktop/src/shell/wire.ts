@@ -41,6 +41,8 @@ export type HelperMethod =
   | 'oauth-listen'
   | 'oauth-result'
   | 'oauth-close'
+  | 'preview-open'
+  | 'preview-close'
 
 export type HelperRequest = { id: number; method: HelperMethod; params: unknown }
 export type HelperReplyTiming = {

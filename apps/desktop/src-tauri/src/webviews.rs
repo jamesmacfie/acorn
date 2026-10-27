@@ -10,10 +10,11 @@ use tauri::{AppHandle, Emitter, LogicalPosition, LogicalSize, Manager, Runtime, 
 // Host-owned child webviews: the browser preview pane and loaded-plugin webview surfaces. See
 // docs/shell.md, "Host-owned webviews", for why one module covers both.
 
-/// Preview keys are `preview:<taskId>`; plugin surfaces are
-/// `plugin:<pluginId>:<nodeId>:<surface>[:<taskId>]`.
+/// Preview keys are `preview:<taskId>`, or `remote-preview:<nodeId>:<taskId>` for a remote Node's preview
+/// through the helper's listener; plugin surfaces are `plugin:<pluginId>:<nodeId>:<surface>[:<taskId>]`.
 /// The prefix selects the policy below, so it is validated rather than assumed.
 const PREVIEW_PREFIX: &str = "preview:";
+const REMOTE_PREVIEW_PREFIX: &str = "remote-preview:";
 const PLUGIN_PREFIX: &str = "plugin:";
 
 /// A renderer bug that ensures in a loop should cost a refused call, not every webview the OS will
@@ -24,6 +25,10 @@ const MAX_WEBVIEWS: usize = 32;
 enum Policy {
     Denied,
     Preview,
+    /// A remote Node's preview: the one origin of its listener on 127.0.0.1, and nowhere else. The page's own
+    /// requests are held to that origin by the listener's content security policy
+    /// (docs/shell/bridge-and-broker.md § Previews).
+    RemotePreview(String),
     /// The manifest host allowlist, checked here and in the renderer broker. Widening the grant in
     /// one layer must not silently widen the other.
     Plugin(Vec<String>),
@@ -34,6 +39,7 @@ impl Policy {
         match self {
             Policy::Denied => false,
             Policy::Preview => is_allowed_preview_url(url),
+            Policy::RemotePreview(origin) => remote_preview_origin(url).is_some_and(|candidate| &candidate == origin),
             Policy::Plugin(hosts) => is_allowed_webview_url(url, hosts),
         }
     }
@@ -153,6 +159,14 @@ pub fn is_allowed_preview_url(url: &str) -> bool {
     parsed(url).is_some_and(|parsed| matches!(parsed.scheme(), "http" | "https") && parsed.host().is_some())
 }
 
+/// The origin of a remote preview's listener: plain `http` on 127.0.0.1 with a port, which is all the helper
+/// binds. Anything else has no origin here, so a policy can't be made from it.
+fn remote_preview_origin(url: &str) -> Option<String> {
+    let parsed = parsed(url)?;
+    (parsed.scheme() == "http" && parsed.host_str() == Some("127.0.0.1") && parsed.port().is_some())
+        .then(|| parsed.origin().ascii_serialization())
+}
+
 fn is_loopback(host: &str) -> bool {
     matches!(host, "localhost" | "127.0.0.1" | "::1")
 }
@@ -224,10 +238,18 @@ pub struct Rect {
     height: f64,
 }
 
-fn policy_for(key: &str, hosts: Option<Vec<String>>) -> Option<Policy> {
+fn policy_for(key: &str, hosts: Option<Vec<String>>, home: &str) -> Option<Policy> {
     if let Some(task) = key.strip_prefix(PREVIEW_PREFIX) {
         // One segment, non-empty: a task id, not a path.
         return (!task.is_empty() && !task.contains(':')).then_some(Policy::Preview);
+    }
+    if let Some(rest) = key.strip_prefix(REMOTE_PREVIEW_PREFIX) {
+        // Exactly a Node id and a task id. The home is the listener's entry, and its origin is the whole grant.
+        let segments: Vec<_> = rest.split(':').collect();
+        if segments.len() != 2 || segments.iter().any(|segment| segment.is_empty()) {
+            return None;
+        }
+        return remote_preview_origin(home).map(Policy::RemotePreview);
     }
     let rest = key.strip_prefix(PLUGIN_PREFIX)?;
     let segments = rest.split(':').count();
@@ -245,7 +267,7 @@ fn policy_for(key: &str, hosts: Option<Vec<String>>) -> Option<Policy> {
 pub fn webview_ensure<R: Runtime>(app: AppHandle<R>, key: String, url: String, hosts: Option<Vec<String>>) -> bool {
     let state = app.state::<Webviews<R>>();
     let _operation = state.operations.lock().unwrap();
-    let Some(policy) = policy_for(&key, hosts) else {
+    let Some(policy) = policy_for(&key, hosts, &url) else {
         // An empty or invalid replacement grant must retire an older view with this key.
         retire_record(&state, &key);
         return false;
@@ -349,7 +371,7 @@ fn create<R: Runtime>(app: &AppHandle<R>, key: &str, home: &str, policy: Policy)
             }
             if !guard_policy.allows(url) {
                 eprintln!("[webview] blocked navigation: {url}");
-                if guard_key.starts_with(PLUGIN_PREFIX) {
+                if guard_key.starts_with(PLUGIN_PREFIX) || guard_key.starts_with(REMOTE_PREVIEW_PREFIX) {
                     let _ = guard_app.emit(
                         BLOCKED_EVENT,
                         BlockedEvent {
@@ -383,12 +405,84 @@ fn create<R: Runtime>(app: &AppHandle<R>, key: &str, home: &str, policy: Policy)
     // top-left corner for those two frames is a visible artefact.
     let _ = webview.hide();
 
+    // Before the first navigation. A WebRTC connection ignores the page's content security policy, so a remote
+    // Node's page could use one to reach this computer's network. A WebKit without the switch gets no view.
+    if key.starts_with(REMOTE_PREVIEW_PREFIX) && !peer_connections_disabled(&webview) {
+        eprintln!("[webview] refusing {key}: this WebKit can't turn WebRTC off, so a remote preview can't be confined");
+        let _ = webview.close();
+        return None;
+    }
+
     if let Err(error) = webview.navigate(home_url.clone()) {
         eprintln!("[webview] could not navigate {key}: {error}");
         let _ = webview.close();
         return None;
     }
     Some(Record { webview, nav, policy: live_policy, invalidated: false, home: Target::applied(home_url) })
+}
+
+/// Turn WebRTC off in one view. `_setPeerConnectionEnabled:` is private to WebKit, so both it and its getter are
+/// checked first, and the value is read back. Sending a selector the object doesn't know raises an Objective-C
+/// exception, which aborts the process from inside Rust. False whenever the switch can't be shown to have worked.
+///
+/// `ensure` is a synchronous command, which Tauri runs on the main thread, and there `with_webview` runs its
+/// closure at once. Anywhere else it waits for the event loop, and gives up after two seconds.
+fn peer_connections_disabled<R: Runtime>(webview: &Webview<R>) -> bool {
+    #[cfg(target_os = "macos")]
+    {
+        let (sender, receiver) = std::sync::mpsc::channel();
+        let queued = webview.with_webview(move |platform| {
+            let _ = sender.send(disable_peer_connections(platform.inner()));
+        });
+        queued.is_ok() && receiver.recv_timeout(std::time::Duration::from_secs(2)).unwrap_or(false)
+    }
+    #[cfg(not(target_os = "macos"))]
+    {
+        // Only WebKit's switch was checked, and the bridge offers remote previews on macOS alone.
+        let _ = webview;
+        false
+    }
+}
+
+#[cfg(target_os = "macos")]
+fn disable_peer_connections(webview: *mut std::ffi::c_void) -> bool {
+    use objc2::msg_send;
+    use objc2::runtime::AnyObject;
+
+    let view = webview as *mut AnyObject;
+    if view.is_null() {
+        return false;
+    }
+    // SAFETY: `view` is the live WKWebView Tauri handed to `with_webview`, and this runs on the main thread inside
+    // that callback. A WKWebView's configuration shares its preferences object, so a change applies to the view.
+    unsafe {
+        let configuration: *mut AnyObject = msg_send![view, configuration];
+        if configuration.is_null() {
+            return false;
+        }
+        let preferences: *mut AnyObject = msg_send![configuration, preferences];
+        if preferences.is_null() {
+            return false;
+        }
+        disable_peer_connection_preference(preferences)
+    }
+}
+
+/// The preference itself, apart from the view, so a test can run it against a real `WKPreferences`.
+///
+/// # Safety
+/// `preferences` must be a live Objective-C object, used on the main thread.
+#[cfg(target_os = "macos")]
+unsafe fn disable_peer_connection_preference(preferences: *mut objc2::runtime::AnyObject) -> bool {
+    use objc2::{msg_send, sel};
+    let setter: bool = msg_send![preferences, respondsToSelector: sel!(_setPeerConnectionEnabled:)];
+    let getter: bool = msg_send![preferences, respondsToSelector: sel!(_peerConnectionEnabled)];
+    if !setter || !getter {
+        return false;
+    }
+    let _: () = msg_send![preferences, _setPeerConnectionEnabled: false];
+    let enabled: bool = msg_send![preferences, _peerConnectionEnabled];
+    !enabled
 }
 
 /// Tauri labels have their own grammar and must be unique per app, and the seam's keys carry colons.
@@ -433,9 +527,9 @@ pub fn webview_show<R: Runtime>(app: AppHandle<R>, key: String, exclusive: bool)
     let state = app.state::<Webviews<R>>();
     let records = state.records.lock().unwrap();
     if exclusive {
-        if let Some(prefix) = family(&key) {
+        if let Some(shown) = family(&key) {
             for (other, record) in records.iter() {
-                if other != &key && other.starts_with(prefix) {
+                if other != &key && family(other) == Some(shown) {
                     let _ = record.webview.hide();
                 }
             }
@@ -542,14 +636,15 @@ pub fn webview_evict_previews<R: Runtime>(app: AppHandle<R>) {
     let state = app.state::<Webviews<R>>();
     let _operation = state.operations.lock().unwrap();
     let keys: Vec<_> = state.records.lock().unwrap().keys()
-        .filter(|key| key.starts_with(PREVIEW_PREFIX)).cloned().collect();
+        .filter(|key| family(key) == Some(PREVIEW_PREFIX)).cloned().collect();
     for key in keys {
         retire_record(&state, &key);
     }
 }
 
+/// A remote Node's preview is a preview: one of either kind is on screen at a time.
 fn family(key: &str) -> Option<&'static str> {
-    if key.starts_with(PREVIEW_PREFIX) {
+    if key.starts_with(PREVIEW_PREFIX) || key.starts_with(REMOTE_PREVIEW_PREFIX) {
         Some(PREVIEW_PREFIX)
     } else if key.starts_with(PLUGIN_PREFIX) {
         Some(PLUGIN_PREFIX)
@@ -597,18 +692,18 @@ mod tests {
 
     #[test]
     fn the_key_grammar_decides_the_policy_and_nothing_else_gets_one() {
-        assert_eq!(policy_for("preview:task-1", None), Some(Policy::Preview));
-        assert_eq!(policy_for("preview:", None), None);
-        assert_eq!(policy_for("preview:a:b", None), None);
-        assert_eq!(policy_for("plugin:db:node-1:pane", Some(vec!["example.com".into()])), Some(Policy::Plugin(vec!["example.com".into()])));
-        assert_eq!(policy_for("plugin:db:node-1:pane:task-1", Some(vec!["example.com".into()])), Some(Policy::Plugin(vec!["example.com".into()])));
+        assert_eq!(policy_for("preview:task-1", None, ""), Some(Policy::Preview));
+        assert_eq!(policy_for("preview:", None, ""), None);
+        assert_eq!(policy_for("preview:a:b", None, ""), None);
+        assert_eq!(policy_for("plugin:db:node-1:pane", Some(vec!["example.com".into()]), ""), Some(Policy::Plugin(vec!["example.com".into()])));
+        assert_eq!(policy_for("plugin:db:node-1:pane:task-1", Some(vec!["example.com".into()]), ""), Some(Policy::Plugin(vec!["example.com".into()])));
         // A plugin surface with no allowlist reaches nothing, so it is never created.
-        assert_eq!(policy_for("plugin:db:node-1:pane", None), None);
-        assert_eq!(policy_for("plugin:db:node-1:pane", Some(vec![])), None);
-        assert_eq!(policy_for("plugin:db:node-1", Some(vec!["example.com".into()])), None);
-        assert_eq!(policy_for("plugin:db", Some(vec!["example.com".into()])), None);
-        assert_eq!(policy_for("plugin::node-1", Some(vec!["example.com".into()])), None);
-        assert_eq!(policy_for("../etc/passwd", None), None);
+        assert_eq!(policy_for("plugin:db:node-1:pane", None, ""), None);
+        assert_eq!(policy_for("plugin:db:node-1:pane", Some(vec![]), ""), None);
+        assert_eq!(policy_for("plugin:db:node-1", Some(vec!["example.com".into()]), ""), None);
+        assert_eq!(policy_for("plugin:db", Some(vec!["example.com".into()]), ""), None);
+        assert_eq!(policy_for("plugin::node-1", Some(vec!["example.com".into()]), ""), None);
+        assert_eq!(policy_for("../etc/passwd", None, ""), None);
     }
 
     #[test]
@@ -667,5 +762,70 @@ mod tests {
         assert_eq!(webview_label("preview:task-1"), "acorn-preview-task-1");
         assert_eq!(webview_label("plugin:db:node-1:pane"), "acorn-plugin-db-node-1-pane");
         assert!(webview_label("preview:../x").chars().all(|c| c.is_ascii_alphanumeric() || c == '-'));
+    }
+
+    #[test]
+    fn a_remote_preview_key_is_a_node_and_a_task_and_its_grant_is_its_listener() {
+        let entry = "http://127.0.0.1:51234/__acorn/preview?key=k&to=%2F";
+        let listener = Some(Policy::RemotePreview("http://127.0.0.1:51234".into()));
+        assert_eq!(policy_for("remote-preview:node-1:task-1", None, entry), listener);
+        // Hosts are ignored: a remote preview's grant is its listener, whatever the caller sends.
+        assert_eq!(policy_for("remote-preview:node-1:task-1", Some(vec!["example.com".into()]), entry), listener);
+        for key in ["remote-preview:", "remote-preview:node-1", "remote-preview:node-1:", "remote-preview::task-1", "remote-preview:a:b:c"] {
+            assert_eq!(policy_for(key, None, entry), None, "{key}");
+        }
+        // Only the helper's listener can be a home: http, 127.0.0.1, and a port.
+        for home in [
+            "http://localhost:51234/",
+            "http://[::1]:51234/",
+            "https://127.0.0.1:51234/",
+            "http://127.0.0.1/",
+            "http://192.168.1.10:51234/",
+            "http://user@127.0.0.1:51234/",
+            "file:///etc/passwd",
+        ] {
+            assert_eq!(policy_for("remote-preview:node-1:task-1", None, home), None, "{home}");
+        }
+    }
+
+    #[test]
+    fn a_remote_preview_reaches_its_own_listener_and_nothing_else() {
+        let policy = Policy::RemotePreview("http://127.0.0.1:51234".into());
+        assert!(policy.allows("http://127.0.0.1:51234/"));
+        assert!(policy.allows("http://127.0.0.1:51234/src/App.tsx?t=1#top"));
+        for url in [
+            "http://127.0.0.1:51235/",
+            "http://localhost:51234/",
+            "http://localhost:5173/",
+            "http://192.168.1.1/admin",
+            "https://example.com/",
+            "https://127.0.0.1:51234/",
+            "http://user:pass@127.0.0.1:51234/",
+            "data:text/html,hi",
+            "blob:http://127.0.0.1:51234/abc",
+            "about:srcdoc",
+        ] {
+            assert!(!policy.allows(url), "{url}");
+        }
+    }
+
+    #[test]
+    fn a_remote_preview_shares_the_preview_family() {
+        assert_eq!(family("remote-preview:node-1:task-1"), family("preview:task-1"));
+        assert_ne!(family("remote-preview:node-1:task-1"), family("plugin:db:node-1:pane"));
+        assert_eq!(webview_label("remote-preview:node-1:task-1"), "acorn-remote-preview-node-1-task-1");
+    }
+
+    // What `create` relies on to refuse a view: an object without the private switch answers false rather than
+    // raising. A real `WKPreferences` can't be made here, because WebKit kills a process that uses it off the main
+    // thread and tests run on others. The switch itself is checked in the app (docs/shell/webviews.md).
+    #[cfg(target_os = "macos")]
+    #[test]
+    fn an_object_without_the_switch_for_webrtc_is_refused() {
+        use objc2::runtime::{AnyObject, NSObject};
+        let object = NSObject::new();
+        let pointer = objc2::rc::Retained::as_ptr(&object) as *mut AnyObject;
+        assert!(!unsafe { disable_peer_connection_preference(pointer) });
+        assert!(!disable_peer_connections(std::ptr::null_mut()));
     }
 }

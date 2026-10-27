@@ -11,6 +11,11 @@ import { disposeWsHub } from './wsHub'
 import { mintInternalToken } from '../auth/internalTokens'
 import { startPreview } from './preview/start'
 import { startRelayTunnel } from './relayTunnel'
+import { Hono } from 'hono'
+import { WebSocket, WebSocketServer } from 'ws'
+import type { AppEnv } from '../middleware/auth'
+import { registerRoute, removePluginRoutes } from '../routes/registry'
+import { serveLoopback } from '../proxy/loopbackRoute'
 
 // The tunnel dials out, so here it only records whether the listener started it, and keeps the relay
 // name allowed for as long as it runs, as the real one does.
@@ -295,4 +300,48 @@ describe('the loopback TLS listener', () => {
       await new Promise<void>((resolve) => squatter.close(() => resolve()))
     }
   }, 30_000)
+  // A dev server's live reload socket, on a loopback route: through the app's own checks, like a request.
+  it('takes a WebSocket upgrade on a loopback route for a paired device, and refuses anyone else', async () => {
+    const dev = new WebSocketServer({ host: '127.0.0.1', port: 0 })
+    dev.on('connection', (socket, req) => socket.send(`dev server saw ${req.url}`))
+    await new Promise((resolve) => dev.once('listening', resolve))
+    const devPort = (dev.address() as import('node:net').AddressInfo).port
+    const mount = '/v1/p/preview/tasks/:taskId/proxy'
+    registerRoute({
+      plugin: 'preview',
+      prefix: '/tasks/:taskId/proxy',
+      router: new Hono<AppEnv>().all('/*', (c) =>
+        serveLoopback(c, mount, async ({ taskId }) => (taskId === 't1' ? devPort : null)),
+      ),
+    })
+    try {
+      const runtime = makeRuntime(root!)
+      opened.push(runtime.DB)
+      listener = await startListener(runtime, root!)
+      const { token } = await runtime.DEVICES.issue('laptop')
+      const taskToken = mintInternalToken(runtime.INTERNAL_TOKEN, { scope: 'task', taskId: 't1', credentialId: 'c1' })
+      runtime.INTERNAL_CREDENTIALS.activate('c1')
+      const open = (path: string, headers: Record<string, string>) =>
+        new Promise<string>((resolve) => {
+          const socket = new WebSocket(`wss://127.0.0.1:${listener!.endpoint.port}${path}`, {
+            ca: [listener!.certPem],
+            headers,
+          })
+          socket.once('message', (data) => (resolve(String(data)), socket.close()))
+          socket.once('unexpected-response', (_req, res) => resolve(`refused ${res.statusCode}`))
+          socket.once('error', () => resolve('destroyed'))
+        })
+      const device = { authorization: `Bearer ${token}` }
+      expect(await open('/v1/p/preview/tasks/t1/proxy/@vite/hmr?token=x', device)).toBe(
+        'dev server saw /@vite/hmr?token=x',
+      )
+      expect(await open('/v1/p/preview/tasks/t1/proxy/hmr', { 'x-acorn-internal': taskToken })).toBe('refused 403')
+      expect(await open('/v1/p/preview/tasks/t1/proxy/hmr', {})).toBe('refused 401')
+      expect(await open('/v1/p/preview/tasks/t2/proxy/hmr', device)).toBe('refused 404')
+      expect(await open('/v1/p/preview/tasks/t1/proxy/hmr', { ...device, host: 'elsewhere.test' })).toBe('refused 403')
+    } finally {
+      removePluginRoutes('preview')
+      await new Promise((resolve) => dev.close(resolve))
+    }
+  }, 20_000)
 })

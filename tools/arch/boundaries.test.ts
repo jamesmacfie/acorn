@@ -311,6 +311,8 @@ describe('architecture boundaries', () => {
       ['apps/desktop/src/helper/helperMain.ts -> plugins/account/src/contract/routes.ts', 'the relay ticket route'],
       ['apps/tui/src/platform.ts -> plugins/account/src/contract/routes.ts', 'the relay ticket route'],
       ['apps/cli/src/browser/bridge.ts -> plugins/account/src/contract/routes.ts', 'the relay ticket route'],
+      // The same reason: a remote Node's preview listener forwards to the preview plugin's proxy route.
+      ['apps/desktop/src/helper/helperServer.ts -> plugins/preview/src/contract/routes.ts', 'the preview proxy route'],
       [
         'apps/cli/src/browser/agents.ts -> plugins/agents/src/contract/appApproval.ts',
         'app approval wording and targets',

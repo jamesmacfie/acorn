@@ -38,6 +38,7 @@ client: PaneModelContext
 client: PersistedSliceKeys
 client: PersistedStateSlice
 client: PrefKeys
+client: PreviewBlockedReason
 client: Project
 client: ProjectImporterProps
 client: ProjectSurfaceContribution
@@ -159,6 +160,8 @@ client: pluginLabel
 client: positionAt
 client: postJson
 client: prefsOptions
+client: previewProxy
+client: previewTarget
 client: previewUrlForClient
 client: previewViews
 client: projectImporterRegistry

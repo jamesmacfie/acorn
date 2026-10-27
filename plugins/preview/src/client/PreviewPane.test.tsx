@@ -47,6 +47,7 @@ vi.mock('@acorn/plugin-api/client', async (original) => ({
     }
   },
   visibleElementRect: () => ({ x: 0, y: 0, width: 300, height: 200 }),
+  toast: () => {},
 }))
 
 let host: HTMLElement
@@ -80,6 +81,32 @@ it('shows a remote-node explanation without creating or loading a native view', 
   expect(views.load).not.toHaveBeenCalled()
   expect(views.evict).toHaveBeenCalledWith('task-1')
   expect(host.querySelector('[data-kind="webview"]')?.hasAttribute('hidden')).toBe(true)
+})
+
+it("says when a remote Node's address isn't an app on its loopback", () => {
+  dispose = render(() => <PreviewPane taskId="task-1" url={null} remoteBlocked blockedReason="not-loopback" />, host)
+  expect(host.textContent).toContain("This address isn't an app on the Node")
+  expect(host.textContent).not.toContain('Preview works on this computer only')
+  expect(views.ensure).not.toHaveBeenCalled()
+})
+
+it('shows an address the shell refused, with a way to copy it', async () => {
+  const writeText = vi.fn(async () => {})
+  Object.assign(navigator, { clipboard: { writeText } })
+  dispose = render(
+    () => (
+      <PreviewPane
+        taskId="task-1"
+        url="http://127.0.0.1:50000/__acorn/preview?key=k&to=%2F"
+        remoteBlocked={false}
+        blockedNavigation="http://192.168.1.1/admin"
+      />
+    ),
+    host,
+  )
+  expect(host.textContent).toContain('The page tried to open http://192.168.1.1/admin')
+  ;(host.querySelector('[aria-label="Copy the blocked address"]') as HTMLElement).click()
+  expect(writeText).toHaveBeenCalledWith('http://192.168.1.1/admin')
 })
 
 it('evicts a local view and removes its address controls when the active node becomes remote', async () => {

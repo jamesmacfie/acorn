@@ -358,6 +358,9 @@ export type WsAuthDeps = {
   maxBufferedBytes?: number
   // Lower-only injection for bounded carrier regressions.
   maxMessageBytes?: number
+  // An upgrade on any other path, such as a dev server's live reload on a loopback route. The listener
+  // answers it through the app, so it gets the same checks a request does. Without it, the socket is destroyed.
+  upgrade?(req: IncomingMessage, socket: Duplex, head: Buffer): Promise<void>
 }
 
 // What a successful upgrade resolved to. `deviceId` is what makes revocation actionable later: a
@@ -489,9 +492,9 @@ export function attachWsHub(server: Server, deps: WsAuthDeps): WsHub {
   // A background sweep must never be the reason the process stays alive.
   sweep.unref?.()
   const onUpgrade = (req: IncomingMessage, socket: Duplex, head: Buffer): void => {
-    // This is the listener's only upgrade handler, so it destroys an upgrade to any other path. Node
-    // stops doing that once an 'upgrade' listener exists, and an unanswered socket would stay open for
-    // the life of the process and hang `server.close()`.
+    // This is the listener's only upgrade handler, so it answers or destroys an upgrade to any other
+    // path. Node stops doing that once an 'upgrade' listener exists, and an unanswered socket would stay
+    // open for the life of the process and hang `server.close()`.
     let path: string
     try {
       // Only a syntactic base for parsing the path out. A request with no Host is refused by
@@ -501,16 +504,18 @@ export function attachWsHub(server: Server, deps: WsAuthDeps): WsHub {
       socket.destroy()
       return
     }
-    if (path !== WS_PATH) {
-      socket.destroy()
-      return
-    }
+    // Tracked from here for any path, so disposing the hub also closes a proxied socket.
     pending.add(socket)
     const onPeerError = (): void => {
       socket.destroy()
     }
     socket.on('error', onPeerError)
     socket.once('close', () => pending.delete(socket))
+    if (path !== WS_PATH) {
+      if (deps.upgrade) void deps.upgrade(req, socket, head).catch(() => socket.destroy())
+      else socket.destroy()
+      return
+    }
     void (async () => {
       const authorized = await authorizeWsUpgrade(req, deps)
       if (!ready(socket) || !authorized) return refuse(socket)

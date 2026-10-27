@@ -172,7 +172,8 @@ export async function proxyUpgrade(
     new Set(['connection', 'upgrade']),
   )
   const lines = Object.entries(headers).map(([name, value]) => `${name}: ${value}`)
-  upstream.write(`${req.method} ${req.url} HTTP/1.1\r\n${lines.join('\r\n')}\r\n\r\n`)
+  const path = req.url.slice(options.mount?.length ?? 0)
+  upstream.write(`${req.method} ${path.startsWith('/') ? path : `/${path}`} HTTP/1.1\r\n${lines.join('\r\n')}\r\n\r\n`)
   if (head.length) upstream.write(head)
   upstream.on('error', () => socket.destroy())
   socket.on('error', () => upstream.destroy())

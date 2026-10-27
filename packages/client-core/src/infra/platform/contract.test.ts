@@ -68,6 +68,7 @@ const fullHost = () => ({
     evictAll: vi.fn(),
     onEvent: vi.fn(),
   },
+  previewProxy: { open: vi.fn(), onBlocked: vi.fn() },
   webview: {
     ensure: vi.fn(),
     setBounds: vi.fn(),
@@ -102,9 +103,9 @@ describe('the platform seam contract', () => {
 
   // A shell that ships without preview panes or plugin webviews, which is a supported shape.
   it('holds for a host without the webview groups', () => {
-    const { preview: _preview, webview: _webview, ...host } = fullHost()
+    const { preview: _preview, previewProxy: _previewProxy, webview: _webview, ...host } = fullHost()
     install(host)
-    expect(seamProblems(SEAM_GROUPS.filter((g) => g !== 'preview' && g !== 'webviews'))).toEqual([])
+    expect(seamProblems(SEAM_GROUPS.filter((g) => !['preview', 'previewProxy', 'webviews'].includes(g)))).toEqual([])
   })
 
   it('fails a group the host claims but the seam cannot resolve', () => {
@@ -259,6 +260,7 @@ describe('the platform seam contract', () => {
       'oauthCallback',
       'rendererLayer',
       'preview',
+      'previewProxy',
       'webviews',
     ]
     expect(SEAM_GROUPS).toEqual(expected)

@@ -2,3 +2,4 @@ export { FleetStore, pairedNode, toBrokerNode, toNodeRecord } from './fleetStore
 export type { FleetNode } from './fleetStore.ts'
 export { NodeBroker } from './nodeBroker.ts'
 export { openTaskConnection } from './taskConnection.ts'
+export { openPreviewListener, PREVIEW_POLICY, type PreviewListener } from './previewProxy.ts'

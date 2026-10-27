@@ -15,6 +15,12 @@ const SUPPORT = readFileSync(join(ROOT, 'packages/client-core/src/kit/tokens/sup
 const KIT_NODES = new Set(
   [...SUPPORT.slice(SUPPORT.indexOf('export const NODE_SUPPORT = {')).matchAll(/^ {2}([A-Z]\w*):/gm)].map((m) => m[1]),
 )
+// Names no caller here uses any more but plugins elsewhere may, kept until the next plugin API major
+// (docs/plugins/forward-compatibility.md). Each says what replaced it.
+const KEPT_FOR_COMPATIBILITY = new Set([
+  'client: previewUrlForClient', // previewTarget, October 27, 2026
+])
+
 const isKitNode = (name: string): boolean => {
   const [entry, member] = name.split(': ')
   return (entry === 'ui' || entry === 'ui/tree') && KIT_NODES.has(member!)
@@ -28,6 +34,8 @@ it('every facade export has an importer outside the facade', () => {
   expect(consumers.get('node: NodePlugin')?.size).toBeGreaterThan(5)
   expect(KIT_NODES.size).toBeGreaterThan(40)
 
-  const unused = [...consumers].filter(([name, users]) => users.size === 0 && !isKitNode(name)).map(([name]) => name)
+  const unused = [...consumers]
+    .filter(([name, users]) => users.size === 0 && !isKitNode(name) && !KEPT_FOR_COMPATIBILITY.has(name))
+    .map(([name]) => name)
   expect(unused, 'delete these from the facade, or import them where they are meant to be used').toEqual([])
 })

@@ -1,6 +1,6 @@
 # Keep the Node, client, and plugin splits honest
 
-Date: October 14, 2026. Status: phases 1 to 9 implemented October 15, 2026. Phase 10, the remote preview proxy, is proposed.
+Date: October 14, 2026. Status: phases 1 to 9 implemented October 15, 2026. Phase 10, the remote preview proxy, was built October 27, 2026. Its checks in the real desktop webview are still open.
 The plans for phases 1 to 8 were removed on October 20, 2026, and are in Git history at commit
 `ffe59144b`, under `docs/future/split/`. Phase 9 stays, because phase 10 builds on its spike.
 

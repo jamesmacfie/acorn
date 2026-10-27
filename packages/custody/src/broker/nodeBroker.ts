@@ -1,6 +1,6 @@
 import { randomUUID } from 'node:crypto'
-import { Agent as HttpAgent } from 'node:http'
-import { Agent as HttpsAgent } from 'node:https'
+import { Agent as HttpAgent, request as httpRequest, type ClientRequest } from 'node:http'
+import { Agent as HttpsAgent, request as httpsRequest } from 'node:https'
 import { WebSocket } from 'ws'
 import { nodeRequest } from './nodeRequest'
 import {
@@ -66,11 +66,19 @@ export { MAX_NODE_WS_MESSAGE_BYTES } from '@acorn/protocol/ws.ts'
 const LOOPBACK_HTTP_SOCKETS = 16
 const REMOTE_HTTP_SOCKETS = 6
 const LONG_HTTP_SOCKETS = 4
+// WebKit opens six connections to one origin, so one preview's pool matches it.
+const PREVIEW_HTTP_SOCKETS = 6
 const LOOPBACK_HOSTS = new Set(['127.0.0.1', 'localhost', '[::1]'])
 
 // A node plus the material only the helper may hold: the bearer, the certificate to pin against, and
 // for a relayed node the relay's credential.
 export type BrokerNode = NodeRecord & { token: string; certPem?: string; relayCredential?: string }
+
+// One preview's way to its Node (./previewProxy.ts). `request` answers null once the Node has gone.
+export type PreviewTransport = {
+  request(path: string, options: { method: string; headers: Record<string, string> }): ClientRequest | null
+  close(): void
+}
 
 export type BrokerEvents = {
   // A server→client frame arrived. Forwarded verbatim; the broker does not interpret channels.
@@ -147,23 +155,11 @@ export class NodeBroker {
   // token or a moved endpoint cannot leave a socket on the previous credential.
   upsert(node: BrokerNode): void {
     this.remove(node.nodeId)
-    const { relay } = node
-    const agentWith = (maxSockets: number) =>
-      relay
-        ? new RelayAgent({ keepAlive: true, maxSockets, ...this.pinning(node) }, async () =>
-            this.openRelayStream(
-              relay,
-              await relayCredentialFor(node.relayCredential, relay, (route) => this.tickets.ticket(route)),
-            ),
-          )
-        : node.endpoint.startsWith('https:')
-          ? new HttpsAgent({ keepAlive: true, maxSockets, ...this.pinning(node) })
-          : new HttpAgent({ keepAlive: true, maxSockets })
     const loopback = LOOPBACK_HOSTS.has(new URL(node.endpoint).hostname)
     const connection: Connection = {
       node,
-      agent: agentWith(loopback ? LOOPBACK_HTTP_SOCKETS : REMOTE_HTTP_SOCKETS),
-      longAgent: agentWith(LONG_HTTP_SOCKETS),
+      agent: this.agentWith(node, loopback ? LOOPBACK_HTTP_SOCKETS : REMOTE_HTTP_SOCKETS),
+      longAgent: this.agentWith(node, LONG_HTTP_SOCKETS),
       ws: null,
       viewers: new EventViewers((viewerId, error) => this.events.transportError?.(node.nodeId, error, viewerId)),
       state: 'offline',
@@ -180,6 +176,42 @@ export class NodeBroker {
     }
     this.connections.set(node.nodeId, connection)
     void this.openConnection(connection)
+  }
+
+  private agentWith(node: BrokerNode, maxSockets: number): HttpAgent | HttpsAgent {
+    const { relay } = node
+    return relay
+      ? new RelayAgent({ keepAlive: true, maxSockets, ...this.pinning(node) }, async () =>
+          this.openRelayStream(
+            relay,
+            await relayCredentialFor(node.relayCredential, relay, (route) => this.tickets.ticket(route)),
+          ),
+        )
+      : node.endpoint.startsWith('https:')
+        ? new HttpsAgent({ keepAlive: true, maxSockets, ...this.pinning(node) })
+        : new HttpAgent({ keepAlive: true, maxSockets })
+  }
+
+  // A preview's own pool to this Node, pinned like the others, so a dev build's hundreds of requests don't
+  // queue behind the app's (docs/shell/bridge-and-broker.md § Previews). The bearer is added here and never
+  // leaves the broker. Once the Node is forgotten, revoked, or moved to another address or certificate,
+  // `request` answers null.
+  previewTransport(nodeId: string): PreviewTransport {
+    const node = this.connections.get(nodeId)?.node
+    if (!node) throw new Error(`Unknown node ${nodeId}`)
+    const agent = this.agentWith(node, PREVIEW_HTTP_SOCKETS)
+    return {
+      request: (path, { method, headers }) => {
+        const live = this.connections.get(nodeId)
+        if (!live || live.closed || live.state === 'revoked') return null
+        if (live.node.endpoint !== node.endpoint || live.node.fingerprint !== node.fingerprint) return null
+        const url = new URL(path, node.endpoint)
+        if (!path.startsWith('/') || url.origin !== new URL(node.endpoint).origin) return null
+        const send = url.protocol === 'https:' ? httpsRequest : httpRequest
+        return send(url, { method, agent, headers: { ...headers, authorization: `Bearer ${live.node.token}` } })
+      },
+      close: () => agent.destroy(),
+    }
   }
 
   // A ticket for a Node reached through the relay with this client's account, for the one stream that
