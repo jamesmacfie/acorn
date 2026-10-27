@@ -644,6 +644,12 @@ export default function App() {
         all.find((candidate) => candidate.id === startup.lastWorkspaceId() && candidate.projects.length) ??
         all.find((candidate) => candidate.projects.length)
       if (ws) openWorkspaceView(ws)
+      else if (!urlTask) {
+        // Nowhere to return to on this node, so it opens on Home. After a node switch the address and
+        // the selected source are still the previous node's, and neither names anything here.
+        setSelectedSource(defaultSourceId() ?? null)
+        if (params.projectId || params.taskId) navigate('/', { replace: true })
+      }
     })
     setPlaceRestored(true)
     startupAccount.restored()

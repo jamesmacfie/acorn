@@ -529,7 +529,7 @@ describe('Timeline', () => {
 describe('Timeline health', () => {
   afterEach(() => _resetSurfaceHealth())
 
-  it('reports projected and mounted turns apart, and returns its observers and frames on teardown', () => {
+  it('reports projected and mounted turns apart, and returns its observers and frames on teardown', async () => {
     const [turns, setTurns] = createSignal(['a', 'b', 'c'])
     for (const key of ['a', 'b', 'c', 'd']) heights.set(key, 100)
     dispose = render(
@@ -566,6 +566,7 @@ describe('Timeline health', () => {
 
     dispose?.()
     dispose = undefined
+    await Promise.resolve()
     const snapshot = surfaceHealthSnapshot()
     expect(snapshot.surfaces).toEqual([])
     expect(snapshot.retired.timeline?.measurement.activeObservers).toBe(0)
@@ -817,7 +818,7 @@ describe('Timeline deferred bodies', () => {
     _resetSurfaceHealth()
   })
 
-  it('builds a body when its turn comes near, in the same list item, and counts it', () => {
+  it('builds a body when its turn comes near, in the same list item, and counts it', async () => {
     let built = 0
     dispose = render(
       () => (
@@ -859,6 +860,7 @@ describe('Timeline deferred bodies', () => {
 
     dispose?.()
     dispose = undefined
+    await Promise.resolve()
     const retired = surfaceHealthSnapshot().retired.timeline
     expect(retired?.measurement.activeObservers).toBe(0)
     expect(retired?.measurement.observedElements).toBe(0)
