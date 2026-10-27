@@ -80,15 +80,13 @@ export default {
       label: 'Sentry issues',
       glyph: 'brand:sentry',
       order: 31,
-      // No `providerId`. The shell hides a source with one until a Settings connection is linked, and
-      // this rail also answers from the environment, and has to say how to connect when neither is
-      // there (docs/integrations/sentry.md § Scoping).
+      // As Rollbar's: the shell hides the source until the workspace follows a Sentry connection's
+      // project, so environment credentials alone don't draw it (docs/integrations/sentry.md § Scoping).
+      providerId: 'sentry',
       items: '/v1/p/sentry/rail-items',
       projectScoped: true,
       onSelect: { verb: 'navigate', surface: 'sentry-issue' },
-      emptyState: {
-        message: 'No unresolved issues. Connect Sentry in Settings > Services and follow it here, or set ACORN_SENTRY_TOKEN, ACORN_SENTRY_ORG, and ACORN_SENTRY_PROJECT.',
-      },
+      emptyState: { message: 'No unresolved issues in the linked Sentry projects.' },
     }],
     // The routed project's unresolved issues, from the palette. `scope: 'project'` makes the host send
     // the project the palette captured, and offer the command only where there is one. Picking a row

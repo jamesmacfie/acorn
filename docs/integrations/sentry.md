@@ -150,9 +150,10 @@ the host, and the project ID in `config`. The token needs `event:read` to list i
 ## Credentials from the environment
 
 A developer can skip the Settings step. Set `ACORN_SENTRY_TOKEN`, `ACORN_SENTRY_ORG`, and
-`ACORN_SENTRY_PROJECT` in the environment that starts the Node, and the rail shows that project's
-issues. `ACORN_SENTRY_URL` picks the region, and defaults to `https://sentry.io`. All three of the
-token, organization, and project must be set, or the environment counts as unset. A partial set, or
+`ACORN_SENTRY_PROJECT` in the environment that starts the Node, and **Find a Sentry issue** searches
+that project's issues. The rail doesn't show them (see [Scoping](#scoping)). `ACORN_SENTRY_URL`
+picks the region, and defaults to `https://sentry.io`. All three of the token, organization, and
+project must be set, or the environment counts as unset. A partial set, or
 an address on another host, logs one warning that names the variables and never a value.
 
 Any Sentry connection in Settings wins over the environment, so a person can point at their own
@@ -176,10 +177,10 @@ The environment's credential has no connection row, and the workspace map can't 
 rows. Its rows carry the fixed connection ID `env`, and they show in every project's rail. That's the
 developer's own Node-wide choice, as the exporter's `ACORN_SENTRY_DSN` is.
 
-The **Sentry issues** source declares no `providerId`, unlike Rollbar's. The shell hides a source
-with one until a Settings connection is linked, which would hide the environment's rows and the
-empty state. So the source shows whenever the plugin is installed. With no connection and no
-environment, it fetches nothing, and its empty state says how to connect.
+The **Sentry issues** source declares `providerId: 'sentry'`, as Rollbar's does. The shell hides it
+until the active workspace follows a Sentry connection's project. A connection switches the
+environment's credential off, so the environment's rows never reach the rail. Only the palette reads
+them.
 
 ## Event limits
 

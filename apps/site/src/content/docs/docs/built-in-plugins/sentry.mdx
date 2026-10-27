@@ -52,8 +52,9 @@ A connection reads one Sentry project, so connect once for each project you want
 
 If you start the Node yourself, set `ACORN_SENTRY_TOKEN`, `ACORN_SENTRY_ORG`, and
 `ACORN_SENTRY_PROJECT` in its environment instead. For the EU region, also set `ACORN_SENTRY_URL` to
-`https://de.sentry.io`. The rail then lists that project's issues in every project, with no Settings
-step. All three must be set, and the Node reads them when it starts.
+`https://de.sentry.io`. **Find a Sentry issue** then searches that project's issues with no Settings
+step. The rail shows **Sentry issues** only once the workspace follows a Sentry connection. All
+three must be set, and the Node reads them when it starts.
 
 A Sentry connection in Settings wins over the variables, so you can point at another project without
 unsetting them.
