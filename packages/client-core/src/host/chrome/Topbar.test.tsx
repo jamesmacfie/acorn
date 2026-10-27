@@ -57,6 +57,7 @@ describe('core topbar', () => {
     )
     expect(host.querySelector('.topbar')).not.toBeNull()
     expect(host.querySelector('[data-node="n1"]')).not.toBeNull()
+    expect(host.querySelector('[aria-label="Node"]')).toBeNull()
     expect(host.querySelector('[data-status]')?.textContent).toBe('Ready')
     expect(host.textContent).toContain('#4')
     expect(host.querySelector('[aria-label="Workspace"]')).not.toBeNull()
@@ -162,10 +163,60 @@ describe('core topbar', () => {
       ),
       host!,
     )
-    host.querySelector<HTMLButtonElement>('.repo-picker button')?.click()
+    host.querySelector<HTMLButtonElement>('[aria-label="Workspace"]')?.click()
     const popover = document.querySelector('.repo-picker-popover')
     expect(popover?.textContent).toContain('Default')
     expect(popover?.textContent).not.toContain('Laptop')
+  })
+
+  it('puts a node picker first, with its dot, once more than one node is connected', () => {
+    const pickNode = vi.fn()
+    const value: TopbarProps = {
+      workspacesMode: 'on',
+      workspace: { id: 'w1', label: 'Default' },
+      workspaces: [{ id: 'w1', label: 'Default', nodeId: 'n1', nodeLabel: 'Laptop', projectCount: 1 }],
+      project: null,
+      projects: [],
+      projectPickerVisible: false,
+      projectPickerDisabled: false,
+      breadcrumb: [],
+      node: { id: 'n1', label: 'Laptop', state: 'online' },
+      nodes: [
+        { id: 'n1', label: 'Laptop', state: 'online' },
+        { id: 'n2', label: 'Build box', state: 'online' },
+      ],
+      account: null,
+      canAddProject: false,
+      slots: { right: 'minted-right' as SlotRef },
+      pickWorkspace: vi.fn(),
+      pickProject: vi.fn(),
+      pickNode,
+      openSettings: vi.fn(),
+      navigate: vi.fn(),
+      clearCache: vi.fn(),
+      addProject: vi.fn(),
+    }
+    host = document.createElement('div')
+    document.body.append(host)
+    dispose = render(
+      () => (
+        <WithNestedChromeSlots slots={[]}>
+          <Topbar value={value} />
+        </WithNestedChromeSlots>
+      ),
+      host!,
+    )
+    const pickers = host.querySelectorAll('.repo-picker')
+    expect(pickers[0]?.querySelector('[aria-label="Node"]')).not.toBeNull()
+    expect(pickers[0]?.querySelector('[data-node="n1"]')).not.toBeNull()
+    expect(pickers[1]?.querySelector('[aria-label="Workspace"]')).not.toBeNull()
+    // The dot sits in the picker, so no chip at the far end.
+    expect(host.querySelector('.topbar-end [data-node]')).toBeNull()
+    host.querySelector<HTMLButtonElement>('[aria-label="Node"]')!.click()
+    ;[...document.querySelectorAll<HTMLButtonElement>('.repo-picker-popover li button')]
+      .find((button) => button.textContent?.includes('Build box'))
+      ?.click()
+    expect(pickNode).toHaveBeenCalledWith('n2')
   })
 
   it('labels the primary picker as Project and hides the second picker while off', () => {

@@ -1,7 +1,7 @@
 import { For, Show } from 'solid-js'
 import type { TopbarProps } from '@acorn/protocol/chrome.ts'
 import Picker from '../../kit/components/inputs/Picker'
-import { Button, Select } from '../../kit/components/primitives'
+import { Button } from '../../kit/components/primitives'
 import NodeChip from '../../features/fleet/NodeChip'
 import OverflowMenu from '../../features/settings/OverflowMenu'
 import { NestedChromeSlot } from '../plugins/NestedChromeSlot'
@@ -14,6 +14,10 @@ export default function Topbar(own: { value?: unknown }) {
     const q = query.trim().toLowerCase()
     return props().workspaces.filter((entry) => entry.label.toLowerCase().includes(q))
   }
+  const nodeResults = (query: string) => {
+    const q = query.trim().toLowerCase()
+    return props().nodes.filter((entry) => entry.label.toLowerCase().includes(q))
+  }
   const projectResults = (query: string) => {
     const q = query.trim().toLowerCase()
     return props().projects.filter((entry) => entry.label.toLowerCase().includes(q))
@@ -21,6 +25,26 @@ export default function Topbar(own: { value?: unknown }) {
   return (
     <div class="topbar">
       <div class="topbar-side">
+        {/* With one node there's nothing to switch to, so its state shows as a chip at the far end instead. */}
+        <Show when={props().nodes.length > 1}>
+          <Picker
+            size="sm"
+            label={
+              <span class="workspace-identity-label">
+                <Show when={props().node}>{(node) => <NodeChip nodeId={node().id} query={{}} dot />}</Show>
+                {props().node?.label ?? 'Select a node'}
+              </span>
+            }
+            ariaLabel="Node"
+            placeholder="Filter nodes…"
+            emptyText="No nodes."
+            results={nodeResults}
+            leading={(entry) => <NodeChip nodeId={entry.id} query={{}} dot />}
+            rowLabel={(entry) => entry.label}
+            isActive={(entry) => entry.id === props().node?.id}
+            onSelect={(entry) => props().pickNode(entry.id)}
+          />
+        </Show>
         <Show when={props().workspacesMode && props().workspacePickerVisible !== false && props().workspaces.length}>
           <Picker
             size="sm"
@@ -110,17 +134,8 @@ export default function Topbar(own: { value?: unknown }) {
         </Show>
       </div>
       <div class="topbar-side topbar-end">
-        <Show when={props().nodes.length > 1 || import.meta.env.DEV}>
-          <Select
-            width="auto"
-            label="Active node"
-            value={props().node?.id ?? ''}
-            onChange={(value) => props().pickNode(value)}
-            options={props().nodes.map((node) => ({ value: node.id, label: node.label }))}
-          />
-        </Show>
-        <Show when={props().node}>
-          {(node) => <NodeChip nodeId={node().id} compact={props().nodes.length <= 1} query={{}} />}
+        <Show when={props().nodes.length <= 1 && props().node}>
+          {(node) => <NodeChip nodeId={node().id} compact query={{}} />}
         </Show>
         <NestedChromeSlot slotRef={props().slots.right} />
         <OverflowMenu

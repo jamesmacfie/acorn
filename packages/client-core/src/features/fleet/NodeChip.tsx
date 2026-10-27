@@ -27,7 +27,14 @@ const HARD_ERRORS = {
   protocol_mismatch: { label: 'Version mismatch', detail: 'upgrade the app or the node' },
 } as const
 
-export default function NodeChip(props: { nodeId: string; label?: string; query?: FreshnessQuery; compact?: boolean }) {
+export default function NodeChip(props: {
+  nodeId: string
+  label?: string
+  query?: FreshnessQuery
+  compact?: boolean
+  // Only the dot, for a control that already names the node, such as the topbar's node picker.
+  dot?: boolean
+}) {
   const status = () => nodeStatus(props.nodeId)
   const freshness = () => freshnessOf(nodeState(props.nodeId), props.query)
   const hard = () => {
@@ -55,6 +62,10 @@ export default function NodeChip(props: { nodeId: string; label?: string; query?
   // One word for the state, on the chip and in its tip.
   const stateLabel = () => hard()?.label ?? (starting() ? 'Starting' : FRESHNESS_LABELS[freshness()])
 
+  const tone = () => FRESHNESS_TONE[hard() ? 'error' : freshness()]
+
+  if (props.dot) return <StatusDot tone={tone()} label={stateLabel()} tip={`${label()}: ${stateLabel()}`} />
+
   return (
     <span
       class="node-chip"
@@ -63,7 +74,7 @@ export default function NodeChip(props: { nodeId: string; label?: string; query?
       data-tip={`${label()}: ${stateLabel()}`}
       data-tip-sub={detail() || undefined}
     >
-      <StatusDot tone={FRESHNESS_TONE[hard() ? 'error' : freshness()]} />
+      <StatusDot tone={tone()} />
       <Show when={props.label}>{(label) => <span class="node-chip-label">{label()}</span>}</Show>
       <span class="node-chip-state">{stateLabel()}</span>
       <Show when={detail() && !hard()}>
