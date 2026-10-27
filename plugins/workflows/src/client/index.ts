@@ -11,7 +11,6 @@ import { WORKFLOW_CONTROL } from '@acorn/plugin-agents/contract/workflowControl.
 import { AGENT_TOOL_CARD_POINT } from '@acorn/protocol/extensionPoints.ts'
 import { WORKFLOW_GIT_LAUNCH, openWorkflowGitLaunch, workflowGitLaunchRequest } from '../contract/gitLaunch.ts'
 import { workflowApi } from './workflowsClient'
-import { scheduleAgentPrompt } from './agentPromptSchedule'
 import { workflowsCommands } from './commands'
 import { workflowsSourceContribution, workflowsSurfaceContribution } from './sourceContribution'
 import { workflowsAttentionSource } from './runs/attentionSource'
@@ -47,7 +46,10 @@ export const workflowsClientPlugin: ClientPlugin = {
     // The reads plugins/agents' pane needs (docs/plugins/collaboration.md § Collaboration rules), under
     // the id agents declares. A node with workflows disabled never provides it.
     // A kept dashboard panel's Refresh on a schedule, which core draws and can't reach this plugin for.
-    ctx.capabilities.provide(AGENT_PROMPT_SCHEDULES, { schedule: (input) => scheduleAgentPrompt(input) })
+    // Loaded on first use, because it pulls in the editor's draft code, which startup leaves out.
+    ctx.capabilities.provide(AGENT_PROMPT_SCHEDULES, {
+      schedule: async (input) => (await import('./agentPromptSchedule')).scheduleAgentPrompt(input),
+    })
     ctx.capabilities.provide(WORKFLOW_CONTROL, {
       runs: workflowApi.runs,
       steps: workflowApi.steps,
