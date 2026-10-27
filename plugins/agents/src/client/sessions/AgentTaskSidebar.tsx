@@ -1,7 +1,7 @@
 import { agentTelemetry, startAgentView } from './agentTelemetry'
 import { createMemo, createEffect, onCleanup, Show } from 'solid-js'
 import type { Task } from '@acorn/plugin-api/client'
-import type { AgentSession } from '../../contract/wire.ts'
+import type { AgentSession, AgentSessionOrigin } from '../../contract/wire.ts'
 import type { InlineDiffOrigin } from '../../contract/inlineDiff.ts'
 import { AGENT_SESSION_POINT } from '@acorn/protocol/extensionPoints.ts'
 import { InlineAnnotationMarks } from '@acorn/plugin-api/ui/host'
@@ -52,7 +52,7 @@ import {
 } from './managedSelection'
 
 // The Agent pane's `list` region: what is running in this task, grouped as requests that need you,
-// sessions you started, sessions a workflow started, and inline diff chats.
+// sessions you started, sessions a workflow started, inline diff chats, and side questions.
 //
 // Each group is a `Rows` collection, so the arrows, Home, End, type-ahead and the selection that
 // survives a refetch are the kit's and this file writes no key handling
@@ -104,11 +104,82 @@ export function AgentSidebarHeader(props: { task: Task; model: AgentPaneModel })
 }
 
 type InlineDiffSession = AgentSession & { origin: InlineDiffOrigin }
+type BtwSession = AgentSession & { origin: Extract<AgentSessionOrigin, { kind: 'btw' }> }
 
 /** A session or subagent row's tooltip. `updatedAt` rather than the newest event's time: the node
  *  rebroadcasts the row only when an event changes something else on it (`SessionFrames.rowChanged`),
  *  such as a turn ending or a subagent finishing, so a running one reads as of its last state change. */
 const lastActive = (at: number) => `Last active ${eventTime(at).full}`
+
+const needsYou = (session: AgentSession) => !['none', 'unread'].includes(session.attention)
+
+/** A fold of sessions started from somewhere else, such as a diff line or another session. Hidden
+ *  when the task has none. `detail` is each row's second line, saying where it started. */
+function OriginChats<S extends AgentSession>(props: {
+  task: Task
+  group: SessionGroup
+  label: string
+  persistKey: string
+  sessions: S[]
+  detail: (session: S) => string
+  selected: string | null
+  collapsed: boolean
+}) {
+  const waiting = () => props.sessions.filter(needsYou).length
+  return (
+    <Show when={props.sessions.length}>
+      <Fold
+        label={`${props.label} (${props.sessions.length})`}
+        persistKey={props.persistKey}
+        actions={<OrderMenu taskId={props.task.id} group={props.group} label={props.label.toLowerCase()} />}
+        meta={waiting() ? <Text emphasis="muted">{waiting()} need you</Text> : undefined}
+      >
+        <Rows
+          id={`agents:${props.group}:${props.task.id}`}
+          ariaLabel={props.label}
+          items={props.sessions.map((session) => ({ key: session.id, label: session.title }))}
+          selected={props.selected}
+          onSelect={(key) => openManagedSession(props.task.id, key)}
+          onActivate={(key) => openManagedSession(props.task.id, key)}
+        >
+          {(item, itemProps, selected) => {
+            const current = () => props.sessions.find((session) => session.id === item.key)
+            return (
+              <Show when={current()}>
+                {(session) => (
+                  <Row
+                    item={itemProps}
+                    variant="stacked"
+                    density="compact"
+                    selected={selected()}
+                    title={session().title}
+                    tip={lastActive(session().updatedAt)}
+                    tipAt={session().updatedAt}
+                    collapsed={
+                      props.collapsed ? (
+                        <RuntimeStateIcon state={session().runtimeState} queued={session().queuedTurns} />
+                      ) : undefined
+                    }
+                    leading={<RuntimeStateIcon state={session().runtimeState} queued={session().queuedTurns} />}
+                    trailing={
+                      <Show when={needsYou(session())}>
+                        <Icon {...attentionMark(session().attention)} />
+                      </Show>
+                    }
+                    onPress={() => openManagedSession(props.task.id, session().id)}
+                  >
+                    <Text emphasis="strong">{session().title}</Text>
+                    <Text emphasis="muted">{props.detail(session())}</Text>
+                  </Row>
+                )}
+              </Show>
+            )
+          }}
+        </Rows>
+      </Fold>
+    </Show>
+  )
+}
 
 export default function AgentTaskSidebar(props: { task: Task; model: AgentPaneModel }) {
   const model = props.model
@@ -193,8 +264,11 @@ export default function AgentTaskSidebar(props: { task: Task; model: AgentPaneMo
       .filter((session): session is InlineDiffSession => session.origin?.kind === 'inline-diff')
       .sort(compareSessions(sessionOrderFor(props.task.id, 'inline'))),
   )
-  const inlineNeedsYou = createMemo(
-    () => inlineSessions().filter((session) => !['none', 'unread'].includes(session.attention)).length,
+  const btwSessions = createMemo(() =>
+    model
+      .taskSessions()
+      .filter((session): session is BtwSession => session.origin?.kind === 'btw')
+      .sort(compareSessions(sessionOrderFor(props.task.id, 'btw'))),
   )
   createEffect(() => agentTelemetry.observe('agents.sidebar.row_count', sessionRows().length))
   const sessionOf = (key: string) => model.sessionRoster().find((candidate) => candidate.key === key) ?? null
@@ -282,7 +356,7 @@ export default function AgentTaskSidebar(props: { task: Task; model: AgentPaneMo
                           itemKey={{ session: current().id }}
                           dotsOnly
                         />
-                        <Show when={!['none', 'unread'].includes(current().attention)}>
+                        <Show when={needsYou(current())}>
                           <Icon {...attentionMark(current().attention)} />
                         </Show>
                         <RowActions ariaLabel="Session actions">
@@ -463,60 +537,30 @@ export default function AgentTaskSidebar(props: { task: Task; model: AgentPaneMo
           <SessionRows id={`agents:workflows:${props.task.id}`} ariaLabel="Workflow runs" items={workflowRows()} />
         </Fold>
       </Show>
-      <Show when={inlineSessions().length}>
-        <Fold
-          label={`Inline chats (${inlineSessions().length})`}
-          persistKey="agents.inline-chats"
-          actions={<OrderMenu taskId={props.task.id} group="inline" label="inline chats" />}
-          meta={inlineNeedsYou() ? <Text emphasis="muted">{inlineNeedsYou()} need you</Text> : undefined}
-        >
-          <Rows
-            id={`agents:inline:${props.task.id}`}
-            ariaLabel="Inline chats"
-            items={inlineSessions().map((session) => ({ key: session.id, label: session.title }))}
-            selected={selectedRowKey()}
-            onSelect={(key) => openManagedSession(props.task.id, key)}
-            onActivate={(key) => openManagedSession(props.task.id, key)}
-          >
-            {(item, itemProps, selected) => {
-              const current = () => inlineSessions().find((session) => session.id === item.key)
-              return (
-                <Show when={current()}>
-                  {(session) => (
-                    <Row
-                      item={itemProps}
-                      variant="stacked"
-                      density="compact"
-                      selected={selected()}
-                      title={session().title}
-                      tip={lastActive(session().updatedAt)}
-                      tipAt={session().updatedAt}
-                      collapsed={
-                        collapsed() ? (
-                          <RuntimeStateIcon state={session().runtimeState} queued={session().queuedTurns} />
-                        ) : undefined
-                      }
-                      leading={<RuntimeStateIcon state={session().runtimeState} queued={session().queuedTurns} />}
-                      trailing={
-                        <Show when={!['none', 'unread'].includes(session().attention)}>
-                          <Icon {...attentionMark(session().attention)} />
-                        </Show>
-                      }
-                      onPress={() => openManagedSession(props.task.id, session().id)}
-                    >
-                      <Text emphasis="strong">{session().title}</Text>
-                      <Text emphasis="muted">
-                        {session().origin?.path}:{session().origin?.line} ·{' '}
-                        {session().origin && isStale(session().origin!) ? 'stale patch' : 'diff chat'}
-                      </Text>
-                    </Row>
-                  )}
-                </Show>
-              )
-            }}
-          </Rows>
-        </Fold>
-      </Show>
+      <OriginChats
+        task={props.task}
+        group="inline"
+        label="Inline chats"
+        persistKey="agents.inline-chats"
+        sessions={inlineSessions()}
+        detail={(session) =>
+          `${session.origin.path}:${session.origin.line} · ${isStale(session.origin) ? 'stale patch' : 'diff chat'}`
+        }
+        selected={selectedRowKey()}
+        collapsed={collapsed()}
+      />
+      <OriginChats
+        task={props.task}
+        group="btw"
+        label="Side questions"
+        persistKey="agents.side-questions"
+        sessions={btwSessions()}
+        detail={(session) =>
+          model.taskSessions().find((source) => source.id === session.origin.sourceSessionId)?.title ?? 'Side question'
+        }
+        selected={selectedRowKey()}
+        collapsed={collapsed()}
+      />
     </Stack>
   )
 }

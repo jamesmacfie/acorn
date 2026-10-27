@@ -41,6 +41,7 @@ const session = (id: string, extra: Partial<BridgeAgentSession> = {}): BridgeAge
   model: null,
   kind: 'interactive',
   inline: false,
+  btw: false,
   runtimeState: 'ready',
   attention: 'none',
   lastEventSeq: 0,
@@ -992,8 +993,12 @@ describe('home', () => {
 
   it('groups the conversations into managed sessions, then closed folds that stay as the person leaves them', async () => {
     const subject = mount()
-    subject.state.sessions.push(session('s3', { kind: 'workflow' }), session('s4', { inline: true }))
-    subject.state.events.set('s3', []).set('s4', [])
+    subject.state.sessions.push(
+      session('s3', { kind: 'workflow' }),
+      session('s4', { inline: true }),
+      session('s5', { btw: true }),
+    )
+    subject.state.events.set('s3', []).set('s4', []).set('s5', [])
     await settle()
     await openTask(subject.root, 'Fix it')
     await tab(subject.root, 'Agents')
@@ -1011,6 +1016,7 @@ describe('home', () => {
     expect(folds()).toEqual([
       ['Workflow runs', '1', false],
       ['Inline chats', '1', false],
+      ['Side questions', '1', false],
     ])
 
     view().querySelector<HTMLElement>('details summary')!.click()
@@ -1022,6 +1028,7 @@ describe('home', () => {
     expect(folds()).toEqual([
       ['Workflow runs', '1', true],
       ['Inline chats', '1', false],
+      ['Side questions', '1', false],
     ])
   })
 

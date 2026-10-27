@@ -31,6 +31,7 @@ const session = (id: string): BridgeAgentSession => ({
   model: null,
   kind: 'workflow',
   inline: false,
+  btw: false,
   runtimeState: 'working',
   attention: 'none',
   lastEventSeq: 0,

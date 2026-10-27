@@ -102,6 +102,7 @@ function ledger(last: number) {
         model: null,
         kind: 'interactive',
         inline: false,
+        btw: false,
         runtimeState: 'ready',
         attention: 'none',
         lastEventSeq: state.last,

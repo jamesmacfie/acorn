@@ -48,7 +48,7 @@ does. From the top:
 1. **Needs you**, with the task's waiting requests, drawn only while one waits. Its rows leave out the
    task's title, since the tab already names it ([the Needs you list](./notifications.md#the-needs-you-list)).
 2. **Managed sessions**, the kit's `Section`, with **New chat** in its header.
-3. **Workflow runs** and **Inline chats**, each the kit's `Fold` with its count, closed until the
+3. **Workflow runs**, **Inline chats**, and **Side questions**, each the kit's `Fold` with its count, closed until the
    person opens it. A fold with no rows isn't drawn. The panel remembers which folds are open until it
    closes, for every task, and never stores it.
 

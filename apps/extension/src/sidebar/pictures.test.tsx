@@ -52,6 +52,7 @@ const session = (id: string, title: string, extra: Partial<BridgeAgentSession> =
   model: 'Opus · High',
   kind: 'interactive',
   inline: false,
+  btw: false,
   runtimeState: 'ready',
   attention: 'none',
   lastEventSeq: 0,

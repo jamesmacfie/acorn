@@ -88,7 +88,7 @@ summary unless the provider named another model. Starting an interactive session
 row at once and shows **Connecting…** above an editable composer. **Send** waits until the handshake,
 metadata, and saved defaults settle. Workflow creation returns when ready.
 
-Managed sessions, workflow runs, and inline chats each have an order button: running first, name,
+Managed sessions, workflow runs, inline chats, and side questions each have an order button: running first, name,
 newest first (the default), or latest activity. The choice is saved per task and group in the
 `agents.session-order` state slice (`sessionOrder.ts`). Latest activity reads `lastEventAt`, which the
 Node leaves out of the row-change check, so the order re-sorts when a turn starts or ends.
@@ -118,6 +118,11 @@ side session holds the **History copied from** context.
 `managedSelection.ts` holds which side session is open beside each session for the app lifetime.
 Nothing is saved, so a relaunch shows the conversation alone. Closing the split hides it and leaves
 the side session running. Archiving the side session closes the split too.
+
+The task sidebar lists side sessions in a **Side questions** fold under **Inline chats**, drawn only
+when the task has one. A row's second line names the session the question was asked from, or reads
+**Side question** once that session is gone. Picking a row opens the side session on its own, not the
+split, which belongs to the source session's view.
 
 A phone and the terminal client have no room for two conversations, so there the side session opens
 in place, as if picked from the sidebar. The terminal leaves **btw** off its bar, where one more button

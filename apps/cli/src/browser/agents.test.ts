@@ -3,11 +3,12 @@ import type {
   AgentEventRecord,
   AgentInputPart,
   AgentRequest,
+  AgentSession,
   AgentSessionSnapshot,
   AgentToolCall,
 } from '@acorn/plugin-agents/contract/wire.ts'
 import type { BridgeAgentHint } from '@acorn/protocol/extensionBridge.ts'
-import { agentHints, bridgeRequest, bridgeSessionRead } from './agents'
+import { agentHints, bridgeRequest, bridgeSession, bridgeSessionRead } from './agents'
 
 const record = (seq: number, event: AgentEventRecord['event'], extra: Partial<AgentEventRecord> = {}) =>
   ({
@@ -41,6 +42,26 @@ const snapshot = (events: AgentEventRecord[], turns: Partial<AgentSessionSnapsho
     events,
     requests: [],
   }) as unknown as AgentSessionSnapshot
+
+describe('session rows for the sidebar', () => {
+  it('flags inline diff chats and side questions by their origin, and neither for a plain session', () => {
+    const row = (origin: AgentSession['origin']) => bridgeSession({ ...snapshot([]).session, origin } as AgentSession)
+    expect(row(null)).toMatchObject({ inline: false, btw: false })
+    expect(row({ kind: 'btw', sourceSessionId: 's0' })).toMatchObject({ inline: false, btw: true })
+    expect(
+      row({
+        kind: 'inline-diff',
+        source: 'changes',
+        taskId: 'task',
+        path: 'a.ts',
+        side: 'new',
+        line: 1,
+        patchKey: 'p',
+        quote: 'x',
+      }),
+    ).toMatchObject({ inline: true, btw: false })
+  })
+})
 
 describe('session pages for the sidebar', () => {
   it('keeps messages, tool summaries, and errors, and drops tool output and subagent streams', () => {

@@ -465,6 +465,8 @@ export type BridgeAgentSession = {
   kind: string
   // A chat started from a line of a diff.
   inline: boolean
+  // A side question asked beside another session.
+  btw: boolean
   runtimeState: string
   attention: string
   lastEventSeq: number

@@ -10,7 +10,7 @@ import type { AgentSession, AgentSubagent } from '../../contract/wire.ts'
 import { isActiveAgent } from './agentActivity'
 
 export type SessionOrder = 'status' | 'name' | 'created' | 'activity'
-export type SessionGroup = 'managed' | 'workflow' | 'inline'
+export type SessionGroup = 'managed' | 'workflow' | 'inline' | 'btw'
 type TaskOrders = Partial<Record<SessionGroup, SessionOrder>>
 
 // Newest first, so a sidebar nobody has reordered keeps its familiar order.
@@ -24,7 +24,7 @@ export const SESSION_ORDER_CHOICES: readonly { value: SessionOrder; label: strin
 ]
 
 const ORDERS = new Set<string>(SESSION_ORDER_CHOICES.map((choice) => choice.value))
-const GROUPS = new Set<string>(['managed', 'workflow', 'inline'])
+const GROUPS = new Set<string>(['managed', 'workflow', 'inline', 'btw'])
 
 const [ordersByTask, setOrdersByTask] = createSignal<Record<string, TaskOrders>>({})
 

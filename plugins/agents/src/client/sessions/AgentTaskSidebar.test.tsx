@@ -9,6 +9,7 @@ import { agentSessionRoster } from './sessionRoster'
 import {
   clearManagedSession,
   clearManagedSubagent,
+  openSideSession,
   selectManagedSession,
   selectedManagedSession,
   selectedManagedSubagent,
@@ -79,6 +80,8 @@ const rowNamed = (title: string): HTMLElement => {
 }
 
 afterEach(() => {
+  vi.restoreAllMocks()
+  localStorage.clear()
   dispose?.()
   host?.remove()
   clearManagedSubagent('root')
@@ -215,6 +218,55 @@ describe('the delegated session sidebar', () => {
     expect(group('Workflow runs')).toContain('Workflow step')
     expect(group('Workflow runs')).toContain('Provider child')
     expect(host.textContent).toContain('Workflow runs (1)')
+  })
+
+  it('lists side sessions under Side questions, named by their source, and opens one without the split', () => {
+    const source = session('source', { title: 'Main work' })
+    const btw = (id: string, title: string, sourceSessionId: string, over: Partial<AgentSession> = {}) =>
+      session(id, { title, origin: { kind: 'btw', sourceSessionId }, ...over })
+    // A closed fold builds its rows on first open.
+    localStorage.setItem('fold:agents.side-questions', '1')
+    // The waiting side session's permission request, as its snapshot would carry it.
+    vi.spyOn(managedAgentStore, 'hold').mockReturnValue(() => undefined)
+    vi.spyOn(managedAgentStore, 'loadSnapshot').mockResolvedValue(undefined as never)
+    vi.spyOn(managedAgentStore, 'snapshotFor').mockImplementation((id) =>
+      id === 'asking'
+        ? ({
+            requests: [{ status: 'pending', providerRequestId: 'r1', title: 'Allow reading', kind: 'permission' }],
+          } as never)
+        : undefined,
+    )
+    mount(
+      [
+        source,
+        btw('asking', 'Which file?', source.id, { attention: 'permission' }),
+        btw('orphan', 'Why that test?', 'archived-source'),
+      ],
+      {},
+    )
+
+    const group = (label: string) => host.querySelector(`[aria-label="${label}"]`)?.textContent ?? ''
+    expect(group('Managed sessions')).toContain('Main work')
+    expect(group('Managed sessions')).not.toContain('Which file?')
+    expect(host.textContent).toContain('Side questions (2)')
+    expect(host.textContent).toContain('1 need you')
+    // The Needs you list names the side session too, so look in the section.
+    const sideRow = (title: string) =>
+      [...host.querySelectorAll<HTMLElement>('[aria-label="Side questions"] .ui-row')].find((row) =>
+        row.textContent?.includes(title),
+      )!
+    expect(sideRow('Which file?').textContent).toContain('Main work')
+    expect(sideRow('Why that test?').textContent).toContain('Side question')
+    expect(group('Agent requests')).toContain('Allow reading')
+
+    sideRow('Which file?').click()
+    expect(selectedManagedSession(taskId)).toBe('asking')
+    expect(openSideSession(source.id)).toBeUndefined()
+  })
+
+  it('draws no Side questions section for a task without side sessions', () => {
+    mount([session('mine', { title: 'Mine' })], {})
+    expect(host.textContent).not.toContain('Side questions')
   })
 })
 

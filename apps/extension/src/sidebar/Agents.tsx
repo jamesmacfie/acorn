@@ -15,18 +15,19 @@ import { agentState } from './state'
 
 // The folds under Managed sessions, named as the desktop app's Agents sidebar names them.
 const FOLDS: { label: string; has(session: BridgeAgentSession): boolean }[] = [
-  { label: 'Workflow runs', has: (session) => !session.inline && session.kind === 'workflow' },
+  { label: 'Workflow runs', has: (session) => !session.inline && !session.btw && session.kind === 'workflow' },
   { label: 'Inline chats', has: (session) => session.inline },
+  { label: 'Side questions', has: (session) => session.btw },
 ]
-const managed = (session: BridgeAgentSession) => !session.inline && session.kind !== 'workflow'
+const managed = (session: BridgeAgentSession) => !session.inline && !session.btw && session.kind !== 'workflow'
 
 // A provider's logo, when the agents plugin has one for it (main.tsx registers them).
 const providerMark = (providerId: string) =>
   brandMarkRegistry.get(`agents/${providerId}`) ? `brand:agents/${providerId}` : undefined
 
 // A task's Agents tab, laid out as the desktop's Agents sidebar: the task's Needs you list while an
-// agent waits, Managed sessions with New chat in its header, then Workflow runs and Inline chats as
-// folds. A task with no conversation shows an empty state instead. The item waiting for the task's next
+// agent waits, Managed sessions with New chat in its header, then Workflow runs, Inline chats, and Side
+// questions as folds. A task with no conversation shows an empty state instead. The item waiting for the task's next
 // chat shows as a chip in either. docs/browser-extension/conversations.md.
 export function Agents(props: {
   client: BridgeClient

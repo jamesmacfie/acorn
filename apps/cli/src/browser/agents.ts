@@ -107,6 +107,7 @@ export const bridgeSession = (session: AgentSession): BridgeAgentSession => ({
   model: sessionModelSummary(session) ?? null,
   kind: session.kind,
   inline: session.origin?.kind === 'inline-diff',
+  btw: session.origin?.kind === 'btw',
   runtimeState: session.runtimeState,
   attention: session.attention,
   lastEventSeq: session.lastEventSeq,

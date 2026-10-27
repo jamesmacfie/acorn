@@ -77,8 +77,14 @@ describe('session order', () => {
     expect(sessionOrderFor('task-1', 'inline')).toBe('name')
     expect(sessionOrderFor('task-1', 'managed')).toBe('created')
     expect(sessionOrderFor('task-2', 'inline')).toBe('created')
-    expect(sessionOrderSlice.codec.parse('{"managed":"status","inline":"sideways","other":"name"}')).toEqual({
+    setSessionOrder('task-1', 'btw', 'activity')
+    expect(sessionOrderFor('task-1', 'btw')).toBe('activity')
+    expect(sessionOrderFor('task-1', 'inline')).toBe('name')
+    expect(
+      sessionOrderSlice.codec.parse('{"managed":"status","btw":"status","inline":"sideways","other":"name"}'),
+    ).toEqual({
       managed: 'status',
+      btw: 'status',
     })
     expect(sessionOrderSlice.codec.parse('not json')).toEqual({})
   })
