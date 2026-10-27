@@ -153,6 +153,11 @@ Outside the startup gate, a supervised local Node the broker hasn't reported rea
 instead of **Offline**. Its freshness value stays `offline`. A remote Node with no status reads
 **Offline**, because this app doesn't control its process.
 
+A read to a Node with no status still goes out, because the broker may already hold its connection.
+A write first re-reads the fleet from the helper once, and fails fast only if the Node still has no
+status there. The broker sends a status only when one changes, so a window that never got one would
+otherwise refuse every write until a reload.
+
 The event client tracks per-connection sequence numbers and reconnects with backoff. A gap, a missed
 heartbeat, or a Node restart marks the scope stale and refetches active queries. Feature streams show
 attached or disconnected state separately from whether a process is alive.

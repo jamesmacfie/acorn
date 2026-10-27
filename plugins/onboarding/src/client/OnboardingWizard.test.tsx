@@ -15,6 +15,8 @@ import type { WorkspacesMode } from '@acorn/protocol/workspacesMode.ts'
 import { activeNodeId, projectImporterRegistry, setActiveNode } from '@acorn/plugin-api/client'
 
 const platform = vi.hoisted(() => ({
+  // False on a remote Node, whose disk the folder picker can't browse.
+  canPickFolder: true,
   pickNodeFolder: vi.fn<() => Promise<string | null>>(),
   createProject: vi.fn(),
   patchProject: vi.fn(),
@@ -27,7 +29,7 @@ vi.mock('@solidjs/router', async (original) => ({
 }))
 vi.mock('@acorn/plugin-api/client', async (original) => ({
   ...(await original<typeof import('@acorn/plugin-api/client')>()),
-  canAddProjectFromFolder: () => true,
+  canAddProjectFromFolder: () => platform.canPickFolder,
   pickNodeFolder: platform.pickNodeFolder,
   createProject: platform.createProject,
   patchProject: platform.patchProject,
@@ -137,6 +139,7 @@ beforeEach(() => {
   releaseWrite = undefined
   saveError = undefined
   vi.clearAllMocks()
+  platform.canPickFolder = true
   platform.pickNodeFolder.mockResolvedValue('/tmp/Alpha')
   platform.createProject.mockImplementation(async ({ path }: { path: string }) => {
     const id = path.split('/').at(-1)!
@@ -251,6 +254,23 @@ describe('first-run workspace choice', () => {
     click('Continue')
     await waitForText('Generate with AI')
     expect(platform.patchProject).toHaveBeenCalledWith('Alpha', { name: 'Renamed' })
+  })
+
+  it("adds a typed folder path on a remote Node, whose disk the picker can't browse", async () => {
+    platform.canPickFolder = false
+    mount('off')
+    click('Get started')
+    await waitForText('Add your first project')
+    expect(view().textContent).toContain("A project is a folder on this Node's machine.")
+    expect(view().textContent).not.toContain('Open a folder')
+    expect(button('Add project')?.disabled).toBe(true)
+    const path = view().querySelector<HTMLInputElement>('input[placeholder="/absolute/path/on/node"]')!
+    path.value = ' /srv/projects/Alpha '
+    path.dispatchEvent(new InputEvent('input', { bubbles: true }))
+    click('Add project')
+    await waitForText('Name your project')
+    expect(platform.createProject).toHaveBeenCalledWith({ path: '/srv/projects/Alpha' })
+    expect(platform.pickNodeFolder).not.toHaveBeenCalled()
   })
 
   it('keeps grouped workspace selection and creation available', async () => {

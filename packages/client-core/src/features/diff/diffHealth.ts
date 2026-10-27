@@ -60,9 +60,9 @@ function coverage(scroller: HTMLElement, selector: string): { blank: number; unc
 }
 
 /**
- * Register the pane as a `diff` surface. Call it first in the pane, before anything that registers a
- * cleanup, and `attach` its inputs once they exist: disposal then runs after the layout, its measure
- * scheduler and the loader have stopped, and the final reading shows that they did.
+ * Register the pane as a `diff` surface, and `attach` its inputs once they exist. The final reading
+ * waits for the pane's whole teardown, so it shows whether the layout, its measure scheduler and the
+ * loader stopped.
  */
 export function createDiffHealth() {
   let inputs: DiffHealthInputs | null = null

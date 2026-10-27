@@ -10,7 +10,7 @@ sources:
   - docs/tui/sources-and-settings.md
   - packages/client-core/src/features/settings/corePages.ts
   - packages/protocol/src/chrome/settingsPages.ts
-checked: 'e7c7447f7'
+checked: 'aa6684ee9'
 ---
 
 This page covers how Settings works: opening it, its groups, what the label beside each page's title
@@ -61,10 +61,9 @@ Beside each page's title, a label says what a change on it affects:
 A row stored somewhere other than its page carries its own **This device** label, such as **Tool call
 display** on **Harnesses and defaults**.
 
-With two or more Nodes paired, some pages' **Node** label is a picker, so you can change another Node's
-settings without switching to it. Those pages are **Schedules**, **Datasets**, **Run history**,
-**Security and backup**, **Audit log**, **Telemetry**, **Storage and memory**, and **Installed**. Every
-other Node page works on the Node you're using, and its label names that Node.
+Every Node, workspace, and project page works on the Node you're using, the one the top bar shows. With
+two or more Nodes paired, the **Node** label on those pages is a picker. Picking another Node switches
+to it, the same as the top bar's Node picker, and Settings stays open on the same page.
 
 A value a project's committed `.acorn/config.toml` sets shows read-only, marked **From
 .acorn/config.toml**, with the file's value above this machine's own

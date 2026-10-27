@@ -23,7 +23,6 @@
 .workspace-rail { width: var(--tabrail-w); flex: 0 0 var(--tabrail-w); min-height: 0; overflow-y: auto; background: var(--bg-subtle); border-right: var(--chrome-divider); }
 .workspace-rail .tabrail-tab { position: relative; }
 .workspace-rail .tabrail-tab.active::before { content: ''; position: absolute; left: 1px; top: 25%; bottom: 25%; width: 3px; background: var(--accent); border-radius: var(--radius-marker); }
-.workspace-rail-group + .workspace-rail-group { border-top: var(--chrome-divider); margin-top: var(--space-3); padding-top: var(--space-3); }
 .workspace-icon-editor { display: flex; flex-direction: column; align-items: flex-start; gap: var(--gap-row); }
 .workspace-icon-previews, .workspace-icon-controls { display: flex; align-items: center; flex-wrap: wrap; gap: var(--gap-row); }
 .workspace-image-crop { width: 160px; height: 160px; overflow: hidden; position: relative; border-radius: var(--radius); background: var(--bg-subtle); }

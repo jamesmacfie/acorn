@@ -110,6 +110,7 @@ describe('the diff health probe', () => {
     expect(mounted.measurement.observedElements).toBeLessThanOrEqual(mounted.mounted.dynamicBlocks + 1)
 
     unmount()
+    await Promise.resolve()
     const snapshot = surfaceHealthSnapshot()
     expect(snapshot.surfaces.filter((entry) => entry.kind === 'diff')).toEqual([])
     const retired = snapshot.retired.diff!

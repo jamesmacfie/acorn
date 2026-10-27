@@ -168,12 +168,11 @@ describe('syncFrameContributions', () => {
         category: settingsCategoryOf(page),
         scope: settingsScopeOf(page),
         icon: page.icon,
-        follows: page.followsNodeSwitcher,
       }
     }
-    expect(placed('board-plain')).toEqual({ category: 'features', scope: 'node', icon: 'puzzle', follows: undefined })
-    expect(placed('board-agents')).toEqual({ category: 'agents', scope: 'device', icon: 'bot', follows: undefined })
-    expect(placed('board-odd')).toEqual({ category: 'features', scope: 'node', icon: 'puzzle', follows: undefined })
+    expect(placed('board-plain')).toEqual({ category: 'features', scope: 'node', icon: 'puzzle' })
+    expect(placed('board-agents')).toEqual({ category: 'agents', scope: 'device', icon: 'bot' })
+    expect(placed('board-odd')).toEqual({ category: 'features', scope: 'node', icon: 'puzzle' })
     expect(placed('board-workspace').scope).toBe('workspace')
   })
 

@@ -25,7 +25,6 @@ export function WorkspaceRail(props: { value: TopbarProps }) {
     selected,
     onActivate: activate,
   })
-  const groups = createMemo(() => [...new Set(roster().map((entry) => entry.nodeId))])
   const rosterKeys = createMemo(() => JSON.stringify(roster().map(keyOf)))
   createEffect(() => {
     const key = selected()
@@ -39,40 +38,26 @@ export function WorkspaceRail(props: { value: TopbarProps }) {
       aria-label={props.value.workspacesMode === 'off' ? 'Projects' : 'Workspaces'}
       role="navigation"
     >
-      <For each={groups()}>
-        {(nodeId) => (
-          <div
-            class="workspace-rail-group"
-            role="group"
-            aria-label={props.value.nodes.find((node) => node.id === nodeId)?.label}
-          >
-            <For
-              each={roster()
-                .filter((entry) => entry.nodeId === nodeId)
-                .map(keyOf)}
+      <For each={roster().map(keyOf)}>
+        {(key) => {
+          const entry = () => roster().find((candidate) => keyOf(candidate) === key)!
+          return (
+            <RailTab
+              {...collection.itemProps(key)}
+              label={entry().label}
+              active={selected() === keyOf(entry())}
+              aria-current={selected() === keyOf(entry()) ? 'true' : undefined}
+              onClick={() => activate(keyOf(entry()))}
             >
-              {(key) => {
-                const entry = () => roster().find((candidate) => keyOf(candidate) === key)!
-                return (
-                  <RailTab
-                    {...collection.itemProps(key)}
-                    label={`${entry().label}${props.value.nodes.length > 1 ? ` · ${entry().nodeLabel}` : ''}`}
-                    active={selected() === keyOf(entry())}
-                    aria-current={selected() === keyOf(entry()) ? 'true' : undefined}
-                    onClick={() => activate(keyOf(entry()))}
-                  >
-                    <WorkspaceIdentity
-                      name={entry().label}
-                      appearance={entry().appearance}
-                      nodeId={entry().nodeId}
-                      size="rail"
-                    />
-                  </RailTab>
-                )
-              }}
-            </For>
-          </div>
-        )}
+              <WorkspaceIdentity
+                name={entry().label}
+                appearance={entry().appearance}
+                nodeId={entry().nodeId}
+                size="rail"
+              />
+            </RailTab>
+          )
+        }}
       </For>
     </nav>
   )

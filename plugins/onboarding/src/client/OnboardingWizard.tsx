@@ -232,18 +232,30 @@ export default function OnboardingWizard(props: { onClose: () => void; workspace
   async function openFolder() {
     if (!canAddProjectFromFolder()) return
     const path = await pickNodeFolder(nodeId)
-    if (!path || !stillHere()) return
+    if (path && stillHere()) await addFolder(path)
+  }
+
+  // A remote Node's disk can't be browsed from here, so its owner types the path and the Node checks it.
+  const [typedPath, setTypedPath] = createSignal('')
+  async function addTypedFolder() {
+    const path = typedPath().trim()
+    if (path && (await addFolder(path)) && stillHere()) setTypedPath('')
+  }
+
+  async function addFolder(path: string): Promise<boolean> {
     setBusy(true)
     setError('')
     try {
       const { project: created } = await createProject({ path })
-      if (!stillHere()) return
+      if (!stillHere()) return false
       remember([created.id])
       await refresh()
-      if (!stillHere()) return
+      if (!stillHere()) return false
       go('organize')
+      return true
     } catch (cause) {
       if (stillHere()) setError(cause instanceof Error ? cause.message : 'Could not add that folder.')
+      return false
     } finally {
       if (stillHere()) setBusy(false)
     }
@@ -392,22 +404,49 @@ export default function OnboardingWizard(props: { onClose: () => void; workspace
             {added().length ? 'Add another project' : 'Add your first project'}
           </Heading>
           <Text emphasis="muted" wrap>
-            A project is a folder on your computer. It doesn't need Git or GitHub, but acorn uses them when they're
-            there.
+            A project is a folder on {canAddProjectFromFolder() ? 'your computer' : "this Node's machine"}. It doesn't
+            need Git or GitHub, but acorn uses them when they're there.
           </Text>
           <AddedTally added={added()} />
           <Inline gap="stack" even>
-            <Card interactive disabled={!canAddProjectFromFolder() || busy()} onPress={() => void openFolder()}>
-              <Stack gap="row">
-                <Show when={codeHosts().length}>
-                  <Text emphasis="eyebrow">Recommended</Text>
-                </Show>
-                <Text emphasis="strong">Open a folder</Text>
-                <Text emphasis="muted" wrap>
-                  Choose a folder on this computer.
-                </Text>
-              </Stack>
-            </Card>
+            <Show
+              when={canAddProjectFromFolder()}
+              fallback={
+                <Card>
+                  <Stack gap="row">
+                    <Show when={codeHosts().length}>
+                      <Text emphasis="eyebrow">Recommended</Text>
+                    </Show>
+                    <Text emphasis="strong">Add a folder</Text>
+                    <Field label="Folder path on this Node">
+                      <Input
+                        placeholder="/absolute/path/on/node"
+                        value={typedPath()}
+                        onInput={setTypedPath}
+                        onSubmit={() => void addTypedFolder()}
+                      />
+                    </Field>
+                    <Inline gap="row">
+                      <Button busy={busy()} disabled={!typedPath().trim()} onPress={() => void addTypedFolder()}>
+                        Add project
+                      </Button>
+                    </Inline>
+                  </Stack>
+                </Card>
+              }
+            >
+              <Card interactive disabled={busy()} onPress={() => void openFolder()}>
+                <Stack gap="row">
+                  <Show when={codeHosts().length}>
+                    <Text emphasis="eyebrow">Recommended</Text>
+                  </Show>
+                  <Text emphasis="strong">Open a folder</Text>
+                  <Text emphasis="muted" wrap>
+                    Choose a folder on this computer.
+                  </Text>
+                </Stack>
+              </Card>
+            </Show>
             {/* One card per code host, each opening that host's own sign-in. */}
             <For each={codeHosts()}>
               {(provider) => (
@@ -432,9 +471,6 @@ export default function OnboardingWizard(props: { onClose: () => void; workspace
               )}
             </For>
           </Inline>
-          <Show when={!canAddProjectFromFolder()}>
-            <Text emphasis="muted">Choose the local Node in the desktop app to open a folder.</Text>
-          </Show>
           <Show when={error()}>{(text) => <Alert>{text()}</Alert>}</Show>
         </Stack>
       </Show>

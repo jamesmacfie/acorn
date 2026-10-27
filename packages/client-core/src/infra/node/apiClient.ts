@@ -5,7 +5,7 @@ import { nodeTransport } from '../platform'
 import { bodyForFetch } from './fetchBody'
 import { currentTrace, measure, recordSample, startSpan } from '../telemetry/emitter'
 import { activeNodeId } from './activeNode'
-import { nodeState, nodeStatus } from './fleet'
+import { nodeState, nodeStatus, refreshFleet } from './fleet'
 
 // The renderer's only HTTP surface. Every request goes through the desktop helper's connection broker
 // (docs/architecture/node-api.md § The platform seam), which owns the endpoint, the pinned
@@ -189,6 +189,11 @@ async function deliver(
   // `incompatible` gets its own message from the route it fails on. A node the broker hasn't reported
   // on yet counts as offline for a write, but a read still goes out, because the broker may already
   // hold its connection.
+  //
+  // A write to a node this window holds no status for asks main for the fleet once before refusing.
+  // The broker pushes a status only when one changes, so a window that never got a node's status
+  // would otherwise refuse every write to it, while its reads go through, until a reload.
+  if (isMutation(method) && !nodeStatus(nodeId)) await refreshFleet().catch(() => undefined)
   const state = isMutation(method) ? nodeState(nodeId) : nodeStatus(nodeId)?.state
   if (state === 'offline' || state === 'revoked') {
     throw new ApiError('This node is offline, so nothing was sent. Try again once it is back.', 0, 'node_offline', {

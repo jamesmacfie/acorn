@@ -4,8 +4,8 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { Disposable } from '../../kit/lib/state/registry'
 
 // The shell's four promises, each one a thing a person would notice the moment it broke: a plugin page
-// that declares nothing still has a home, a deep link lands on its page, the header's node switcher
-// never moves the window's own node, and settings reopens where it was left.
+// that declares nothing still has a home, a deep link lands on its page, the header's node selector
+// moves the window's own node, and settings reopens where it was left.
 type TestWorkspace = { id: string; name: string; projects: unknown[] }
 const mocks = vi.hoisted(() => ({
   // An accessor, so a test can stand in for a refetch with a signal.
@@ -121,6 +121,11 @@ const results = () =>
       .join(' '),
   )
 const title = () => host.querySelector('.settings-title')?.textContent
+const pickNode = (nodeId: string) => {
+  const native = host.querySelector<HTMLSelectElement>('.settings-header select')!
+  native.value = nodeId
+  native.dispatchEvent(new Event('change', { bubbles: true }))
+}
 const railItem = (label: string) =>
   [...host.querySelectorAll<HTMLButtonElement>('.settings-rail-item')].find((item) => item.textContent === label)
 const groupOf = (label: string) => railItem(label)?.closest('[role="group"]')?.getAttribute('aria-label')
@@ -150,7 +155,6 @@ beforeEach(() => {
       page('plugins', {
         label: 'Plugins',
         category: 'plugins',
-        followsNodeSwitcher: true,
         component: (props) => <p data-page="plugins">reads {props.context.scope.nodeId}</p>,
       }),
     ),
@@ -184,17 +188,39 @@ describe('SettingsView', () => {
     expect(document.activeElement?.textContent).toBe('Keyboard shortcuts')
   })
 
-  it("points a page at the switched node without moving the window's active node", () => {
+  it("moves the window's active node from the header, and every page reads that node", () => {
     open({ target: 'plugins' })
     expect(host.querySelector('[data-page="plugins"]')?.textContent).toBe('reads node-a')
-    const native = host.querySelector<HTMLSelectElement>('.settings-header select')!
-    native.value = 'node-b'
-    native.dispatchEvent(new Event('change', { bubbles: true }))
+    pickNode('node-b')
+    expect(activeNodeId()).toBe('node-b')
     expect(host.querySelector('[data-page="plugins"]')?.textContent).toBe('reads node-b')
+    // A page that reads the ambient client offers the same selector, on the same node.
+    open({ target: 'board-settings' })
+    expect(host.querySelector<HTMLSelectElement>('.settings-header select')?.value).toBe('node-b')
+  })
+
+  it('asks before a node switch drops unsaved changes', async () => {
+    held.push(
+      settingsRegistry.register(
+        page('agents', {
+          label: 'Custom agents',
+          category: 'agents',
+          component: () => {
+            useUnsavedChanges(() => true)
+            return <p>form</p>
+          },
+        }),
+      ),
+    )
+    open({ target: 'agents' })
+    pickNode('node-b')
+    expect(document.querySelector('[role="alertdialog"]')?.textContent).toContain('Discard unsaved changes')
     expect(activeNodeId()).toBe('node-a')
-    // Every visit starts on the active node again.
-    open({ target: 'plugins' })
-    expect(host.querySelector('[data-page="plugins"]')?.textContent).toBe('reads node-a')
+    ;[...document.querySelectorAll<HTMLButtonElement>('[role="alertdialog"] .ui-modal-actions button')]
+      .find((item) => item.textContent === 'Discard changes')!
+      .click()
+    await Promise.resolve()
+    expect(activeNodeId()).toBe('node-b')
   })
 
   it('takes focus back when something under the layer grabs it, and leaves it with a dialog above', () => {
@@ -249,7 +275,8 @@ describe('SettingsView', () => {
     expect(closed).toBe(0)
   })
 
-  it('names the node a page reads, as plain text, when the page does not follow the switcher', () => {
+  it('names the node a page reads, as plain text, when there is one node', () => {
+    mocks.nodes = [{ nodeId: 'node-a', label: 'Laptop' }]
     open({ target: 'board-settings' })
     expect(host.querySelector('.settings-header select')).toBeNull()
     expect(host.querySelector('.settings-scopes .ui-badge')?.textContent).toBe('Node: Laptop')
@@ -334,8 +361,8 @@ describe('SettingsView', () => {
     expect(host.querySelector('[data-page="workspace"]')?.textContent).toBe('Runn')
     expect([...host.querySelectorAll('.settings-scopes .ui-badge')].map((chip) => chip.textContent)).toEqual([
       'Workspace',
-      'Node: Laptop',
     ])
+    expect(host.querySelector<HTMLSelectElement>('.settings-header select')?.value).toBe('node-a')
     // A refetch hands back new objects. The row keeps its button, and with it the focus.
     railItem('Runn')!.focus()
     setWorkspaces([{ id: 'ws-1', name: 'Runn', projects: [] }])
@@ -381,7 +408,6 @@ describe('SettingsView', () => {
     expect(host.querySelector('.settings-breadcrumb')?.textContent).toBe('Workspaces and projects › Runn')
     expect([...host.querySelectorAll('.settings-scopes .ui-badge')].map((chip) => chip.textContent)).toEqual([
       'Project',
-      'Node: Laptop',
     ])
     // The workspace in the path is the way back, and its tip names the chord.
     const crumb = [...host.querySelectorAll<HTMLElement>('.settings-crumb')].find(

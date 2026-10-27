@@ -1,6 +1,7 @@
 # Node-scoped pickers: one selected Node for the top bar and Settings
 
-Date: October 27, 2026. Status: proposed. Implementation not started.
+Date: October 27, 2026. Status: implemented October 27, 2026. The palette stays fleet-wide, as
+recommended below.
 
 With two or more Nodes paired, the top bar has a Node selector. Picking a Node should narrow
 everything beside it to that Node. Today it doesn't. The workspace picker lists every Node's

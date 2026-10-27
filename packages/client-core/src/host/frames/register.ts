@@ -767,8 +767,7 @@ function registerSurface(pluginId: string, hash: string, row: NodePluginRow, sur
       const settingsTree = singleRegionTree(surface)
       // Placed by this build's own lists, because the row is bytes a node sent: a group or scope this
       // build does not offer plugins leaves the page in its default place rather than out of settings.
-      // The node already reported the value when it read the manifest. No `followsNodeSwitcher`: a
-      // frame is pinned to the active node (`frameNode` above), so its header names that node.
+      // The node already reported the value when it read the manifest.
       return own(settingsRegistry, {
         id: surface.id,
         label: surface.label,

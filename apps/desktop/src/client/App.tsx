@@ -155,6 +155,13 @@ const PromoteToTaskModal = lazy(() =>
   })),
 )
 
+// Settings: a full-window layer over the shell, not a route, so the workspace under it stays mounted.
+// `null` is closed. A request is a fresh object per call, so a deep link that arrives while settings is
+// open still navigates. With no target it opens on the last page used; a target is
+// `settings/<pageId>#<sectionId>` or a bare page id. Held outside App, because a node switch remounts
+// App and settings stays open across one.
+const [settingsRequest, setSettingsRequest] = createSignal<SettingsRequest | null>(null)
+
 // The Router root: the top bar, the rails, and a content region that draws the selected source or the
 // active task. Routes render nothing themselves; they exist to populate params.
 export default function App() {
@@ -165,11 +172,9 @@ export default function App() {
   const location = useLocation()
   const navigate = useNavigate()
   const isRestoring = useIsRestoring()
-  // Settings: a full-window layer over the shell, not a route, so the workspace under it stays mounted.
-  // `null` is closed. A request is a fresh object per
-  // call, so a deep link that arrives while settings is open still navigates. With no target it opens on
-  // the last page used; a target is `settings/<pageId>#<sectionId>` or a bare page id.
-  const [settingsRequest, setSettingsRequest] = createSignal<SettingsRequest | null>(null)
+  // A node switch remounts App with settings still open. Reopen on the page the view remembers, not
+  // on whatever target first opened it.
+  if (untrack(settingsRequest)) setSettingsRequest({})
   const [settingsLink, setSettingsLink] = createSignal<{
     nodeId: string
     place: Extract<Place, { kind: 'settings' }>
@@ -583,9 +588,11 @@ export default function App() {
     }
   })
 
-  // Every node's workspaces, for the topbar picker. Grouped rather than merged: a workspace belongs to
-  // exactly one node, and two nodes both having a "Default" is the normal case.
-  const fleetWorkspaces = createFleetWorkspaces()
+  // The active node's workspaces, or its projects with workspaces off, for the topbar picker and the
+  // workspace rail. Another node's are one node switch away, through the node selector. The shell
+  // remounts on a switch, so the node mounted here stays the active one. No node id means no fleet to
+  // narrow: the origin is the node, or nothing is paired.
+  const fleetWorkspaces = createFleetWorkspaces(mountedNodeId ? { nodeIds: [mountedNodeId] } : {})
   // Projects scoped to the active workspace for the topbar selector. Falls back to all projects before
   // the workspace mapping has loaded so the picker is never empty.
   const scopedProjects = () => {
@@ -637,6 +644,12 @@ export default function App() {
         all.find((candidate) => candidate.id === startup.lastWorkspaceId() && candidate.projects.length) ??
         all.find((candidate) => candidate.projects.length)
       if (ws) openWorkspaceView(ws)
+      else if (!urlTask) {
+        // Nowhere to return to on this node, so it opens on Home. After a node switch the address and
+        // the selected source are still the previous node's, and neither names anything here.
+        setSelectedSource(defaultSourceId() ?? null)
+        if (params.projectId || params.taskId) navigate('/', { replace: true })
+      }
     })
     setPlaceRestored(true)
     startupAccount.restored()
