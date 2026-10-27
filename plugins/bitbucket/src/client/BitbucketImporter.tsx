@@ -1,9 +1,8 @@
-import { createSignal, For, Show } from 'solid-js'
+import { createEffect, createSignal, For, on, Show } from 'solid-js'
 import { createQuery, useQueryClient } from '@tanstack/solid-query'
 import {
   activeNodeId,
   canAddProjectFromFolder,
-  canPickFolder,
   clientEvents,
   integrationsOptions,
   pickNodeFolder,
@@ -23,6 +22,7 @@ import {
   IconButton,
   Inline,
   Input,
+  NodePathForm,
   SettingRow,
   Stack,
   Text,
@@ -79,20 +79,55 @@ export default function BitbucketImporter(props: ProjectImporterProps) {
     return (repositories.data ?? []).filter((repository) => repository.path.toLowerCase().includes(needle))
   }
 
+  // The row and action whose folder field is open, where the folder dialog can't browse the Node's
+  // disk. Clone starts with the last folder typed for Clone. Both drop when the active Node changes,
+  // as GithubImporter's do.
+  const [typing, setTyping] = createSignal<{
+    repository: BitbucketRepository
+    action: 'map' | 'clone'
+    nodeId: string | null
+  } | null>(null)
+  const [cloneDir, setCloneDir] = createSignal('')
+  createEffect(
+    on(
+      activeNodeId,
+      () => {
+        setTyping(null)
+        setCloneDir('')
+      },
+      { defer: true },
+    ),
+  )
+  // By path, not by object, so a background refetch of the list keeps the field open.
+  const typingIn = (repository: BitbucketRepository) => {
+    const open = typing()
+    return open && open.repository.path === repository.path ? open : null
+  }
+
   const importOne = async (repository: BitbucketRepository, action: 'map' | 'clone') => {
     if (running()) return
     setError('')
+    const nodeId = activeNodeId()
     if (!canAddProjectFromFolder()) {
-      setError('Choose the local Node to import with a folder picker.')
+      setTyping({ repository, action, nodeId })
       return
     }
-    const nodeId = activeNodeId()
     // The folder first, so cancelling the dialog cancels the import.
     const folder = await pickNodeFolder(nodeId)
-    if (!folder) return
-    if (activeNodeId() !== nodeId || !canAddProjectFromFolder()) {
+    if (folder) await send(repository, action, folder, nodeId)
+  }
+
+  // Resolves true once the repository is imported, which is when the folder field closes.
+  const send = async (
+    repository: BitbucketRepository,
+    action: 'map' | 'clone',
+    folder: string,
+    nodeId: string | null,
+  ): Promise<boolean> => {
+    if (activeNodeId() !== nodeId) {
+      setTyping(null)
       setError('The active Node changed. Choose the folder again.')
-      return
+      return false
     }
     const item: BitbucketImportItem =
       action === 'map'
@@ -112,16 +147,20 @@ export default function BitbucketImporter(props: ProjectImporterProps) {
       const result = results[0]
       if (!result?.ok) {
         setError(result?.error ?? "Couldn't add that repository.")
-        return
+        return false
       }
+      setTyping(null)
+      if (action === 'clone') setCloneDir(folder)
       await Promise.all([
         queryClient.invalidateQueries({ queryKey: projectsKey }),
         queryClient.invalidateQueries({ queryKey: workspacesKey }),
         queryClient.invalidateQueries({ queryKey: repositoriesKey }),
       ])
       props.onImported(result.acornProjectId ? [result.acornProjectId] : [])
+      return true
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : String(cause))
+      return false
     } finally {
       setRunning(null)
     }
@@ -152,57 +191,50 @@ export default function BitbucketImporter(props: ProjectImporterProps) {
             .
           </Text>
           <Show
-            when={canAddProjectFromFolder()}
+            when={!repositories.isLoading}
             fallback={
-              <Text emphasis="muted">
-                {canPickFolder()
-                  ? 'Choose the local Node to import from Bitbucket.'
-                  : 'To choose a folder, use the desktop app.'}
-              </Text>
+              <EmptyState align="start" size="sm" busy>
+                Loading Bitbucket repositories…
+              </EmptyState>
             }
           >
             <Show
-              when={!repositories.isLoading}
+              when={repositories.data?.length}
               fallback={
-                <EmptyState align="start" size="sm" busy>
-                  Loading Bitbucket repositories…
+                <EmptyState align="start" size="sm">
+                  No repositories to show.
                 </EmptyState>
               }
             >
-              <Show
-                when={repositories.data?.length}
-                fallback={
-                  <EmptyState align="start" size="sm">
-                    No repositories to show.
-                  </EmptyState>
-                }
-              >
-                <Show when={error()}>{(text) => <Alert>{text()}</Alert>}</Show>
-                <Text emphasis="muted" wrap>
-                  Clone asks where to put the copy. Link folder asks where your copy already is.
-                </Text>
-                <Input
-                  kind="filter"
-                  label="Filter repositories"
-                  placeholder="Filter repositories…"
-                  value={filter()}
-                  onInput={setFilter}
-                />
-                <Show when={!shown().length}>
-                  <EmptyState align="start" size="sm">
-                    Nothing matches that filter.
-                  </EmptyState>
-                </Show>
-                <Stack gap="none">
-                  <For each={shown()}>
-                    {(repository) => (
-                      <SettingRow
-                        label={repository.path}
-                        description={[
-                          repository.private ? 'Private' : 'Public',
-                          ...(added(repository) ? [`Added as ${added(repository)!.name}`] : []),
-                        ].join(' · ')}
-                      >
+              <Show when={!typing() && error()}>{(text) => <Alert>{text()}</Alert>}</Show>
+              <Text emphasis="muted" wrap>
+                Clone asks where to put the copy. Link folder asks where your copy already is.
+              </Text>
+              <Input
+                kind="filter"
+                label="Filter repositories"
+                placeholder="Filter repositories…"
+                value={filter()}
+                onInput={setFilter}
+              />
+              <Show when={!shown().length}>
+                <EmptyState align="start" size="sm">
+                  Nothing matches that filter.
+                </EmptyState>
+              </Show>
+              <Stack gap="none">
+                <For each={shown()}>
+                  {(repository) => (
+                    <SettingRow
+                      label={repository.path}
+                      description={[
+                        repository.private ? 'Private' : 'Public',
+                        ...(added(repository) ? [`Added as ${added(repository)!.name}`] : []),
+                      ].join(' · ')}
+                      layout={typingIn(repository) ? 'stacked' : 'inline'}
+                      error={typingIn(repository) ? error() || undefined : undefined}
+                    >
+                      <Stack gap="row">
                         <Inline gap="row">
                           <For each={['clone', 'map'] as const}>
                             {(action) => (
@@ -218,11 +250,21 @@ export default function BitbucketImporter(props: ProjectImporterProps) {
                             )}
                           </For>
                         </Inline>
-                      </SettingRow>
-                    )}
-                  </For>
-                </Stack>
-              </Show>
+                        <Show when={typingIn(repository)} keyed>
+                          {(open) => (
+                            <NodePathForm
+                              action={open.action === 'clone' ? 'Clone' : 'Link folder'}
+                              busy={!!running()}
+                              initial={open.action === 'clone' ? cloneDir() : ''}
+                              submit={(folder) => send(repository, open.action, folder, open.nodeId)}
+                            />
+                          )}
+                        </Show>
+                      </Stack>
+                    </SettingRow>
+                  )}
+                </For>
+              </Stack>
             </Show>
           </Show>
         </>

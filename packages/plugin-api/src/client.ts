@@ -257,7 +257,6 @@ export type { ReferenceTargetContribution } from '@acorn/client-core/features/ag
 // because every plugin folder so far is a Node's. Transport, fleet and plugin custody stay core's
 // business.
 export {
-  canPickFolder,
   formFactor,
   oauthCallback,
   pickFiles,

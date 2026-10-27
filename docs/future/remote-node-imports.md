@@ -1,6 +1,7 @@
 # Remote Node imports: clone and link with a typed folder
 
-Date: October 27, 2026. Status: proposed. Implementation not started.
+Date: October 27, 2026. Status: implemented October 27, 2026. The live checks under Acceptance, on a
+remote Node, remain open.
 
 With a remote Node selected, such as a homelab, the GitHub, GitLab, and Bitbucket importers list the
 Node's repositories but won't import any of them. Each one says "Choose the local Node to import

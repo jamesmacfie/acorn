@@ -26,9 +26,11 @@ reports its project IDs to the host; the host selects a reported ID present in t
 The desktop keeps the pending navigation alive if that refresh removes the empty screen, and drops
 it if the active Node or route changes before completion.
 For a remote Node, enter an absolute folder path on that Node. The native folder picker selects a
-path on the desktop machine and is unavailable for remote project creation. Importer contributions
-remain listed; the GitHub importer refuses its picker action for a remote Node, because that action
-would send a desktop path to the Node.
+path on the desktop machine and is unavailable for remote project creation. The GitHub, GitLab, and
+Bitbucket importers follow the same rule. On a Node the picker can't browse, **Clone** and **Link
+folder** open a folder field in the repository's row instead of the dialog, so no desktop path
+reaches the Node. **Clone** starts with the last folder typed for **Clone** in the open importer.
+Changing the active Node closes the field.
 
 The Node detects a checkout's GitHub identity from its `origin` remote. It accepts HTTPS, SSH,
 and scp forms, including `git@github.com:Owner/repo` and `git@github.com:/Owner/repo`, with an

@@ -1,3 +1,4 @@
+import { stat } from 'node:fs/promises'
 import { isAbsolute, join } from 'node:path'
 import { Hono } from 'hono'
 import { z } from 'zod'
@@ -62,6 +63,14 @@ export const bitbucketImport = (
           path = entry.path
         } else {
           if (!isAbsolute(entry.parentDir)) throw new Error('Clone parent directory must be absolute.')
+          // Checked first, because git would fail with "spawn git ENOENT" for a missing working folder.
+          if (
+            !(await stat(entry.parentDir).then(
+              (found) => found.isDirectory(),
+              () => false,
+            ))
+          )
+            throw new Error("That folder doesn't exist on this Node.")
           // The full name names a folder and reaches git's arguments, so it's held to the repository
           // path grammar first.
           if (!isValidRepositoryPath(found.repo))

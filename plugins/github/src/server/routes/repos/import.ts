@@ -1,3 +1,4 @@
+import { stat } from 'node:fs/promises'
 import { isAbsolute, join } from 'node:path'
 import { and, eq } from 'drizzle-orm'
 import { Hono } from 'hono'
@@ -73,6 +74,14 @@ export const githubImport = (db: PluginDatabase, core: ImportCore) =>
           path = item.path
         } else {
           if (!isAbsolute(item.parentDir)) throw new Error('Clone parent directory must be absolute.')
+          // Checked first, because git would fail with "spawn git ENOENT" for a missing working folder.
+          if (
+            !(await stat(item.parentDir).then(
+              (found) => found.isDirectory(),
+              () => false,
+            ))
+          )
+            throw new Error("That folder doesn't exist on this Node.")
           await core.git.gitOrThrow(['clone', `https://github.com/${repo.owner}/${repo.name}.git`, repo.name], {
             cwd: item.parentDir,
             env: { GIT_TERMINAL_PROMPT: '0' },

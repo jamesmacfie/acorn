@@ -1,3 +1,5 @@
+import { tmpdir } from 'node:os'
+import { join } from 'node:path'
 import { Hono } from 'hono'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { Env } from '@acorn/plugin-api/testkit'
@@ -23,6 +25,8 @@ const ref = (id: string, path: string | null = null, github: ProjectRef['github'
 })
 
 describe('GitHub project importer', () => {
+  // A clone needs a folder that's really there; the clone itself is mocked.
+  const parentDir = tmpdir()
   let plugin: TestPluginDb
   let app: Hono<AppEnv>
   const create = vi.fn()
@@ -102,15 +106,28 @@ describe('GitHub project importer', () => {
   })
 
   it('clones through core.git with terminal prompts disabled and stamps the project', async () => {
-    const response = await post({ repositories: [{ repoId: 102, action: 'clone', parentDir: '/checkouts' }] })
+    const response = await post({ repositories: [{ repoId: 102, action: 'clone', parentDir }] })
     expect(response.status).toBe(200)
     expect((await response.json()).results[0]).toMatchObject({ repoId: 102, action: 'clone', ok: true })
     expect(gitOrThrow).toHaveBeenCalledWith(['clone', 'https://github.com/acme/clone-me.git', 'clone-me'], {
-      cwd: '/checkouts',
+      cwd: parentDir,
       env: { GIT_TERMINAL_PROMPT: '0' },
     })
-    expect(create).toHaveBeenCalledWith({ name: 'clone-me', path: '/checkouts/clone-me' })
-    expect(update).toHaveBeenCalledWith(expect.any(String), { path: '/checkouts/clone-me', githubRepoId: 102 })
+    expect(create).toHaveBeenCalledWith({ name: 'clone-me', path: join(parentDir, 'clone-me') })
+    expect(update).toHaveBeenCalledWith(expect.any(String), { path: join(parentDir, 'clone-me'), githubRepoId: 102 })
+  })
+
+  // A typed folder from a remote Node can name nothing; git would report that as a missing git.
+  it('fails a clone into a folder that does not exist before running git', async () => {
+    const response = await post({
+      repositories: [{ repoId: 102, action: 'clone', parentDir: join(parentDir, 'acorn-no-such-folder') }],
+    })
+    expect((await response.json()).results[0]).toMatchObject({
+      ok: false,
+      error: "That folder doesn't exist on this Node.",
+    })
+    expect(gitOrThrow).not.toHaveBeenCalled()
+    expect(create).not.toHaveBeenCalled()
   })
 
   // The duplicate this closes: a deferred project already names the repository with no path, and
@@ -135,7 +152,7 @@ describe('GitHub project importer', () => {
     gitOrThrow.mockRejectedValueOnce(new Error('authentication required'))
     const response = await post({
       repositories: [
-        { repoId: 102, action: 'clone', parentDir: '/checkouts' },
+        { repoId: 102, action: 'clone', parentDir },
         { repoId: 101, action: 'map', path: '/checkouts/map-me' },
       ],
     })
