@@ -18,8 +18,10 @@ Two surfaces register:
   its window isn't drawing.
 
 The reader runs only when someone asks for a snapshot, so an open surface pays nothing between
-requests. Disposal takes one final reading after the surface's own cleanups and keeps it as that kind's
-`retired` entry, which shows whether observers, frames, and queued work reached zero.
+requests. Disposal takes one final reading a microtask later, once the whole teardown has finished,
+and keeps it as that kind's `retired` entry, which shows whether observers, frames, and queued work
+reached zero. Reading mid-teardown isn't safe: a reader reads props and memos, and a memo that the
+same update marked stale re-runs when read, which disposes its owner a second time.
 
 | Group | Fields | Meaning |
 | --- | --- | --- |

@@ -3,9 +3,10 @@
 //
 // A surface registers when it mounts and hands over a reader. The reader is only called when someone
 // asks for a snapshot, so a surface pays for its counts at read time rather than on every scroll or
-// streamed event. Disposing the registration takes one final reading, after the surface's own
-// cleanups have run, and keeps it as the kind's `retired` entry. That reading is how a teardown check
-// proves observers and scheduled frames went back to zero without waiting on garbage collection.
+// streamed event. Disposing the registration takes one final reading a microtask later, after the
+// whole teardown it runs in, and keeps it as the kind's `retired` entry. That reading is how a
+// teardown check proves observers and scheduled frames went back to zero without waiting on garbage
+// collection.
 //
 // Numbers and one boolean, nothing else. The template below is the whole schema:
 // `sanitizeSurfaceHealth` copies only the fields it names and only when they are finite numbers (or
@@ -203,8 +204,8 @@ const notify = (entry: SurfaceHealthEntry, checkpoint: SurfaceCheckpoint): void 
 }
 
 /**
- * Register a surface. Call it before the surface's other cleanups are registered, so that disposal,
- * which Solid runs in reverse order, happens after them and the final reading sees them done.
+ * Register a surface. The final reading waits for the whole teardown, so it sees every cleanup done
+ * whichever order the surface registered them in.
  */
 export function registerSurfaceHealth(kind: SurfaceKind, read: () => SurfaceHealthReading): SurfaceHealthProbe {
   const registration: Registration = { kind, read }
@@ -215,10 +216,15 @@ export function registerSurfaceHealth(kind: SurfaceKind, read: () => SurfaceHeal
     },
     dispose: () => {
       if (!live.has(registration)) return
-      const final = readSafely(registration)
       live.delete(registration)
-      retired[kind] = final
-      notify(final, 'teardown')
+      // A microtask later, once Solid has finished the teardown this runs in. Readers read props and
+      // memos, and a memo the same update has marked stale re-runs when read. Mid-teardown, that re-run
+      // disposes its owner a second time, under the loop that is disposing it now.
+      queueMicrotask(() => {
+        const final = readSafely(registration)
+        retired[kind] = final
+        notify(final, 'teardown')
+      })
     },
   }
 }

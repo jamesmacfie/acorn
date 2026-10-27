@@ -471,6 +471,7 @@ describe('rendered-surface checkpoints', () => {
     }))
     probe.checkpoint('ready')
     probe.dispose()
+    await Promise.resolve()
     await flushTelemetry()
     const rows = posted[0].filter(
       (record): record is Extract<TelemetryRecord, { kind: 'metric' }> =>

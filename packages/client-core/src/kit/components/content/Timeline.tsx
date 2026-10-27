@@ -146,9 +146,8 @@ export function Timeline(props: {
   let scroller: HTMLDivElement | undefined
 
   // What this timeline says about itself (../../lib/telemetry/surfaceHealth.ts). Registered before the early
-  // return, so a plain run of cards counts too, and before every cleanup below, so the final reading
-  // sees the observers disconnected and the frames cancelled. Observers count up when constructed and
-  // down when disconnected, which is how a teardown check sees them go without waiting on the collector.
+  // return, so a plain run of cards counts too. Observers count up when constructed and down when
+  // disconnected, which is how a teardown check sees them go without waiting on the collector.
   const counts = {
     observers: 0,
     observed: 0,
