@@ -1,5 +1,5 @@
 import { resolve } from 'node:path'
-import type { Plugin } from 'vite'
+import { normalizePath, type Plugin } from 'vite'
 import { describeChunks } from '../../scripts/chunkGraph.mts'
 
 // Top-level imports in main are awaited before rendering. Imports inside functions are optional or
@@ -7,7 +7,8 @@ import { describeChunks } from '../../scripts/chunkGraph.mts'
 // dynamic imports cannot hide a startup dependency.
 export function startupGraph(): Plugin {
   const repo = resolve(import.meta.dirname, '../..')
-  const entry = resolve(import.meta.dirname, 'src/main.tsx')
+  // Vite keys modules by forward-slash paths, and resolve() gives backslashes on Windows.
+  const entry = normalizePath(resolve(import.meta.dirname, 'src/main.tsx'))
   return {
     name: 'acorn:tui-startup-graph',
     apply: 'build',

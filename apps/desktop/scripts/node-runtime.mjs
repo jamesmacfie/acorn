@@ -1,7 +1,7 @@
 import { createHash } from 'node:crypto'
 import { execFileSync } from 'node:child_process'
 import { chmodSync, copyFileSync, existsSync, mkdirSync, mkdtempSync, readFileSync, renameSync, rmSync, writeFileSync } from 'node:fs'
-import { homedir, tmpdir } from 'node:os'
+import { homedir } from 'node:os'
 import { dirname, resolve } from 'node:path'
 
 // The pinned Node runtime that rides in the bundle, fetched from nodejs.org and verified against that
@@ -87,7 +87,10 @@ export const cachedRuntime = async (version, triple, cacheDir = CACHE) => {
   const archive = windows ? `${dist}/node.exe` : `node-v${version}-${dist}.tar.gz`
   const tarball = await verifiedDownload(version, archive)
 
-  const scratch = mkdtempSync(resolve(tmpdir(), 'acorn-node-runtime-'))
+  // Scratch sits inside the cache, because a rename across filesystems fails with EXDEV, as /tmp and
+  // the home folder are in the Linux archive jobs' container.
+  mkdirSync(cacheDir, { recursive: true })
+  const scratch = mkdtempSync(resolve(cacheDir, '.scratch-runtime-'))
   try {
     const local = resolve(scratch, windows ? 'node.exe' : archive)
     writeFileSync(local, tarball)
@@ -95,7 +98,6 @@ export const cachedRuntime = async (version, triple, cacheDir = CACHE) => {
     if (!windows) execFileSync('tar', ['-xzf', local, '-C', scratch, '--strip-components=2', `node-v${version}-${dist}/bin/node`])
     const extracted = resolve(scratch, 'node')
     if (windows) writeFileSync(extracted, tarball)
-    mkdirSync(cacheDir, { recursive: true })
     // Written under its final name only once it is whole, so an interrupted stage cannot leave a
     // truncated runtime behind that the next run would trust.
     rmSync(cached, { force: true })
@@ -114,12 +116,12 @@ export const cachedLicense = async (version, cacheDir = CACHE) => {
   if (existsSync(cached)) return cached
   const dist = `node-v${version}-linux-x64`
   const tarball = await verifiedDownload(version, `${dist}.tar.gz`)
-  const scratch = mkdtempSync(resolve(tmpdir(), 'acorn-node-license-'))
+  mkdirSync(cacheDir, { recursive: true })
+  const scratch = mkdtempSync(resolve(cacheDir, '.scratch-license-'))
   try {
     const local = resolve(scratch, `${dist}.tar.gz`)
     writeFileSync(local, tarball)
     execFileSync(tar, ['-xzf', local, '-C', scratch, '--strip-components=1', `${dist}/LICENSE`])
-    mkdirSync(cacheDir, { recursive: true })
     renameSync(resolve(scratch, 'LICENSE'), cached)
     return cached
   } finally {
