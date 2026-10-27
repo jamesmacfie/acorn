@@ -563,6 +563,20 @@ describe('durable queue admission', () => {
     expect(counts()).toEqual({ active: 0, reserved: 0 })
   })
 
+  // The queue panel tells a person to send another message to retry a failed session.
+  it('retries a failed session when another message is sent', async () => {
+    const start = launch
+    launch = async () => {
+      throw new Error('Synthetic startup failure')
+    }
+    const item = await session()
+    const held = await enqueue(item.id)
+    await vi.waitFor(async () => expect((await runtime.store.snapshot(item.id)).session.runtimeState).toBe('failed'))
+    launch = start
+    await enqueue(item.id, 'Try again')
+    await vi.waitFor(() => expect(sends[0]).toBe(held.id))
+  })
+
   it('shutdown joins the reserved process generation and leaves its durable turn queued', async () => {
     const held = deferred<void>(),
       start = launch

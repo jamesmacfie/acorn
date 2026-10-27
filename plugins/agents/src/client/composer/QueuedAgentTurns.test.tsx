@@ -55,7 +55,7 @@ const turn = (input: AgentTurn['input']): AgentTurn => ({
   completedAt: null,
 })
 
-const mount = (queued: AgentTurn, runtimeState: 'working' | 'ready' = 'working') => {
+const mount = (queued: AgentTurn, runtimeState: 'working' | 'ready' | 'failed' = 'working') => {
   const host = document.createElement('div')
   document.body.append(host)
   const unmount = render(
@@ -82,6 +82,16 @@ it.each(['project', 'workspace'])('names a blocked queue limit per %s', (singula
   const { host, dispose } = mount(turn([{ type: 'text', text: 'Next step' }]), 'ready')
   try {
     expect(host.textContent).toContain(`2 turns at once per provider and 3 per ${singular}.`)
+  } finally {
+    dispose()
+  }
+})
+
+it('says a failed session holds the queue until another message is sent', () => {
+  const { host, dispose } = mount(turn([{ type: 'text', text: 'Next step' }]), 'failed')
+  try {
+    expect(host.textContent).toContain('Send another message to try again.')
+    expect(host.textContent).not.toContain('Sends when the provider is ready.')
   } finally {
     dispose()
   }

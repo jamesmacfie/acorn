@@ -103,7 +103,10 @@ export default function QueuedAgentTurns(props: {
                       ? `Usage limit reached. Continues automatically at ${new Date(scheduled()!.notBefore!).toLocaleString()}.`
                       : props.runtimeState === 'working' || props.runtimeState === 'waiting'
                         ? 'Sends when the current turn finishes.'
-                        : 'Sends when the provider is ready.'}
+                        : // The dispatcher doesn't retry a failed session until another turn is queued.
+                          props.runtimeState === 'failed'
+                          ? 'The provider failed, so this is on hold. Send another message to try again.'
+                          : 'Sends when the provider is ready.'}
                   </Text>
                 }
               >
