@@ -40,6 +40,51 @@ assets. The renderer loads from the shell's `app://acorn` scheme, holds no token
 reaches Nodes through the helper's connection broker. [Architecture overview](./docs/architecture-overview.md)
 has the full picture.
 
+## Run a Node in Docker
+
+Each release publishes a Linux x64 image of the standalone Node to `ghcr.io/jamesmacfie/acorn-node`.
+It runs anywhere Docker does, including a Mac too old for the macOS archive, which needs macOS 13.5.
+The image includes Git, tmux, ripgrep, and the `claude` and `codex` commands, so agents run inside the
+container and the machine needs neither installed.
+
+Save this as `compose.yaml`. Change `homelab.local` to the name other machines use to reach this one,
+and `~/Projects` to the folder that holds your repositories.
+
+```yaml
+services:
+  acorn-node:
+    image: ghcr.io/jamesmacfie/acorn-node:latest
+    restart: unless-stopped
+    ports:
+      - "4317:4317"
+    environment:
+      ACORN_ADVERTISE_HOST: homelab.local
+    volumes:
+      - acorn-data:/data # the Node's keys, database, and paired devices
+      - acorn-home:/home/acorn # Claude and Codex logins, Git settings, and SSH keys
+      - ~/Projects:/projects
+volumes:
+  acorn-data:
+  acorn-home:
+```
+
+Keep the port the same on both sides, because the Node checks it in every request. To use another
+port, change both numbers and set `ACORN_PORT` to match.
+
+1. Start the Node: `docker compose up -d`.
+2. Read the pairing code and the six identity words: `docker compose logs acorn-node`.
+3. In the desktop app, open **Settings > Nodes**, add `https://homelab.local:4317`, check the words
+   match, and enter the code. The code lasts 10 minutes. For a fresh one, run
+   `docker compose kill -s USR1 acorn-node`, then read the logs again.
+4. Sign in to the agents once, inside the container: `docker compose exec acorn-node claude`, and
+   `docker compose exec acorn-node codex login --device-auth` for Codex.
+5. Add projects from `/projects`. For Git to push, set your name and email, and add an SSH key, in
+   the same way: `docker compose exec acorn-node bash`.
+
+To upgrade, run `docker compose pull`, then `docker compose up -d`. Both volumes stay, and the Node
+migrates its data when it starts. On macOS, set Docker to start at login, or the Node won't come back
+after a restart.
+
 ## Repository layout
 
 ```text

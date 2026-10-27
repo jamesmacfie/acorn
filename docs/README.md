@@ -240,6 +240,7 @@ Start with the plugin map, then follow the authoring guide or API reference.
 | [browser-extension/project-sites.md](./browser-extension/project-sites.md) | Web addresses tied to a project on the Node, the extension's project suggestions and overrides, and the site operations. |
 | [browser-extension/notifications.md](./browser-extension/notifications.md) | The extension's toolbar badge, waiting list, and opt-in OS notifications for requests agents are waiting on, and the `requests.pending` operation. |
 | [node-distribution.md](./node-distribution.md) | The standalone node tarball, the self-contained platform archives, and how a Node boots without a desktop. |
+| [node-distribution/container.md](./node-distribution/container.md) | The standalone Node's container image, how a tag publishes it, and what a deployment keeps on volumes. |
 | [node-distribution/dependency-security.md](./node-distribution/dependency-security.md) | How the standalone Node's runtime dependencies are pinned, audited, and locked. |
 | [node-distribution/install.md](./node-distribution/install.md) | The archive installers, where they put the Node, starting it at login with `acorn node service`, upgrades, and removal. |
 | [node-distribution/keep-awake.md](./node-distribution/keep-awake.md) | How a Node keeps its computer awake while agents work or workflows run, the inhibitor on each platform, and the setting. |

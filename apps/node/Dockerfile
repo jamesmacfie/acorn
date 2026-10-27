@@ -20,6 +20,8 @@ WORKDIR /opt/acorn-node
 RUN npm ci --omit=dev --no-audit --no-fund && node scripts/prune-runtime.mjs
 
 FROM node:24.21.0-bookworm-slim
+# Links the published image to its repository (.github/workflows/build-node.yml pushes it on a tag).
+LABEL org.opencontainers.image.source=https://github.com/jamesmacfie/acorn
 # The tools a task runs: Git for projects and worktrees, tmux for terminals, ripgrep for search.
 RUN apt-get update \
   && apt-get install -y --no-install-recommends ca-certificates git openssh-client ripgrep tmux \

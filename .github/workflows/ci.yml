@@ -175,8 +175,12 @@ jobs:
       ACORN_SENTRY_DSN: ${{ secrets.ACORN_SENTRY_DSN }}
       SENTRY_AUTH_TOKEN: ${{ secrets.SENTRY_AUTH_TOKEN }}
 
-  # The Node-only archives, on the installers' triggers and behind the same gate.
+  # The Node-only archives and container image, on the installers' triggers and behind the same gate.
   package-node:
     needs: [lint, test]
     if: startsWith(github.ref, 'refs/tags/v') || github.event_name == 'workflow_dispatch'
+    # The image job pushes to the GitHub container registry on a tag.
+    permissions:
+      contents: read
+      packages: write
     uses: ./.github/workflows/build-node.yml
