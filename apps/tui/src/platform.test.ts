@@ -32,6 +32,7 @@ const LEFT_OUT: SeamGroup[] = [
   'folderPicker',
   'rendererLayer',
   'preview',
+  'previewProxy',
   'webviews',
 ]
 

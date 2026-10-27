@@ -22,6 +22,7 @@ const LEFT_OUT: SeamGroup[] = [
   'oauthCallback',
   'rendererLayer',
   'preview',
+  'previewProxy',
   'webviews',
 ]
 
