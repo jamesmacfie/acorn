@@ -25,7 +25,7 @@ import {
   openManagedSession,
 } from './sessions/managedSelection'
 import { activateManagedAgentNotifications, managedAgentStore } from './sessions/managedStore'
-import { clearableAgents, markAgentsRead } from './sessions/markAgentsRead'
+import { acknowledgeAgentRows, clearableAgents, markAgentsRead } from './sessions/markAgentsRead'
 import { AGENT_PANE_ID, agentPaneContribution } from './paneContribution'
 import { agentRailMarkerContribution } from './railMarkerContribution'
 import { managedReferenceTarget } from './referenceContribution'
@@ -478,6 +478,7 @@ export const agentsClientPlugin: ClientPlugin = {
           }
         })
       },
+      acknowledge: acknowledgeAgentRows,
     })
   },
   // Not registration: these attach listeners to the managed-session store and return nothing the

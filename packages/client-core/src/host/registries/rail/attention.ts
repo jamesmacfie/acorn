@@ -54,6 +54,11 @@ export type AttentionSourceContribution = {
   // every paired node at once, and a fetcher that ignored its argument would silently report the
   // active node's items under every card.
   fetch(nodeId: string, signal: AbortSignal): Promise<AttentionItem[]>
+  // The owner read these `info` rows with the bell's "Mark all read". The inbox hides them at once from
+  // a set that lives only as long as the window, so a source whose node keeps the row has to clear it
+  // there too, or the row returns in the next window or after a node switch. Absent means the row is
+  // gone once the client stops asking.
+  acknowledge?(nodeId: string, items: AttentionItem[]): Promise<void>
 }
 
 export const attentionRegistry = new Registry<AttentionSourceContribution>('attention')

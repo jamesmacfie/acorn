@@ -3,7 +3,10 @@ import type { NodeRecord } from '@acorn/protocol/broker.ts'
 import { createFleetQuery, type FleetUnavailable } from '../../infra/node/fanout'
 import { attentionSources, compareAttention, type AttentionItem } from '../../host/registries/rail/attention'
 import { onScopeEvicted } from '../../host/registries/shell/scopeEviction'
+import { createLogger } from '../../infra/telemetry/logger'
 import { onAttentionStateChange } from './deliver'
+
+const log = createLogger('attention-inbox')
 
 // The fleet-wide attention list, merged across every source and every node.
 //
@@ -45,6 +48,29 @@ const seenKey = (nodeId: string, itemId: string): string => `${nodeId}:${itemId}
 export function markAttentionSeen(nodeId: string, itemId: string): void {
   const key = seenKey(nodeId, itemId)
   setSeen((current) => (current.has(key) ? current : new Set<string>(current).add(key)))
+}
+
+// The bell's "Mark all read" over the rows it shows: hidden here at once, and handed to each source to
+// clear on its node, since the set above is forgotten by the next window. A block is skipped, for the
+// rule below. A failed hand-off leaves the row hidden in this window and back in the next, which is
+// what happened before sources could hear about it, so it is logged rather than shown.
+export function acknowledgeAttention(rows: readonly AttentionRow[]): void {
+  const batches = new Map<string, { nodeId: string; sourceId: string; items: AttentionItem[] }>()
+  for (const row of rows) {
+    if (row.item.severity !== 'info') continue
+    markAttentionSeen(row.nodeId, row.item.id)
+    const key = `${row.nodeId}:${row.sourceId}`
+    const batch = batches.get(key) ?? { nodeId: row.nodeId, sourceId: row.sourceId, items: [] }
+    batch.items.push(row.item)
+    batches.set(key, batch)
+  }
+  const sources = new Map(attentionSources().map((source) => [source.id, source]))
+  for (const { nodeId, sourceId, items } of batches.values()) {
+    sources
+      .get(sourceId)
+      ?.acknowledge?.(nodeId, items)
+      .catch((error: unknown) => log.warn(`${sourceId}: acknowledge failed`, error, { 'attention.source': sourceId }))
+  }
 }
 
 // Only a nudge is retirable, and `severity` is the vocabulary for that: `info` means nothing is

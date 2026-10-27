@@ -1,8 +1,8 @@
 // @vitest-environment node
-import { describe, expect, it } from 'vitest'
-import type { AttentionItem } from '../../host/registries/rail/attention'
+import { describe, expect, it, vi } from 'vitest'
+import { attentionRegistry, type AttentionItem } from '../../host/registries/rail/attention'
 import { evictScope } from '../../host/registries/shell/scopeEviction'
-import { attentionIsAcknowledged, markAttentionSeen } from './attentionInbox'
+import { acknowledgeAttention, attentionIsAcknowledged, markAttentionSeen } from './attentionInbox'
 
 const item = (over: Partial<AttentionItem>): AttentionItem => ({
   id: 'agents.sessions:s1',
@@ -50,5 +50,29 @@ describe('acknowledge on view', () => {
     markAttentionSeen('n1', row.id)
     evictScope({ scope: 'node-switched' })
     expect(attentionIsAcknowledged('n1', row)).toBe(false)
+  })
+})
+
+// The seen set lives as long as the window, so "Mark all read" also tells each source, which clears
+// the row on its node. Otherwise every cleared row is back in the next window.
+describe('mark all read', () => {
+  it('hides each nudge and hands it to its source, one batch per node', () => {
+    const acknowledge = vi.fn(async () => {})
+    const registration = attentionRegistry.register({ id: 'src', order: 1, fetch: async () => [], acknowledge })
+    const done = item({ id: 'src:a' })
+    const other = item({ id: 'src:b' })
+    const blocked = item({ id: 'src:c', severity: 'warn' })
+    const row = (nodeId: string, it: AttentionItem) => ({ item: it, nodeId, node: {} as never, sourceId: 'src' })
+
+    acknowledgeAttention([row('n1', done), row('n1', blocked), row('n2', other)])
+
+    expect(attentionIsAcknowledged('n1', done)).toBe(true)
+    expect(attentionIsAcknowledged('n2', other)).toBe(true)
+    // A block is never handed over: reading about it does not lift it.
+    expect(acknowledge.mock.calls).toEqual([
+      ['n1', [done]],
+      ['n2', [other]],
+    ])
+    registration.dispose()
   })
 })

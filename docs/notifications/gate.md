@@ -60,6 +60,13 @@ clears on a Node switch, like every other Node-scoped signal
 **Mark all read** applies to the whole number the bell shows. It marks every notice read and
 acknowledges every nudge on show. It can't empty a bell that holds a real block.
 
+The set alone can't hold a **Mark all read**. It's empty in a new window and after a Node switch,
+and the Node still flags each of those sessions, so every cleared row came back. So
+`acknowledgeAttention` also hands each nudge to its source's optional `acknowledge` hook, batched by
+Node. The agents plugin answers by moving each session's read mark to its end, which clears its
+`attention` on the Node, the same as opening the session. It skips a session that has turned into a
+block since the bell drew it. A source with no hook keeps the window-only behavior.
+
 ## Keeping the inbox current
 
 The inbox fetches its rows once and nothing else asks again, so `observeAttention` also tells it when

@@ -10,7 +10,7 @@ import {
   unreadCount,
   type Notice,
 } from './notifications'
-import { createAttentionInbox, markAttentionSeen } from './attentionInbox'
+import { acknowledgeAttention, createAttentionInbox } from './attentionInbox'
 import { parseNotificationSettings } from './settings'
 import { onNoticeActivated } from '../../infra/platform'
 import { trackBadge } from './badge'
@@ -55,11 +55,11 @@ export default function NotificationBell(props: { onSelectTask: (taskId: string)
   const pill = () => unreadCount() + inbox().rows.length
 
   // "Mark all read" means the number the bell shows, and the bell shows both sections. Notices go
-  // read; an attention row retires only if it is a nudge, which is the rule `attentionIsAcknowledged`
-  // keeps — a block is still a block after you have read about it.
+  // read; an attention row retires only if it is a nudge, and its source hears about it so the node
+  // stops raising it (`acknowledgeAttention`). A block is still a block after you have read about it.
   const clearAll = () => {
     markAllRead()
-    for (const row of inbox().rows) markAttentionSeen(row.nodeId, row.item.id)
+    acknowledgeAttention(inbox().rows)
   }
 
   // Opening a notice, from the row below and from a click on the system banner it raised. One
