@@ -144,8 +144,12 @@ describe('the interpreter', () => {
 
   it('cancels the program and its calls when the outer call is cancelled', async () => {
     const outer = new AbortController()
-    const running = runScript('return await tools.slow({})', { ...context(hang), signal: outer.signal })
-    setTimeout(() => outer.abort(), 20)
+    // Cancels once the call has started; a fixed delay can fire before a slow machine reaches it.
+    const hangThenCancel: ToolContext['callTool'] = (name, input, call) => {
+      setTimeout(() => outer.abort())
+      return hang(name, input, call)
+    }
+    const running = runScript('return await tools.slow({})', { ...context(hangThenCancel), signal: outer.signal })
     expect(await running).toMatchObject({
       ok: false,
       error: { message: 'The program stopped. The call was cancelled.' },
