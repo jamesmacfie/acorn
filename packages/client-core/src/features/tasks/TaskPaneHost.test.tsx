@@ -39,11 +39,19 @@ const layout = vi.hoisted(() => ({
 }))
 const maximized = vi.hoisted(() => ({ pane: undefined as string | undefined }))
 const dispatched = vi.hoisted(() => [] as unknown[])
-vi.mock('./tasks', () => ({
-  layoutForTask: () => layout,
-  maximizedPane: () => maximized.pane,
-  dispatchLayout: (_taskId: string, action: unknown) => void dispatched.push(action),
-}))
+// A dispatch re-renders the host, as the real store does, so a test sees what a layout change tears down.
+vi.mock('./tasks', async () => {
+  const { createSignal } = await import('solid-js')
+  const [version, setVersion] = createSignal(0)
+  return {
+    layoutForTask: () => (version(), layout),
+    maximizedPane: () => maximized.pane,
+    dispatchLayout: (_taskId: string, action: unknown) => {
+      dispatched.push(action)
+      setVersion((current) => current + 1)
+    },
+  }
+})
 vi.mock('../../infra/node/activeNode', () => ({ activeNodeId: () => 'node-1' }))
 vi.mock('../../infra/node/fleet', () => ({ nodeState: () => ({}) }))
 vi.mock('../../infra/node/freshness', () => ({ freshnessOf: () => 'live' }))
@@ -289,6 +297,26 @@ describe('TaskPaneHost', () => {
     expect(host.querySelectorAll('.pane-divider')).toHaveLength(2)
   })
 
+  it('keeps resizing after the first step of a divider drag changes the layout', () => {
+    pane({ id: 'pr', order: 0 })
+    pane({ id: 'changes', order: 1 })
+    layout.panes = ['pr', 'changes']
+    vi.stubGlobal('requestAnimationFrame', (step: FrameRequestCallback) => (step(0), 1))
+    mount()
+    for (const slot of host.querySelectorAll<HTMLElement>('.task-slot'))
+      slot.getBoundingClientRect = () => ({ width: 400 }) as DOMRect
+    const divider = host.querySelector<HTMLElement>('.pane-divider')!
+    divider.setPointerCapture = () => {}
+    expect(divider.getAttribute('aria-label')).toBe('Resize pr and changes')
+
+    divider.dispatchEvent(new PointerEvent('pointerdown', { bubbles: true, clientX: 400 }))
+    window.dispatchEvent(new PointerEvent('pointermove', { clientX: 410 }))
+    window.dispatchEvent(new PointerEvent('pointermove', { clientX: 450 }))
+    window.dispatchEvent(new PointerEvent('pointerup', { clientX: 450 }))
+
+    expect(dispatched.map((action) => (action as { deltaPx: number }).deltaPx)).toEqual([10, 50])
+  })
+
   it('contains a pane that throws and keeps its neighbour', () => {
     vi.spyOn(console, 'error').mockImplementation(() => {})
     pane({
@@ -362,9 +390,10 @@ describe('TaskPaneHost', () => {
     pane({ id: 'changes', order: 1 })
 
     mount()
-    const tab = [...host.querySelectorAll<HTMLElement>('.pane-switcher [aria-pressed]')][1]
-    tab?.dispatchEvent(new MouseEvent('click', { bubbles: true }))
-    tab?.dispatchEvent(new MouseEvent('click', { bubbles: true, metaKey: true }))
+    // Looked up for each click, because a dispatch redraws the switcher.
+    const tab = () => [...host.querySelectorAll<HTMLElement>('.pane-switcher [aria-pressed]')][1]
+    tab()?.dispatchEvent(new MouseEvent('click', { bubbles: true }))
+    tab()?.dispatchEvent(new MouseEvent('click', { bubbles: true, metaKey: true }))
 
     // Every layout change goes through the one reducer; the host never writes the store itself.
     expect(dispatched).toEqual([

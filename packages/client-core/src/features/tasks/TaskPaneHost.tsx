@@ -243,6 +243,8 @@ export default function TaskPaneHost(props: {
   const minWidthFor = (pane: PaneContribution) => pane.minWidth ?? 240
 
   const slotRefs = new Map<PaneId, HTMLDivElement>()
+  const resizeLabel = (pane: PaneContribution, next: PaneContribution | undefined) =>
+    `Resize ${pane.label} and ${next?.label ?? 'next pane'}`
 
   // Pointer capture, rAF coalescing, selection suppression, and the arrow/Home/End keys come from
   // createSplitDrag; the weight model stays here. Widths are snapshotted at pointer-down, because
@@ -257,7 +259,7 @@ export default function TaskPaneHost(props: {
     }
     return createSplitDrag({
       axis: 'x',
-      label: `Resize ${pane.label} and ${adjacent()?.label ?? 'next pane'}`,
+      label: resizeLabel(pane, adjacent()),
       onStart: measure,
       onDelta: (deltaPx) => {
         const next = adjacent()
@@ -304,6 +306,10 @@ export default function TaskPaneHost(props: {
             onMount(() => {
               if (!pane.layout) featureMounted(pane.id)
             })
+            // Built here, once per pane, and not in the divider's markup. There it re-ran on every
+            // layout change, so the first resize step of a drag disposed the drag and ended it.
+            const adjacent = () => visiblePanes()[index() + 1]
+            const drag = paneDrag(pane, adjacent)
             return (
               <>
                 <div
@@ -349,16 +355,12 @@ export default function TaskPaneHost(props: {
                   </ContributionBoundary>
                 </div>
                 <Show when={!maximizedPane(props.task.id) && index() < visiblePanes().length - 1}>
-                  {(() => {
-                    const adjacent = () => visiblePanes()[index() + 1]
-                    return (
-                      <div
-                        {...paneDrag(pane, adjacent).handleProps}
-                        class="pane-divider ui-split-handle"
-                        data-axis="x"
-                      />
-                    )
-                  })()}
+                  <div
+                    {...drag.handleProps}
+                    aria-label={resizeLabel(pane, adjacent())}
+                    class="pane-divider ui-split-handle"
+                    data-axis="x"
+                  />
                 </Show>
               </>
             )
