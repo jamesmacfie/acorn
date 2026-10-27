@@ -97,7 +97,18 @@ the old Keychain login.
 Each account shows as its own row in **New**, on the empty pane's cards, and in the palette, labeled
 `Claude Code · work`. Once a harness has an account, its plain row goes away, so the default login
 can't start a new session from **New**. Add your usual login as an account too if you want to keep
-picking it. The default account is listed first. A signed-out account's row is disabled.
+picking it. The default account is listed first.
+
+**New**, the cards, the palette, the Agent Center, and the plan usage gauge list only what can start
+a session. A harness that isn't installed, a signed-out account, and a custom agent whose login is
+signed out are left out. **Settings > Agents** still lists every harness and account with its state.
+When only one row is left, **New** is a button that starts it, drawn with that harness's mark.
+
+These lists follow a sign-in without a refresh. The pane reads the harnesses again each time the
+window regains focus, and the Node answers from memory while it re-checks anything older than 30
+seconds. When a re-check changes the answer, the Node sends `agent:providers-changed` and every open
+pane reads again. After the Node opens a terminal on a signed-out account, it checks that account
+every 5 seconds for 5 minutes, so a sign-in there shows within seconds.
 
 ## Plan usage
 

@@ -331,6 +331,20 @@ describe('agent usage detail formatting', () => {
 })
 
 describe('usage groups', () => {
+  it('leaves out a login whose CLI is missing or signed out', () => {
+    const work = {
+      ...provider('claude', 30),
+      label: 'Claude Code · work',
+      accountName: 'work',
+      error: { code: 'authentication_required' as const, message: 'Not logged in.' },
+    }
+    const codex = { ...provider('codex', 50), error: { code: 'cli_missing' as const, message: 'Not found.' } }
+    const groups = usageGroups({ providers: [provider('claude', 80), work, codex], refreshedAt: 1 })
+    expect(groups.map((group) => [group.label, group.readings.map(usageAccountLabel)])).toEqual([
+      ['Claude Code', ['Usual sign-in']],
+    ])
+  })
+
   it('names the harness without favoring an account when only named accounts are collected', () => {
     const personal = { ...provider('claude', 80), label: 'Claude Code · personal', accountName: 'personal' }
     const work = { ...provider('claude', 30), label: 'Claude Code · work', accountName: 'work' }

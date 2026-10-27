@@ -19,6 +19,7 @@ import {
 } from '@acorn/plugin-api/ui'
 import { confirmAction, IconPicker } from '@acorn/plugin-api/ui/host'
 import type { AgentProviderDescriptor } from '../../contract/wire.ts'
+import { providerStartable } from '../../contract/newSessionChoices.ts'
 import { accountLabel } from '../../shared/accounts'
 import { MAX_CUSTOM_AGENT_INSTRUCTIONS, type CustomAgent, type CustomAgentInput } from '../../shared/customAgents'
 import { managedAgentApi } from '../sessions/managedClient'
@@ -67,7 +68,7 @@ export default function CustomAgentsSettings() {
 
   const open = (id: string | null, draft: CustomAgentInput) => setEditing({ id, draft, opened: draft })
   const create = () => {
-    const first = providers()?.find((provider) => provider.installed)
+    const first = providers()?.find(providerStartable)
     open(null, { name: '', providerId: first?.id ?? '', profileId: first?.profileId ?? '', options: {} })
   }
   const inputOf = ({ id: _id, source: _source, ...input }: CustomAgent): CustomAgentInput => input
@@ -118,7 +119,7 @@ export default function CustomAgentsSettings() {
               label="Your agents"
               help="A custom agent starts a session with the harness, settings, instructions, and tool access you choose. It shows under New in the Agent pane and in the command palette. Changes apply to sessions you start later."
               actions={
-                <Button onPress={create} disabled={!providers()?.some((provider) => provider.installed)}>
+                <Button onPress={create} disabled={!providers()?.some(providerStartable)}>
                   <Icon name="plus" /> New agent
                 </Button>
               }
@@ -302,7 +303,7 @@ function AgentEditor(props: {
               label="Harness"
               value={draft().providerId}
               options={props.providers
-                .filter((candidate) => candidate.installed || candidate.id === draft().providerId)
+                .filter((candidate) => providerStartable(candidate) || candidate.id === draft().providerId)
                 .map((candidate) => ({ value: candidate.id, label: candidate.label }))}
               onChange={chooseHarness}
             />

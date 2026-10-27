@@ -853,7 +853,7 @@ describe('conversation', () => {
     expect(draft(subject.root)).toBe('Still here')
   })
 
-  it("starts a chat from the desktop's New picker, custom agents included, and says why a row can't start", async () => {
+  it("starts a chat from the desktop's New picker, custom agents included, and leaves out a row that can't start", async () => {
     const subject = mount()
     await openSession(subject)
     await back(subject.root)
@@ -875,7 +875,6 @@ describe('conversation', () => {
     expect(
       rows().map((each) => [each.querySelector('button')!.textContent, each.classList.contains('disabled')]),
     ).toEqual([
-      ['Codexcodex not found', true],
       ['Claude CodeAvailable', false],
       ['ReviewerClaude Code · opus', false],
     ])

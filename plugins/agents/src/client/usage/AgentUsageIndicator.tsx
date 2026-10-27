@@ -25,73 +25,76 @@ export default function AgentUsageIndicator(props: {
 
   const entries = () => usageSummaryEntries(agentUsageStore.snapshot(), props.defaultAccounts)
 
+  // Once read, a node with no signed-in harness has nothing to show, so the button goes.
   return (
-    <Popover
-      placement="bottom-end"
-      // Wide enough for the longest line the panel draws, a label beside "80% remaining · resets
-      // Sep 17 at 11:59pm": the value column wraps rather than pushing the surface open, so the
-      // width has to be asked for here.
-      minWidth={460}
-      ariaLabel="Agent utilization"
-      role="dialog"
-      trigger={({ toggle, open }) => (
-        <Button label="Agent utilization" size="sm" expanded={open()} onPress={toggle}>
-          {/* A line after the gauge and between harnesses, so "Claude Code · personal 92%" and
+    <Show when={!agentUsageStore.snapshot() || entries().length}>
+      <Popover
+        placement="bottom-end"
+        // Wide enough for the longest line the panel draws, a label beside "80% remaining · resets
+        // Sep 17 at 11:59pm": the value column wraps rather than pushing the surface open, so the
+        // width has to be asked for here.
+        minWidth={460}
+        ariaLabel="Agent utilization"
+        role="dialog"
+        trigger={({ toggle, open }) => (
+          <Button label="Agent utilization" size="sm" expanded={open()} onPress={toggle}>
+            {/* A line after the gauge and between harnesses, so "Claude Code · personal 92%" and
               "Codex 13%" read as two readings rather than one run of words. */}
-          <Inline gap="stack" divided>
-            <Icon name="gauge" />
-            {/* The placeholder names no harness, because only the node knows which ones exist. A
+            <Inline gap="stack" divided>
+              <Icon name="gauge" />
+              {/* The placeholder names no harness, because only the node knows which ones exist. A
                 phone's header has room for the gauge and a dot per harness, so it draws no words. */}
-            <Show
-              when={entries().length}
-              fallback={
-                <Only formFactors={['desktop', 'tui']}>
-                  <Text emphasis="muted">reading usage…</Text>
-                </Only>
-              }
-            >
-              <For each={entries()}>
-                {(entry) => {
-                  const provider = () => props.providers?.find((candidate) => candidate.id === entry.provider)
-                  const icon = () => accountIcon(provider(), entry.account)
-                  return (
-                    <Inline>
-                      {/* How much of the window is still to run, as a pie that empties toward the
+              <Show
+                when={entries().length}
+                fallback={
+                  <Only formFactors={['desktop', 'tui']}>
+                    <Text emphasis="muted">reading usage…</Text>
+                  </Only>
+                }
+              >
+                <For each={entries()}>
+                  {(entry) => {
+                    const provider = () => props.providers?.find((candidate) => candidate.id === entry.provider)
+                    const icon = () => accountIcon(provider(), entry.account)
+                    return (
+                      <Inline>
+                        {/* How much of the window is still to run, as a pie that empties toward the
                           reset. Muted, because time passing is not a warning; the dot says that. */}
-                      <Only formFactors={['desktop', 'tui']}>
-                        <Show when={entry.timeLeft != null}>
-                          <Meter shape="pie" tone="muted" value={entry.timeLeft!} label={entry.timeLeftLabel} />
-                        </Show>
-                      </Only>
-                      <StatusDot tone={usageTone(entry.health)} size="sm" />
-                      <Only formFactors={['desktop', 'tui']}>
-                        <Show
-                          when={icon()}
-                          fallback={
-                            <Text emphasis="muted">
-                              {entry.label} {entry.value}
-                            </Text>
-                          }
-                        >
-                          {(name) => (
-                            <>
-                              <Text emphasis="muted">{entry.harness}</Text>
-                              <Icon name={name()} title={accountLabel(provider(), entry.account!)} />
-                              <Text emphasis="muted">{entry.value}</Text>
-                            </>
-                          )}
-                        </Show>
-                      </Only>
-                    </Inline>
-                  )
-                }}
-              </For>
-            </Show>
-          </Inline>
-        </Button>
-      )}
-    >
-      <AgentUsageSection defaultAccounts={props.defaultAccounts} providers={props.providers} />
-    </Popover>
+                        <Only formFactors={['desktop', 'tui']}>
+                          <Show when={entry.timeLeft != null}>
+                            <Meter shape="pie" tone="muted" value={entry.timeLeft!} label={entry.timeLeftLabel} />
+                          </Show>
+                        </Only>
+                        <StatusDot tone={usageTone(entry.health)} size="sm" />
+                        <Only formFactors={['desktop', 'tui']}>
+                          <Show
+                            when={icon()}
+                            fallback={
+                              <Text emphasis="muted">
+                                {entry.label} {entry.value}
+                              </Text>
+                            }
+                          >
+                            {(name) => (
+                              <>
+                                <Text emphasis="muted">{entry.harness}</Text>
+                                <Icon name={name()} title={accountLabel(provider(), entry.account!)} />
+                                <Text emphasis="muted">{entry.value}</Text>
+                              </>
+                            )}
+                          </Show>
+                        </Only>
+                      </Inline>
+                    )
+                  }}
+                </For>
+              </Show>
+            </Inline>
+          </Button>
+        )}
+      >
+        <AgentUsageSection defaultAccounts={props.defaultAccounts} providers={props.providers} />
+      </Popover>
+    </Show>
   )
 }

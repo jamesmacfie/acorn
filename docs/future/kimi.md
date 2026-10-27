@@ -190,6 +190,8 @@ For auth, a token found means `{ "authenticated": true }`. Nothing found means `
 diagnostic naming `kimi login` and the `KIMI_CREDENTIALS` variable. A credentials file that exists but
 will not parse means `null`, which the health row shows differently, because `null` means "cannot
 tell" and sending someone to re-authenticate a working account is worse than saying nothing.
+`false` also takes Kimi out of **New**, the palette, and the Agent Center, and its usage out of the
+gauge, so that answer has to be right. `null` keeps it listed.
 
 Two simplifications worth taking, each of which loses something small. Ignoring the `window.duration`
 and `timeUnit` fields gives a quota a generic label instead of "5-hour limit". Ignoring `expires_at`

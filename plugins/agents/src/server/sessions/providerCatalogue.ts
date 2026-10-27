@@ -8,6 +8,9 @@ import type { AgentStore } from './store'
 // How long a providers answer is served without probing again. After this it is still served, and a
 // probe runs behind it. Short, because signing in or installing a CLI should show within a visit.
 const PROVIDER_FRESH_MS = 30_000
+// How often, and for how long, the Node checks an account after opening a terminal on it (watchSignIn).
+const SIGN_IN_POLL_MS = 5_000
+const SIGN_IN_WATCH_MS = 5 * 60_000
 
 /**
  * What each registered harness says about itself: installed, signed in, what it can do.
@@ -16,13 +19,16 @@ const PROVIDER_FRESH_MS = 30_000
  * asks on every task visit. So the last answer is served at once, and a probe runs in the background
  * once it is older than PROVIDER_FRESH_MS. Only the first call after boot, a call after a harness was
  * added or removed, and `force` wait for one. `force` is the Refresh button, and the re-check a refused
- * start makes before it refuses (usable()).
+ * start makes before it refuses (usable()). A probe whose answer differs from the last one calls
+ * `onChanged`, so a client showing the old answer reads again instead of waiting for its next visit.
  */
 export class ProviderCatalogue {
   // The last probe answer, when that probe started, and which drivers it asked.
   private cache: { probedAt: number; generation: number; descriptors: AgentProviderDescriptor[] } | null = null
   // The probe running now, which every caller that needs one joins.
   private probe: { generation: number; promise: Promise<AgentProviderDescriptor[]> } | null = null
+  // The accounts watchSignIn is checking, by `provider\0name`, so a second terminal starts no second watch.
+  private readonly watching = new Set<string>()
 
   constructor(
     private readonly registry: AgentDriverRegistry,
@@ -30,6 +36,7 @@ export class ProviderCatalogue {
     private readonly accounts: Pick<AgentAccounts, 'list' | 'home' | 'defaultAccount' | 'details' | 'showAs'>,
     // The runtime's shutdown. Once it aborts, every probe is refused and nothing is cached.
     private readonly shutdown: AbortSignal,
+    private readonly onChanged: () => void = () => {},
   ) {
     shutdown.addEventListener(
       'abort',
@@ -63,6 +70,31 @@ export class ProviderCatalogue {
     this.shutdown.throwIfAborted()
     if (served?.installed && signedIn(served, account) !== false) return served
     return (await this.list(true)).find(pick)
+  }
+
+  /**
+   * Checks one account every SIGN_IN_POLL_MS for up to SIGN_IN_WATCH_MS, and probes every harness again
+   * once it reads signed in, which announces the change. For the terminal the Node opens on an
+   * account: the sign-in happens inside the CLI, and nothing else tells the Node it finished.
+   */
+  watchSignIn(providerId: string, name: string): void {
+    const driver = this.registry.create(providerId)
+    const key = `${providerId}\u0000${name}`
+    if (!driver?.probeAccount || this.watching.has(key)) return
+    this.watching.add(key)
+    const home = this.accounts.home(providerId, name)
+    void (async () => {
+      for (let waited = 0; waited < SIGN_IN_WATCH_MS; waited += SIGN_IN_POLL_MS) {
+        await pause(SIGN_IN_POLL_MS, this.shutdown)
+        if (this.shutdown.aborted) return
+        if (await driver.probeAccount!(home)) {
+          await this.list(true)
+          return
+        }
+      }
+    })()
+      .catch(() => undefined)
+      .finally(() => this.watching.delete(key))
   }
 
   /** Harnesses that turn the person's read block into their own sandbox. */
@@ -155,7 +187,9 @@ export class ProviderCatalogue {
       .then((descriptors) => {
         // An older probe that finishes last must not replace a newer answer.
         if (!this.shutdown.aborted && this.probe === wave && this.registry.generation === generation) {
+          const previous = this.cache?.descriptors
           this.cache = { probedAt, generation, descriptors }
+          if (previous && JSON.stringify(previous) !== JSON.stringify(descriptors)) this.onChanged()
         }
         return descriptors
       })
@@ -166,6 +200,19 @@ export class ProviderCatalogue {
     this.probe = wave
     return probe
   }
+}
+
+/** Resolves after `ms`, or at once when `signal` aborts. */
+function pause(ms: number, signal: AbortSignal): Promise<void> {
+  return new Promise((resolve) => {
+    const done = () => {
+      clearTimeout(timer)
+      signal.removeEventListener('abort', done)
+      resolve()
+    }
+    const timer = setTimeout(done, ms)
+    signal.addEventListener('abort', done)
+  })
 }
 
 export const shellQuote = (value: string): string => `'${value.replaceAll("'", "'\\''")}'`

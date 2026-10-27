@@ -15,11 +15,13 @@ import type {
   AgentWsFrame,
 } from '../../contract/wire.ts'
 
-let deliver: (frame: AgentWsFrame) => void = () => {}
+// Every subscriber hears every frame, as on the real channel: the store and the providers query both listen.
+const listeners = new Set<(frame: AgentWsFrame) => void>()
+const deliver = (frame: AgentWsFrame) => listeners.forEach((listener) => listener(frame))
 vi.mock('./wsChannel', () => ({
   wsOnAgentFrame: (cb: (frame: AgentWsFrame) => void) => {
-    deliver = cb
-    return () => {}
+    listeners.add(cb)
+    return () => void listeners.delete(cb)
   },
 }))
 
@@ -144,6 +146,20 @@ it('marks read up to the newest event frame, which the row no longer carries', a
   await vi.advanceTimersByTimeAsync(350)
   expect(patch).toHaveBeenCalledTimes(1)
   expect(patch).toHaveBeenCalledWith('s1', { lastReadSeq: 9 })
+  dispose()
+})
+
+it('reads the harnesses again when the node says their sign-in changed', async () => {
+  providers.mockClear()
+  const { model, dispose } = createRoot((dispose) => ({
+    model: withQueryClient(() => createAgentPaneModel({ id: 't1' } as never, { shown: () => true })),
+    dispose,
+  }))
+  // A read still in flight would be joined rather than repeated, so the first one lands first.
+  await vi.waitFor(() => expect(model.providersLoading()).toBe(false))
+  expect(providers).toHaveBeenCalledTimes(1)
+  deliver({ channel: 'agent:providers-changed' } as never)
+  await vi.waitFor(() => expect(providers).toHaveBeenCalledTimes(2))
   dispose()
 })
 

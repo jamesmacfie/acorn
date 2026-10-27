@@ -10,3 +10,4 @@ export type AgentServerFrame =
   | { channel: 'agent:turn'; turn: unknown }
   | { channel: 'agent:request'; request: unknown }
   | { channel: 'agent:deleted'; sessionId: string }
+  | { channel: 'agent:providers-changed' }

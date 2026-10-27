@@ -245,8 +245,8 @@ async function fakeNode(nodeId: string, options: { protocolVersion?: number } = 
           profileId: 'claude-code',
           label: 'Claude Code',
           installed: true,
-          authenticated: false,
-          diagnostics: ['Not signed in'],
+          authenticated: true,
+          diagnostics: [],
           configOptions: [],
         },
       ])

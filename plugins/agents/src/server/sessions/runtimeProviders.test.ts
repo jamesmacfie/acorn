@@ -29,8 +29,10 @@ describe('the providers answer', () => {
   let runtime: ManagedAgentRuntime
   let driver: CountedDriver
   let registry: AgentDriverRegistry
+  let published: string[]
 
   beforeEach(() => {
+    published = []
     vi.useFakeTimers({ toFake: ['Date'] })
     ctx = makeTestNodeContext({ plugin: { name: 'agents' } })
     driver = new CountedDriver()
@@ -44,6 +46,7 @@ describe('the providers answer', () => {
       secrets: ctx.env.SECRETS,
       currentUserId: () => 'owner',
       registry,
+      publish: (frame) => void published.push(frame.channel),
     })
   })
 
@@ -132,6 +135,21 @@ describe('the providers answer', () => {
     driver.answer()
     await vi.waitFor(async () => expect((await runtime.providers.list())[0]?.installed).toBe(false))
     expect(driver.pending).toHaveLength(0)
+  })
+
+  it('says so when a probe answers differently, and stays quiet when it answers the same', async () => {
+    await warm()
+    const probe = async () => {
+      const forced = runtime.providers.list(true)
+      await vi.waitFor(() => expect(driver.pending).toHaveLength(1))
+      driver.answer()
+      await forced
+    }
+    await probe()
+    expect(published).toEqual([])
+    driver.installed = false
+    await probe()
+    expect(published).toEqual(['agent:providers-changed'])
   })
 
   it('blocks on a fresh probe when forced', async () => {

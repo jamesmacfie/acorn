@@ -1,5 +1,5 @@
 import type { AgentProviderDescriptor } from './wire.ts'
-import { accountIcon, accountLabel } from '../shared/accounts'
+import { accountIcon, accountLabel, signedIn } from '../shared/accounts'
 import type { CustomAgent } from '../shared/customAgents'
 
 export type { CustomAgent }
@@ -15,10 +15,10 @@ export type NewSessionChoice = { provider: AgentProviderDescriptor; agent?: Cust
  * The harnesses first, then the custom agents, for the pane's New picker, its empty-state cards and
  * the palette, so the three never list different things. A harness with extra accounts is listed as
  * those accounts instead, because once the person has named their logins the unnamed default is noise
- * (docs/managed-agents/accounts.md). An agent
- * whose harness this node does not register at all is left out, since nothing could start it; one
- * whose harness is registered but not installed stays, disabled, beside that harness. A custom agent
- * runs on its harness's default login.
+ * (docs/managed-agents/accounts.md). Only rows that can start a session are listed: a harness that
+ * isn't installed, a login that's signed out, and an agent whose harness is missing or signed out are
+ * all left out. Settings > Agents still lists them, with the reason. With a single row left, a
+ * surface can start it straight from New instead of opening a list.
  */
 export function newSessionChoices(
   providers: readonly AgentProviderDescriptor[],
@@ -34,20 +34,32 @@ export function newSessionChoices(
       const provider = providers.find((candidate) => candidate.id === agent.providerId)
       return provider ? [{ provider, agent }] : []
     }),
-  ]
+  ].filter(choiceAvailable)
 }
+
+/** Whether New has at least one row for the harness, for the pickers that choose a harness rather
+ *  than a row. */
+export const providerStartable = (provider: AgentProviderDescriptor): boolean =>
+  newSessionChoices([provider], []).length > 0
 
 const defaultFirst = (provider: AgentProviderDescriptor) =>
   [...(provider.accounts ?? [])].sort(
     (left, right) => Number(right.name === provider.defaultAccount) - Number(left.name === provider.defaultAccount),
   )
 
-const choiceAccount = (choice: NewSessionChoice) =>
-  choice.account ? choice.provider.accounts?.find((account) => account.name === choice.account) : undefined
+// The login a start from this row runs on, picked the way the runtime picks it: the row's account,
+// else the agent's, else the harness's default (server/sessions/runtime.ts).
+function startAccount(choice: NewSessionChoice): string | null {
+  const named = choice.account ?? choice.agent?.account
+  return named && choice.provider.accounts?.some((account) => account.name === named)
+    ? named
+    : (choice.provider.defaultAccount ?? null)
+}
 
-/** Whether the row can start a session. An account that is known to be signed out can't. */
+/** Whether the row can start a session: the CLI is installed and the login it would use isn't known
+ *  to be signed out. */
 export const choiceAvailable = (choice: NewSessionChoice): boolean =>
-  choice.provider.installed && choiceAccount(choice)?.authenticated !== false
+  choice.provider.installed && signedIn(choice.provider, startAccount(choice)) !== false
 
 /** What a start from this row names besides the harness. */
 export const choiceStart = (choice: NewSessionChoice): { customAgentId?: string; account?: string } => ({
@@ -77,8 +89,6 @@ export const choiceGlyph = (choice: NewSessionChoice): string | undefined =>
  *  tells two agents on one harness apart. */
 export function choiceDescription(choice: NewSessionChoice): string {
   const { provider, agent } = choice
-  if (!provider.installed) return provider.diagnostics[0] ?? 'Not installed'
-  if (choiceAccount(choice)?.authenticated === false) return 'Not signed in. Sign in from Settings > Agents.'
   if (choice.account && choice.account === provider.defaultAccount) return 'Default account'
   if (!agent) return provider.executableVersion ?? 'Available'
   return agent.description || [provider.label, ...Object.values(agent.options)].join(' · ')

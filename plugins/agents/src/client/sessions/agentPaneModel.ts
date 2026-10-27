@@ -44,7 +44,7 @@ import {
   type NewSessionChoice,
 } from '../../contract/newSessionChoices.ts'
 import { customAgentsOptions } from '../settings/customAgentsClient'
-import { agentProvidersOptions, refreshAgentProviders } from '../providersClient'
+import { agentProvidersOptions, followAgentProviders, refreshAgentProviders } from '../providersClient'
 
 // Everything the Agent pane's two regions have to agree on.
 //
@@ -97,8 +97,17 @@ export function createAgentPaneModel(task: Task, pane: PaneModelContext) {
   const [dialog, setDialog] = createSignal<AgentDialog | null>(null)
   const [renameText, setRenameText] = createSignal('')
   const queryClient = useQueryClient()
-  // Only while the pane is on screen, so a kept task's model is no reason to read these again.
-  const providersQuery = createQuery(() => ({ ...agentProvidersOptions(), enabled: pane.shown() }))
+  // Only while the pane is on screen, so a kept task's model is no reason to read these again. Read again
+  // on every return to the window, since that is when someone who just signed in elsewhere comes back.
+  // The read is cheap: the node answers from memory and re-checks behind it, then says if it changed.
+  const providersQuery = createQuery(() => ({
+    ...agentProvidersOptions(),
+    enabled: pane.shown(),
+    refetchOnWindowFocus: 'always' as const,
+  }))
+  createEffect(() => {
+    if (pane.shown()) onCleanup(followAgentProviders(queryClient))
+  })
   const customAgents = createQuery(() => ({ ...customAgentsOptions(), enabled: pane.shown() }))
   // `.data` is read only once there is some. On an empty cache solid-query suspends the boundary above
   // whoever reads it, and this model is built inside the first region that asks for it, which is the

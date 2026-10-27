@@ -46,7 +46,6 @@ import RuntimeStateIcon, { SubagentStateIcon } from './RuntimeStateIcon'
 import type { AgentPaneModel } from './agentPaneModel'
 import {
   choiceAccountIcon,
-  choiceAvailable,
   choiceDescription,
   choiceGlyph,
   choiceLabel,
@@ -333,7 +332,26 @@ export function AgentDetailHeader(props: { task: Task; model: AgentPaneModel }) 
       </Show>
       <AgentUsageIndicator defaultAccounts={usageAccounts()} providers={model.providers()} />
       {/* An archived task has no worktree to start a session in (docs/panes/contributions.md § Contributions). */}
-      <Show when={props.task.status === 'active'}>
+      {/* One way to start a session needs no list, so New starts it (docs/managed-agents/accounts.md). */}
+      <Show when={props.task.status === 'active' && model.choices().length === 1 && model.choices()[0]}>
+        {(only) => (
+          <Button
+            label={`New ${choiceLabel(only())} session`}
+            size="sm"
+            disabled={model.creating()}
+            onPress={() => void model.createSession(only())}
+          >
+            <Inline gap="inline">
+              <ProviderGlyph glyph={choiceGlyph(only())} label={choiceLabel(only())} />
+              <Show when={choiceAccountIcon(only())}>
+                {(icon) => <Icon name={icon()} title={accountLabel(only().provider, only().account!)} />}
+              </Show>
+              <Only formFactors={['desktop', 'tui']}>New</Only>
+            </Inline>
+          </Button>
+        )}
+      </Show>
+      <Show when={props.task.status === 'active' && model.choices().length !== 1}>
         <Picker<NewSessionChoice>
           label={
             <>
@@ -347,9 +365,7 @@ export function AgentDetailHeader(props: { task: Task; model: AgentPaneModel }) 
           size="sm"
           placement="bottom-end"
           placeholder="Filter agents…"
-          emptyText={
-            model.providersLoading() ? 'Checking which agents this node can run…' : 'No managed providers available.'
-          }
+          emptyText={model.providersLoading() ? 'Checking which agents this node can run…' : NO_AGENTS}
           results={(query) =>
             model.choices().filter((item) => choiceLabel(item).toLowerCase().includes(query.trim().toLowerCase()))
           }
@@ -364,7 +380,7 @@ export function AgentDetailHeader(props: { task: Task; model: AgentPaneModel }) 
           rowLabel={choiceText}
           rowDescription={choiceDescription}
           isActive={() => false}
-          isDisabled={(item) => !choiceAvailable(item) || model.creating()}
+          isDisabled={() => model.creating()}
           onSelect={(item) => void model.createSession(item)}
           trailing={(item, close) => (
             <Show when={!item.agent && item.account}>
@@ -400,6 +416,8 @@ export function AgentDetailHeader(props: { task: Task; model: AgentPaneModel }) 
   )
 }
 
+const NO_AGENTS = 'No agent on this node is installed and signed in. Set one up in Settings > Agents.'
+
 type SessionChip = { id: string; icon: string; label: string; title?: string; press?: () => void }
 
 // The session actions an archived task keeps, because they only read or relabel what is stored. Fork,
@@ -427,13 +445,12 @@ function AgentProviderCards(props: { task: Task; model: AgentPaneModel }) {
           <Show when={model.providersLoading()}>
             <Text emphasis="muted">Checking which agents this node can run…</Text>
           </Show>
+          <Show when={!model.providersLoading() && !model.choices().length}>
+            <Text emphasis="muted">{NO_AGENTS}</Text>
+          </Show>
           <For each={model.choices()}>
             {(choice) => (
-              <Card
-                interactive
-                disabled={!choiceAvailable(choice) || model.creating()}
-                onPress={() => void model.createSession(choice)}
-              >
+              <Card interactive disabled={model.creating()} onPress={() => void model.createSession(choice)}>
                 <Stack gap="row">
                   <Inline>
                     <ProviderGlyph glyph={choiceGlyph(choice)} label={choiceLabel(choice)} />
@@ -442,9 +459,7 @@ function AgentProviderCards(props: { task: Task; model: AgentPaneModel }) {
                       {(icon) => <Icon name={icon()} title={accountLabel(choice.provider, choice.account!)} />}
                     </Show>
                   </Inline>
-                  <Text emphasis="muted">
-                    {!choiceAvailable(choice) || choice.agent ? choiceDescription(choice) : 'Start managed session'}
-                  </Text>
+                  <Text emphasis="muted">{choice.agent ? choiceDescription(choice) : 'Start managed session'}</Text>
                 </Stack>
               </Card>
             )}

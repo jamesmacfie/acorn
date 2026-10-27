@@ -27,6 +27,7 @@ import { managedAgentStore } from '../sessions/managedStore'
 import { openManagedSession, restoreManagedSessionSelection } from '../sessions/managedSelection'
 import { workflowRunOf } from './workflowRun'
 import type { AgentSession } from '../../contract/wire.ts'
+import { providerStartable } from '../../contract/newSessionChoices.ts'
 import {
   Alert,
   Card,
@@ -341,22 +342,12 @@ export default function AgentCenter() {
           </For>
 
           <Inline wrap>
-            <For each={providers() ?? []}>
+            {/* Only the harnesses that can start a session, as in New. Settings > Agents shows the rest. */}
+            <For each={(providers() ?? []).filter(providerStartable)}>
               {(provider) => (
                 <Card pad="sm" fit>
                   <Inline>
-                    <StatusDot
-                      tone={providerTone(
-                        provider.installed ? (provider.authenticated === false ? 'error' : 'ok') : 'missing',
-                      )}
-                      label={
-                        provider.installed
-                          ? provider.authenticated === false
-                            ? 'Authentication required'
-                            : 'Available'
-                          : 'Not installed'
-                      }
-                    />
+                    <StatusDot tone={providerTone('ok')} label="Available" />
                     <Text emphasis="strong">{provider.label}</Text>
                   </Inline>
                 </Card>
@@ -382,7 +373,9 @@ export default function AgentCenter() {
               onChange={(value) => setProviderFilter(value)}
               options={[
                 { value: '', label: 'All providers' },
-                ...(providers() ?? []).map((provider) => ({ value: provider.id, label: provider.label })),
+                ...(providers() ?? [])
+                  .filter(providerStartable)
+                  .map((provider) => ({ value: provider.id, label: provider.label })),
               ]}
             />
             {/* With one node the workspace and fleet scopes answer identically, so the switch is unnecessary. */}

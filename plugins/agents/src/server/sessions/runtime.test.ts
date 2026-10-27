@@ -3250,6 +3250,22 @@ describe('sessions pinned to an extra account', () => {
     await expect(runtime.openAccountTerminal(taskId, 'fake', 'other')).rejects.toThrow(/not found/)
   })
 
+  it('notices a sign-in in the terminal it opened on a signed-out account', async () => {
+    driver.executable = '/opt/fake'
+    await runtime.addAccount('fake', 'work')
+    vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] })
+    try {
+      await runtime.openAccountTerminal(taskId, 'fake', 'work')
+      driver.signedIn.add(join(dataDir, 'agent-accounts', 'fake', 'work'))
+      await vi.advanceTimersByTimeAsync(5_000)
+      const work = async () =>
+        (await runtime.providers.list()).find((provider) => provider.id === 'fake')?.accounts?.[0]?.authenticated
+      await vi.waitFor(async () => expect(await work()).toBe(true))
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+
   it('fails a start whose account was removed', async () => {
     await runtime.addAccount('fake', 'work')
     driver.signedIn.add(join(dataDir, 'agent-accounts', 'fake', 'work'))

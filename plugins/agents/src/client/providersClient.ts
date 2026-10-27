@@ -1,6 +1,7 @@
 import type { QueryClient } from '@tanstack/solid-query'
 import type { AgentProviderDescriptor } from '../contract/wire.ts'
 import { managedAgentApi } from './sessions/managedClient'
+import { wsOnAgentFrame } from './sessions/wsChannel'
 
 // The harnesses this node can run, as the Agent pane's New menu and empty state show them.
 //
@@ -11,6 +12,7 @@ export const agentProvidersQueryKey = ['agents', 'providers'] as const
 
 // A minute: install and sign-in state changes rarely, the node serves its own last answer at once, and
 // Refresh (`refreshAgentProviders` below) asks for a fresh probe when the owner has just changed something.
+// The node also says when its answer changes (`followAgentProviders` below).
 export const AGENT_PROVIDERS_STALE_MS = 60_000
 
 export const agentProvidersOptions = () => ({
@@ -26,3 +28,11 @@ export async function refreshAgentProviders(queryClient: QueryClient): Promise<A
   queryClient.setQueryData(agentProvidersQueryKey, fresh)
   return fresh
 }
+
+/** Reads the providers again whenever the node says a harness's install or sign-in state changed.
+ *  Returns the unsubscribe. */
+export const followAgentProviders = (queryClient: QueryClient): (() => void) =>
+  wsOnAgentFrame((frame) => {
+    if (frame.channel === 'agent:providers-changed')
+      void queryClient.invalidateQueries({ queryKey: agentProvidersQueryKey })
+  })

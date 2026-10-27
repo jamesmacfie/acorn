@@ -51,6 +51,10 @@ export function Agents(props: {
 
   const agents = agentChoice(props.client, props.nodeId)
   onMount(() => void agents.load())
+  // Back in the panel, perhaps after signing in to a harness elsewhere, so New lists what can start.
+  const again = () => void agents.load(false, true)
+  window.addEventListener('focus', again)
+  onCleanup(() => window.removeEventListener('focus', again))
   const start = async (choice: BridgeAgentChoice) => {
     const session = await agents.start(props.taskId, choice)
     if (session) props.started(session)

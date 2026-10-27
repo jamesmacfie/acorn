@@ -10,6 +10,8 @@ import type { AgentStore } from './store'
  *  goes out through the same door (docs/plugins/events.md § Hearing a core event). */
 export type PublishedFrame =
   | AgentWsFrame
+  // The harnesses' install or sign-in state changed. No payload: a client reads the providers route again.
+  | { channel: 'agent:providers-changed' }
   | ({ channel: 'agent-session:changed' } & AgentSessionChangedEvent)
   | AgentLifecycleFrame
 

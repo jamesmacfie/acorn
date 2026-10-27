@@ -3,12 +3,12 @@ import type { AgentProviderDescriptor } from '../../contract/wire.ts'
 import type { CustomAgent } from '../../shared/customAgents'
 import {
   choiceAccountIcon,
-  choiceAvailable,
   choiceDescription,
   choiceLabel,
   choiceStart,
   choiceText,
   newSessionChoices,
+  providerStartable,
 } from '../../contract/newSessionChoices.ts'
 
 const provider = (id: string, installed = true) =>
@@ -30,18 +30,24 @@ const agent = (id: string, providerId: string): CustomAgent => ({
 })
 
 describe('new session choices', () => {
-  it('lists harnesses, then agents, and drops an agent whose harness is not registered', () => {
+  it('lists harnesses, then agents, and drops what cannot start', () => {
     const choices = newSessionChoices(
       [provider('claude'), provider('codex', false)],
-      [agent('Reviewer', 'codex'), agent('Orphan', 'gone')],
+      [agent('Writer', 'claude'), agent('Reviewer', 'codex'), agent('Orphan', 'gone')],
     )
-    expect(choices.map((choice) => choice.agent?.name ?? choice.provider.id)).toEqual(['claude', 'codex', 'Reviewer'])
-    // An agent on an uninstalled harness says why it cannot start.
-    expect(choiceDescription(choices[2]!)).toBe('Not on PATH')
+    expect(choices.map((choice) => choice.agent?.name ?? choice.provider.id)).toEqual(['claude', 'Writer'])
     expect(choiceDescription({ provider: provider('codex'), agent: agent('Reviewer', 'codex') })).toBe('Codex · high')
   })
 
-  it('lists a harness with extra accounts as those accounts only, and a signed-out one cannot start', () => {
+  it('drops a harness whose own login is signed out, and its agents with it', () => {
+    const codex = { ...provider('codex'), authenticated: false }
+    expect(newSessionChoices([provider('claude'), codex], [agent('Reviewer', 'codex')]).map(choiceLabel)).toEqual([
+      'Claude Code',
+    ])
+    expect([provider('claude'), codex, provider('codex', false)].map(providerStartable)).toEqual([true, false, false])
+  })
+
+  it('lists a harness with extra accounts as its signed-in accounts only', () => {
     const claude = {
       ...provider('claude'),
       accounts: [
@@ -49,15 +55,17 @@ describe('new session choices', () => {
         { name: 'old', authenticated: false, loginCommand: null },
       ],
     }
-    expect(newSessionChoices([{ ...claude, defaultAccount: 'old' }], []).map(choiceLabel)).toEqual([
-      'Claude Code · old',
+    const choices = newSessionChoices([claude, provider('codex')], [])
+    expect(choices.map(choiceLabel)).toEqual(['Claude Code · work', 'Codex'])
+    expect(choiceStart(choices[0]!)).toEqual({ account: 'work' })
+    // An agent runs on the default account, so a signed-out default drops it while `work` stays.
+    const signedOutDefault = { ...claude, defaultAccount: 'old' }
+    expect(newSessionChoices([signedOutDefault], [agent('Writer', 'claude')]).map(choiceLabel)).toEqual([
       'Claude Code · work',
     ])
-    const choices = newSessionChoices([claude, provider('codex')], [])
-    expect(choices.map(choiceLabel)).toEqual(['Claude Code · work', 'Claude Code · old', 'Codex'])
-    expect(choices.map(choiceAvailable)).toEqual([true, false, true])
-    expect(choiceStart(choices[0]!)).toEqual({ account: 'work' })
-    expect(choiceDescription(choices[1]!)).toMatch(/Not signed in/)
+    expect(
+      newSessionChoices([signedOutDefault], [{ ...agent('Writer', 'claude'), account: 'work' }]).map(choiceLabel),
+    ).toEqual(['Claude Code · work', 'Writer'])
   })
 
   it("draws an account's icon in place of its name only when the harness shows icons", () => {

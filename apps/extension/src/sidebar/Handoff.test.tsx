@@ -224,9 +224,10 @@ const pendingItem = (root: HTMLElement) => root.querySelector('[aria-label="Pend
 const resolvedUrls = (state: { requests: Request[] }) =>
   state.requests.filter((request) => request.op === 'handoff.resolve').map((request) => request.url)
 
-// Starts the first chat in the open task from its empty state's picker, then sends a message.
+// Starts the first chat in the open task from its empty state, then sends a message. The Node offers
+// one harness, so the empty state's button starts it without a list.
 async function chatAndSend(root: HTMLElement) {
-  await pickFrom(root, 'Start a chat', 'Claude Code')
+  button(root, 'Start a chat: Claude Code')!.click()
   await settle(30)
   const box = root.querySelector<HTMLTextAreaElement>('textarea[name="message"]')!
   // A chat just started puts the cursor in its message box.

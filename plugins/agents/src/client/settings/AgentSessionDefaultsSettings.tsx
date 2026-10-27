@@ -21,6 +21,7 @@ import {
   Text,
 } from '@acorn/plugin-api/ui'
 import type { AgentProviderDescriptor } from '../../contract/wire.ts'
+import { providerStartable } from '../../contract/newSessionChoices.ts'
 import {
   AGENT_ARCHIVED_HISTORY_CHOICES,
   AGENT_IDLE_MEMORY_CHOICES,
@@ -117,9 +118,7 @@ export default function AgentSessionDefaultsSettings(props: { context?: PageCont
     else delete forProvider[optionId]
     return save({ pinned: { ...record().pinned, [providerId]: forProvider } })
   }
-  const inlineProvider = createMemo(
-    () => record().inline.providerId ?? providers()?.find((provider) => provider.installed)?.id ?? '',
-  )
+  const inlineProvider = createMemo(() => record().inline.providerId ?? providers()?.find(providerStartable)?.id ?? '')
   const chooseInlineProvider = (providerId: string) =>
     void inlineProviderSave.run(() => save({ inline: { ...record().inline, providerId } }))
   const chooseInlineOption = (providerId: string, optionId: string, value: string) => {
@@ -333,7 +332,7 @@ export default function AgentSessionDefaultsSettings(props: { context?: PageCont
       </SettingsSection>
 
       <Show when={!record().followLastSession}>
-        <For each={providers()?.filter((provider) => provider.installed) ?? []}>
+        <For each={providers()?.filter(providerStartable) ?? []}>
           {(provider) => (
             <SettingsSection
               id={`pinned-${provider.id}`}
@@ -389,7 +388,7 @@ export default function AgentSessionDefaultsSettings(props: { context?: PageCont
             label="Inline chat provider"
             value={inlineProvider()}
             options={(providers() ?? [])
-              .filter((provider) => provider.installed)
+              .filter(providerStartable)
               .map((provider) => ({ value: provider.id, label: provider.label }))}
             onChange={chooseInlineProvider}
           />

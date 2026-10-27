@@ -9,13 +9,7 @@ import {
 import { startSessionFromPalette } from './commands'
 import { agentProvidersOptions } from './providersClient'
 import { customAgentsOptions } from './settings/customAgentsClient'
-import {
-  choiceAvailable,
-  choiceLabel,
-  choiceStart,
-  newSessionChoices,
-  type NewSessionChoice,
-} from '../contract/newSessionChoices.ts'
+import { choiceLabel, choiceStart, newSessionChoices, type NewSessionChoice } from '../contract/newSessionChoices.ts'
 import { agentSessionDefaultsOptions, writeAgentSessionDefaults } from './settings/sessionDefaultsClient'
 import {
   AGENT_TOOL_FOLD_CHOICES,
@@ -93,12 +87,7 @@ function AgentCommands() {
 
   const providers = createQuery(() => agentProvidersOptions())
   const customAgents = createQuery(() => customAgentsOptions())
-  registerNewSessionCommands(() =>
-    newSessionChoices(
-      (providers.data ?? []).filter((provider) => provider.installed),
-      customAgents.data ?? [],
-    ).filter(choiceAvailable),
-  )
+  registerNewSessionCommands(() => newSessionChoices(providers.data ?? [], customAgents.data ?? []))
 
   return null
 }

@@ -4,6 +4,7 @@ import { Alert, Button, Card, Inline, SegmentedControl, Select, Stack, Text, Tex
 import { ModelPickerPopover } from '@acorn/plugin-api/ui/host'
 import type { AgentNormalizedEvent, AgentProviderDescriptor } from '../../contract/wire.ts'
 import { sameInlineLine, type InlineDiffOrigin } from '../../contract/inlineDiff.ts'
+import { providerStartable } from '../../contract/newSessionChoices.ts'
 import { defaultAgentSessionDefaults } from '../../shared/sessionDefaults.ts'
 import { agentSessionDefaultsOptions, writeAgentSessionDefaults } from '../settings/sessionDefaultsClient.ts'
 import { managedAgentApi } from '../sessions/managedClient.ts'
@@ -99,10 +100,10 @@ export default function InlineDiffCard(props: Props) {
       },
     }
   }
-  const installed = createMemo(() => (providers() ?? []).filter((provider) => provider.installed))
+  const startable = createMemo(() => (providers() ?? []).filter(providerStartable))
   const provider = createMemo(() => {
     const id = providerOverride() ?? record().inline.providerId
-    return installed().find((candidate) => candidate.id === id) ?? installed()[0]
+    return startable().find((candidate) => candidate.id === id) ?? startable()[0]
   })
   const advertised = createMemo(() => provider()?.configOptions)
   const modelOption = createMemo(() => advertised()?.find((option) => option.category === 'model'))
@@ -145,7 +146,7 @@ export default function InlineDiffCard(props: Props) {
       let target = session()
       if (!target) {
         const chosen = provider()
-        if (!chosen) throw new Error('No agent provider is installed.')
+        if (!chosen) throw new Error('No agent provider is installed and signed in.')
         const values = { ...record().inline.pinned[chosen.id] }
         if (modelOption() && model()) values[modelOption()!.id] = model()
         const readonly = readonlyProfile()
@@ -281,17 +282,20 @@ export default function InlineDiffCard(props: Props) {
                   </Stack>
                 }
               >
-                <Select
-                  label="Provider"
-                  size="sm"
-                  value={provider()?.id ?? ''}
-                  options={installed().map((item) => ({ value: item.id, label: item.label }))}
-                  onChange={(value) => {
-                    setProviderOverride(value)
-                    setModelOverride(null)
-                    setPendingAttempt(null)
-                  }}
-                />
+                {/* One harness to start leaves nothing to choose. */}
+                <Show when={startable().length > 1}>
+                  <Select
+                    label="Provider"
+                    size="sm"
+                    value={provider()?.id ?? ''}
+                    options={startable().map((item) => ({ value: item.id, label: item.label }))}
+                    onChange={(value) => {
+                      setProviderOverride(value)
+                      setModelOverride(null)
+                      setPendingAttempt(null)
+                    }}
+                  />
+                </Show>
                 <Show when={modelOption()}>
                   {(option) => (
                     <Select

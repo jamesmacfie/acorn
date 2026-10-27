@@ -67,7 +67,7 @@ const mount = () => {
 }
 
 describe('inline diff chat', () => {
-  it('moves provider, model, and per-chat permissions into the sparkle picker', async () => {
+  it('moves model and per-chat permissions into the sparkle picker, with no provider choice for one harness', async () => {
     store.configOptions = [
       { id: 'model', category: 'model', values: [{ value: 'fast', label: 'Fast' }] },
       { id: 'sandbox', category: 'permission', values: [{ value: 'read-only', label: 'Read only' }] },
@@ -79,11 +79,11 @@ describe('inline diff chat', () => {
 
     picker!.click()
     const popover = document.querySelector('.ui-popover')!
-    await vi.waitFor(() => expect(popover.querySelectorAll('select')).toHaveLength(2))
+    await vi.waitFor(() => expect(popover.querySelectorAll('select')).toHaveLength(1))
     expect(popover.textContent).toContain('Permissions')
     expect(popover.textContent).toContain('Model')
     expect(popover.querySelector('[aria-label="Agent permissions"]')).toBeTruthy()
-    const model = popover.querySelectorAll<HTMLSelectElement>('select')[1]!
+    const model = popover.querySelectorAll<HTMLSelectElement>('select')[0]!
     model.value = 'fast'
     model.dispatchEvent(new Event('change', { bubbles: true }))
     expect(picker!.dataset.tip).toContain('Fast')

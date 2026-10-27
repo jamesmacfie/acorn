@@ -113,10 +113,12 @@ export const usageAccountLabel = (reading: AgentProviderUsage): string =>
   reading.accountLabel ?? reading.accountName ?? 'Usual sign-in'
 
 // Account labels carry a suffix, while the group names only the harness. The Node omits the usual
-// sign-in once named accounts exist, so a group cannot rely on that reading for its label.
+// sign-in once named accounts exist, so a group cannot rely on that reading for its label. A login
+// whose CLI is missing or signed out is left out, as New leaves it out: it has no usage to show.
 export function usageGroups(snapshot: AgentUsageSnapshot | null): UsageGroup[] {
   const groups = new Map<string, UsageGroup>()
   for (const reading of snapshot?.providers ?? []) {
+    if (reading.error?.code === 'cli_missing' || reading.error?.code === 'authentication_required') continue
     const group = groups.get(reading.provider)
     if (group) group.readings.push(reading)
     else groups.set(reading.provider, { provider: reading.provider, label: reading.label, readings: [reading] })

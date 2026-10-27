@@ -14,7 +14,6 @@ import { openManagedSession, requestComposerFocus } from './sessions/managedSele
 import { clearableAgents, markAgentsRead } from './sessions/markAgentsRead'
 import { managedAgentStore } from './sessions/managedStore'
 import {
-  choiceAvailable,
   choiceDescription,
   choiceGlyph,
   choiceLabel,
@@ -87,9 +86,7 @@ export const agentsCommands: readonly ContributedCommand[] = [
     placeholder: 'Pick a harness or an agent…',
     // The pane's New picker as a palette row: the providers this node runs and then the custom agents,
     // read once when the frame opens and filtered here, because that list does not move while somebody
-    // types. Only installed harnesses, and only agents on one: an absent CLI cannot start a session,
-    // and the pane's cards are where the diagnostic that says why belongs. A signed-out account is
-    // left out for the same reason.
+    // types. Like New, it lists only rows that can start a session.
     ...localSearch(async () => {
       const [providers, agents] = await Promise.all([
         managedAgentApi.providers(),
@@ -97,30 +94,25 @@ export const agentsCommands: readonly ContributedCommand[] = [
         readJson<CustomAgent[]>(customAgentsRoute).catch(() => []),
       ])
       pickedRows.clear()
-      return newSessionChoices(
-        providers.filter((provider) => provider.installed),
-        agents,
-      )
-        .filter(choiceAvailable)
-        .map((choice): CommandSearchItem => {
-          const glyph = choiceGlyph(choice)
-          const id = choice.agent
-            ? `custom-agent:${choice.agent.id}`
-            : choice.account
-              ? `${choice.provider.id}:account:${choice.account}`
-              : choice.provider.id
-          pickedRows.set(id, choice)
-          return {
-            id,
-            title: choiceLabel(choice),
-            subtitle: choiceDescription(choice),
-            ...(glyph ? { icon: glyph } : {}),
-            ...(choice.agent ? { badge: 'Agent' } : {}),
-            // The profile the session runs under. The row carries it because a picked row is all
-            // `select` gets, and the two ids differ for a provider that ships more than one profile.
-            ref: choice.provider.profileId,
-          }
-        })
+      return newSessionChoices(providers, agents).map((choice): CommandSearchItem => {
+        const glyph = choiceGlyph(choice)
+        const id = choice.agent
+          ? `custom-agent:${choice.agent.id}`
+          : choice.account
+            ? `${choice.provider.id}:account:${choice.account}`
+            : choice.provider.id
+        pickedRows.set(id, choice)
+        return {
+          id,
+          title: choiceLabel(choice),
+          subtitle: choiceDescription(choice),
+          ...(glyph ? { icon: glyph } : {}),
+          ...(choice.agent ? { badge: 'Agent' } : {}),
+          // The profile the session runs under. The row carries it because a picked row is all
+          // `select` gets, and the two ids differ for a provider that ships more than one profile.
+          ref: choice.provider.profileId,
+        }
+      })
     }),
     select: async (item, context) => {
       const taskId = context.taskId

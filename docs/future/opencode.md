@@ -48,7 +48,7 @@ Each row cites the OpenCode source under `references/opencode/packages/opencode/
 | Unknown session | Answers `-32602` with "session not found" (`src/acp/error.ts`). | Starts a fresh session and warns the reader (`acpSession.ts`). |
 | Questions | Turns its `question` tool off when the client is ACP, unless `OPENCODE_ENABLE_QUESTION_TOOL` is set (`src/tool/registry.ts`). The ACP code has no form support. | No question cards. Keep that variable from reaching the child, or the tool waits for an answer that never comes. |
 | Subagents and plans | Sends no subagent metadata and no plan updates. | OpenCode's `task` tool shows as an ordinary tool call, and the subagent list stays empty. |
-| Auth | Advertises one method, `opencode-login`, which tells the user to run `opencode auth login`. | Ignores auth methods. The Agent Center shows auth as unknown. |
+| Auth | Advertises one method, `opencode-login`, which tells the user to run `opencode auth login`. | Ignores auth methods. With no auth probe, sign-in reads as unknown, so **New** lists OpenCode even when it isn't signed in, and the first turn fails instead. An auth probe that answers `false` takes it out of **New**. |
 | Local server | Starts an HTTP server on `127.0.0.1` with a random port, and talks to it itself (`src/cli/cmd/acp.ts`). It has no password unless `OPENCODE_SERVER_PASSWORD` is set. | One server per running session. See the risks below. |
 
 ## The manifest

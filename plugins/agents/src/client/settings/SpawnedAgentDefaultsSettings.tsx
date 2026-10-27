@@ -2,6 +2,7 @@ import { For, Show } from 'solid-js'
 import { createSettingSave } from '@acorn/plugin-api/client'
 import { Select, SettingRow, SettingsSection, Text } from '@acorn/plugin-api/ui'
 import type { AgentConfigOption, AgentProviderDescriptor } from '../../contract/wire.ts'
+import { providerStartable } from '../../contract/newSessionChoices.ts'
 import type { SpawnedAgentDefaults } from '../../shared/sessionDefaults'
 
 export default function SpawnedAgentDefaultsSettings(props: {
@@ -15,7 +16,7 @@ export default function SpawnedAgentDefaultsSettings(props: {
   const selected = () => props.providers.find((provider) => provider.profileId === props.value.profileId)
   const harnessOptions = () => {
     const options = props.providers
-      .filter((provider) => provider.installed)
+      .filter(providerStartable)
       .map((provider) => ({ value: provider.profileId, label: provider.label }))
     const saved = props.value.profileId
     if (saved && !options.some((option) => option.value === saved)) {

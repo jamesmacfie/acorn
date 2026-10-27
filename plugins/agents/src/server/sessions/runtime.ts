@@ -120,7 +120,9 @@ export class ManagedAgentRuntime {
     this.instructionAdmission = engine.instructionAdmission
     this.mcpReviews = engine.mcpReviews
     this.registry = options.registry ?? agentDriverRegistry
-    this.providers = new ProviderCatalogue(this.registry, engine.store, engine.accounts, engine.shutdownSignal)
+    this.providers = new ProviderCatalogue(this.registry, engine.store, engine.accounts, engine.shutdownSignal, () =>
+      options.publish?.({ channel: 'agent:providers-changed' }),
+    )
     this.core = options.core
     this.db = options.db
     this.currentUserId = options.currentUserId
@@ -439,6 +441,8 @@ export class ManagedAgentRuntime {
       command: `${unset}${shellQuote(provider.executable)}; exec "\${SHELL:-/bin/sh}" -l`,
       env: { [accounts.env]: home },
     })
+    if (provider.accounts?.find((account) => account.name === name)?.authenticated !== true)
+      this.providers.watchSignIn(providerId, name)
     return { terminalSessionId }
   }
 

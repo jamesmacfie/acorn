@@ -237,6 +237,16 @@ describe('the New menu', () => {
     expect(requestTerminalFocusIntent).toHaveBeenCalledWith('task-1', 'term-1')
     expect(document.querySelector('.repo-picker-popover')).toBeNull()
   })
+
+  it('starts the only choice straight from New, with no list to pick from', async () => {
+    const codex = { id: 'codex', label: 'Codex', installed: true, authenticated: true }
+    const createSession = vi.fn()
+    mount(session({}), undefined, undefined, { choices: () => [{ provider: codex }] as never, createSession })
+    await settle()
+    expect(host.querySelector('button[aria-label="New session"]')).toBeNull()
+    host.querySelector<HTMLButtonElement>('button[aria-label="New Codex session"]')!.click()
+    expect(createSession).toHaveBeenCalledWith({ provider: codex })
+  })
 })
 
 describe('stopping the selected agent', () => {

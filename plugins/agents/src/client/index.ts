@@ -36,6 +36,7 @@ import { harnessTerminalCommands } from './terminalProfileCommands'
 import { agentToolFoldSlice } from './sessions/toolFoldPrefs'
 import { sessionOrderSlice } from './sessions/sessionOrder'
 import { PROVIDER_MARKS } from '../contract/providerMarks.ts'
+import { providerStartable } from '../contract/newSessionChoices.ts'
 import { composerExpansionSlice } from './composer/composerPrefs'
 import { sessionContextContribution } from './sessionContextContribution'
 
@@ -86,10 +87,10 @@ export const agentsClientPlugin: ClientPlugin = {
         ),
       startSession: async ({ taskId, title, context, like }) => {
         const previous = like ? (await managedAgentApi.snapshot(like, 0, 1).catch(() => undefined))?.session : undefined
-        const providers = (await managedAgentApi.providers()).filter((provider) => provider.installed)
+        const providers = (await managedAgentApi.providers()).filter(providerStartable)
         const same = previous && providers.find((provider) => provider.id === previous.providerId)
         const provider = same ?? providers[0]
-        if (!provider) throw new Error('No agent harness is installed on this Node.')
+        if (!provider) throw new Error('No agent harness on this Node is installed and signed in.')
         const session = await managedAgentApi.createSession({
           taskId,
           providerId: provider.id,
@@ -104,11 +105,11 @@ export const agentsClientPlugin: ClientPlugin = {
       },
     })
     // A kept dashboard panel's Ask an agent to refresh: a new session in the task that kept it, on the
-    // first installed harness, sent the prompt as its first turn.
+    // first harness that can start one, sent the prompt as its first turn.
     ctx.capabilities.provide(AGENT_ASK, {
       ask: async ({ taskId, title, prompt }) => {
-        const provider = (await managedAgentApi.providers()).find((candidate) => candidate.installed)
-        if (!provider) throw new Error('No agent harness is installed on this Node.')
+        const provider = (await managedAgentApi.providers()).find(providerStartable)
+        if (!provider) throw new Error('No agent harness on this Node is installed and signed in.')
         const session = await managedAgentApi.createSession({
           taskId,
           providerId: provider.id,
