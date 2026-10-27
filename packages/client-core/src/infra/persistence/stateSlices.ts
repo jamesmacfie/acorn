@@ -1,3 +1,9 @@
+import {
+  hydrateCommandUsage,
+  MAX_COMMAND_USES,
+  commandUsage,
+  type CommandUsage,
+} from '../../host/registries/commands/usage'
 import { homeTabSlice } from '../../features/dashboards/homeTab'
 import { dashboardsSlice } from '../../features/dashboards/persist'
 import { hydrateNoticeValues, notices, type Notice } from '../../features/notifications/notifications'
@@ -105,6 +111,32 @@ export const workspaceHistorySlice: PersistedStateSlice<WorkspaceHistory> = {
   // Room for MAX_RECENT_WORKSPACES ids.
   maxBytes: 2 * 1024,
   binding: appStateBinding(workspaceHistory, hydrateWorkspaceHistory),
+}
+
+const parseCommandUsage = (raw: unknown): CommandUsage => {
+  const value = parseJson(raw)
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return {}
+  return Object.fromEntries(
+    Object.entries(value)
+      .filter(([, use]) => Number.isFinite(use?.score) && use.score > 0 && Number.isFinite(use?.at))
+      .slice(0, MAX_COMMAND_USES)
+      .map(([id, use]) => [id, { score: use.score, at: use.at }]),
+  )
+}
+
+// Command ids and numbers only. A removed plugin's commands stay inert and fade out on their own.
+export const commandUsageSlice: PersistedStateSlice<CommandUsage> = {
+  id: 'core.command-usage',
+  key: PrefKeys.commandUsage,
+  scope: 'app',
+  restore: 'view',
+  version: 1,
+  codec: { parse: parseCommandUsage, serialize: (value) => value },
+  empty: () => ({}),
+  unknownIds: 'retain-inert',
+  // Room for MAX_COMMAND_USES entries with long plugin ids.
+  maxBytes: 32 * 1024,
+  binding: appStateBinding(commandUsage, hydrateCommandUsage),
 }
 
 // Which workspace was open, so a launch knows which workspace's memory above to reopen. Both clients

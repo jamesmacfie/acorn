@@ -22,6 +22,7 @@ import { setCommandPresenter } from './presenter'
 import { latestSignal } from '../../../kit/lib/state/latestSignal'
 import { ROOT, SETTING_LOADING, frameFor, instructionState, minQueryOf } from './sessionFrames'
 import { groupRows, inputRows, rootRows, searchRows, settingRows } from './sessionRows'
+import { commandUsage, recordCommandUse, usageSnapshot } from './usage'
 
 // One command session per client owns the palette's frame stack, selection, request cancellation,
 // and setting writes. Both desktop and terminal render its rows and forward keys to it. Rows come
@@ -243,6 +244,9 @@ export function createCommandSession(options: CommandSessionOptions): CommandSes
   const [captured, setCaptured] = createSignal<CommandExecutionContext | null>(null)
   const [frames, setFrames] = createSignal<readonly SessionFrame[]>([])
   const [pending, setPending] = createSignal(false)
+  // Read once per opening, so a command that keeps the palette open doesn't move the rows under the
+  // cursor by being used.
+  const [usage, setUsage] = createSignal<ReadonlyMap<string, number>>(new Map())
 
   // Two lifetimes, because there are two kinds of work. `whileOpen` lasts as long as the palette is
   // open and is what a setting write runs under: typing does not cancel a write, and closing does.
@@ -315,6 +319,16 @@ export function createCommandSession(options: CommandSessionOptions): CommandSes
     return { effect: 'stay', status: `Set to ${stored.label}.` }
   }
 
+  // A pick counts once it runs, even if the command then fails, so this is the one place a run is
+  // recorded. A shortcut or a menu runs `executeCommand` directly and records nothing.
+  const executeAndRecord = (
+    commandId: string,
+    context: CommandExecutionContext,
+  ): Promise<CommandOutcome | void> | CommandOutcome | void => {
+    recordCommandUse(commandId)
+    return executeCommand(commandId, context)
+  }
+
   const rows = createMemo<readonly SessionRow[]>(() => {
     if (!open()) return []
     const current = frame()
@@ -330,8 +344,8 @@ export function createCommandSession(options: CommandSessionOptions): CommandSes
         : []
     }
     return current.commandId === null
-      ? rootRows(graph(), current.query, executeCommand)
-      : groupRows(graph(), current.commandId, current.query, executeCommand)
+      ? rootRows(graph(), current.query, executeAndRecord, usage())
+      : groupRows(graph(), current.commandId, current.query, executeAndRecord, usage())
   })
 
   // ── The cursor ──────────────────────────────────────────────────────────────────────────────────
@@ -573,6 +587,7 @@ export function createCommandSession(options: CommandSessionOptions): CommandSes
       whileOpen?.abort()
       whileOpen = new AbortController()
       setCaptured(untrack(options.context))
+      setUsage(usageSnapshot(untrack(commandUsage), Date.now()))
     }
     setFrames(stack)
     if (!wasOpen) {
@@ -643,6 +658,8 @@ export function createCommandSession(options: CommandSessionOptions): CommandSes
     if (row.action.effect === 'enter') {
       const node = untrack(graph).nodes.get(row.action.commandId)
       if (!node) return
+      // A group only opens a submenu. Entering a search, an input or a setting is the pick.
+      if (node.command.kind !== 'group') recordCommandUse(node.id)
       setFrames((stack) => [...stack, frameFor(node)])
       entered()
       return

@@ -24,6 +24,10 @@ export const PrefKeys = {
   // The two-workspace shortcut's pair. Both hosts persist it through the same app-scoped Node
   // preference path as lastWorkspace, including when the previous workspace is on another Node.
   workspaceHistory: 'workspace_history',
+  // Which palette commands this person picks, as decaying scores
+  // (packages/client-core/src/host/registries/commands/usage.ts).
+  // The device's, like `keybindings`: a habit of one person on one machine.
+  commandUsage: 'command_usage',
   taskLayouts: 'task_layouts',
   notices: 'notices',
   editorOpenFiles: 'editor_open_files',

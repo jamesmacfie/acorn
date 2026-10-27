@@ -9,6 +9,7 @@ const DEVICE_KEYS: ReadonlySet<string> = new Set<string>([
   PrefKeys.style,
   PrefKeys.devicePluginsDisabled,
   PrefKeys.keybindings,
+  PrefKeys.commandUsage,
   PrefKeys.railOrder,
   PrefKeys.railVisibility,
   PrefKeys.workspaceRail,

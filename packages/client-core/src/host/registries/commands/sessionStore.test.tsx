@@ -13,6 +13,7 @@ import {
   type SettingCommand,
 } from './commands'
 import { createCommandSession, type CommandFleetNode, type CommandSession } from './sessionStore'
+import { commandUsage, hydrateCommandUsage } from './usage'
 
 // The session's transitions, as one suite both hosts are held to.
 //
@@ -1334,5 +1335,89 @@ describe('a contributor going away underneath', () => {
     } finally {
       vi.useRealTimers()
     }
+  })
+})
+
+describe('ranking by use', () => {
+  beforeEach(() => hydrateCommandUsage({}))
+  afterEach(() => hydrateCommandUsage({}))
+
+  const NOW = Date.now()
+
+  it('puts the more used of two equal matches first, but never above a better match', async () => {
+    register(leaf('cmd.alpha', { title: 'Open alpha', order: 10 }))
+    register(leaf('cmd.beta', { title: 'Open beta', order: 20 }))
+    register(leaf('cmd.archive', { title: 'Archive task', order: 30 }))
+    register(leaf('cmd.rearchive', { title: 'rearchive-old-logs', order: 40 }))
+    hydrateCommandUsage({ 'cmd.beta': { score: 3, at: NOW }, 'cmd.rearchive': { score: 50, at: NOW } })
+    await withSession((session) => {
+      session.openRoot()
+      session.setQuery('open')
+      expect(ids(session)).toEqual(['cmd.beta', 'cmd.alpha'])
+      session.setQuery('archive')
+      expect(ids(session)).toEqual(['cmd.archive', 'cmd.rearchive'])
+    })
+  })
+
+  it('lists recent commands first on the empty root, leaving out what the context hides', async () => {
+    register(group('panes', { title: 'Panes' }))
+    register(leaf('panes.close', { title: 'Close pane', parentId: 'panes' }))
+    register(leaf('cmd.new', { title: 'New task' }))
+    register(leaf('needs.task', { scope: 'task' }))
+    hydrateCommandUsage({
+      'cmd.new': { score: 1, at: NOW },
+      'panes.close': { score: 2, at: NOW },
+      'needs.task': { score: 5, at: NOW },
+      'cmd.gone': { score: 9, at: NOW },
+    })
+    await withSession(
+      (session) => {
+        session.openRoot()
+        expect(ids(session)).toEqual(['recent:panes.close', 'recent:cmd.new', 'panes', 'cmd.new'])
+        expect(session.rows()[0]).toMatchObject({ badge: 'recent', breadcrumb: ['Panes'] })
+      },
+      { context: { ...CONTEXT, taskId: null } },
+    )
+  })
+
+  it('records a command run and a search entered, and not a group entered', async () => {
+    register(group('panes', { title: 'Panes', order: 10 }))
+    register(leaf('panes.close', { title: 'Close pane', parentId: 'panes' }))
+    register(search('find', { title: 'Find', order: 20 }))
+    await withSession(async (session) => {
+      session.openRoot()
+      session.activateRow('panes')
+      expect(Object.keys(commandUsage())).toEqual([])
+      session.activateRow('panes.close')
+      await settle()
+      session.openRoot()
+      session.activateRow('find')
+      expect(Object.keys(commandUsage()).sort()).toEqual(['find', 'panes.close'])
+    })
+  })
+
+  it('counts a shortcut run as nothing', async () => {
+    register(leaf('cmd.go'))
+    await executeCommand('cmd.go', CONTEXT)
+    expect(commandUsage()).toEqual({})
+  })
+
+  it('does not move the rows while a command keeps the palette open', async () => {
+    register(leaf('cmd.alpha', { title: 'Open alpha', order: 10 }))
+    register(leaf('cmd.beta', { title: 'Open beta', order: 20, run: () => ({ effect: 'stay' as const }) }))
+    await withSession(async (session) => {
+      session.openRoot()
+      session.setQuery('open')
+      for (let at = 0; at < 3; at++) {
+        session.activateRow('cmd.beta')
+        await settle()
+      }
+      expect(session.open()).toBe(true)
+      expect(ids(session)).toEqual(['cmd.alpha', 'cmd.beta'])
+      session.close()
+      session.openRoot()
+      session.setQuery('open')
+      expect(ids(session)).toEqual(['cmd.beta', 'cmd.alpha'])
+    })
   })
 })

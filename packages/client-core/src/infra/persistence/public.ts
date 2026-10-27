@@ -6,4 +6,10 @@ export { storageKeyFor } from './persistedState.ts'
 export { directPreferenceSlices } from './preferenceSlices.ts'
 export { readDevicePrefs, removeDevicePluginPrefs } from './devicePrefs.ts'
 export { createStartupRestore } from './startupRestore.ts'
-export { coreStateSlices, lastWorkspaceSlice, workspaceHistorySlice, workspaceViewSlice } from './stateSlices.ts'
+export {
+  commandUsageSlice,
+  coreStateSlices,
+  lastWorkspaceSlice,
+  workspaceHistorySlice,
+  workspaceViewSlice,
+} from './stateSlices.ts'

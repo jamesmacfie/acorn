@@ -36,6 +36,28 @@ executor goes to the registered palette presenter, which opens the session at th
 (`packages/client-core/src/host/registries/commands/presenter.ts`). A leaf named this way opens at
 its parent with the cursor on it.
 
+## Ranking by use
+
+The palette learns which commands you pick. Each pick adds 1 to that command's score, and the score
+halves every 7 days it goes unused. A pick counts when you run a command from the palette, or when
+you enter a search, input, or setting command, even if the command then fails. Entering a group
+doesn't count. Neither does a command run by a shortcut or a menu, or a search result
+(`packages/client-core/src/host/registries/commands/usage.ts`).
+
+Use only breaks ties. A typed query still ranks by text match first, and use decides between two
+matches with the same score. The author's order decides what's left. With nothing typed, the root
+lists up to five of your most used commands first, each with its breadcrumb and a **recent** badge.
+A recent row's ID is `recent:<commandId>`, so a command that's also a top-level row doesn't appear
+under one ID twice. A recent command the current context hides isn't listed. An empty group keeps
+the author's order.
+
+The session reads the scores once when it opens, so a command that keeps the palette open doesn't
+move the rows under the cursor.
+
+Scores stay on the device, under the `command_usage` key, with command IDs and numbers only. The
+list keeps at most 200 commands and drops a score once it falls below 0.05, so a removed plugin's
+commands fade out on their own.
+
 ## Search, input, and setting commands
 
 A `search` command owns the field. The host waits 250 ms after typing stops and for at least two

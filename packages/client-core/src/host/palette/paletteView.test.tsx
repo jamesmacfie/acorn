@@ -9,6 +9,7 @@ import {
   type CommandExecutionContext,
 } from '../registries/commands/commands'
 import type { CommandSession } from '../registries/commands/sessionStore'
+import { hydrateCommandUsage } from '../registries/commands/usage'
 import { createCommandPaletteView } from './paletteView'
 import { PaletteSurface } from './PaletteSurface'
 
@@ -114,6 +115,8 @@ afterEach(() => {
   host.remove()
   Reflect.deleteProperty(window, 'acorn')
   for (const disposable of held.splice(0).reverse()) disposable.dispose()
+  // A command one test ran would otherwise be a recent row in the next.
+  hydrateCommandUsage({})
 })
 
 describe('the dialog', () => {

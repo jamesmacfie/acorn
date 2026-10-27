@@ -8,7 +8,7 @@ import { resolveTheme } from '../../features/settings/builtInThemes'
 import { resolveStyle } from '../../features/settings/uiStyles'
 import { PrefKeys } from './prefKeys'
 import { persistedStateRegistry, type PersistedStateSlice } from './persistedState'
-import { lastWorkspaceSlice, workspaceHistorySlice } from './stateSlices'
+import { commandUsageSlice, lastWorkspaceSlice, workspaceHistorySlice } from './stateSlices'
 import { createStartupRestore } from './startupRestore'
 
 // Every read goes through `resolveTheme`, which falls back to the built-in
@@ -84,6 +84,7 @@ export function createAppStartupRestore(options: AppStartupOptions): {
   const [lastWorkspaceId, setLastWorkspaceId] = createSignal('')
   const shellSlices = [
     workspaceHistorySlice,
+    commandUsageSlice,
     lastWorkspaceSlice(setLastWorkspaceId),
   ] as readonly PersistedStateSlice<unknown>[]
 

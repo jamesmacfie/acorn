@@ -12,6 +12,7 @@
 import { createEffect } from 'solid-js'
 import { useQueryClient } from '@tanstack/solid-query'
 import {
+  commandUsageSlice,
   createStartupRestore,
   lastWorkspaceSlice,
   type PersistedStateSlice,
@@ -53,6 +54,8 @@ export function installRestore(model: ShellModel, prefs: () => Readonly<Record<s
   const slices = [
     workspaceViewSlice,
     workspaceHistorySlice,
+    // Not a place: the palette's command usage, so this palette ranks by use as the desktop's does.
+    commandUsageSlice,
     lastWorkspaceSlice(restoreLastWorkspace(model)),
   ] as readonly PersistedStateSlice<unknown>[]
   const pass = createStartupRestore({

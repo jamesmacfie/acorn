@@ -76,7 +76,7 @@ export type CommandGraph = {
 }
 
 /** One search hit: the node, and what it scored. */
-type CommandNodeHit = { readonly node: CommandNode; readonly score: number }
+export type CommandNodeHit = { readonly node: CommandNode; readonly score: number }
 
 type Draft = {
   command: CommandContribution

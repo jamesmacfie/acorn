@@ -1,13 +1,16 @@
 import type { CommandSettingOption } from '@acorn/protocol/commands.ts'
 import { fuzzyScore } from '../../../kit/lib/controls/fuzzy'
 import { isActionCommand, type CommandExecutionContext, type CommandOutcome, type SettingCommand } from './commands'
-import type { CommandGraph, CommandNode } from './graph'
+import type { CommandGraph, CommandNode, CommandNodeHit } from './graph'
 import type { SessionRow, SessionSearchResult, SessionSearchState, SessionSettingState } from './sessionStore'
 
 type Execute = (
   commandId: string,
   context: CommandExecutionContext,
 ) => Promise<CommandOutcome | void> | CommandOutcome | void
+
+/** Each command's decayed use, read once when the session opened (./usage.ts). */
+type Usage = ReadonlyMap<string, number>
 
 const commandRow = (node: CommandNode, trail: boolean, execute: Execute): SessionRow => ({
   id: node.id,
@@ -19,19 +22,47 @@ const commandRow = (node: CommandNode, trail: boolean, execute: Execute): Sessio
     : { effect: 'enter', commandId: node.id },
 })
 
-export const rootRows = (graph: CommandGraph, query: string, execute: Execute): SessionRow[] => {
+/** Recent rows at the empty root. Enough to reach a habit without pushing the top level off a short
+ *  screen. */
+const MAX_RECENT_ROWS = 5
+
+/** Equal text matches, most used first. `ranked` already applied the author's order, and a stable sort
+ *  keeps it under whatever use doesn't decide. */
+const byUse = (hits: readonly CommandNodeHit[], usage: Usage): CommandNodeHit[] =>
+  [...hits].sort((a, b) => b.score - a.score || (usage.get(b.node.id) ?? 0) - (usage.get(a.node.id) ?? 0))
+
+/** The most used commands this context can reach. The row id differs from the command's, so one that is
+ *  also a top-level row doesn't put two rows with one id in the list. */
+const recentRows = (graph: CommandGraph, usage: Usage, execute: Execute): SessionRow[] =>
+  [...usage]
+    .sort((a, b) => b[1] - a[1])
+    .map(([id]) => graph.nodes.get(id))
+    .filter((node): node is CommandNode => !!node?.discoverable)
+    .slice(0, MAX_RECENT_ROWS)
+    .map((node) => ({ ...commandRow(node, true, execute), id: `recent:${node.id}`, badge: 'recent' }))
+
+export const rootRows = (graph: CommandGraph, query: string, execute: Execute, usage: Usage): SessionRow[] => {
   const trimmed = query.trim()
-  if (!trimmed) return graph.top().map((node) => commandRow(node, false, execute))
-  return graph.ranked(trimmed).map((hit) => commandRow(hit.node, true, execute))
+  if (!trimmed) {
+    return [...recentRows(graph, usage, execute), ...graph.top().map((node) => commandRow(node, false, execute))]
+  }
+  return byUse(graph.ranked(trimmed), usage).map((hit) => commandRow(hit.node, true, execute))
 }
 
-export const groupRows = (graph: CommandGraph, commandId: string, query: string, execute: Execute): SessionRow[] => {
+// An empty group keeps the author's order. Its rows are a short list that people learn by position.
+export const groupRows = (
+  graph: CommandGraph,
+  commandId: string,
+  query: string,
+  execute: Execute,
+  usage: Usage,
+): SessionRow[] => {
   const trimmed = query.trim()
   if (!trimmed) return graph.children(commandId).map((node) => commandRow(node, false, execute))
-  return graph
-    .ranked(trimmed)
-    .filter((hit) => hit.node.parentId === commandId)
-    .map((hit) => commandRow(hit.node, false, execute))
+  return byUse(
+    graph.ranked(trimmed).filter((hit) => hit.node.parentId === commandId),
+    usage,
+  ).map((hit) => commandRow(hit.node, false, execute))
 }
 
 export const searchRows = (
