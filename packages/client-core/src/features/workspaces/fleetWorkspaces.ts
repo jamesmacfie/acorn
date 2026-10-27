@@ -14,7 +14,7 @@ import { WORKSPACES_PREF_KEY, workspacesMode } from '@acorn/protocol/workspacesM
 import type { NodeRecord } from '@acorn/protocol/broker.ts'
 import { readJson } from '../../infra/node/apiClient'
 import { activeNodeId, setActiveNode } from '../../infra/node/activeNode'
-import { createFleetQuery, type FleetUnavailable } from '../../infra/node/fanout'
+import { createFleetQuery, type FleetQueryOptions, type FleetUnavailable } from '../../infra/node/fanout'
 import { nodes } from '../../infra/node/fleet'
 import { projectPath } from '../../host/registries/commands/corePaths'
 
@@ -48,19 +48,26 @@ export function pickerWorkspaces(
   })
 }
 
-export function createFleetWorkspaces(): () => FleetWorkspaceList {
+/** Every Node's picker rows, or only the Nodes `options.nodeIds` names. */
+export function createFleetWorkspaces(options: FleetQueryOptions = {}): () => FleetWorkspaceList {
   const [result] = createFleetQuery(
     () => workspacesKey,
     (nodeId, _dep, signal) => readJson<Workspace[]>(workspacesRoute, { nodeId, signal }),
+    undefined,
+    options,
   )
   const [prefs] = createFleetQuery(
     () => prefsKey,
     (nodeId, _dep, signal) => readJson<Record<string, string>>(prefsRoute, { nodeId, signal }),
+    undefined,
+    options,
   )
   const [projects] = createFleetQuery(
     () => projectsKey,
     // Shares the active Node's projects query key, so the cache value must be the same array shape.
     async (nodeId, _dep, signal) => (await readJson<ProjectsResponse>(projectsRoute, { nodeId, signal })).projects,
+    undefined,
+    options,
   )
   return createMemo<FleetWorkspaceList>(() => {
     const current = result()

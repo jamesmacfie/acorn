@@ -61,10 +61,6 @@ export type SettingsContribution = {
   /** The older placement. `workspace` means `scope: 'workspace'`; `general` means the defaults. */
   group?: 'general' | 'workspace'
   order: number
-  /** The page reads and writes the node in `context.scope.nodeId`, so the header can offer the node
-   *  switcher. Without it a node page's header names the active node, because that is what a body
-   *  bound to the ambient API client reads. */
-  followsNodeSwitcher?: boolean
   /** Words search matches besides the label, at most 16. Search only. */
   keywords?: readonly string[]
   /** The page's sections, at most 16, in the order the page draws them. Each is a search result and a

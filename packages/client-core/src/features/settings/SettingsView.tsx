@@ -23,7 +23,7 @@ import {
   type Project,
   type Workspace,
 } from '../../infra/queries'
-import { activeNodeId } from '../../infra/node/activeNode'
+import { activeNodeId, setActiveNode } from '../../infra/node/activeNode'
 import { nodes } from '../../infra/node/fleet'
 import { nodePlugins } from '../../infra/node/nodePlugins'
 import { pluginLabel } from '../../host/plugins/pluginLabel'
@@ -80,10 +80,10 @@ import './settings.css'
 // terminal, an agent stream or an editor keeps running and is where the person left it after Escape.
 // A route would unmount the task's panes.
 //
-// Three pieces of state, and all three belong to this device and to this one visit. The page is
-// remembered across visits in local storage and never sent to a node. The node the header's switcher
-// points at starts on the active node every time settings opens and never moves the app's own active
-// node, because switching that remounts the whole shell on another node's cache.
+// The page is device state, remembered across visits in local storage and never sent to a node. The
+// node is the app's active node, the one the top bar shows. The header's node selector changes it, which
+// remounts the shell on that node's cache; the shell keeps settings open and this view reopens on the
+// remembered page.
 
 /** What asked for settings. A fresh object per request, so the same deep link twice still navigates. */
 export type SettingsRequest = { target?: string }
@@ -229,12 +229,6 @@ export default function SettingsView(props: {
   // Below about 900 px the rail and the page take turns. Opening settings shows the page; its back
   // link shows the rail. Wider, both are always drawn and this is ignored.
   const [pageOpen, setPageOpen] = createSignal(true)
-  const [pickedNode, setPickedNode] = createSignal(untrack(activeNodeId))
-  // Falls back to the active node when the picked one is unpaired while settings is open.
-  const switchedNode = () => {
-    const picked = pickedNode()
-    return picked && nodes().some((node) => node.nodeId === picked) ? picked : activeNodeId()
-  }
 
   const workspaceById = (id: string) => workspaces.data?.find((workspace) => workspace.id === id)
 
@@ -501,11 +495,8 @@ export default function SettingsView(props: {
   const nodeLabel = (nodeId: string | null): string =>
     (nodeId && nodes().find((node) => node.nodeId === nodeId)?.label) || nodeId || 'this node'
 
-  // The node a page's body reads. The switcher's on a page that follows it, and the active node on every
-  // other one, because a body bound to the ambient API client can read nothing else.
-  const pageNode = () => (current()?.page.followsNodeSwitcher ? switchedNode() : activeNodeId())
   createEffect(() => {
-    const nodeId = pageNode()
+    const nodeId = activeNodeId()
     const selected = selection()
     props.onLinkPlace?.(
       nodeId && current()
@@ -525,7 +516,7 @@ export default function SettingsView(props: {
     get scope() {
       const workspace = current()?.workspace
       const project = current()?.project
-      return { nodeId: pageNode(), ...(workspace ? { workspace } : {}), ...(project ? { project } : {}) }
+      return { nodeId: activeNodeId(), ...(workspace ? { workspace } : {}), ...(project ? { project } : {}) }
     },
     navigate: (target, opened) => go(selectionFrom(target), opened),
     get workspace() {
@@ -603,7 +594,7 @@ export default function SettingsView(props: {
   // refetch that hands back new objects does not.
   const pageKey = createMemo(() => {
     const resolved = current()
-    return resolved ? `${resolved.page.id} ${selection().page} ${visit()} ${pageNode()}` : undefined
+    return resolved ? `${resolved.page.id} ${selection().page} ${visit()} ${activeNodeId()}` : undefined
   })
   createEffect(() => {
     const target = landing()
@@ -683,35 +674,34 @@ export default function SettingsView(props: {
     </button>
   )
 
+  // The same switch as the top bar's node selector. It remounts the whole shell, so a form holding
+  // changes asks first.
+  const nodeSelector = () => (
+    <Select
+      size="sm"
+      width="auto"
+      label="Node"
+      value={activeNodeId() ?? ''}
+      options={nodes().map((node) => ({ value: node.nodeId, label: `Node: ${node.label}` }))}
+      onChange={(value) => leave(() => setActiveNode(value))}
+    />
+  )
+
   const scopeChip = (resolved: Resolved) => {
     const scope = settingsScopeOf(resolved.page)
     if (scope === 'device') return <Badge>This device</Badge>
     if (scope === 'node') {
       return (
-        <Show
-          when={resolved.page.followsNodeSwitcher && nodes().length > 1}
-          fallback={<Badge>Node: {nodeLabel(pageNode())}</Badge>}
-        >
-          <Select
-            size="sm"
-            width="auto"
-            label="Node this page shows"
-            value={switchedNode() ?? ''}
-            options={nodes().map((node) => ({ value: node.nodeId, label: `Node: ${node.label}` }))}
-            // Another node is another page: it remounts, so a form holding changes asks first.
-            onChange={(value) => leave(() => setPickedNode(value))}
-          />
+        <Show when={nodes().length > 1} fallback={<Badge>Node: {nodeLabel(activeNodeId())}</Badge>}>
+          {nodeSelector()}
         </Show>
       )
     }
-    // A workspace or project page reads the active node, the one the workspaces list came from. The
-    // title already names the workspace or project, so the chip says only which kind it is.
+    // The title already names the workspace or project, so the chip says only which kind it is.
     return (
       <>
         <Badge>{resolved.project ? 'Project' : 'Workspace'}</Badge>
-        <Show when={nodes().length > 1}>
-          <Badge>Node: {nodeLabel(activeNodeId())}</Badge>
-        </Show>
+        <Show when={nodes().length > 1}>{nodeSelector()}</Show>
       </>
     )
   }

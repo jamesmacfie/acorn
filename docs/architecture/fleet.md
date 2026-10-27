@@ -48,6 +48,15 @@ second try would wait in the same queue. The broker's deadline starts when a req
 ([connection broker](../shell/bridge-and-broker.md#connection-broker)). Liveness comes from the WebSocket heartbeat,
 and a Node that misses two pings is terminated and reconnected.
 
+## The selected Node
+
+The Node selector in the top bar sets `activeNodeId()`, the one answer to "which Node am I looking
+at". The workspace picker beside it, the workspace rail, and every Settings page show only that Node.
+Changing Node is the selector's job alone, and the Settings header's selector makes the same switch. A
+switch remounts the shell on the new Node's cache. The command palette's workspace finder stays
+fleet-wide, so an owner can search by name across Nodes, and picking another Node's workspace there
+switches Node first.
+
 ## The Fleet view
 
 The Fleet source and the Node switcher appear only when more than one Node is paired, through
