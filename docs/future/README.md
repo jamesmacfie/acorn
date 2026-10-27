@@ -32,7 +32,6 @@ Dated delivery evidence belongs in `docs/testing/` or the dated security reviews
 | [opencode.md](./opencode.md) | An external OpenCode harness package beside Claude Code and Codex, through `opencode acp`. | Postponed October 19, 2026, until OpenCode is installed and signed in. The tool result cap, memory change notes, and `run_script` from the same review were implemented October 19, 2026. |
 | [plugin-signing.md](./plugin-signing.md) | Design package signing, check signatures on install and update, then build discovery over signed packages. | Proposed. Authoring, reload, and worker isolation implemented. The ecosystem/ folder merged into this file October 26, 2026. |
 | [split.md](./split.md) | Extract loaded plugins and the authoring toolkit with packed-artifact compatibility and host seeding. | Published authoring packages implemented. Repository extraction remains proposed. |
-| [workflows-gaps.md](./workflows-gaps.md) | Assess graph navigation, prompt display, retry safety, agent control, and file triggers. | Proposed gaps. Confirm each against Workflows before implementation. |
 
 ## Choose the owning plan
 
@@ -71,7 +70,7 @@ These plans remain in Git history. Use their reference owners for implemented be
 | `lazy-plugin-code.md`, removed October 12, 2026 | [Load a route on first use](../plugin-authoring/the-node-half.md#load-a-route-on-first-use). |
 | `task-deletion.md`, removed October 12, 2026 | [Deleting a task](../workspaces-and-tasks/archive.md#deleting-a-task). |
 | `workflow-agent-goals.md`, removed October 12, 2026 | [Completion conditions](../workflows/agent-steps.md#completion-conditions). |
-| `workflow-agent-tools.md`, removed October 12, 2026 | [Workflow tools](../agent-tools/workflow-tools.md). Open acceptance is in [workflow followups](./workflows-gaps.md#add-dedicated-agent-control-tools). |
+| `workflow-agent-tools.md`, removed October 12, 2026 | [Workflow tools](../agent-tools/workflow-tools.md). Its open acceptance, dedicated agent control tools, went with `workflows-gaps.md`. |
 | `group-projects-later.md`, removed October 8, 2026 | [Workspaces and tasks](../workspaces-and-tasks.md#workspace-and-project). |
 | `find-in-file.md`, removed October 8, 2026 | [Find in a file](../editor.md#find-in-a-file). |
 | `editor-files.md`, removed October 8, 2026 | [File renderers](../editor/file-renderers.md). The renderer catalogue and the rectangle design remain in Git history. |
@@ -79,6 +78,7 @@ These plans remain in Git history. Use their reference owners for implemented be
 | `test-feedback.md`, removed October 8, 2026 | [Testing](../testing.md). Broader excluded performance ideas remain in Git history, not assigned requirements. |
 | `dashboards/`, removed October 8, 2026 | [Dashboard reference](../dashboards.md) and [derived sources](../data-sources/derived-sources.md). |
 | `dashboards-gaps.md`, removed October 26, 2026 | [The panel editor](../dashboards/mapping-and-editor.md) and [derived sources](../data-sources/derived-sources.md#limits-and-known-gaps). Its unassigned leftovers, a relations inspector review and a Workflows dock, remain in Git history. |
+| `workflows-gaps.md`, removed October 26, 2026 | [Workflows](../workflows.md). Its unassigned gaps remain in Git history: navigating large definitions, showing the prompt a step got, retries for uncertain outcomes, dedicated agent control tools, and consent for file-owned triggers. |
 | Six Editor phase plans, removed October 8, 2026 | [Editor reference](../editor.md), [dated completion records](../testing/editor-delivery-2026-10-08.md), and [checks still to run](../testing/editor-phase06-follow-up-2026-10-08.md). |
 
 ## Retired folders

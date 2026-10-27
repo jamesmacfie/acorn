@@ -145,5 +145,3 @@ heatmap of when runs start.
 - [Triggers](./workflows/triggers.md): workflows a trigger starts with nobody present.
 
 - [What workflows refuses](./workflows/refusals.md): settled decisions and what would reopen them.
-
-Known gaps are in [docs/future/workflows-gaps.md](./future/workflows-gaps.md).
