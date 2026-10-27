@@ -22,6 +22,16 @@ export function toggleManagedChatsOnly(sessionId: string): void {
   setChatsOnlyBySession((current) => ({ ...current, [sessionId]: !current[sessionId] }))
 }
 
+// The side question drawn in a split beside each session, keyed by the session it was asked from.
+// Held for the app's lifetime like the filter above: a relaunch shows the conversation alone.
+const [sideBySession, setSideBySession] = createSignal<Record<string, string | undefined>>({})
+
+export const openSideSession = (sessionId: string): string | undefined => sideBySession()[sessionId]
+
+export function showSideSession(sourceSessionId: string, sideSessionId: string | undefined): void {
+  setSideBySession((current) => ({ ...current, [sourceSessionId]: sideSessionId }))
+}
+
 export const selectedManagedSession = (taskId: string): string | undefined => selectedByTask()[taskId]
 export const focusedManagedRequest = (sessionId: string): string | undefined => focusedRequestBySession()[sessionId]
 export const selectedManagedSubagent = (sessionId: string): string | undefined => selectedSubagentBySession()[sessionId]

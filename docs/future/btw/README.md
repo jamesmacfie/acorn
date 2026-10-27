@@ -1,6 +1,6 @@
 # Side questions: a btw thread beside a running session
 
-Date: October 27, 2026. Status: in progress. Phase 1 is done.
+Date: October 27, 2026. Status: in progress. Phases 1 and 2 are done.
 
 Claude Code's `/btw` lets you ask a quick question while the agent keeps working. The answer can see
 the whole conversation, and the question never enters the main thread. This folder plans the same

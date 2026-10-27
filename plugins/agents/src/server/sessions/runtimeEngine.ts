@@ -1467,8 +1467,8 @@ export class ManagedAgentEngine {
     })
   }
 
-  forkContext(source: AgentSession): ReturnType<typeof buildForkContext> {
-    return buildForkContext(this.store, source)
+  forkContext(source: AgentSession, instruction?: string): ReturnType<typeof buildForkContext> {
+    return buildForkContext(this.store, source, instruction)
   }
 
   stopLive(sessionId: string): Promise<void> {

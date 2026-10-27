@@ -293,10 +293,18 @@ export function DetailColumn(props: {
   /** `page` caps the column's content at a settings page's width, from its start edge, for a detail
    *  that is a form or a document rather than a canvas. Chrome still spans the column. */
   measure?: 'page'
+  /** Pad the column the way a pane's detail region pads its children, for a column that holds what
+   *  would otherwise fill that region, such as a followed `Timeline` and the composer under it. */
+  inset?: boolean
   children: JSX.Element
 }) {
   return (
-    <div class="ui-listdetail-detail" data-scroll={props.scroll ? '' : undefined} data-measure={props.measure}>
+    <div
+      class="ui-listdetail-detail"
+      data-scroll={props.scroll ? '' : undefined}
+      data-measure={props.measure}
+      data-inset={props.inset ? '' : undefined}
+    >
       {props.children}
     </div>
   )

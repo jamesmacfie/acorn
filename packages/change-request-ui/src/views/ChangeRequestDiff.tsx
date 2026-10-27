@@ -34,7 +34,10 @@ type InlineOrigin = {
 /** The part of the agents plugin's inline diff surface this view uses. */
 export type InlineDiffSurface = {
   prime: (taskId: string) => void
-  sessionsForTask: (taskId: string) => readonly { origin?: InlineOrigin | null; archivedAt?: number | null }[]
+  /** A session can also be a side question, which isn't about a diff line. */
+  sessionsForTask: (
+    taskId: string,
+  ) => readonly { origin?: InlineOrigin | { kind: 'btw' } | null; archivedAt?: number | null }[]
   reportPatches: (
     scope: { taskId: string; source: 'pull-request'; pull: { owner: string; repo: string; number: string } },
     patches: Record<string, string | null>,
@@ -116,7 +119,7 @@ export function ChangeRequestDiff(props: {
     const visible = (inline()?.sessionsForTask(taskId) ?? []).flatMap((session) => {
       const origin = session.origin
       if (
-        !origin ||
+        origin?.kind !== 'inline-diff' ||
         origin.source !== 'pull-request' ||
         session.archivedAt ||
         origin.pull?.owner !== pull.owner ||
@@ -152,7 +155,12 @@ export function ChangeRequestDiff(props: {
                   if (!origin || !inline()?.Card) return null
                   const exists = inline()
                     ?.sessionsForTask(taskId)
-                    .some((session) => session.origin && sameLine(session.origin, origin) && !session.archivedAt)
+                    .some(
+                      (session) =>
+                        session.origin?.kind === 'inline-diff' &&
+                        sameLine(session.origin, origin) &&
+                        !session.archivedAt,
+                    )
                   return exists || (openInline() && sameLine(openInline()!, origin)) ? origin : null
                 },
                 null,

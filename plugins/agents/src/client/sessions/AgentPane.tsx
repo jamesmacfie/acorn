@@ -19,6 +19,7 @@ import {
   Button,
   Card,
   Chip,
+  DetailColumn,
   EmptyState,
   Field,
   Heading,
@@ -26,6 +27,7 @@ import {
   IconButton,
   Inline,
   Input,
+  ListDetail,
   Menu,
   Modal,
   Only,
@@ -306,6 +308,15 @@ export function AgentDetailHeader(props: { task: Task; model: AgentPaneModel }) 
             {stateIcon()}
             <Text emphasis="muted">{stateWords()}</Text>
           </Inline>
+          {/* On the bar as well as in the menu, because a side question is for mid-turn. Not in the
+              terminal, where one more button wraps the bar onto a second line. */}
+          <Only formFactors={['desktop']}>
+            <Show when={props.task.status === 'active'}>
+              <Button size="sm" tip="Ask a side question" onPress={() => void model.askSideQuestion()}>
+                btw
+              </Button>
+            </Show>
+          </Only>
           <Button size="sm" disabled={!canStop()} onPress={stop}>
             Stop
           </Button>
@@ -558,17 +569,40 @@ export default function AgentPaneDetail(props: { task: Task; model: AgentPaneMod
           </Show>
         }
       >
-        {(narrowed) => (
-          <AgentConversation
-            sessionId={narrowed().id}
-            viewKeyPrefix="agents"
-            // On a phone, focus raises the keyboard over the transcript. It rises when someone taps
-            // the message box.
-            autoFocus={!archived() && formFactor() !== 'narrow'}
-            composerDisabled={archived()}
-            note={archived() ? 'This task is archived. Restore it to send a message.' : undefined}
-          />
-        )}
+        {(narrowed) => {
+          // Not focused while a side question is open beside it: the side one has the caret.
+          const conversation = (autoFocus: boolean) => (
+            <AgentConversation
+              sessionId={narrowed().id}
+              viewKeyPrefix="agents"
+              // On a phone, focus raises the keyboard over the transcript. It rises when someone taps
+              // the message box.
+              autoFocus={autoFocus && !archived() && formFactor() !== 'narrow'}
+              composerDisabled={archived()}
+              note={archived() ? 'This task is archived. Restore it to send a message.' : undefined}
+            />
+          )
+          // The side question in the sized first column and the session in the rest, so the session
+          // keeps most of the width (docs/managed-agents/client-surfaces.md § Side questions).
+          return (
+            <Show when={!archived() && model.sideSession()} fallback={conversation(true)}>
+              {(side) => (
+                <ListDetail split listWidth="wide" widthKey="agents.side-question">
+                  <DetailColumn inset>
+                    <Toolbar ariaLabel="Side question">
+                      <RuntimeStateIcon state={side().runtimeState} queued={side().queuedTurns} />
+                      <Heading level={3}>{side().title}</Heading>
+                      <Toolbar.Spacer />
+                      <IconButton icon="x" label="Close side question" onPress={() => model.closeSideSession()} />
+                    </Toolbar>
+                    <AgentConversation sessionId={side().id} viewKeyPrefix="agents" autoFocus />
+                  </DetailColumn>
+                  <DetailColumn inset>{conversation(false)}</DetailColumn>
+                </ListDetail>
+              )}
+            </Show>
+          )
+        }}
       </Show>
       <AgentSessionDialogs task={props.task} model={model} />
     </>

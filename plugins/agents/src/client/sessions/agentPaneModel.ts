@@ -3,6 +3,7 @@ import { createQuery, useQueryClient } from '@tanstack/solid-query'
 import {
   activeNodeId,
   defaultDeliveryContext,
+  formFactor,
   markAttentionSeen,
   saveFile,
   setTerminalOpen,
@@ -13,6 +14,7 @@ import {
 import type { AgentContextSnapshot } from '@acorn/protocol/agentContext.ts'
 import type {
   AgentAttachment,
+  AgentConfigOption,
   AgentProviderDescriptor,
   AgentSession,
   AgentSessionSnapshot,
@@ -27,10 +29,13 @@ import {
   agentAttentionItemId,
   clearManagedSubagent,
   clearManagedSession,
+  openSideSession,
   restoreManagedSessionSelection,
   selectManagedSession,
   selectedManagedSession,
+  showSideSession,
 } from './managedSelection'
+import { readOnlyPermission } from '../readOnlyPermission'
 import { agentSessionRoster } from './sessionRoster'
 import {
   choiceAvailable,
@@ -142,6 +147,13 @@ export function createAgentPaneModel(task: Task, pane: PaneModelContext) {
     return session ? managedAgentStore.snapshotFor(session.id) : undefined
   })
   const provider = createMemo(() => providers()?.find((candidate) => candidate.id === selected()?.providerId))
+  // The side question open beside the selected session. An archived one leaves the task's list, and
+  // the split goes with it.
+  const sideSession = createMemo(() => {
+    const id = selectedSessionId()
+    const sideId = id ? openSideSession(id) : undefined
+    return sideId ? taskSessions().find((session) => session.id === sideId) : undefined
+  })
 
   const releaseSocket = managedAgentStore.activate()
   onCleanup(releaseSocket)
@@ -250,6 +262,24 @@ export function createAgentPaneModel(task: Task, pane: PaneModelContext) {
       managedAgentStore.upsertSession(next)
       selectManagedSession(task.id, next.id)
       await managedAgentStore.loadSnapshot(next.id)
+    }, false)
+  }
+
+  /** Starts a side session from the open one, in the harness's read-only mode when it has one, and
+   *  opens it beside the conversation. A phone and the terminal have no room for two conversations,
+   *  so there it opens in place, as if picked in the sidebar. */
+  async function askSideQuestion() {
+    const session = selected()
+    if (!session) return
+    // The open session's live options name the modes its harness offers. The provider's list is often
+    // empty until a session has started.
+    const live = session.config.configOptions
+    const readOnly = readOnlyPermission(Array.isArray(live) ? (live as AgentConfigOption[]) : provider()?.configOptions)
+    await action(async () => {
+      const side = await managedAgentApi.btw(session.id, readOnly && { [readOnly.optionId]: readOnly.value })
+      managedAgentStore.upsertSession(side)
+      if (formFactor() === 'desktop') showSideSession(session.id, side.id)
+      else selectManagedSession(task.id, side.id)
     }, false)
   }
 
@@ -386,6 +416,13 @@ export function createAgentPaneModel(task: Task, pane: PaneModelContext) {
       snapshot()?.turns[0]?.input.some((part) => part.type === 'text' && !!part.text.trim()) ?? false
     return [
       { id: 'fork', label: 'Fork session', icon: 'git-fork', run: () => void fork() },
+      // Fine mid-turn, where the Node refuses a fork: the side session copies stored events instead.
+      {
+        id: 'btw',
+        label: 'Ask a side question',
+        icon: 'message-circle-question-mark',
+        run: () => void askSideQuestion(),
+      },
       ...(snapshot()?.turns.some((turn) => turn.status === 'failed' || turn.status === 'interrupted')
         ? [
             {
@@ -498,6 +535,12 @@ export function createAgentPaneModel(task: Task, pane: PaneModelContext) {
     selectedDelegation,
     selectedManagedParent,
     openManagedParent,
+    sideSession,
+    closeSideSession: () => {
+      const id = selectedSessionId()
+      if (id) showSideSession(id, undefined)
+    },
+    askSideQuestion,
     snapshot,
     creating,
     error,

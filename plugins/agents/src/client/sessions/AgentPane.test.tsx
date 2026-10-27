@@ -67,6 +67,17 @@ vi.mock('../usage/usageStore', () => ({
 
 vi.mock('./managedClient', () => ({ managedAgentApi: { cancel, cancelSubagent, openAccountTerminal } }))
 
+// A stand-in that says which session it shows and whether it takes the caret. The real one needs a
+// snapshot, a transcript and a composer, and what the split decides is only which conversations it draws.
+vi.mock('./AgentConversation', () => ({
+  default: (props: { sessionId: string; autoFocus?: boolean }) => {
+    const element = document.createElement('div')
+    element.dataset.conversation = props.sessionId
+    element.dataset.autofocus = String(!!props.autoFocus)
+    return element
+  },
+}))
+
 vi.mock('@acorn/plugin-api/client', async (importOriginal) => ({
   ...(await importOriginal<Record<string, unknown>>()),
   clientCapability: () => ({ runForSession }),
@@ -78,7 +89,7 @@ vi.mock('@acorn/plugin-api/client', async (importOriginal) => ({
   registerCommands: (...args: unknown[]) => registerCommands(...args) ?? { dispose: disposeCommands },
 }))
 
-const { AgentDetailHeader } = await import('./AgentPane')
+const { AgentDetailHeader, default: AgentPaneDetail } = await import('./AgentPane')
 const { registerSessionActionCommands } = await import('../commands')
 const { selectManagedSubagent, clearManagedSubagent } = await import('./managedSelection')
 
@@ -133,6 +144,7 @@ const mount = (
   parent?: AgentSession,
   selected?: () => AgentSession,
   over: Partial<AgentPaneModel> = {},
+  status: 'active' | 'archived' = 'active',
 ): void => {
   host = document.createElement('div')
   document.body.append(host)
@@ -147,7 +159,7 @@ const mount = (
     () => (
       <QueryClientProvider client={queryClient}>
         <AgentDetailHeader
-          task={{ id: 'task-1', status: 'active' } as never}
+          task={{ id: 'task-1', status } as never}
           model={{ ...modelFor(current, parent), ...(selected ? { selected } : {}), ...over }}
         />
       </QueryClientProvider>
@@ -457,5 +469,86 @@ describe('the session actions in the palette', () => {
     ])
     pane.disposeRoot()
     expect(disposeCommands).toHaveBeenCalledTimes(2)
+  })
+})
+
+describe('a side question', () => {
+  const askSideQuestion = vi.fn()
+  const actions = (): SessionAction[] => [
+    { id: 'btw', label: 'Ask a side question', run: askSideQuestion },
+    { id: 'rename', label: 'Rename session', run: () => {} },
+  ]
+  const button = (text: string) => [...host.querySelectorAll('button')].find((item) => item.textContent === text)
+  const menuLabels = async () => {
+    host.querySelector<HTMLButtonElement>('button[aria-label="Session actions"]')!.click()
+    await settle()
+    return [...document.querySelectorAll('[role="menuitem"]')].map((item) => item.textContent)
+  }
+
+  it('is on the bar and in the menu while a turn runs', async () => {
+    mount(session({ runtimeState: 'working' }), undefined, undefined, { sessionActions: actions, askSideQuestion })
+    await settle()
+    button('btw')!.click()
+    expect(askSideQuestion).toHaveBeenCalledTimes(1)
+    expect(await menuLabels()).toContain('Ask a side question')
+  })
+
+  it('is not offered on an archived task, which has no worktree to start a harness in', async () => {
+    mount(session({}), undefined, undefined, { sessionActions: actions, askSideQuestion }, 'archived')
+    await settle()
+    expect(button('btw')).toBeUndefined()
+    expect(await menuLabels()).toEqual(['Rename session'])
+  })
+
+  it('draws the side session beside the open one with the caret in it, and closing returns to one', async () => {
+    const main = session({})
+    const side = session({
+      id: 'side-1',
+      title: 'Side question: A session',
+      origin: { kind: 'btw', sourceSessionId: main.id },
+    })
+    const [open, setOpen] = createSignal<AgentSession | undefined>(side)
+    const closeSideSession = vi.fn(() => setOpen(undefined))
+    host = document.createElement('div')
+    document.body.append(host)
+    const queryClient = new QueryClient({ defaultOptions: { queries: { staleTime: Infinity } } })
+    queryClient.setQueryData(['agents', 'pricing'], {
+      version: 1,
+      claude: { overrides: [], customModels: [] },
+      codex: { overrides: [], customModels: [] },
+    })
+    const model = {
+      ...modelFor(main),
+      taskSessions: () => [main, side],
+      error: () => '',
+      rosterSettled: () => true,
+      dialog: () => null,
+      sideSession: open,
+      closeSideSession,
+    } as unknown as AgentPaneModel
+    dispose = render(
+      () => (
+        <QueryClientProvider client={queryClient}>
+          <AgentPaneDetail task={{ id: 'task-1', status: 'active' } as never} model={model} />
+        </QueryClientProvider>
+      ),
+      host,
+    )
+    await settle()
+    const conversations = () =>
+      [...host.querySelectorAll<HTMLElement>('[data-conversation]')].map((item) => [
+        item.dataset.conversation,
+        item.dataset.autofocus,
+      ])
+    expect(conversations()).toEqual([
+      ['side-1', 'true'],
+      ['sess-1', 'false'],
+    ])
+    expect(host.querySelector('[aria-label="Side question"]')?.textContent).toContain('Side question: A session')
+
+    host.querySelector<HTMLButtonElement>('button[aria-label="Close side question"]')!.click()
+    await settle()
+    expect(closeSideSession).toHaveBeenCalledTimes(1)
+    expect(conversations()).toEqual([['sess-1', 'true']])
   })
 })

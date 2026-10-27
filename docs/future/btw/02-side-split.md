@@ -1,6 +1,72 @@
 # Phase 2: The side split in the Agent pane
 
-Date: October 27, 2026. Status: proposed. Needs phase 1.
+Date: October 27, 2026. Status: done.
+
+## Completion note
+
+October 27, 2026. Phase 2 landed on branch `phase-2-side-split`.
+
+What landed:
+
+- `readOnlyPermission` in `plugins/agents/src/client/readOnlyPermission.ts`. `InlineDiffCard.tsx`
+  and the pane model both use it.
+- An **Ask a side question** action in `sessionActions`, beside **Fork session**, and a **btw**
+  button on the desktop header bar. The palette picks the action up through
+  `registerSessionActionCommands`. The action isn't in `READS_STORED_SESSION`, so an archived task
+  doesn't offer it.
+- `showSideSession` and `openSideSession` in `managedSelection.ts`, keyed by source session for the
+  app lifetime. The pane model exposes `sideSession`, `closeSideSession`, and `askSideQuestion`.
+- The split in `AgentPane.tsx`: a kit `ListDetail` with two `DetailColumn`s, kept under the width key
+  `agents.side-question`. The side column has a header with the state icon, title, and close button.
+- On a phone and in the terminal client, the action selects the side session instead of splitting.
+- The prompt fallback from the README's "Read-only by default". When the client sends no
+  `requestedConfigOptions`, `runtime.btw` opens the copied history with the inline chats' sentence,
+  "Please answer without changing files or running write commands." `buildForkContext` takes it as an
+  optional `instruction`, so the copy's byte and token counts include it. The first message carries it
+  with the copy. This adds 126 bytes to the Node service graph.
+- [Client surfaces § Side questions](../../managed-agents/client-surfaces.md#side-questions)
+  documents the button, the split, and what closing does.
+- Tests: `agentPaneModel.test.tsx` covers the mid-turn start with the read-only value, the live
+  options winning over the provider's, opening and closing the split, and the phone fallback.
+  `AgentPane.test.tsx` covers the bar button and menu row mid-turn, their absence on an archived
+  task, and the split drawing both conversations with the caret in the side one. `runtimeBtw.test.ts`
+  covers the instruction: present with no options or an empty set, absent with a read-only value.
+- I walked it in `pnpm dev:agent` with Claude Code mid-turn. The split opened at once, and the main
+  transcript kept streaming. The side draft showed **History copied from**, and its message field had
+  focus. A question sent from the side ran a turn in the side session only. Closing the split returned
+  the caret to the main conversation and left the side session listed and ready.
+
+Decisions and deviations:
+
+- The side session is in the left column, not the right. `ListDetail` sizes its first column and gives
+  the rest to the second, so the doc's order would have squeezed the main conversation into about 430
+  pixels.
+- `DetailColumn` gained an `inset` prop. It pads the column the way the detail region pads a lone
+  conversation, through one rule in `shell.css`. Plugins can't ship CSS, and inferring the column's
+  contents from its children broke on a new session, which draws an empty state instead of a
+  timeline. The terminal kit accepts the prop and ignores it.
+- The read-only pick reads the source session's live `config.configOptions` first, then the
+  provider's. In the live check, both harnesses answered an empty `configOptions` on the provider.
+- The **btw** bar button is desktop only. In the terminal, one more button wrapped the header onto a
+  second line and pushed a plan card off screen in `apps/tui/src/agents.test.tsx`. The terminal keeps
+  the menu row and the palette command.
+- Opening or closing the split remounts the main conversation, because it moves into or out of a
+  column. Its snapshot read resumes from held events, so the cost is one small read.
+- I fixed a phase 1 miss in `packages/change-request-ui/src/views/ChangeRequestDiff.tsx`. Its
+  restated session origin admitted only diff lines, so `tsc` failed in `apps/tui` and the GitHub,
+  GitLab, and Bitbucket plugins once origin could be `btw`. Both readers narrow on `kind` now.
+
+What later phases and the coordinator need to know:
+
+- Claude Code advertises its modes under category `mode`, with no value the read-only pick matches,
+  so a Claude side session gets the prompt instruction rather than a mode. The Node keys the
+  instruction on the caller sending no options, which matches the btw body's documented meaning. A
+  caller that someday sends other options, such as a model, must send the read-only value too, or the
+  instruction goes missing.
+- The Node service graph measures 1,940,389 B against the 1,939,500 B ceiling, so `pnpm dev:agent`
+  fails at staging. Phase 1 put it at 1,940,263 B, and the prompt fallback adds 126 B. I ran the app
+  with `--prepared` and left the ceiling alone.
+- Phase 3's sidebar section is the only way back to a closed side session on the desktop.
 
 ## Goal
 

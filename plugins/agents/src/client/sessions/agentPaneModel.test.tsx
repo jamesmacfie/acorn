@@ -2,7 +2,7 @@
 //
 // A `.tsx` for the reason ./managedStore.test.tsx gives: the mark is an effect, and only the `hosts`
 // project runs Solid's browser build, where an effect runs at all.
-import { afterEach, expect, it, vi } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 import { createEffect, createRoot, Suspense } from 'solid-js'
 import { render } from 'solid-js/web'
 import { QueryClient, QueryClientProvider } from '@tanstack/solid-query'
@@ -51,8 +51,18 @@ const patch = vi.fn(async (_id: string, body: { lastReadSeq: number }) => ({
 const enqueue = vi.fn(async (_id: string, _body: unknown) => ({}))
 const snapshot = vi.fn(async () => ({ session, turns: [] as AgentTurn[], events: [], requests: [] }))
 const providers = vi.fn(async (_force?: boolean): Promise<AgentProviderDescriptor[]> => [])
+const btw = vi.fn(async (_id: string, _options?: Record<string, string>) => ({
+  ...session,
+  id: 'side',
+  title: 'Side question: s1',
+  runtimeState: 'starting',
+  origin: { kind: 'btw', sourceSessionId: 's1' },
+  createdAt: 2,
+  updatedAt: 2,
+}))
 vi.mock('./managedClient', () => ({
   managedAgentApi: {
+    btw: (id: string, options?: Record<string, string>) => btw(id, options),
     enqueue: (id: string, body: unknown) => enqueue(id, body),
     snapshot: () => snapshot(),
     providers: (force?: boolean) => providers(force),
@@ -63,6 +73,7 @@ vi.mock('./managedClient', () => ({
 
 const copyText = vi.fn(async (_text: string) => true)
 const toast = vi.fn()
+let form: 'desktop' | 'narrow' | 'tui' = 'desktop'
 vi.mock('@acorn/plugin-api/ui', async (importOriginal) => ({
   ...(await importOriginal<Record<string, unknown>>()),
   copyText: (text: string) => copyText(text),
@@ -70,6 +81,7 @@ vi.mock('@acorn/plugin-api/ui', async (importOriginal) => ({
 vi.mock('@acorn/plugin-api/client', async (importOriginal) => ({
   ...(await importOriginal<Record<string, unknown>>()),
   toast: (...args: unknown[]) => toast(...args),
+  formFactor: () => form,
 }))
 
 // The custom agents never answer, so a case that turns queries on sees them as a cold cache too, and
@@ -81,7 +93,8 @@ vi.mock('../settings/customAgentsClient', () => ({
 const { managedAgentStore } = await import('./managedStore')
 const { createAgentPaneModel, sessionIsBlank } = await import('./agentPaneModel')
 const { agentTelemetry, claimAgentSelection } = await import('./agentTelemetry')
-const { clearManagedSession } = await import('./managedSelection')
+const { clearManagedSession, showSideSession } = await import('./managedSelection')
+const { agentProvidersQueryKey } = await import('../providersClient')
 
 const event = (seq: number): AgentEventRecord =>
   ({
@@ -329,4 +342,91 @@ it('copies the clicked session’s ID and says so only once the clipboard took i
   // The fallback shows the ID to select by hand, which is what a terminal without OSC 52 needs.
   expect(model.dialog()).toEqual({ kind: 'session-id', session: other })
   dispose()
+})
+
+describe('a side question', () => {
+  // A harness that advertises a read-only permission mode, so the side session should start in it.
+  const withModes = {
+    ...claude,
+    configOptions: [
+      {
+        id: 'mode',
+        category: 'permission',
+        label: 'Mode',
+        currentValue: 'default',
+        values: [
+          { value: 'default', label: 'Default' },
+          { value: 'plan', label: 'Plan', description: 'Read only, no edits' },
+        ],
+      },
+    ],
+  } as unknown as AgentProviderDescriptor
+  const modelWithProviders = () => {
+    const client = new QueryClient({ defaultOptions: { queries: { retry: false } } })
+    client.setQueryData(agentProvidersQueryKey, [withModes])
+    let built!: ReturnType<typeof createAgentPaneModel>
+    const dispose = render(
+      () => (
+        <QueryClientProvider client={client}>
+          {(() => {
+            built = createAgentPaneModel({ id: 't1' } as never, { shown: () => true })
+            return null
+          })()}
+        </QueryClientProvider>
+      ),
+      document.createElement('div'),
+    )
+    return { model: built, dispose }
+  }
+
+  afterEach(() => {
+    form = 'desktop'
+    showSideSession('s1', undefined)
+    btw.mockClear()
+  })
+
+  it('starts mid-turn in the read-only mode, opens beside the session, and closing leaves it listed', async () => {
+    managedAgentStore.upsertSession(session)
+    const { model, dispose } = modelWithProviders()
+    await settle()
+    expect(model.selected()?.runtimeState).toBe('working')
+    const ask = model.sessionActions().find((action) => action.id === 'btw')!
+    expect(ask).toMatchObject({ label: 'Ask a side question' })
+    expect(ask.disabled).toBeFalsy()
+
+    ask.run()
+    await vi.waitFor(() => expect(model.sideSession()?.id).toBe('side'))
+    expect(btw).toHaveBeenCalledWith('s1', { mode: 'plan' })
+    expect(model.selectedSessionId()).toBe('s1')
+
+    // The session's live options win over the provider's, which are often empty before a session starts.
+    managedAgentStore.upsertSession({
+      ...session,
+      config: { configOptions: [{ ...withModes.configOptions[0], id: 'live-mode' }] },
+    })
+    model
+      .sessionActions()
+      .find((action) => action.id === 'btw')!
+      .run()
+    await vi.waitFor(() => expect(btw).toHaveBeenLastCalledWith('s1', { 'live-mode': 'plan' }))
+
+    model.closeSideSession()
+    expect(model.sideSession()).toBeUndefined()
+    expect(model.taskSessions().map((item) => item.id)).toContain('side')
+    dispose()
+  })
+
+  it('opens in place on a phone, where two conversations do not fit', async () => {
+    form = 'narrow'
+    managedAgentStore.upsertSession(session)
+    const { model, dispose } = modelWithProviders()
+    await settle()
+    model
+      .sessionActions()
+      .find((action) => action.id === 'btw')!
+      .run()
+    await vi.waitFor(() => expect(model.selectedSessionId()).toBe('side'))
+    expect(model.sideSession()).toBeUndefined()
+    dispose()
+  })
 })

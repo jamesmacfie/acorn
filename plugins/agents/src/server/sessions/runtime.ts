@@ -1009,7 +1009,13 @@ export class ManagedAgentRuntime {
    */
   async btw(sessionId: string, requestedConfigOptions?: Record<string, string>): Promise<AgentSession> {
     const source = await this.store.requireSession(sessionId)
-    const pendingForkContext = await this.engine.forkContext(source)
+    // A caller sends the harness's read-only permission value when it has one. Without it nothing
+    // stops the side session changing files, so the copy asks it not to, in an inline chat's words.
+    const readOnlyMode = Object.keys(requestedConfigOptions ?? {}).length > 0
+    const pendingForkContext = await this.engine.forkContext(
+      source,
+      readOnlyMode ? undefined : 'Please answer without changing files or running write commands.',
+    )
     const { requestedConfigOptions: _sourceRequested, ...config } = source.config
     return this.acceptSession({
       taskId: source.taskId,

@@ -13,13 +13,16 @@ export const agentTurnInputText = (turn: AgentTurn): string =>
     })
     .join('\n\n')
 
+/** `instruction` opens the copy, for the agent to read before the history. */
 export async function buildForkContext(
   store: AgentStore,
   source: AgentSession,
+  instruction?: string,
 ): Promise<Extract<AgentTurn['input'][number], { type: 'context' }>> {
   const snapshot = await store.exportSnapshot(source.id)
   const { text } = renderSessionConversation(snapshot)
   const snapshotContent = [
+    ...(instruction ? [instruction, ''] : []),
     'This is an explicit Acorn context-copy fork, not provider-native history.',
     'The provider has not seen this snapshot until it is included with a new turn.',
     '',

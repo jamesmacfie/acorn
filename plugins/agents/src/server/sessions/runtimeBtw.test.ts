@@ -98,6 +98,8 @@ describe('a side question beside a running session', () => {
     expect(copy.label).toBe('History copied from Migrate the billing tables')
     expect(copy.content).toContain('Run the long migration')
     expect(copy.content).toContain(`Fake response for ${first.id}`)
+    // The harness's read-only mode does the job, so the copy doesn't ask as well.
+    expect(copy.content).not.toContain('without changing files')
     expect(side.config).toMatchObject({ forkKind: 'acorn-context-copy', forkSourceSessionId: source.id })
 
     // The source's turn is still running, its queue still holds the next message, and nothing new was
@@ -119,6 +121,15 @@ describe('a side question beside a running session', () => {
     const { source } = await running()
     const side = await runtime.btw(source.id)
     expect(side.config.requestedConfigOptions).toBeUndefined()
+  })
+
+  it('asks in the copy for no changes when the harness has no read-only mode to apply', async () => {
+    const { source } = await running()
+    for (const side of [await runtime.btw(source.id), await runtime.btw(source.id, {})]) {
+      const copy = side.config.pendingForkContext as { content: string; byteSize: number }
+      expect(copy.content).toMatch(/^Please answer without changing files or running write commands\.\n\n/)
+      expect(copy.byteSize).toBe(Buffer.byteLength(copy.content, 'utf8'))
+    }
   })
 
   it('answers 404 for an unknown source', async () => {

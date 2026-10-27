@@ -96,6 +96,33 @@ Node leaves out of the row-change check, so the order re-sorts when a turn start
 The task sidebar keeps a **Needs you** list. Picking a row opens that session and brings its request
 card into view.
 
+### Side questions
+
+**Ask a side question** in the session menu and the palette, and **btw** on the desktop header bar,
+start a side session from the open one ([side questions](./sessions.md#side-questions)). It's offered
+while a turn runs, but not on an archived task, because it starts a harness. The pane asks for the
+harness's read-only permission mode when the harness advertises one, using the same pick as inline
+chats (`plugins/agents/src/client/readOnlyPermission.ts`). It reads the open session's live
+`configOptions` first, because the provider's list is often empty before a session starts. A harness
+without one, Claude Code among them, gets no options, and the Node puts an instruction not to change
+files at the top of the copied history instead ([side questions](./sessions.md#side-questions)).
+
+On the desktop, the side session opens in a split inside the detail region, with its own header, its
+title, and a close button. It uses the kit's `ListDetail`, so the divider drags and the width is kept
+under `agents.side-question`. Both columns are `DetailColumn inset`, which pads them the way the
+detail region pads a lone conversation. The side session takes the first, narrower column and has the caret.
+The open session keeps the rest of the width and goes on streaming. Each column is an
+`AgentConversation` addressed by its own session ID, so the two don't share a draft. The draft of the
+side session holds the **History copied from** context.
+
+`managedSelection.ts` holds which side session is open beside each session for the app lifetime.
+Nothing is saved, so a relaunch shows the conversation alone. Closing the split hides it and leaves
+the side session running. Archiving the side session closes the split too.
+
+A phone and the terminal client have no room for two conversations, so there the side session opens
+in place, as if picked from the sidebar. The terminal leaves **btw** off its bar, where one more button
+wraps the bar onto a second line.
+
 ## Agent Center
 
 Agent Center gathers sessions, search, provider health, attention, transcript import, and launch. Its

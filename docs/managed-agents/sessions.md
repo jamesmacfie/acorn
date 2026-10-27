@@ -101,7 +101,10 @@ about 25,000 tokens a question. The source's queue, drafts, attention, and event
 The side session keeps its source's config, identity, and authority snapshots, the same as a fork.
 `requestedConfigOptions` replaces the source's, and the runtime applies it once the harness lists its
 options, as it does for an inline diff chat. A caller sends the harness's read-only permission value
-there. An unknown source gets `404`, and a source on an archived task gets the same refusal as a fork.
+there. With no options sent, nothing stops the side session changing files, so the copy opens with
+the instruction an inline chat sends: "Please answer without changing files or running write
+commands." The permission mode is a real limit. The instruction isn't. An unknown source gets `404`,
+and a source on an archived task gets the same refusal as a fork.
 
 `origin` is a union narrowed on `kind`: `inline-diff` for an inline diff chat, and `btw` for a side
 question. A session with any origin stays out of the main session list, and starts on the options it

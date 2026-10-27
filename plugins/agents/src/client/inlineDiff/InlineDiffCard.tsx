@@ -7,6 +7,7 @@ import { sameInlineLine, type InlineDiffOrigin } from '../../contract/inlineDiff
 import { defaultAgentSessionDefaults } from '../../shared/sessionDefaults.ts'
 import { agentSessionDefaultsOptions, writeAgentSessionDefaults } from '../settings/sessionDefaultsClient.ts'
 import { managedAgentApi } from '../sessions/managedClient.ts'
+import { readOnlyPermission } from '../readOnlyPermission.ts'
 import { managedAgentStore } from '../sessions/managedStore.ts'
 import { buildConversationItems, isChatItem, visibleConversationItems } from '../sessions/conversationItems.ts'
 import { openManagedSession } from '../sessions/managedSelection.ts'
@@ -109,11 +110,7 @@ export default function InlineDiffCard(props: Props) {
     () => modelOverride() ?? record().inline.pinned[provider()?.id ?? '']?.[modelOption()?.id ?? 'model'] ?? '',
   )
   const modelLabel = () => modelOption()?.values.find((value) => value.value === model())?.label ?? 'provider default'
-  const readonlyProfile = createMemo(() =>
-    advertised()
-      ?.find((option) => option.category === 'permission')
-      ?.values.find((value) => /read.?only/i.test(`${value.value} ${value.label} ${value.description ?? ''}`)),
-  )
+  const readonlyProfile = createMemo(() => readOnlyPermission(advertised()))
 
   createEffect(() => {
     const id = session()?.id
@@ -151,9 +148,8 @@ export default function InlineDiffCard(props: Props) {
         if (!chosen) throw new Error('No agent provider is installed.')
         const values = { ...record().inline.pinned[chosen.id] }
         if (modelOption() && model()) values[modelOption()!.id] = model()
-        const permission = advertised()?.find((option) => option.category === 'permission')
-        if (access() === 'read-only' && readonlyProfile() && permission)
-          values[permission.id] = readonlyProfile()!.value
+        const readonly = readonlyProfile()
+        if (access() === 'read-only' && readonly) values[readonly.optionId] = readonly.value
         const origin = { ...props.origin, access: access() }
         target = await managedAgentStore.startInlineSession(
           props.origin.taskId,

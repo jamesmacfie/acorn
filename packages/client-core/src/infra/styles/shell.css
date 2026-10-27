@@ -251,7 +251,8 @@
   .layout-hbf-footer,
   .layout-tabs-panel:not(:has(> .ui-listdetail, > .remote-tree > .ui-listdetail)),
   .layout-region-detail:not(:has(> .ui-listdetail, > .remote-tree > .ui-listdetail, > .diff-toolbar)),
-  .ui-listdetail-detail[data-scroll]
+  .ui-listdetail-detail[data-scroll],
+  .ui-listdetail-detail[data-inset]
 ) :is(.ui-toolbar, .ui-tabs, .section-header[data-level='pane'], .ui-row) {
   margin-inline: calc(-1 * var(--pane-pad));
   /* `Row` is the one of the four with a `width: 100%`, and a percentage resolves against the padded
@@ -273,6 +274,7 @@
   .layout-tabs-panel:not(:has(> .ui-listdetail, > .remote-tree > .ui-listdetail)),
   .layout-region-detail:not(:has(> .ui-listdetail, > .remote-tree > .ui-listdetail, > .diff-toolbar)),
   .ui-listdetail-detail[data-scroll],
+  .ui-listdetail-detail[data-inset],
   .ui-listdetail-list[data-scroll],
   .ui-tab-panel,
   .ui-rows-scroll
@@ -366,6 +368,13 @@
 .layout-region-detail:has(> .diff-toolbar) { padding: 0; row-gap: 0; }
 .layout-region-detail:has(> .ui-listdetail, > .remote-tree > .ui-listdetail) > *,
 .layout-region-detail:has(> .diff-toolbar) > * { max-width: none; margin-inline: 0; }
+/* `DetailColumn inset` stands in for a detail region, as each side of the Agent pane's split does, so
+   it takes the region's inset and gap. */
+.ui-listdetail-detail[data-inset] {
+  padding-inline: var(--pane-pad);
+  padding-block-end: var(--space-4);
+  row-gap: var(--gap-stack);
+}
 
 /* Narrow `document-over-frame`, `frame-beside-document` and `stack-split` (host/layouts/RegionSheet.tsx):
    the first region fills the pane under a bar holding **Show panel**, and the second opens in a drawer. */
