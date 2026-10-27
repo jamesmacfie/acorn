@@ -478,12 +478,8 @@ Each plugin landing page above has topic pages in a folder of the same name:
 
 ## Mobile web app proposal
 
-- [Build a mobile web app](./future/mobile/README.md), with phases for [the
-  gateway](./future/mobile/01-gateway.md), [the shell](./future/mobile/02-shell.md), [narrow
-  mode](./future/mobile/03-narrow-mode.md), [narrow layouts](./future/mobile/04-narrow-layouts.md),
-  [Needs you and the conversation](./future/mobile/05-needs-you.md), [running on a
-  phone](./future/mobile/06-on-a-phone.md), and [workspaces and compact
-  controls](./future/mobile/07-workspaces-and-compact-controls.md), then [later work](./future/mobile/later.md).
+- [What's left for the mobile web app](./future/mobile.md): real-device checks, small fixes on a phone,
+  and later work.
 
 ## Plugins on the phone proposal
 

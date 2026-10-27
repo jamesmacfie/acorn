@@ -80,7 +80,6 @@ Earlier phases and this one left these open. Each needs a real device or a real 
 ## Record problems
 
 For each failure, name the check, the device, what you saw, and the file you'd start in. A problem in a
-shared component goes in client-core, never in one plugin
-([what holds across every phase](../future/mobile/README.md#what-holds-across-every-phase)). When every
-cell reads **Pass** or **Not applicable**, delete `docs/future/mobile/` except [later](../future/mobile/later.md),
-as [phase 6](../future/mobile/06-on-a-phone.md#when-this-phase-ships) says.
+shared component goes in client-core, never in one plugin ([narrow mode](../mobile/narrow-mode.md)).
+[What's left for the mobile web app](../future/mobile.md#run-it-on-real-phones) lists more device checks to
+run beside these. When every cell reads **Pass** or **Not applicable**, remove that section.

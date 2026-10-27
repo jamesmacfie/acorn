@@ -186,5 +186,4 @@ phone](./mobile/agent-pane.md) covers how the shared Agents pane draws here.
 
 The desktop's shell holds the rail, the three-column grid, and the drawers, which are the parts a
 phone has to change. The parts under the shell are what a phone shares, and they live in client-core,
-so the phone gets its own shell over them, as the terminal client does
-([build a mobile web app](./future/mobile/README.md#why)).
+so the phone gets its own shell over them, as the terminal client does.
