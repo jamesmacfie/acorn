@@ -25,6 +25,7 @@ Dated delivery evidence belongs in `docs/testing/` or the dated security reviews
 
 | File | Developer handoff | Status |
 | --- | --- | --- |
+| [apps-pane-layout.md](./apps-pane-layout.md) | Keep each Apps pane list row to two lines, with the full description in a tooltip and the change time beside the version, and draw a row `Stack` of only `Card`s as equal, top-aligned columns with the kit's `Inline even`. | Proposed October 29, 2026. Implementation not started. |
 | [bundle.md](./bundle.md) | Container coordination, desktop TUI embedding, and macOS signing. Platform archives, Windows operation support, and the installer belong to [node-tray/](./node-tray/README.md). | Standalone CLI/TUI staging and certificate generation implemented. Release delivery remains proposed. |
 | [compiled-tier.md](./compiled-tier.md) | Assess plugin migration candidates, reproduce retained cleanup reports, and finish loaded-package acceptance. | Standing assessment refreshed October 8, 2026. No migration scheduled. |
 | [integration-ideas.md](./integration-ideas.md) | Research catalogue for selecting integrations and checking contribution coverage. | Research, not an implementation specification. Recheck each candidate before assigning work. |
