@@ -73,9 +73,9 @@ workspace:
 
 Under the picker, **This page** lists the chosen project's open tasks as
 [Home's task rows](./task-pages.md#homes-task-list), from the Node's task list, and clicking one opens
-it. **New task in Acorn** opens the project in the desktop app. A page on a project's site that belongs
-to no task moves nothing by itself: the task or conversation the panel shows, and its draft, stay put
-when the page changes, and only **This page** follows it.
+it. **New task in Acorn** opens the project in the desktop app. Moving to a page on a project's site that
+belongs to no task sends the panel Home, where **This page** shows the site's project. A conversation's
+draft stays ([moving between pages](./task-pages.md#moving-between-pages)).
 
 Task addresses use the prefix kind's grammar, an exact origin and a path prefix, and are matched the
 same way ([pages that belong to a task](./task-pages.md#pages-that-belong-to-a-task)).

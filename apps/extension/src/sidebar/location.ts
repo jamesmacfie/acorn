@@ -45,8 +45,6 @@ export function createLocation(options: {
   let restoring = false
   // The task the stored location named, until the Node's task list says whether it's still active.
   let restored: string | null = null
-  // The task the page belonged to when the panel last followed it.
-  let pageTask: string | null = null
 
   // Home and Settings leave the stored destination alone, so a selection added from the page's menu
   // still has a conversation to go to.
@@ -75,22 +73,21 @@ export function createLocation(options: {
 
   // The page beside the panel moved, or the Node's task list arrived. A stored task the list doesn't
   // have, archived while the panel was closed, gives way to Home. A page of a task opens that task, on
-  // the conversation it last showed or else its tab, unless Settings or a conversation is open. A page
-  // of no task, reached from the page of the task the panel shows, goes Home. Any other page of no task
-  // leaves the panel where it is.
-  const followPage = (taskId: string | null) => {
+  // the conversation it last showed or else its tab, unless Settings or a conversation is open. Moving
+  // to a page of no task sends a task or conversation Home, so the panel doesn't keep showing a task
+  // the page has nothing to do with. Opening the panel beside one keeps where it last was.
+  const followPage = (taskId: string | null, moved = false) => {
     if (restoring) return
     const list = tasks()
     if (restored && list) {
       if (locationTask(location()) === restored && !list.some((task) => task.id === restored)) goHome()
       restored = null
     }
-    const left = pageTask
-    pageTask = taskId
     const here = location()
     if (here.level === 'settings') return
     if (!taskId) {
-      if (left && locationTask(here) === left) goHome()
+      // Until the list arrives every page looks taskless, so nothing moves.
+      if (moved && list && locationTask(here)) goHome()
     } else if (here.level === 'home' || (here.level === 'task' && here.taskId !== taskId)) {
       const sessionId = taskViews[taskId]?.sessionId
       if (sessionId) openConversation(taskId, sessionId)

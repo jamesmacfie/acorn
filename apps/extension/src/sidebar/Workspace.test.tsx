@@ -257,7 +257,7 @@ describe('project suggestions for a site', () => {
     expect(fake.storage.get('siteChoices:n1')).toEqual({})
   })
 
-  it('keeps the conversation and its draft on a localhost page that suggests another project', async () => {
+  it('goes Home from a conversation, keeping its draft, on a localhost page that suggests another project', async () => {
     const { fake, root } = mount({
       url: 'http://localhost:5173/shop',
       sites: [site('p1', 'http://localhost:5173', '/shop'), site('p2', 'http://localhost:5173', '/admin')],
@@ -270,12 +270,10 @@ describe('project suggestions for a site', () => {
     fill(root, 'textarea[name="message"]', 'Half a thought')
     await settle(20)
 
-    // A page no task holds leaves the conversation where it is.
+    // A page no task holds goes Home, where This page follows the page.
     fake.navigate('http://localhost:5173/admin/users')
     await settle(20)
-    expect(conversationTitle(root)).toBe('Chat s1')
-    // This page follows the page.
-    await goHome(root)
+    expect(root.querySelector('.view[aria-label="Home"]')).not.toBeNull()
     expect(siteProject(root)).toBe('Docs')
     // Another port on localhost is another site, which matches nothing and moves nothing.
     fake.navigate('http://localhost:5174/admin')
@@ -587,7 +585,7 @@ describe('This page', () => {
     expect(strips()).toEqual(['This page is in Speed up searchSwitch'])
   })
 
-  it("goes Home from the page's task to a page of no task, and stays on a task opened by hand", async () => {
+  it("goes Home on a page of no task, from the page's task or one opened by hand", async () => {
     const { fake, state, root } = mount({ url: 'https://github.com/acme/web/pull/7' })
     state.taskPages = [pullTask, { ...pullTask, id: 't2', title: 'Speed up search', pages: [] }]
     await settle(30)
@@ -601,7 +599,12 @@ describe('This page', () => {
     await openTask(root, 'Speed up search')
     fake.navigate('https://github.com/acme/web/pull/21')
     await settle(30)
-    expect(shownTask(root)).toBe('Speed up search')
+    expect(root.querySelector('.view[aria-label="Home"]')).not.toBeNull()
+    // The same from a task opened on a page of no task, as Start run opens one.
+    await openTask(root, 'Speed up search')
+    fake.navigate('https://github.com/acme/web/pull/22')
+    await settle(30)
+    expect(root.querySelector('.view[aria-label="Home"]')).not.toBeNull()
   })
 
   it('goes Home when the task it shows leaves the Node', async () => {
