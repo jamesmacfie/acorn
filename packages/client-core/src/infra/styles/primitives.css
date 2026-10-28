@@ -70,6 +70,8 @@
 /* See docs/ui-design/kit-internals.md § How the kit is built (Button): tone must survive the solid variant. */
 .ui-btn[data-variant='solid'][data-tone='accent'] { color: var(--accent-fg); }
 .ui-btn[data-variant='solid'][data-tone='danger'] { background: var(--danger); border-color: var(--danger); color: var(--accent-fg); }
+/* The solid hover above paints the accent fill; a danger button keeps its red and fades like any solid. */
+.ui-btn[data-variant='solid'][data-tone='danger']:hover:not(:disabled) { background: var(--danger); }
 
 /* ── Form controls ──────────────────────────────────────────────────────────────────────────
    Matches .integration-key-input, the de-facto shared input this replaces. `flex: 1` lives in the
