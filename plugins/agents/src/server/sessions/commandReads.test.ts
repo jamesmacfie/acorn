@@ -105,6 +105,17 @@ it('settles a session through the tool index', () => {
   expect(plan(unfinishedCommandsQuery({ sessionId: 's' }))).toContain('agent_events_session_tool_idx')
 })
 
+it('settles from the last start through the date index', async () => {
+  const sessionId = await newSession()
+  const turnId = await newTurn(sessionId)
+  await store.recordEvent(sessionId, turnId, tool({ id: 'cmd', status: 'running' }))
+  expect(readUnfinished({ since: 0 }).map((record) => record.event.type === 'tool' && record.event.tool.id)).toEqual([
+    'cmd',
+  ])
+  expect(readUnfinished({ since: Date.now() + 60_000 })).toEqual([])
+  expect(plan(unfinishedCommandsQuery({ since: 0 }))).toContain('agent_events_created_idx')
+})
+
 it('finds the owner of a late update through the tool index', async () => {
   const sessionId = await newSession()
   const turnId = await newTurn(sessionId)

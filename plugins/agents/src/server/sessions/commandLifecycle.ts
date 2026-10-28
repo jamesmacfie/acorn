@@ -59,12 +59,17 @@ export type CommandScope = { sessionId?: string; turnId?: string; since?: number
 // Both reads below repeat the expressions of `agent_events_session_tool_idx` exactly, `->>` and all.
 // SQLite uses an index on an expression only when the query spells it the same way, and a
 // `json_extract` here reads every event of the session instead.
+//
+// A scope with only `since` is the boot settle, and it names the date index. Its type test also matches
+// the tool index's WHERE, and with no statistics SQLite picked that index and opened every tool event
+// ever written to check its date: 25 s on a 4 GB ledger instead of 0.4 s.
 export function unfinishedCommandsQuery({ sessionId, turnId, since }: CommandScope) {
+  const byDate = since !== undefined && !sessionId && !turnId
   return sql`
     WITH commands AS (
       SELECT session_id, min(seq) AS opener,
         coalesce(max(CASE WHEN event_json ->> '$.tool.status' IS NOT NULL THEN seq END), max(seq)) AS seq
-      FROM agent_events
+      FROM agent_events ${byDate ? sql`INDEXED BY agent_events_created_idx` : sql``}
       WHERE event_json ->> '$.type' = 'tool'
         ${sessionId ? sql`AND session_id = ${sessionId}` : sql``}
         ${turnId ? sql`AND turn_id = ${turnId}` : sql``}

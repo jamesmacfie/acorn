@@ -178,6 +178,11 @@ A turn's end settles only that turn's commands, through `agent_events_turn_seq_i
 or a subagent's end settles the whole session. A `#session` reference reads the newest 201 events,
 not the session.
 
+The settle at boot reads every session's events since the last start, and names
+`agent_events_created_idx` with `INDEXED BY`. Its tool test also matches the tool index's condition,
+and with no statistics SQLite chose that index and opened every tool event ever written to check its
+date. On a 4 GB ledger that held boot for 25 s, against 0.4 s through the date index.
+
 ## Shutdown
 
 Shutdown closes queue admission, aborts starts, and clears reconnect, quiet, idle, and process sample
