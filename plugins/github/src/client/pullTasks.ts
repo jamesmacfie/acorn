@@ -156,6 +156,17 @@ async function linksForResolvedPull(pull: NonNullable<PullDetail['pull']>, proje
   return linksFromPull(pull.body, pull.headRef, linearId)
 }
 
+// A search hit, which is what a filtered PR list shows, carries no head branch. Without one the modal
+// makes up a branch from the title, and that branch can't push to the pull request. So read the full
+// pull first, the same way the list's own Create task does.
+async function withHeadRef(pull: NonNullable<PullDetail['pull']>, projectId: string) {
+  if (pull.headRef) return pull
+  const { projects } = await readJson<ProjectsResponse>(projectsRoute)
+  const github = projects.find((project) => project.id === projectId)?.github
+  if (!github) return pull
+  return (await readJson<PullDetail>(pullRoute(github.owner, github.name, pull.number))).pull ?? pull
+}
+
 /**
  * The source's promotion contract for the shared promote-to-task modal. Workflows opens it from
  * a pull request row (docs/workflows/starting-runs.md § Starting a run); Acorn links open it after
@@ -183,14 +194,17 @@ export const githubPullPromotion: NonNullable<SourceContribution<NonNullable<Pul
     return activeTaskForPull(tasks, projectId, number)
   },
   canPromote: (pull, context) => !!context.projectId && !!pull.headRef,
-  prepare: async (pull, context) => ({
-    origin: 'github-pr',
-    projectId: context.projectId,
-    title: pull.title,
-    branch: pull.headRef ?? context.branch,
-    pullNumber: pull.number,
-    links: await linksForResolvedPull(pull, context.projectId),
-  }),
+  prepare: async (item, context) => {
+    const pull = await withHeadRef(item, context.projectId)
+    return {
+      origin: 'github-pr',
+      projectId: context.projectId,
+      title: pull.title,
+      branch: pull.headRef ?? context.branch,
+      pullNumber: pull.number,
+      links: await linksForResolvedPull(pull, context.projectId),
+    }
+  },
   create: async (seed) => {
     const tasks = await readJson<Task[]>(tasksRoute).catch(() => [] as Task[])
     const existing = tasks.find(

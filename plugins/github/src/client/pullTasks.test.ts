@@ -252,6 +252,20 @@ describe('the GitHub source promotion for an Acorn link', () => {
     }
   })
 
+  it('reads the head branch of a search hit rather than leaving the modal to invent one', async () => {
+    requests.responses.set(projectsRoute, {
+      projects: [{ id: 'project-1', github: { owner: 'acme', name: 'widget', repoId: null } }],
+    })
+    requests.responses.set(pullRoute('acme', 'widget', 42), detail)
+    requests.responses.set(integrationsRoute, { integrations: [] })
+    const hit = { ...detail.pull!, headRef: null, baseRef: null }
+
+    await expect(githubPullPromotion.prepare(hit, { projectId: 'project-1', branch: '' })).resolves.toMatchObject({
+      branch: 'feature/deploy',
+      pullNumber: 42,
+    })
+  })
+
   describe('with the ticket named only by the branch', () => {
     const branchPull = {
       ...detail.pull!,
