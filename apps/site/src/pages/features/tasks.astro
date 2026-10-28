@@ -28,7 +28,7 @@ export const meta = {
 <FeaturePage feature="tasks" meta={meta} related={['agents', 'review', 'task-tools']} docs={{ href: '/docs/using/tasks-and-worktrees/', label: 'Read about tasks' }}>
   <Snapshot slot="picture" id="hero" />
 
-  <Feature number={1} title="Workspaces, projects, and tasks" href="/docs/using/workspaces-and-projects/" link="Workspaces and projects">
+  <Feature title="Workspaces, projects, and tasks" href="/docs/using/workspaces-and-projects/" link="Workspaces and projects">
     <p>
       A project is a folder on your machine, either a plain folder or a Git checkout. A workspace groups projects. A
       task is one piece of work on one project, and each task is a row in the rail.
@@ -36,7 +36,7 @@ export const meta = {
     <Specimen slot="picture" id="task-rows" />
   </Feature>
 
-  <Feature number={2} title="A branch now, a worktree when it needs one" href="/docs/using/tasks-and-worktrees/" link="Tasks and worktrees">
+  <Feature title="A branch now, a worktree when it needs one" href="/docs/using/tasks-and-worktrees/" link="Tasks and worktrees">
     <p>
       <strong>New task</strong> makes a branch from the task's title, and adds <code>-2</code> if that name is taken.
       acorn creates the task's Git worktree the first time the editor, the Changes tab, a terminal, the preview, or an
@@ -45,7 +45,7 @@ export const meta = {
     </p>
   </Feature>
 
-  <Feature number={3} title="A row of panes, kept for each task" href="/docs/using/panes/" link="Panes">
+  <Feature title="A row of panes, kept for each task" href="/docs/using/panes/" link="Panes">
     <p>
       A task draws as a row of panes: the pull request, agents, Git, notes, the editor, and the rest. Pin, resize, and
       maximize them, and the task keeps its row. A pane with nothing to show offers no button, so a task gets no
@@ -54,7 +54,7 @@ export const meta = {
     </p>
   </Feature>
 
-  <Feature number={4} title="Setup and teardown scripts" href="/docs/using/task-scripts/" link="Task scripts">
+  <Feature title="Setup and teardown scripts" href="/docs/using/task-scripts/" link="Task scripts">
     <p>
       The project's setup script runs in a new worktree as a terminal session called Setup, and the task's rail row
       shows a dot until it finishes. The teardown script runs when you archive the task. acorn keeps each run's result
@@ -63,7 +63,7 @@ export const meta = {
     </p>
   </Feature>
 
-  <Feature number={5} title="Archive cleans up, restore brings it back" href="/docs/using/archive-and-restore/" link="Archive and restore">
+  <Feature title="Archive cleans up, restore brings it back" href="/docs/using/archive-and-restore/" link="Archive and restore">
     <p>
       Archive asks each plugin what it has to say first, such as running containers, uncommitted files, or live
       sessions. Then acorn runs the teardown script, stops the task's terminals and agents, and removes the worktree.

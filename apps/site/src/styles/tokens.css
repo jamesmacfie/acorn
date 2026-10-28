@@ -1,0 +1,69 @@
+/* The site's color tokens: its palette, and the only file in src that writes a color
+   (scripts/siteCss.test.mjs). The page draws in it under the app's own token names, so site.css and
+   Starlight's mapping read `--text`, `--accent`, and the rest as they always have. A specimen or a
+   snapshot draws in the app's own theme instead: virtual:acorn-ui.css restates Latte or Mocha on it
+   (pictureScopes() in scripts/acornUi.mjs). scripts/contrast.test.mjs checks the pairs below.
+
+   Night is a violet-black ground with near-white ink, one brass signal, the color of an acorn's shell,
+   and one rose verb for the hero. Day is the same page on violet-white, with the brass taken down to
+   bronze so it reads on the light ground.
+
+   `html:root:root` outweighs the app's `:root[data-theme="…"]` blocks whichever sheet loads first
+   (docs/site/design.md). */
+
+/* Day: the page in light mode. */
+html:root:root {
+  --bg: oklch(97.5% 0.006 290);
+  --bg-subtle: oklch(95% 0.009 290);
+  --bg-hover: oklch(93% 0.011 290);
+  --bg-selected: oklch(90% 0.013 290);
+  --border: oklch(89.5% 0.012 290);
+  --border-strong: oklch(80% 0.016 290);
+  --badge-border: oklch(80% 0.016 290);
+  --text: oklch(22% 0.03 290);
+  --text-muted: oklch(46% 0.03 290);
+  --text-faint: oklch(62% 0.02 290);
+  --accent: oklch(52% 0.115 62);
+  --focus: oklch(52% 0.115 62);
+  --shadow-popover: oklch(30% 0.03 290 / 0.14);
+
+  /* The site's own colors, which a picture of acorn keeps: the accent that marks up a snapshot, and
+     the hero's verb. */
+  --site-accent: oklch(52% 0.115 62);
+  --site-accent-ink: oklch(97.5% 0.006 290);
+  --site-verb: oklch(55% 0.17 15);
+}
+
+/* Night: the page in dark mode, and the stage in either. The stage is the darkest step, `--bg-subtle`,
+   and its controls sit a step up on `--bg`. */
+html:root:root[data-color-scheme='dark'],
+html:root .site-dark {
+  --bg: oklch(17.5% 0.026 290);
+  --bg-subtle: oklch(14% 0.024 290);
+  --bg-hover: oklch(21.5% 0.03 290);
+  --bg-selected: oklch(25.5% 0.032 290);
+  --border: oklch(29% 0.03 290);
+  --border-strong: oklch(40% 0.034 290);
+  --badge-border: oklch(40% 0.034 290);
+  --text: oklch(94% 0.012 300);
+  --text-muted: oklch(74% 0.025 295);
+  --text-faint: oklch(58% 0.025 292);
+  --accent: oklch(80% 0.135 68);
+  --focus: oklch(80% 0.135 68);
+  --shadow-popover: oklch(5% 0.02 290 / 0.6);
+
+  --site-accent: oklch(80% 0.135 68);
+  --site-accent-ink: oklch(14% 0.024 290);
+  --site-verb: oklch(74% 0.14 12);
+
+  /* The glyph field over a stage (src/scripts/glyphField.ts): violet steps for leaves and the twig,
+     brass steps for acorns. Each is only a little lighter than the stage, so the field stays behind
+     the words. */
+  --site-glyph-1: oklch(25% 0.035 290);
+  --site-glyph-2: oklch(31% 0.045 291);
+  --site-glyph-3: oklch(39% 0.06 293);
+  --site-glyph-4: oklch(48% 0.075 295);
+  --site-glyph-warm-1: oklch(36% 0.06 62);
+  --site-glyph-warm-2: oklch(50% 0.09 66);
+  --site-glyph-warm-3: oklch(66% 0.12 68);
+}

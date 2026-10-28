@@ -1,10 +1,11 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">
-  <!-- The app icon's ASCII acorn (Acorn.tsx), one path per row of its 8 by 8 grid, in the text color of
-       the site's Catppuccin Latte and Mocha themes. A cell is 5.5 wide and 7.5 tall. -->
+  <!-- The app icon's ASCII acorn (Acorn.tsx), one path per row of its 8 by 8 grid, in the site's accent:
+       bronze on a light tab bar and brass on a dark one (src/styles/tokens.css). A cell is 5.5 wide and
+       7.5 tall. -->
   <style>
-    g { fill: none; stroke: #4c4f69; stroke-width: 3.4; stroke-linecap: round; stroke-linejoin: round; }
+    g { fill: none; stroke: #97570d; stroke-width: 3.4; stroke-linecap: round; stroke-linejoin: round; }
     @media (prefers-color-scheme: dark) {
-      g { stroke: #cdd6f4; }
+      g { stroke: #f7ac55; }
     }
   </style>
   <g>

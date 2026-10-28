@@ -1,25 +1,41 @@
 ---
-// The top of a marketing page, on the dark stage under the header: an optional eyebrow, the headline, a
-// paragraph in the default slot, the actions, and a picture under them at the page's full width. The
-// picture hangs over the stage's bottom edge onto the page.
+// The top of a marketing page, on the dark stage under the header: an optional link back to the page's
+// section, the headline, a paragraph in the default slot, the actions, and a picture under them at the
+// page's full width. The picture hangs over the stage's bottom edge onto the page. An oak sprig drawn
+// in glyphs sits behind the words (src/scripts/glyphField.ts).
 interface Props {
-  eyebrow?: string
+  /** The section the page belongs to, as a link back to it, such as the features index. */
+  crumb?: { href: string; label: string }
   title: string
-  /** The end of the title, set in the accent. */
+  /** The end of the title, set apart as the hero's one verb. */
   highlight?: string
   /** On a wide screen, sets the paragraph and the actions beside the headline, so the picture starts higher. */
   split?: boolean
 }
 
-const { eyebrow, title, highlight, split = false } = Astro.props
+const { crumb, title, highlight, split = false } = Astro.props
 if (highlight && !title.endsWith(highlight)) throw new Error(`The hero title "${title}" doesn't end with "${highlight}".`)
 const lead = highlight ? title.slice(0, -highlight.length) : title
+// Each page grows its own sprig from its title, so no two pages draw the same one.
+const seed = [...title].reduce((hash, letter) => (hash * 31 + letter.charCodeAt(0)) >>> 0, 7)
 ---
 
 <section class="hero stage site-dark" data-split={split || undefined}>
-  {eyebrow && <p class="eyebrow">{eyebrow}</p>}
-  <h1>{lead}{highlight && <span class="accent">{highlight}</span>}</h1>
+  {
+    crumb && (
+      <nav class="hero-crumb" aria-label="Breadcrumb">
+        <a href={crumb.href}>{crumb.label}</a>
+      </nav>
+    )
+  }
+  <h1>{lead}{highlight && <span class="verb">{highlight}</span>}</h1>
   {Astro.slots.has('default') && <div class="hero-text"><slot /></div>}
   {Astro.slots.has('actions') && <div class="actions"><slot name="actions" /></div>}
   {Astro.slots.has('picture') && <div class="hero-picture"><slot name="picture" /></div>}
+  <canvas class="glyph-field" aria-hidden="true" data-sprig={split ? 'split' : 'aside'} data-seed={seed}></canvas>
+  {/* Astro renders a component's script where it's written. Inside the stage, it can't come between the
+      hero and whatever follows it, which `.hero + *` places below the hanging picture. */}
+  <script>
+    import '../scripts/glyphField'
+  </script>
 </section>

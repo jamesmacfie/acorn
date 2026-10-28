@@ -41,7 +41,8 @@ try {
   await waitForServer()
   mkdirSync(OUT, { recursive: true })
   const browser = await chromium.launch({ channel: 'chrome' })
-  // A new browser in light mode has no choice saved, so the cards draw in the site's light theme.
+  // The card draws at night whichever mode the page is in (SocialCard.astro). A new browser in light
+  // mode has no choice saved, so the page around it is light.
   const page = await browser.newPage({ viewport: { width: 1200, height: 630 }, colorScheme: 'light' })
   for (const name of names.length > 0 ? names : Object.keys(CARDS)) {
     await page.goto(`${BASE}/lab/og/${name}/`, { waitUntil: 'networkidle' })

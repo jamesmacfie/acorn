@@ -50,7 +50,7 @@ const tour = [
 ---
 
 <Marketing title="Design" meta={meta}>
-  <Hero slot="hero" eyebrow="Design lab · placeholder eyebrow" title={headline}>
+  <Hero slot="hero" crumb={{ href: '/lab/', label: 'Lab' }} title={headline}>
     <p>{paragraph}</p>
     <Fragment slot="actions">
       <a class="button" data-variant="primary" href="/download/">Download acorn</a>
@@ -89,14 +89,14 @@ const tour = [
   <section class="section">
     <p class="eyebrow">Feature sections</p>
     <div class="features">
-      <Feature number={1} title="Each task gets its own worktree" href="/docs/using/tasks-and-worktrees/" link="Read about tasks">
+      <Feature title="Each task gets its own worktree" href="/docs/using/tasks-and-worktrees/" link="Read about tasks">
         <p>
           A task is one piece of work on one project. It gets a branch, and a Git worktree the first time it needs
           files, so two agents never edit the same checkout.
         </p>
         <Specimen slot="picture" id="tabs" />
       </Feature>
-      <Feature number={2} title="Approve what the agent asks for" href="/docs/agents/permissions-and-approvals/" link="Read about approvals">
+      <Feature title="Approve what the agent asks for" href="/docs/agents/permissions-and-approvals/" link="Read about approvals">
         <p>Placeholder copy. On a wide screen, this section's picture sits on the other side.</p>
         <Specimen slot="picture" id="buttons" />
       </Feature>

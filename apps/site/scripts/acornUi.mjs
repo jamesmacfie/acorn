@@ -117,20 +117,19 @@ export function acornUiCss() {
     scoped(appSheets().join('\n'), '.acorn-ui'),
     scoped(readFileSync(SIDEBAR, 'utf8'), '.acorn-ui .snapshot-sidebar'),
     darkScope(),
+    pictureScopes(),
   ].join('\n')
 }
 
 /** The site's two themes. The visitor's light or dark mode picks one, and every `.site-dark` draws in the dark one. */
 export const SITE_THEMES = { light: 'catppuccin-latte', dark: 'catppuccin-mocha' }
 
-/** `.site-dark`: the site's dark theme's tokens on one element, whatever <html> carries, so a page's
- *  header, hero, and footer draw dark in either scheme. A token defined from others, such as
- *  `--card-bg: var(--bg)`, takes its value where it's declared, so the block restates every derived
- *  token from the plain `:root` blocks as well as the theme's own colors. It sets tokens only, and site.css
- *  gives the element its color and color scheme. */
-export function darkScope() {
+/** One theme's tokens on the elements `selector` matches, whatever <html> carries. A token defined from
+ *  others, such as `--card-bg: var(--bg)`, takes its value where it's declared, so the block restates
+ *  every derived token from the plain `:root` blocks as well as the theme's own colors. */
+function themeScope(id, selector) {
   const declarations = new Map()
-  const theme = `:root[data-theme="${SITE_THEMES.dark}"]`
+  const theme = `:root[data-theme="${id}"]`
   for (const css of appSheets()) {
     postcss.parse(css).walkRules((rule) => {
       if (rule.parent?.type === 'atrule' || (rule.selector !== ':root' && rule.selector !== theme)) return
@@ -142,7 +141,25 @@ export function darkScope() {
     })
   }
   const body = [...declarations].map(([prop, value]) => `  ${prop}: ${value};`).join('\n')
-  return `.site-dark {\n${body}\n}`
+  return `${selector} {\n${body}\n}`
+}
+
+/** `.site-dark`: the site's dark theme on one element, so a page's header, hero, and footer draw dark in
+ *  either scheme. src/styles/tokens.css then gives it the site's night colors. It sets tokens only,
+ *  and site.css gives the element its color and color scheme. */
+export function darkScope() {
+  return themeScope(SITE_THEMES.dark, '.site-dark')
+}
+
+/** A specimen or a snapshot is a picture of acorn, so it draws in the app's own theme, inside a page
+ *  drawn in the site's palette (src/styles/tokens.css): Latte on a light page, Mocha on a dark one and
+ *  on the stage. The stage's block comes second, so it wins on a light page's stage. */
+export function pictureScopes() {
+  const pictures = ':is(.specimen, .snapshot)'
+  return [
+    themeScope(SITE_THEMES.light, `:root[data-color-scheme="light"] ${pictures}`),
+    themeScope(SITE_THEMES.dark, `:root[data-color-scheme="dark"] ${pictures}, :root .site-dark ${pictures}`),
+  ].join('\n')
 }
 
 // What the plugin serves, by id: the specimen stylesheet, and the theme and style pack ids for a picker.

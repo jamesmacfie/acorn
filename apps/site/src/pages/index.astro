@@ -233,6 +233,11 @@ const faq = [
 // Until there's a release to download, the download page offers ways to build acorn.
 const { release } = await readGithub()
 const getAcorn = release ? 'Download' : 'Get acorn'
+
+// The closing acorn in two pieces, its stalk and cap over its nut, so the cap can tip on its own.
+const art = ACORN_ART.split('\n')
+const cap = art.slice(0, 4).join('\n')
+const nut = art.slice(4).join('\n')
 ---
 
 <Marketing title="A workspace for working with coding agents" meta={meta}>
@@ -243,14 +248,13 @@ const getAcorn = release ? 'Download' : 'Get acorn'
       sessions, so your agents make their mess somewhere safe. Read the diff, merge the pull request, and archive the
       rest.
     </p>
-    <p class="hero-meta">
-      <a href="/docs/start/install/">macOS · Windows</a> ·{' '}
-      <a href="/docs/start/desktop-and-terminal/">terminal client</a> · <a href={`${GITHUB}/blob/main/LICENSE`}>MIT</a>
-    </p>
+    <ul class="hero-meta">
+      <li><a href="/docs/start/install/">macOS and Windows</a></li>
+      <li><a href="/docs/start/desktop-and-terminal/">Terminal client</a></li>
+      <li><a href={`${GITHUB}/blob/main/LICENSE`}>MIT license</a></li>
+    </ul>
     <Fragment slot="actions">
-      <a class="button" data-variant="primary" data-size="lg" href="/download/">
-        {getAcorn} <span class="arrow" aria-hidden="true">→</span>
-      </a>
+      <a class="button" data-variant="primary" data-size="lg" href="/download/">{getAcorn}</a>
       <a class="button" data-size="lg" href="/docs/">Read the docs</a>
     </Fragment>
     <div slot="picture" class="hero-shot">
@@ -265,7 +269,7 @@ const getAcorn = release ? 'Download' : 'Get acorn'
 
   <section class="section chapter" aria-labelledby="loop">
     <header class="chapter-head">
-      <h2 id="loop">Every mess gets <span class="accent">its own branch.</span></h2>
+      <h2 id="loop">Every mess gets its own branch.</h2>
       <p class="lede">
         The usual task gets a branch and a worktree of its own, so agents on different tasks work in different checkouts
         and don't trip over each other.
@@ -287,7 +291,7 @@ const getAcorn = release ? 'Download' : 'Get acorn'
 
   <section class="section chapter" aria-labelledby="window">
     <header class="chapter-head">
-      <h2 id="window">You can close a few windows <span class="accent">now.</span></h2>
+      <h2 id="window">You can close a few windows now.</h2>
       <p class="lede">The pull request, the terminals, and the other tools a task needs open as panes inside it.</p>
     </header>
     <Tour tabs={tour}>
@@ -297,7 +301,7 @@ const getAcorn = release ? 'Download' : 'Get acorn'
 
   <section class="section chapter band" aria-labelledby="plugins">
     <header class="chapter-head">
-      <h2 id="plugins">Take it <span class="accent">apart.</span></h2>
+      <h2 id="plugins">Take it apart.</h2>
       <p class="lede">
         Every pane in that window comes from a plugin, and so do the terminal drawer and most of the icons on its rails.
         A plugin you install uses the same seams, and draws in both clients.{' '}
@@ -378,7 +382,7 @@ const getAcorn = release ? 'Download' : 'Get acorn'
 
   <section class="section chapter" aria-labelledby="trust">
     <header class="chapter-head">
-      <h2 id="trust">The agents don't get <span class="accent">your keys.</span></h2>
+      <h2 id="trust">The agents don't get your keys.</h2>
       <p class="lede">
         Your code stays on the machine that runs the Node, and acorn limits what the agents and plugins there can reach.
       </p>
@@ -417,16 +421,14 @@ const getAcorn = release ? 'Download' : 'Get acorn'
 
   <section class="section finale closing stage site-dark" aria-labelledby="get-acorn">
     <div class="finale-text">
-      <h2 id="get-acorn">Give them <span class="accent">a task.</span></h2>
+      <h2 id="get-acorn">Give them a task.</h2>
       <InstallBlock id="footer-install" methods={installMethods} />
       <div class="actions">
-        <a class="button" data-variant="primary" data-size="lg" href="/download/">
-          {getAcorn} <span class="arrow" aria-hidden="true">→</span>
-        </a>
+        <a class="button" data-variant="primary" data-size="lg" href="/download/">{getAcorn}</a>
         <a class="button" data-size="lg" href="/docs/">Read the docs</a>
       </div>
     </div>
-    <pre class="finale-art" aria-hidden="true">{ACORN_ART}</pre>
+    <pre class="finale-art" aria-hidden="true"><span class="cap">{cap}</span>{'\n'}{nut}</pre>
   </section>
 </Marketing>
 
@@ -436,18 +438,14 @@ const getAcorn = release ? 'Download' : 'Get acorn'
 
 <style>
   /* ── Hero ──
-     A dot grid behind the words, fading out toward the window. */
-  :global(.hero)::after {
-    content: '';
-    position: absolute;
-    inset: 0;
-    z-index: -1;
-    background-image: radial-gradient(var(--border-strong) 1px, transparent 1.5px);
-    background-size: var(--space-10) var(--space-10);
-    mask-image: radial-gradient(ellipse 80% 70% at 70% 20%, currentcolor, transparent);
-    pointer-events: none;
-  }
+     Where acorn runs and its license: a row of three links, which wraps on a phone. */
   .hero-meta {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--space-3) var(--space-9);
+    margin: 0;
+    padding: 0;
+    list-style: none;
     font-family: var(--font-mono);
     font-size: var(--fs-sm);
   }
@@ -585,9 +583,10 @@ const getAcorn = release ? 'Download' : 'Get acorn'
   }
 
   /* ── Plugins ──
-     The hero's window again, with each part a plugin draws outlined in the accent. The selectors name
-     each part by what the capture itself calls it, such as the Git pane's "Git list", so a new capture
-     keeps them. The rail's Home and Archive aren't plugins, so they stay plain. */
+     The hero's window again, with each part a plugin draws outlined in the site's accent, which a
+     snapshot keeps while the window itself draws in the app's theme. The selectors name each part by
+     what the capture itself calls it, such as the Git pane's "Git list", so a new capture keeps them.
+     The rail's Home and Archive aren't plugins, so they stay plain. */
   /* How far the outlines and names have come in, from 0 to 1. Registered, so it animates, and it starts
      at 1, so without the animation everything shows. */
   @property --xray {
@@ -609,7 +608,7 @@ const getAcorn = release ? 'Download' : 'Get acorn'
           .pane-switcher .tabrail-tab:not(.tabrail-bottom)
         )
     ) {
-    outline: calc(var(--xray) * var(--bw-strong)) dashed var(--accent);
+    outline: calc(var(--xray) * var(--bw-strong)) dashed var(--site-accent);
     outline-offset: calc(-1 * var(--bw-strong));
   }
   /* The three big parts carry their plugin's name. The window draws at 1440 pixels and scales down, so
@@ -626,8 +625,8 @@ const getAcorn = release ? 'Download' : 'Get acorn'
     font-size: 1.25rem;
     font-weight: var(--fw-bold);
     line-height: 1;
-    color: var(--bg);
-    background: var(--text);
+    color: var(--site-accent-ink);
+    background: var(--site-accent);
     opacity: var(--xray);
   }
   .xray :global(.pane:has(> [aria-label='Git list']))::after {
@@ -786,10 +785,9 @@ const getAcorn = release ? 'Download' : 'Get acorn'
   .can-group > * {
     margin: 0;
   }
-  /* A dense list, read down then across: the guides as a contents page. */
+  /* Each group of guides drawn the way `tree` prints a folder: the group's name, then a branch per
+     guide. The branches are drawing, so a screen reader skips them. */
   .can ul {
-    columns: 3 16rem;
-    column-gap: var(--space-11);
     max-inline-size: none;
     margin: 0;
     padding: 0;
@@ -797,12 +795,20 @@ const getAcorn = release ? 'Download' : 'Get acorn'
     font-size: var(--fs-md);
   }
   .can li {
-    padding-block: var(--space-3);
-    break-inside: avoid;
+    display: flex;
+    gap: var(--space-4);
+    padding-block: var(--space-2);
   }
   .can li::before {
-    content: '→ ';
-    content: '→ ' / '';
+    content: '├──';
+    content: '├──' / '';
+    flex: none;
+    font-family: var(--font-mono);
+    color: var(--border-strong);
+  }
+  .can li:last-child::before {
+    content: '└──';
+    content: '└──' / '';
   }
   @media (min-width: 64rem) {
     .can {
@@ -810,9 +816,6 @@ const getAcorn = release ? 'Download' : 'Get acorn'
     }
     .can > h4 {
       grid-column: 1 / -1;
-    }
-    .can ul {
-      columns: 1;
     }
   }
 
@@ -917,7 +920,8 @@ const getAcorn = release ? 'Download' : 'Get acorn'
   .finale-text > :global(.install) {
     justify-self: stretch;
   }
-  /* The acorn from the header, at the size of a sign. */
+  /* The acorn from the header, at the size of a sign. It tips its cap to whoever reaches for the main
+     button. */
   .finale-art {
     justify-self: center;
     margin: 0;
@@ -925,6 +929,21 @@ const getAcorn = release ? 'Download' : 'Get acorn'
     font-size: clamp(1.75rem, 1rem + 2vw, 2.75rem);
     line-height: 1;
     color: var(--accent);
+  }
+  .finale-art .cap {
+    display: inline-block;
+    transform-origin: 85% 100%;
+  }
+  @media (prefers-reduced-motion: no-preference) {
+    .finale-art .cap {
+      transition:
+        translate var(--dur-med) var(--ease-out),
+        rotate var(--dur-med) var(--ease-out);
+    }
+    .finale:has(.button[data-variant='primary']:is(:hover, :focus-visible)) .finale-art .cap {
+      translate: 0 -0.35em;
+      rotate: -14deg;
+    }
   }
   @media (min-width: 64rem) {
     .finale {

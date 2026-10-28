@@ -25,7 +25,7 @@ export const meta = {
 <FeaturePage feature="desktop-and-terminal" meta={meta} related={['plugins', 'nodes', 'automation']} docs={{ href: '/docs/start/desktop-and-terminal/', label: 'Read about the two clients' }}>
   <Snapshot slot="picture" id="terminal-small" />
 
-  <Feature number={1} title="Two clients of one Node" href="/docs/start/desktop-and-terminal/" link="Desktop and terminal">
+  <Feature title="Two clients of one Node" href="/docs/start/desktop-and-terminal/" link="Desktop and terminal">
     <p>
       Run <code>acorn</code> with no arguments and the terminal client opens the workspace on this machine's Node. It
       attaches to the Node that's running, or starts one, so the desktop app and the terminal client can be open on
@@ -35,7 +35,7 @@ export const meta = {
     <Snapshot slot="picture" id="hero-terminal" />
   </Feature>
 
-  <Feature number={2} title="The same panes, from the same code" href="/docs/components/one-kit-two-hosts/" link="One kit, two hosts">
+  <Feature title="The same panes, from the same code" href="/docs/components/one-kit-two-hosts/" link="One kit, two hosts">
     <p>
       A pane is a tree of acorn's own components, and each client draws that tree: the desktop in HTML, the terminal
       in character cells. No plugin writes terminal UI or knows which client it's in. The command palette and the
@@ -44,7 +44,7 @@ export const meta = {
     <Specimen slot="picture" id="issues-pane" both />
   </Feature>
 
-  <Feature number={3} title="What the terminal draws its own way" href="/docs/start/desktop-and-terminal/" link="Desktop and terminal">
+  <Feature title="What the terminal draws its own way" href="/docs/start/desktop-and-terminal/" link="Desktop and terminal">
     <p>
       The terminal shows one pane at a time, with a strip of pane labels above it, and three panels on the left: the
       sources, what's under the chosen one, and the tasks. A graph that the desktop draws as cards and curves becomes
@@ -53,7 +53,7 @@ export const meta = {
     </p>
   </Feature>
 
-  <Feature number={4} title="The command line, for scripts" href="/docs/automation/the-command-line/" link="The command line">
+  <Feature title="The command line, for scripts" href="/docs/automation/the-command-line/" link="The command line">
     <p>
       With a subcommand, <code>acorn</code> is a command-line interface (CLI) to a Node: list and create tasks, start
       and wait on agent sessions and workflow runs, and call a plugin's own commands. Every command prints a table,

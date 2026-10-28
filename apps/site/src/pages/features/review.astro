@@ -36,7 +36,7 @@ export const meta = {
 <FeaturePage feature="review" meta={meta} related={['tasks', 'agents', 'automation']} docs={{ href: '/docs/built-in-plugins/github/', label: 'Read about GitHub' }}>
   <Snapshot slot="picture" id="review" />
 
-  <Feature number={1} title="The pull request, inside its task" href="/docs/built-in-plugins/github/" link="GitHub">
+  <Feature title="The pull request, inside its task" href="/docs/built-in-plugins/github/" link="GitHub">
     <p>
       Connect GitHub and a task's pull request opens in its own pane: the state, reviewers, labels, linked issues,
       and description, then the conversation as a timeline of comments, reviews, commits, and file threads, beside
@@ -45,14 +45,14 @@ export const meta = {
     </p>
   </Feature>
 
-  <Feature number={2} title="Checks, their logs, and re-runs" href="/docs/built-in-plugins/github/" link="GitHub">
+  <Feature title="Checks, their logs, and re-runs" href="/docs/built-in-plugins/github/" link="GitHub">
     <p>
       Each check sits in the overview with its status. Press one to open its GitHub Actions job, with the failed
       steps open and each step's log under it. A failed check has a <strong>Re-run</strong> button.
     </p>
   </Feature>
 
-  <Feature number={3} title="Merge from the pane" href="/docs/built-in-plugins/github/" link="GitHub">
+  <Feature title="Merge from the pane" href="/docs/built-in-plugins/github/" link="GitHub">
     <p>
       <strong>Merge</strong> sits beside its method: squash, a merge commit, or rebase. A draft offers{' '}
       <strong>Ready for review</strong> instead, and <strong>Convert to draft</strong> and <strong>Close</strong>{' '}
@@ -61,7 +61,7 @@ export const meta = {
     <Specimen slot="picture" id="ship" />
   </Feature>
 
-  <Feature number={4} title="A diff viewer for big changes" href="/docs/built-in-plugins/git/" link="Git">
+  <Feature title="A diff viewer for big changes" href="/docs/built-in-plugins/git/" link="Git">
     <p>
       The pull request, the compare view, and the Changes tab share one diff viewer. Read it unified or split, with
       the changed words marked inside each changed line and review threads under the lines they're on. Filter files
@@ -70,7 +70,7 @@ export const meta = {
     </p>
   </Feature>
 
-  <Feature number={5} title="Stage, commit, and push in the task" href="/docs/built-in-plugins/git/" link="Git">
+  <Feature title="Stage, commit, and push in the task" href="/docs/built-in-plugins/git/" link="Git">
     <p>
       The task's Git pane opens on <strong>Changes</strong>: every changed file stacked in one list, a checkbox to
       stage each file or group, and a commit box. One button pushes, pulls, fetches, or publishes the branch,
@@ -80,7 +80,7 @@ export const meta = {
     </p>
   </Feature>
 
-  <Feature number={6} title="Merge, rebase, and resolve a conflict" href="/docs/built-in-plugins/git/" link="Git">
+  <Feature title="Merge, rebase, and resolve a conflict" href="/docs/built-in-plugins/git/" link="Git">
     <p>
       From a commit or a branch, merge it into the task, rebase the task onto it, cherry-pick it, or revert it. acorn
       refuses while the checkout has uncommitted changes or an agent is working in it. A conflicted file opens with

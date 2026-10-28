@@ -10,11 +10,13 @@ Two topics have pages of their own:
 - [Fonts](./design/fonts.md): the faces, the JetBrains Mono subsets, and the preloads.
 - [Lighthouse](./design/lighthouse.md): the landing page's target, the command, and its scores.
 
-The site is built from acorn's own design tokens. The only color on a page is the color acorn draws:
-the site's chrome uses the theme's text, background, border, and accent tokens, so in Catppuccin Latte
-it's slate on pale grey with a blue accent. The light and dark switch restyles the site and every
-specimen at once, because both read the same tokens. A marketing page's header, hero, and footer are
-the exception: they always draw in the dark theme, as the [stage](#the-stage).
+The site is built from acorn's own design tokens, under the app's token names, with colors of its
+own. The page draws in the site's palette: a violet-black night with near-white ink, one brass
+accent, the color of an acorn's shell, and one rose verb in the landing page's headline. By day the
+page turns violet-white and the brass deepens to bronze. A picture of acorn, a specimen or a
+snapshot, draws in the app's own theme instead, Catppuccin Latte or Mocha, so it shows the colors
+acorn draws. The light and dark switch restyles the page and every picture at once. A marketing
+page's header, hero, and footer always draw at night, as the [stage](#the-stage).
 
 ## The stylesheets
 
@@ -23,14 +25,15 @@ Every page loads two sheets, in this order:
 1. `virtual:acorn-ui.css`, which `apps/site/scripts/acornUi.mjs` builds from the app's own sheets. Its
    token blocks set the tokens on `<html>`, and its other rules style specimens inside `.acorn-ui`
    ([specimens](./specimens.md#the-specimen-stylesheet)). It ends with the `.site-dark` token block
-   ([the stage](#the-stage)).
-2. `apps/site/src/styles/site.css`, the site's own sheet.
+   ([the stage](#the-stage)) and the picture blocks, which restate Latte or Mocha on every specimen
+   and snapshot ([the palette](#the-palette)).
+2. `apps/site/src/styles/site.css`, the site's own sheet. It imports `tokens.css`, the site's palette.
 
 Starlight loads both through `customCss` in `apps/site/astro.config.mjs`. A marketing page loads them in
 `apps/site/src/layouts/Marketing.astro`.
 
 `site.css` uses the app's tokens for every color, font, space, size, radius, border, shadow, and
-duration. A marketing page doesn't always load the two sheets in that order, so the few app tokens
+duration. `tokens.css` is the one file that writes a color, as the values of those tokens. A marketing page doesn't always load the two sheets in that order, so the few app tokens
 `site.css` overrides, such as `--font-mono`, sit on `html:root`, which beats the app's `:root`. A value the app has no token for is a `--site-*` token at the top of the file, such as the
 hero headline size, the header bar's height, and the width of a docs page's table of contents. The sheet also points Starlight's own
 `--sl-*` palette and type at acorn's tokens, so Starlight's parts follow the theme too.
@@ -43,14 +46,33 @@ it.
 Components with their own look keep it in a `<style>` block beside their markup, written to the same
 rules.
 
+## The palette
+
+`apps/site/src/styles/tokens.css` sets the site's colors under the app's token names, such as `--bg`,
+`--text`, and `--accent`, so `site.css` and Starlight's mapping read them as they always have. Its
+day block sits on `<html>`. Its night block sits on `<html>` in dark mode and on every `.site-dark`
+element. `html:root:root` outweighs the app's `:root[data-theme="…"]` blocks whichever sheet loads
+first. Three more of its tokens are the site's alone:
+
+| Token | What it colors |
+| --- | --- |
+| `--site-accent`, `--site-accent-ink` | Marks the site draws over a picture, such as the outlines on the plugins chapter's window. A picture keeps these when it takes the app's theme. |
+| `--site-verb` | The hero's verb, rose, once, on the landing page. |
+| `--site-glyph-*` | The oak sprig over a stage: four violet steps and three brass ones, each a little lighter than the stage. |
+
+A picture of acorn is a picture, so it shows acorn's own colors. `pictureScopes()` in
+`apps/site/scripts/acornUi.mjs` restates Catppuccin Latte on every specimen and snapshot on a light
+page, and Mocha on a dark page and on the stage, with every token derived from them. Inside a picture,
+`--accent` is the app's blue again. The site's own marks over a picture use `--site-accent`.
+
 ## Text is never muted
 
-Every piece of text on the site is `--text`, on `--bg` or `--bg-subtle`. The app's muted text, tone
-colors, and hover and selection fills fail contrast as text in some of the 12 themes. For example,
-`--text-muted` is 2.93:1 in Solarized Light. So the site sets secondary text apart by size and case,
+Every piece of text on the site is `--text`, on `--bg` or `--bg-subtle`. Inside a picture, the app's
+muted text, tone colors, and hover and selection fills fail contrast as text in some of the 12 themes.
+For example, `--text-muted` is 2.93:1 in Solarized Light. So the site sets secondary text apart by size,
 shows a callout's or a badge's tone in its border beside a word that names it, and marks the current
-or hovered row with an accent rule. A primary button is `--bg` on `--text`, not the accent, for the
-same reason.
+or hovered row with an accent rule. A primary button is the accent, with `--bg` as its ink, which the
+palette pairs at 5.3:1 by day and 9.9:1 by night.
 
 ## The mark
 
@@ -62,8 +84,9 @@ so it stays sharp at 16 pixels.
 
 ## Appearance
 
-The site draws in two of the app's themes, Catppuccin Latte for light and Catppuccin Mocha for dark,
-always in the Terminal style pack. The header's light and dark switch (`ThemeToggle.astro`) flips
+The site picks two of the app's themes, Catppuccin Latte for light and Catppuccin Mocha for dark,
+always in the Terminal style pack. The page draws in the site's palette over them, and the pictures in
+the themes themselves ([the palette](#the-palette)). The header's light and dark switch (`ThemeToggle.astro`) flips
 between them. The site never sets `data-style`, so every page and specimen draws in Terminal, the
 default. `SITE_THEMES` in `apps/site/scripts/acornUi.mjs` names the two, and `AppearanceScript` reads
 them from there.
@@ -78,16 +101,25 @@ read `data-color-scheme` to pick github-light or github-dark (`apps/site/ec.conf
 
 A marketing page opens and closes on a dark band, the _stage_: the header and the hero at the top, and
 the footer at the foot, with the landing page's and every feature page's closing call to action
-running into it. The stage draws in Catppuccin Mocha in both schemes. In light mode the page reads
-dark, light, dark. In dark mode the stage is Mocha's darker `--bg-subtle`, a step below the page's
-`--bg`.
+running into it. The stage draws in the site's night colors in both schemes. In light mode the page
+reads dark, light, dark. In dark mode the stage is the night's darkest step, `--bg-subtle`, a step
+below the page's `--bg`.
 
 An element with the `.site-dark` class takes the dark theme. `darkScope()` in `acornUi.mjs` builds the
 class's token block from the app's own: Mocha's colors, and every token the plain `:root` blocks
 derive from another, such as `--card-bg: var(--bg)`. A derived token takes its value where it's
-declared, so without restating it a dark element would inherit the light page's value. Everything
-inside, specimens and snapshots included, draws in Mocha. Code colors follow too, because they're
-`light-dark()` pairs and `.site-dark` sets `color-scheme: dark`.
+declared, so without restating it a dark element would inherit the light page's value. `tokens.css`
+then gives the element the site's night colors. Specimens and snapshots inside draw in Mocha. Code
+colors follow too, because they're `light-dark()` pairs and `.site-dark` sets `color-scheme: dark`.
+
+Every stage's hero carries an oak sprig drawn in mono glyphs, behind its words
+(`apps/site/src/scripts/glyphField.ts`). Its twig and the leaves' midribs are lines of slashes and
+dashes, the blades are a stipple, and the acorns are shaded in brass with scaly caps. A task branch
+from the site's fixture runs along the twig, and on the landing page it's `retry-failed-webhooks`, the
+task in the hero's window. Each page grows its own sprig from its title. The field fades near the
+words, so they stay clear, and a pointer that brushes the sprig sets it swaying. It stays empty
+without script, holds still under reduced motion, and hides below 48rem, where the words fill the
+stage.
 
 `.stage` paints its own background, and a border image's outset carries the band out to the window's
 edges without widening the page. Keep the background on the element itself: axe reads text contrast
@@ -103,11 +135,11 @@ The components are in `apps/site/src/components/`. Each has a comment that says 
 | --- | --- |
 | `SiteHeader`, `SiteFooter` | The header and the footer on every page. Below 50rem the header's links fold into a menu. |
 | `GitHubStars` | **Star on GitHub**, a plain link to the repository. It shows the star count, read at build time, from 100 stars. |
-| `Hero` | The stage at the top of a page: headline, paragraph, and an optional eyebrow, actions, and picture. `highlight` sets the end of the headline in the accent. The landing page leaves the eyebrow out. A marketing page puts it in the layout's `hero` slot, and the layout draws one with the page's title when there's none. With `split`, the paragraph and actions sit beside the headline on a wide screen, so the picture starts higher. |
+| `Hero` | The stage at the top of a page: headline, paragraph, the oak sprig behind them, and an optional link back to the page's section (`crumb`), actions, and picture. `highlight` sets the end of the headline apart as the hero's verb, in rose over a rule that draws in once. A marketing page puts it in the layout's `hero` slot, and the layout draws one with the page's title when there's none. With `split`, the paragraph and actions sit beside the headline on a wide screen, so the picture starts higher. |
 | `InstallBlock` | A tab per install method, its commands after a prompt, and **Copy**. |
-| `Specimen`, `SnapshotFrame` | A picture of acorn in a frame drawn like a pane, or a whole window with a title bar, its three buttons, a centered title, rounder corners, and a deeper shadow. A specimen switches between its desktop and terminal views with tabs, or shows them side by side with `both`. Either takes a `caption` that replaces its own. Under the hero, a window's caption is for screen readers only. |
+| `Specimen`, `SnapshotFrame` | A picture of acorn in a frame drawn like a pane, or a whole window with a bar that names what it shows and which client drew it, rounder corners, and a deeper shadow. Neither draws a desktop's window buttons. A specimen switches between its desktop and terminal views with tabs, or shows them side by side with `both`. Either takes a `caption` that replaces its own. Under the hero, a window's caption is for screen readers only. |
 | `Snapshot`, `Cells` | A [shell snapshot](./snapshots.md) in its frame, and a terminal's cells, which specimens and snapshots share. |
-| `Feature`, `Tour`, `Card` | A numbered feature section, the landing page's tour, and a card. `Feature` takes `level={3}` under a section's own heading. A `Feature` with no picture keeps to the reading measure. The tour's tabs run down the side on a wide screen, beside the selected tab's words and window. On a marketing page a card is rounder and lifts under the pointer. |
+| `Feature`, `Tour`, `Card` | A feature section, the landing page's tour, and a card. A `.features` list already gives the order, so the sections carry no numbers. `Feature` takes `level={3}` under a section's own heading. A `Feature` with no picture keeps to the reading measure. The tour's tabs run down the side on a wide screen, beside the selected tab's words and window. On a marketing page a card is rounder, and its edge takes the accent under the pointer. |
 | `DownloadPage`, `BuildFromSource` | The download page, in `apps/site/src/layouts/`, for a release or for none, and its Build from source section. `src/scripts/platform.ts` moves the visitor's platform first. |
 | `FeaturePage` | The layout of a feature page, in `apps/site/src/layouts/`: the title and sentence from `apps/site/src/features.ts`, a picture, the page's sections, **In the terminal**, related features, and **Get started**. A new feature page needs an entry in `features.ts`, which the features index reads too. |
 | `Badge`, `Keys` | The kit's own `Badge` and `Kbd` markup, with the text kept in `--text`. |
@@ -115,10 +147,14 @@ The components are in `apps/site/src/components/`. Each has a comment that says 
 | `SocialCard` | The 1200 by 630 picture a shared link shows ([social cards](./agent-outputs.md#social-cards)). |
 | `Search` | The header's search, drawn with the command palette's markup ([search](./agent-outputs.md#search)). |
 
-A primary button is `--bg` on `--text`, and `data-size="lg"` makes it a page's main action. An arrow
-after its label leans toward where it goes on hover. `.segmented` turns a tab strip into buttons in a
-tray, the selected one inverse, as the hero's desktop and terminal switch does. A display heading may
-end in `.accent`: display sizes are large text, where Latte's accent clears 3:1.
+A primary button is the accent, with `--bg` as its ink, and `data-size="lg"` makes it a page's main
+action. A page has one. `.segmented` turns a tab strip into buttons in a tray, the selected one
+inverse, as the hero's desktop and terminal switch does. A heading is one color. The hero's verb is the
+only words set apart, and only on the landing page.
+
+A label, such as a footer column's name or a changelog entry's date, is mono, a step smaller, in
+sentence case and untracked. The app's own labels are uppercase and tracked in the Terminal pack, which
+suits a dense pane, so the docs' sidebar and tables keep them.
 
 Callouts are Starlight's asides, restyled in `site.css` as the kit's banner `Alert`. A marketing page
 writes `class="callout"` for the same look. Steps are
@@ -133,8 +169,14 @@ A marketing page's hero comes in as the page loads, each part rising a little af
 Further down, the landing page's chapter heads, steps, tour, windows, and grids, a feature page's
 sections, and the cards rise the same way as they scroll into view. They finish before they're a third
 of the way in, so nothing is still faint where you'd read it, and a browser without scroll timelines
-shows them in place. A primary button lifts and an arrow leans on hover, a card lifts, and an FAQ
-answer slides open where the browser can animate to `height: auto` (`interpolate-size`).
+shows them in place. A primary button lifts on hover, a link's underline turns from a rule to the
+accent, and an FAQ answer slides open where the browser can animate to `height: auto`
+(`interpolate-size`).
+
+Three moments are the site's own. The rule under the hero's verb draws in once, after the headline
+lands. The oak sprig over a stage comes in from where its twig enters, over a second and a half, and
+sways where a pointer brushes it, settling in about two seconds. The closing acorn on the landing page
+tips its cap when the pointer or the keyboard reaches **Get acorn**.
 
 The Playwright accessibility tests run with reduced motion, so axe reads each block where it settles
 rather than partway through rising in.
@@ -166,10 +208,10 @@ Previous and next stay inside the page's own sidebar.
 
 | Check | What it fails on |
 | --- | --- |
-| `apps/site/scripts/siteCss.test.mjs` | A color written into the site's styles, as hex, a function, or a name, and text set in a token that fails contrast in some theme. The wireframes are left out. |
-| `apps/site/scripts/contrast.test.mjs` | A pair of tokens the site sets text or a meaningful rule in that falls under 4.5:1 for text, or 3:1 for a rule, in any of the 12 themes. Add a pair here when a style uses a new one. |
+| `apps/site/scripts/siteCss.test.mjs` | A color written into the site's styles anywhere but `tokens.css`, as hex, a function, or a name, anything in `tokens.css` but a token, and text set in a token that fails contrast in some theme. The wireframes are left out. |
+| `apps/site/scripts/contrast.test.mjs` | A pair of tokens the site sets text or a meaningful rule in that falls under 4.5:1 for text, or 3:1 for a rule: the page's pairs in the palette by day and by night, and a picture frame's pairs in all 12 themes. Add a pair here when a style uses a new one. |
 | `apps/site/tests/site.spec.ts` | A theme pick that doesn't restyle the page, a saved theme missing from the first frame, and an axe finding on the design gallery. |
-| `apps/site/scripts/acornUi.test.mjs` | A rule in the specimen stylesheet that reaches outside `.acorn-ui` other than a token block, and a `.site-dark` block that misses the dark theme's colors or a derived token. |
+| `apps/site/scripts/acornUi.test.mjs` | A rule in the specimen stylesheet that reaches outside `.acorn-ui` other than a token block, a `.site-dark` block that misses the dark theme's colors or a derived token, and a picture that doesn't draw in Latte on a light page and Mocha on a dark one or the stage. |
 
 ## The design lab
 

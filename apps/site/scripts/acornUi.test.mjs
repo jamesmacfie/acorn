@@ -1,7 +1,8 @@
 import assert from 'node:assert/strict'
+import { readFileSync } from 'node:fs'
 import { test } from 'node:test'
 import postcss from 'postcss'
-import { acornUiCss, appearances, darkScope, scopeSelector, SITE_THEMES } from './acornUi.mjs'
+import { acornUiCss, appearances, darkScope, pictureScopes, scopeSelector, SITE_THEMES } from './acornUi.mjs'
 
 test('a selector applies only inside .acorn-ui', () => {
   assert.equal(scopeSelector('.ui-btn'), '.acorn-ui .ui-btn')
@@ -16,7 +17,8 @@ test('every rule in the specimen stylesheet applies only inside .acorn-ui, apart
   const sheet = postcss.parse(css)
   const qualifiers = String.raw`(?:\[[^\]]*\]|:not\([^)]*\))*`
   const scoped = new RegExp(String.raw`^(:root${qualifiers}\s+)?\.acorn-ui(?![\w-])`)
-  const rootOnly = new RegExp(`^(?::root${qualifiers}|\\.site-dark)$`)
+  // A token block sits on <html>, a `.site-dark` element, or a picture of acorn.
+  const rootOnly = new RegExp(`^(?::root${qualifiers}|\\.site-dark|:root(?:${qualifiers}|\\s+\\.site-dark)\\s+:is\\(\\.specimen, \\.snapshot\\))$`)
   let rules = 0
   sheet.walkRules((rule) => {
     if (rule.parent?.type === 'atrule' && /keyframes$/i.test(rule.parent.name)) return
@@ -45,6 +47,31 @@ test('the dark scope restates the dark theme and every token derived from it', (
   // A token with no var() in it isn't derived, so the scope inherits it rather than resetting it.
   assert.equal(declarations['--font-mono'], undefined)
   assert.ok(Object.keys(declarations).every((prop) => prop.startsWith('--')))
+})
+
+test("a picture of acorn draws in the app's own theme: Latte on a light page, Mocha on a dark one and on the stage", () => {
+  const blocks = {}
+  postcss.parse(pictureScopes()).walkRules((rule) => {
+    const declarations = {}
+    rule.walkDecls((decl) => {
+      declarations[decl.prop] = decl.value
+    })
+    for (const selector of rule.selectors) blocks[selector] = declarations
+  })
+  const theme = (id) => {
+    const block = {}
+    postcss.parse(readFileSync(new URL('../../../packages/client-core/src/infra/styles/tokens-theme.css', import.meta.url), 'utf8')).walkRules(`:root[data-theme="${id}"]`, (rule) => {
+      rule.walkDecls((decl) => {
+        block[decl.prop] = decl.value
+      })
+    })
+    return block
+  }
+  const pictures = ':is(.specimen, .snapshot)'
+  assert.equal(blocks[`:root[data-color-scheme="light"] ${pictures}`]['--bg'], theme(SITE_THEMES.light)['--bg'])
+  assert.equal(blocks[`:root[data-color-scheme="dark"] ${pictures}`]['--bg'], theme(SITE_THEMES.dark)['--bg'])
+  assert.equal(blocks[`:root .site-dark ${pictures}`]['--accent'], theme(SITE_THEMES.dark)['--accent'])
+  assert.equal(blocks[`:root .site-dark ${pictures}`]['--card-bg'], 'var(--bg)')
 })
 
 test('keeps the kit rules the site draws outside specimens', () => {

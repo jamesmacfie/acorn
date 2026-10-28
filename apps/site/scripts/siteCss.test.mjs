@@ -1,6 +1,8 @@
-// The site takes every color from acorn's theme tokens, so the light and dark themes restyle all of it.
-// This fails on a color written into the site's own styles: src/styles/site.css and the <style> blocks
-// in its components, layouts, and lab pages. The wireframes are grey boxes on purpose, so they're left out.
+// The site takes every color from a token, so the light and dark themes restyle all of it. The site's
+// own colors are written once, in src/styles/tokens.css, and the rest come from acorn's theme tokens.
+// This fails on a color written anywhere else in the site's styles: src/styles/site.css and the <style>
+// blocks in its components, layouts, and lab pages. The wireframes are grey boxes on purpose, so they're
+// left out.
 import assert from 'node:assert/strict'
 import { readdirSync, readFileSync } from 'node:fs'
 import { test } from 'node:test'
@@ -16,10 +18,13 @@ const COLOR_FUNCTION = /\b(?:rgba?|hsla?|hwb|lab|lch|oklab|oklch|color)\(/i
 // Text in these tokens fails contrast in some themes. scripts/contrast.test.mjs says which.
 const ILLEGIBLE = /var\(--(?:text-muted|text-faint|state-ok|state-warn|state-bad|success|warn|danger)\)/
 
-/** Every stylesheet the site writes itself, as [file, css]. */
+// The one file that writes a color, as custom properties and nothing else.
+const TOKENS = 'styles/tokens.css'
+
+/** Every stylesheet the site writes itself, as [file, css], apart from the tokens. */
 function siteStyles() {
   return readdirSync(SRC, { recursive: true, encoding: 'utf8' })
-    .filter((file) => !file.startsWith('lab/wireframes/') && /\.(css|astro)$/.test(file))
+    .filter((file) => !file.startsWith('lab/wireframes/') && file !== TOKENS && /\.(css|astro)$/.test(file))
     .flatMap((file) => {
       const text = readFileSync(new URL(file, SRC), 'utf8')
       if (file.endsWith('.css')) return [[file, text]]
@@ -64,6 +69,16 @@ test("the site's styles write no color of their own", () => {
   assert.ok(styles.some(([file]) => file === 'styles/site.css'), 'reads site.css')
   assert.deepEqual(
     styles.flatMap(([file, css]) => literalColors(file, css)),
+    [],
+  )
+})
+
+test('the tokens file declares tokens and nothing else', () => {
+  const props = []
+  postcss.parse(readFileSync(new URL(TOKENS, SRC), 'utf8')).walkDecls((decl) => props.push(decl.prop))
+  assert.ok(props.includes('--accent'), 'reads tokens.css')
+  assert.deepEqual(
+    props.filter((prop) => !prop.startsWith('--')),
     [],
   )
 })
