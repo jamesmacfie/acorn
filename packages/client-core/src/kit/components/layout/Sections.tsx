@@ -1,4 +1,4 @@
-import { For, Show, type JSX } from 'solid-js'
+import { For, Show, untrack, type JSX } from 'solid-js'
 import { DetailColumn, ListColumn, ListDetail } from './ListDetail'
 import { SectionHeader } from './SectionHeader'
 import { Fold } from './Fold'
@@ -61,19 +61,26 @@ export function Sections(props: {
           better than a label would. The same call github's PR surfaces made before this node. */}
       <ListColumn scroll label={props.ariaLabel}>
         <Show when={props.header}>{(header) => header().render()}</Show>
-        <For each={props.sections}>
-          {(section) => (
-            <Fold
-              persistKey={`${props.id}.${section.id}`}
-              defaultOpen
-              label={section.label}
-              {...(section.count === undefined ? {} : { count: section.count })}
-              {...(section.meta ? { meta: section.meta() } : {})}
-              {...(section.actions ? { actions: section.actions() } : {})}
-            >
-              {section.render()}
-            </Fold>
-          )}
+        {/* Keyed by id, not by object. A caller may rebuild its list whenever a count moves, as the
+            change request's does. Keyed by object, every fold is torn down and rebuilt each time,
+            and the column loses its scroll position. */}
+        <For each={props.sections.map((section) => section.id)}>
+          {(id) => {
+            const section = () => props.sections.find((candidate) => candidate.id === id)!
+            return (
+              <Fold
+                persistKey={`${props.id}.${id}`}
+                defaultOpen
+                label={section().label}
+                {...(section().count === undefined ? {} : { count: section().count })}
+                {...(section().meta ? { meta: section().meta!() } : {})}
+                {...(section().actions ? { actions: section().actions!() } : {})}
+              >
+                {/* Built once per fold: a rebuilt list hands over a new `render`, not new content. */}
+                {untrack(() => section().render())}
+              </Fold>
+            )
+          }}
         </For>
       </ListColumn>
       <Show when={props.main}>

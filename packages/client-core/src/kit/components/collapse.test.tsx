@@ -149,6 +149,31 @@ describe('a pull request Sections sidebar', () => {
     expect(host.querySelector('.ui-listdetail-list input')).toBe(input)
     expect(mounted).toBe(1)
   })
+
+  it('keeps a fold mounted when the caller rebuilds its section list', () => {
+    // The change request rebuilds its list whenever a count moves. Remounting the folds then threw
+    // away the column's scroll position mid-read.
+    let mounted = 0
+    const Files = () => {
+      mounted += 1
+      return <input value="files" />
+    }
+    const [count, setCount] = createSignal(1)
+    render(
+      () => (
+        <Sections
+          id="github.pull"
+          sections={[{ id: 'files', label: 'Files', count: count(), render: () => <Files /> }]}
+        />
+      ),
+      host,
+    )
+    const input = host.querySelector('.ui-fold input')
+    setCount(2)
+    expect(host.querySelector('.ui-fold input')).toBe(input)
+    expect(host.querySelector('.ui-section-header-count')?.textContent).toBe('2')
+    expect(mounted).toBe(1)
+  })
 })
 
 describe('a pane that does not offer the control', () => {
