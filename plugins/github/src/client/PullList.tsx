@@ -160,7 +160,7 @@ export default function PullList() {
   // path: a node-offline createTask otherwise throws an uncaught rejection and the click looks dead.
   const [taskError, setTaskError] = createSignal('')
   // A search hit carries no branch, so its detail is read first rather than inventing one.
-  async function openAsTask(pull: Pull) {
+  async function openAsTask(pull: Pull, skipSetup = false) {
     setTaskError('')
     const projectId = params.projectId
     if (!projectId || !owner() || !repo()) return
@@ -175,6 +175,7 @@ export default function PullList() {
         repo: repo(),
         number: String(pull.number),
         headRef,
+        skipSetup,
       })
       activateTaskSignals(task, { pane: 'pr' })
       navigate(pathForTask(task))
@@ -221,6 +222,15 @@ export default function PullList() {
         order: 10,
         when: (target) => isPull(target) && !tracked(target),
         run: (target) => void openAsTask(target.item as Pull),
+      },
+      {
+        id: 'github.pull.create-task-without-setup',
+        location: 'item.row',
+        label: 'Create task without setup',
+        icon: 'square-plus',
+        order: 11,
+        when: (target) => isPull(target) && !tracked(target),
+        run: (target) => void openAsTask(target.item as Pull, true),
       },
       {
         id: 'github.pull.open-task',

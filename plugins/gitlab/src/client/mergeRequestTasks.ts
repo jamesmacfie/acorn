@@ -24,7 +24,14 @@ export const activeTaskForMergeRequest = (tasks: readonly Task[], projectId: str
       task.changeRequest.number === number,
   )
 
-type Target = { projectId: string; address: string; number: number; headRef: string; title?: string }
+type Target = {
+  projectId: string
+  address: string
+  number: number
+  headRef: string
+  title?: string
+  skipSetup?: boolean
+}
 
 // The task's link to its merge request, under the connection on its server. None without one.
 const selfLink = (connectionId: string | undefined, address: string, number: number) => {
@@ -52,7 +59,10 @@ export async function promoteMergeRequestToTask(queryClient: QueryClient, target
   const tasks = await queryClient.ensureQueryData(tasksOptions(true)).catch(() => [] as Task[])
   const existing = activeTaskForMergeRequest(tasks, target.projectId, target.number)
   if (existing) return existing
-  const task = await createTask(seedFor(target, await connectionFor(target.address)))
+  const task = await createTask({
+    ...seedFor(target, await connectionFor(target.address)),
+    skipSetup: target.skipSetup,
+  })
   await queryClient.invalidateQueries({ queryKey: tasksKey })
   return task
 }

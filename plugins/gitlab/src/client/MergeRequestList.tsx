@@ -68,7 +68,7 @@ export default function MergeRequestList(props: { address: string }) {
   }
 
   const [taskError, setTaskError] = createSignal('')
-  async function openAsTask(row: MergeRequestRow) {
+  async function openAsTask(row: MergeRequestRow, skipSetup = false) {
     setTaskError('')
     if (!params.projectId) return
     try {
@@ -82,6 +82,7 @@ export default function MergeRequestList(props: { address: string }) {
         number: row.number,
         headRef,
         title: row.title,
+        skipSetup,
       })
       activateTaskSignals(task, { pane: 'mr' })
       navigate(pathForTask(task))
@@ -115,6 +116,15 @@ export default function MergeRequestList(props: { address: string }) {
         order: 10,
         when: (target) => isMergeRequest(target) && !tracked(target),
         run: (target) => void openAsTask(target.item as MergeRequestRow),
+      },
+      {
+        id: 'gitlab.merge-request.create-task-without-setup',
+        location: 'item.row',
+        label: 'Create task without setup',
+        icon: 'square-plus',
+        order: 11,
+        when: (target) => isMergeRequest(target) && !tracked(target),
+        run: (target) => void openAsTask(target.item as MergeRequestRow, true),
       },
       {
         id: 'gitlab.merge-request.open-task',

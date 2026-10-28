@@ -32,6 +32,7 @@ type Target = {
   headRef: string
   sourceRepository: string | null
   title?: string
+  skipSetup?: boolean
 }
 
 const seedFor = (target: Target, connectionId: string | undefined) => {
@@ -69,7 +70,7 @@ export async function promotePullRequestToTask(queryClient: QueryClient, target:
   const tasks = await queryClient.ensureQueryData(tasksOptions(true)).catch(() => [] as Task[])
   const existing = activeTaskForPullRequest(tasks, target.projectId, target.number)
   if (existing) return existing
-  const task = await createTask(seedFor(target, await connectionId()))
+  const task = await createTask({ ...seedFor(target, await connectionId()), skipSetup: target.skipSetup })
   await queryClient.invalidateQueries({ queryKey: tasksKey })
   return task
 }

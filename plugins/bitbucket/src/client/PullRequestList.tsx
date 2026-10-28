@@ -73,7 +73,7 @@ export default function PullRequestList(props: { repository: string }) {
   }
 
   const [taskError, setTaskError] = createSignal('')
-  async function openAsTask(row: PullRequestRow) {
+  async function openAsTask(row: PullRequestRow, skipSetup = false) {
     setTaskError('')
     if (!params.projectId) return
     try {
@@ -86,6 +86,7 @@ export default function PullRequestList(props: { repository: string }) {
         headRef: row.headRef,
         sourceRepository: row.sourceRepository,
         title: row.title,
+        skipSetup,
       })
       activateTaskSignals(task, { pane: 'bitbucket-pr' })
       navigate(pathForTask(task))
@@ -119,6 +120,15 @@ export default function PullRequestList(props: { repository: string }) {
         order: 10,
         when: (target) => isPullRequest(target) && !tracked(target),
         run: (target) => void openAsTask(target.item as PullRequestRow),
+      },
+      {
+        id: 'bitbucket.pull-request.create-task-without-setup',
+        location: 'item.row',
+        label: 'Create task without setup',
+        icon: 'square-plus',
+        order: 11,
+        when: (target) => isPullRequest(target) && !tracked(target),
+        run: (target) => void openAsTask(target.item as PullRequestRow, true),
       },
       {
         id: 'bitbucket.pull-request.open-task',

@@ -31,6 +31,7 @@ import { pullDetailOptions } from './queries'
 export type PullTaskTarget = PullRef & {
   projectId: string
   headRef: string
+  skipSetup?: boolean
 }
 
 export const activeTaskForPull = (tasks: readonly Task[], projectId: string, pullNumber: number): Task | undefined =>
@@ -97,6 +98,7 @@ export async function promotePullToTask(queryClient: QueryClient, target: PullTa
     branch: target.headRef,
     pullNumber,
     links,
+    skipSetup: target.skipSetup,
   })
   await queryClient.invalidateQueries({ queryKey: tasksKey })
   return task
