@@ -69,7 +69,7 @@ export function App(props: { api: BrowserApi; opensLinks?: boolean }) {
   const [handoff, setHandoff] = createSignal<PageHandoff | null>(null)
   // Counts toolbar clicks, after which the active page may be readable where it wasn't.
   const [pageChecks, setPageChecks] = createSignal(0)
-  const pageUrl = activePageUrl(props.api, pageChecks)
+  const { url: pageUrl, moves: pageMoves } = activePageUrl(props.api, pageChecks)
   // The selected Node's project site associations, matched against the page here in the browser.
   const [sites, setSites] = createSignal<ProjectSite[]>([])
   // What the selected Node's agents are waiting on, as the background reads it for the badge, and a
@@ -271,7 +271,13 @@ export function App(props: { api: BrowserApi; opensLinks?: boolean }) {
   // A later list, such as one with a task just made for the page, moves nothing, so Home's card stays.
   // Pairing never moves.
   const tasksKnown = createMemo(() => nodeTasks() !== null)
-  createEffect(on([pageUrl, tasksKnown], () => !pairing() && nav.followPage(pageTaskId()), { defer: true }))
+  createEffect(
+    on(
+      [pageUrl, tasksKnown, pageMoves],
+      ([, , moves], previous) => !pairing() && nav.followPage(pageTaskId(), moves !== previous?.[2]),
+      { defer: true },
+    ),
+  )
   // `acorn browser install` runs in a terminal, so the panel can't see it finish. It asks again until
   // the bridge answers.
   const installing = createMemo(() => installTitle(host()))

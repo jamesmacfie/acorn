@@ -84,15 +84,15 @@ Sites to allow are under Settings → **Sites**.
 
 ## Moving between pages
 
-The panel follows the browser tab only to a page that belongs to a task, and never throws away what
-you were reading. When the page moves, by navigating or by switching tabs, the panel applies these
-rules in order (`followPage` in `apps/extension/src/sidebar/location.ts`):
+The panel shows only what belongs to the page beside it. When the page moves to another address, by
+navigating or by switching tabs, the panel applies these rules in order (`followPage` in
+`apps/extension/src/sidebar/location.ts`):
 
 1. Bridge setup, pairing, and Settings never move.
-2. A page that belongs to no task, reached from the page of the task the panel shows, goes Home, even
-   from a conversation, so the panel doesn't keep showing a task the page has nothing to do with. Any
-   other page that belongs to no task leaves the panel where it is, such as one reached while showing
-   a task you opened from Home.
+2. A page that belongs to no task goes Home, even from a conversation or a task you opened from Home,
+   so the panel doesn't keep showing a task the page has nothing to do with. A conversation's draft
+   stays in storage. Opening the panel, or a change in which sites the extension may read, isn't a
+   move.
 3. An open conversation stays open on another task's page. The strip under the top bar names the
    page's task, with **Switch**
    ([the strip under the bars](./navigation.md#the-strip-under-the-bars)).
