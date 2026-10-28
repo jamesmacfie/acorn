@@ -196,6 +196,7 @@
     "./kit/components/layout/Grid.tsx": "./src/kit/components/layout/Grid.tsx",
     "./kit/components/content/Fallback.tsx": "./src/kit/components/content/Fallback.tsx",
     "./kit/components/layout": "./src/kit/components/layout/public.ts",
+    "./kit/components/layout/rowsReorder.ts": "./src/kit/components/layout/rowsReorder.ts",
     "./kit/components/overlays": "./src/kit/components/overlays/public.ts",
     "./kit/components/overlays/tips.tsx": "./src/kit/components/overlays/tips.tsx",
     "./kit/components/primitives.tsx": "./src/kit/components/primitives.ts",

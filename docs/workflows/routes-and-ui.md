@@ -1,7 +1,7 @@
 # Workflow routes and UI
 
-This page covers the run pane on a task, the frames it listens to, and how other surfaces point at a
-run. The client is in `plugins/workflows/src/client/`.
+This page covers the order of the workflow list, the run pane on a task, the frames it listens to, and
+how other surfaces point at a run. The client is in `plugins/workflows/src/client/`.
 
 ## Routes and UI
 
@@ -10,6 +10,29 @@ Node routes are under `/v1/p/workflows/`, and core task run-target routes are un
 ([authoring](./authoring.md)), the run pane, a Settings page listing what a task's checkout would load,
 three palette rows, gate controls, and attention items ([starting runs](./starting-runs.md)). Workflow
 notices use `/v1/events`, and durable run history is paged from the plugin database.
+
+## Workflow order
+
+Each row in the Workflows rail has a grip. Drag it, or press it for **Move up** and **Move down**, or press Alt+↑ or Alt+↓
+on the focused row. The terminal client draws no grip, so Alt+↑ and Alt+↓ are its only way to move a
+row. The rail sends every workflow id it shows, in the new order, to `PUT /defs/order`, and the Node
+replaces the workspace's saved order with that list. The order lives in the plugin's `workflow_order`
+table, one row per workspace, and never in a workflow file, so reordering is never a change to commit.
+
+`mergedList` applies the order after it merges the three layers, so the rules work on ids:
+
+1. Ids in the saved order come first, in that order.
+2. Workflows not in the saved order follow in merge order: rows by last edit, then the user layer,
+   then each project's files. A new workflow lands at the bottom.
+3. A saved id that matches no workflow is skipped, and drops out the next time someone reorders.
+4. An id declared by more than one layer appears once, in its saved place, with the winning layer's
+   contents.
+
+A file that fails to parse stays at the top with no grip, because it has no id to place. While the
+save runs, the rail shows the new order and disables the grips. If the save fails, the rail goes back
+to the saved order and shows the error under the list. The save sends `plugin:workflows:defs-changed`,
+so every open rail reads the list again. One order covers the whole workspace, and each picker filters
+it for its project ([starting runs](./starting-runs.md#starting-a-run)).
 
 ## The run pane
 

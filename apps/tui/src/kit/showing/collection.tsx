@@ -1,8 +1,10 @@
 /** @jsxImportSource @acorn/tui/jsx */
-import { createEffect, createMemo, createSignal, For, Index, Show, untrack, type JSX } from 'solid-js'
+import { createEffect, createMemo, createSignal, For, Index, onCleanup, Show, untrack, type JSX } from 'solid-js'
 import type { Renderable } from '../../tree/compat'
 import type { Wheel } from '../../tree/hit'
 import type { CollectionItem } from '@acorn/client-core/kit/keys'
+import { registerIntentLayer } from '@acorn/client-core/kit/keys/keymapHost.ts'
+import { createRowsReorder, type ReorderableItem } from '@acorn/client-core/kit/components/layout/rowsReorder.ts'
 import { createCellCollection, type ItemProps } from '../../keys/collection'
 import { focusRenderable, focusedRenderable, scheduleSettle } from '../../keys/regions'
 import { Line } from '../cells'
@@ -50,7 +52,7 @@ export function keyedRows<T, R extends CollectionItem>(
 
 /** Items on successive lines. `virtual` is the scroll window and changes nothing else: the component
  *  is the virtualiser, because the renderer has none, and it draws only the rows that fit. */
-export function Rows<T extends CollectionItem>(props: {
+export function Rows<T extends ReorderableItem>(props: {
   id: string
   ariaLabel?: string
   items: readonly T[]
@@ -63,9 +65,13 @@ export function Rows<T extends CollectionItem>(props: {
   onActivate?: (key: string) => void
   onExpand?: (key: string, expand: boolean) => boolean | void
   onMenu?: (key: string) => void
+  /** Alt+↑/↓ only. No grip and no drag: there is no pointer to drag with (docs/ui-design/every-node.md). */
+  onReorder?: (keys: string[]) => Promise<unknown>
   children: (item: T, itemProps: ItemProps, selected: () => boolean, place: Record<string, never>) => JSX.Element
 }) {
-  const items = createMemo(() => props.items)
+  const reorder = createRowsReorder({ items: () => props.items, save: () => props.onReorder })
+  // What the reader sees, so the caret walks a pending order the way it is drawn.
+  const items = createMemo(() => reorder.shown())
   // One collection per `Rows`, keyed by the pane's own id (../../keys/collection.ts).
   const collection = createCellCollection({
     id: () => props.id,
@@ -175,6 +181,13 @@ export function Rows<T extends CollectionItem>(props: {
         // with no rows at all (`stopsInTree`).
         element.focusable = true
         collection.attach(element)
+        onCleanup(
+          registerIntentLayer(element, ['moveUp', 'moveDown'], (intent) => {
+            const key = collection.active()
+            const item = items().find((each) => each.key === key)
+            return !!props.onReorder && !!item && !item.fixed && reorder.shift(item.key, intent === 'moveUp' ? -1 : 1)
+          }),
+        )
         scheduleSettle()
       }}
       onSizeChange={() => setRows(box?.height ?? 0)}

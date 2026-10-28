@@ -58,6 +58,9 @@ export function intentKeys(primary: 'super' | 'ctrl'): Record<Intent, readonly s
     expand: ['right', 'l'],
     collapse: ['left', 'h'],
     activate: ['return', 'space'],
+    // Alt+↑/↓, the chord VS Code and the project table already move a line or a row with.
+    moveUp: ['meta+up'],
+    moveDown: ['meta+down'],
     dismiss: ['escape'],
     commit: [`${primary}+return`],
     maximize: [`${primary}+shift+return`],

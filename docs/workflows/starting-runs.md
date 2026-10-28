@@ -9,6 +9,9 @@ A Rollbar error, a Linear issue and a GitHub pull request each have **Start work
 menu, under **Create task**. It picks a workflow, fills its inputs from the item, makes a task or
 attaches to one, starts the run, and lands on the run pane.
 
+The workflow picker lists workflows in the order saved in the Workflows rail
+([workflow order](./routes-and-ui.md#workflow-order)), and selects the first one it can run. **Start workflow
+here** in Git history uses the same order and default. Both read the order when they open.
 The workflow picker excludes unpublished database drafts and definitions with known problems.
 Repository and user-file workflows remain available without a database publication. If no runnable
 workflows remain, the dialog closes and directs the user to create and publish one in the Workflows rail.

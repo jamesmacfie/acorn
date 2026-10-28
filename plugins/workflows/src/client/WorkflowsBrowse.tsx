@@ -1,4 +1,4 @@
-import { createEffect, createMemo, createResource, onCleanup, Show } from 'solid-js'
+import { createEffect, createMemo, createResource, createSignal, onCleanup, Show } from 'solid-js'
 import { useNavigate, useParams } from '@solidjs/router'
 import { createQuery } from '@tanstack/solid-query'
 import {
@@ -152,14 +152,35 @@ export function WorkflowsBrowseList() {
   )
 
   // A file that does not parse keys on its own address, so pressing it opens the editor, which says
-  // what is wrong with it.
+  // what is wrong with it. It has no id to save a place for, so it stays at the top.
   const items = createMemo(() => [
-    ...errors().map((error) => ({ key: error.source, label: fileName(error.source) })),
+    ...errors().map((error) => ({ key: error.source, label: fileName(error.source), fixed: true })),
     ...definitions().map((definition) => ({
       key: defRefKey({ source: definition.source, id: definition.id }),
       label: definition.name,
     })),
   ])
+
+  // The order every picker lists, saved for the whole workspace (docs/workflows/routes-and-ui.md § Workflow order).
+  // Resolves only once the list has been read back in the new order, which is when `Rows` stops
+  // drawing its own copy of it.
+  const [orderError, setOrderError] = createSignal('')
+  const reorder = async (keys: string[]): Promise<void> => {
+    const ids = new Map(
+      definitions().map((definition) => [defRefKey({ source: definition.source, id: definition.id }), definition.id]),
+    )
+    setOrderError('')
+    try {
+      await workflowApi.defsOrder(
+        scope.workspaceId(),
+        keys.flatMap((key) => ids.get(key) ?? []),
+      )
+      await refetchDefs()
+    } catch (error) {
+      setOrderError(error instanceof Error ? error.message : 'The workflow order could not be saved.')
+      throw error
+    }
+  }
 
   const create = async (): Promise<void> => {
     const workspaceId = scope.workspaceId()
@@ -234,6 +255,7 @@ export function WorkflowsBrowseList() {
             selected={scope.item() ?? null}
             onSelect={open}
             onActivate={open}
+            onReorder={collapsed() ? undefined : reorder}
           >
             {(item, itemProps, selected) => (
               <Show
@@ -311,6 +333,9 @@ export function WorkflowsBrowseList() {
               </Show>
             )}
           </Rows>
+          <Show when={orderError()}>
+            <Alert tone="danger">{orderError()}</Alert>
+          </Show>
         </Show>
       </Show>
 

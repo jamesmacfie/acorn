@@ -11,7 +11,7 @@ import { randomUUID } from 'node:crypto'
 import { and, desc, eq, isNull, or } from 'drizzle-orm'
 import type { PluginDatabase } from '@acorn/plugin-api/node'
 import type { WorkflowAgentOrigin, WorkflowDefRow, WorkflowDefSummary } from '../../contract/wire.ts'
-import { workflowDefs, workflowDependencies } from '../../node/schema'
+import { workflowDefs, workflowDependencies, workflowOrder } from '../../node/schema'
 import { publicationStore, storedWorkflowDef } from '../publication/store'
 import type { WorkflowDef } from '../../shared/workflowContracts'
 import { loadWorkflowFiles, type LoadedWorkflow } from './files'
@@ -189,8 +189,31 @@ export async function removeDef(db: PluginDatabase, id: string): Promise<void> {
   await db.delete(workflowDefs).where(eq(workflowDefs.id, id))
 }
 
+/** Saved ids first, in saved order. Anything not placed yet keeps the order it arrived in, below them,
+ *  and a saved id that names nothing is skipped (docs/workflows/routes-and-ui.md § Workflow order). */
+export const orderWorkflows = <T extends { id: string }>(workflows: readonly T[], saved: readonly string[]): T[] => {
+  const rank = new Map(saved.map((id, index) => [id, index]))
+  // `sort` is stable, so every unplaced workflow sharing the last rank stays in merge order.
+  return [...workflows].sort((a, b) => (rank.get(a.id) ?? saved.length) - (rank.get(b.id) ?? saved.length))
+}
+
+export async function savedOrder(db: PluginDatabase, workspaceId: string): Promise<string[]> {
+  const [row] = await db.select().from(workflowOrder).where(eq(workflowOrder.workspaceId, workspaceId)).limit(1)
+  return row ? (JSON.parse(row.idsJson) as string[]) : []
+}
+
+/** Replaces the workspace's order outright. The rail sends every id it shows, so an id that matched
+ *  nothing when it was read drops out here. */
+export async function saveOrder(db: PluginDatabase, workspaceId: string, ids: readonly string[]): Promise<void> {
+  const values = { idsJson: JSON.stringify(ids), updatedAt: now() }
+  await db
+    .insert(workflowOrder)
+    .values({ workspaceId, ...values })
+    .onConflictDoUpdate({ target: workflowOrder.workspaceId, set: values })
+}
+
 /** The rail's list: this workspace's rows, every project's committed files, and the user layer, with
- *  the repo layer winning an id collision. */
+ *  the repo layer winning an id collision, in the order the workspace saved. */
 export async function mergedList(
   db: PluginDatabase,
   workspaceId: string,
@@ -239,5 +262,5 @@ export async function mergedList(
     if (project.path) fold(loadWorkflowFiles(project.path, options.userDir, options.catalog), 'repo', project.id)
   }
 
-  return { workflows: [...byId.values()], errors }
+  return { workflows: orderWorkflows([...byId.values()], await savedOrder(db, workspaceId)), errors }
 }

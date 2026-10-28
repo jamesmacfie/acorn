@@ -42,7 +42,9 @@ const LEGACY: readonly (readonly [string, PtyKey, string])[] = [
 
   // A modifier is the xterm parameter, which is the bitmask plus one: shift 1, alt 2, ctrl 4.
   ['shift+up', key('up', { shift: true }), '\x1b[1;2A'],
-  ['alt+up', key('up', { meta: true }), '\x1b[1;3A'],
+  // `moveUp` and `moveDown`, Alt+↑/↓, spelled `meta` for the same reason `nextPane` is below.
+  ['meta+up', key('up', { meta: true }), '\x1b[1;3A'],
+  ['meta+down', key('down', { meta: true }), '\x1b[1;3B'],
   ['ctrl+up', key('up', { ctrl: true }), '\x1b[1;5A'],
   ['ctrl+shift+left', key('left', { ctrl: true, shift: true }), '\x1b[1;6D'],
   // `nextPane` and `prevPane`, spelled `ctrl+meta` in the intent table because the keymap calls

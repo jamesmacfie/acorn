@@ -115,7 +115,7 @@ paint containment would clip a card's focus ring.
 | `Text` | none | Plain text; `mono` is a no-op, `muted` is the palette grey, `strong` is bold |
 | `Link` | stop | The text, underlined, pressable. `tip` draws nothing, because this host has no hover |
 | `Heading` | none | Eyebrow in grey uppercase, heading in bold. `help` is a grey line under it, because this host has no hover |
-| `Rows` | collection | Its items on successive lines; `virtual` is the window of rows that fit, and it follows the active row because there is no pointer to scroll with |
+| `Rows` | collection | Reduced: its items on successive lines; `virtual` is the window of rows that fit, and it follows the active row because there is no pointer to scroll with. `onReorder` draws no grips, because there is no pointer to drag with, so Alt+↑/↓ on the active row is the only way to move one |
 | `Row` | item | One line: status glyph, title, meta right-aligned. `variant="stacked"` puts the second child on a second line, as it does on the DOM. `reveal` has no meaning, because there is no hover, so the trailing controls always show. `collapsed` is ignored for the same reason its column's `collapseKey` is: the full row draws, and no name is lost |
 | `TreeRow` | item | `Row` indented `depth` cells with `▸` or `▾` |
 | `RowActions` | none | The row's actions at the right end, always drawn with their control labels, never on hover |

@@ -1,8 +1,13 @@
 import { measureWork } from '../../lib/telemetry/workTelemetry'
-import { createEffect, createMemo, For, on, onCleanup, createSignal, type JSX } from 'solid-js'
+import { createEffect, createMemo, For, on, onCleanup, createSignal, Show, type JSX } from 'solid-js'
 import { createVirtualizer } from '@tanstack/solid-virtual'
-import { createCollection, type CollectionItem, type ItemProps } from '../../keys/collection'
+import { createCollection, type ItemProps } from '../../keys/collection'
 import { collectionState, setCollectionOffset } from '../../keys/collectionState'
+import { bindIntents } from '../../keys/keymapHost'
+import { IconButton } from '../inputs/IconButton'
+import { Menu } from '../overlays/Menu'
+import { createRowsDrag } from './rowsDrag'
+import { createRowsReorder, type ReorderableItem } from './rowsReorder'
 import { watchAppearance } from '../../tokens/appearance'
 import { railRowHeight, rowHeight } from '../../lib/layout/metrics'
 import { retainScroll } from '../../lib/layout/retainScroll'
@@ -25,7 +30,7 @@ import { retainScroll } from '../../lib/layout/retainScroll'
  *  outside a virtual list, where the rows sit in normal flow. */
 export type RowPlacement = { offset?: number; height?: number }
 
-export function Rows<T extends CollectionItem>(props: {
+export function Rows<T extends ReorderableItem>(props: {
   /** Keys the host's stored `active` and `selected`. Stable across a rebuild of `items`. */
   id: string
   ariaLabel?: string
@@ -49,6 +54,11 @@ export function Rows<T extends CollectionItem>(props: {
   onActivate?: (key: string) => void
   onExpand?: (key: string, expand: boolean) => boolean | void
   onMenu?: (key: string) => void
+  /** Lets a person reorder the rows: each one not marked `fixed` gets a grip to drag, or to open for
+   *  Move up and Move down, and Alt+↑/↓ moves the active row. Called with every movable key in the new
+   *  order. The rows show that order until it settles, so resolve once `items` holds it, and reject to
+   *  put the old order back. Not with `virtual`. Leave it off, for a collapsed rail, to hide the grips. */
+  onReorder?: (keys: string[]) => Promise<unknown>
   /** `selected` is an accessor, not a boolean: a `<For>` body runs once per row, so a value read
    *  there would never change again. Read it inside the JSX prop. */
   children: (item: T, itemProps: ItemProps, selected: () => boolean, place: RowPlacement) => JSX.Element
@@ -93,9 +103,32 @@ export function Rows<T extends CollectionItem>(props: {
     ),
   )
 
+  let list: HTMLDivElement | undefined
+  const reorder = createRowsReorder({
+    items,
+    save: () => (virtual ? undefined : props.onReorder),
+    // A move redraws the rows, and a row the browser moved has lost its focus. Give it back, unless the
+    // reader has gone somewhere else while the order saved.
+    settled: (key) =>
+      queueMicrotask(() => {
+        const focused = document.activeElement
+        if (focused && focused !== document.body && !list?.contains(focused)) return
+        list?.querySelector<HTMLElement>(`[data-collection-key="${CSS.escape(key)}"]`)?.focus()
+      }),
+  })
+  const reorderable = () => !virtual && !!props.onReorder
+  const movable = (key: string) => !items().find((item) => item.key === key)?.fixed
+  const drag = createRowsDrag({
+    list: () => list,
+    canDrag: (key) => reorderable() && !reorder.busy() && movable(key) && items().filter((i) => !i.fixed).length > 1,
+    canDrop: movable,
+    drop: (key, target, position) => void reorder.move(key, target, position),
+  })
+
   const collection = createCollection({
     id: () => props.id,
-    items: () => items(),
+    // What the reader sees, so the arrows walk a pending order the way it is drawn.
+    items: () => reorder.shown(),
     role: props.tree ? 'tree' : 'listbox',
     ...(virtual
       ? {
@@ -117,15 +150,63 @@ export function Rows<T extends CollectionItem>(props: {
 
   if (!virtual) {
     return (
-      <div class="ui-rows" aria-label={props.ariaLabel} {...collection.containerProps}>
-        <For each={items()}>
-          {(item) =>
-            measureWork('rows.item.mount', () =>
-              props.children(item, collection.itemProps(item.key), () => collection.selected() === item.key, NO_PLACE),
-            )
-          }
-        </For>
-      </div>
+      <>
+        <div
+          class="ui-rows"
+          aria-label={props.ariaLabel}
+          {...collection.containerProps}
+          ref={(element: HTMLDivElement) => {
+            list = element
+            ;(collection.containerProps.ref as (element: HTMLElement) => void)(element)
+            bindIntents(element, ['moveUp', 'moveDown'], (intent) => {
+              const key = collection.active()
+              return reorderable() && !!key && movable(key) && reorder.shift(key, intent === 'moveUp' ? -1 : 1)
+            })
+          }}
+        >
+          <For each={reorder.shown()}>
+            {(item) => {
+              const row = measureWork('rows.item.mount', () =>
+                props.children(
+                  item,
+                  collection.itemProps(item.key),
+                  () => collection.selected() === item.key,
+                  NO_PLACE,
+                ),
+              )
+              // The grip sits beside the row rather than in it, so the row stays one option with
+              // nothing to press inside it. A fixed row keeps the grip's width, so the names line up.
+              return (
+                <Show when={reorderable()} fallback={row}>
+                  <div
+                    class="ui-rows-reorder"
+                    data-reorder-key={item.key}
+                    data-dragging={drag.dragKey() === item.key ? '' : undefined}
+                    data-drop-position={drag.dropTarget()?.key === item.key ? drag.dropTarget()?.position : undefined}
+                  >
+                    <Show when={!item.fixed} fallback={<span class="ui-rows-grip" />}>
+                      <ReorderGrip
+                        label={`Reorder ${item.label ?? 'row'}`}
+                        busy={reorder.busy()}
+                        edges={reorder.edges(item.key)}
+                        onPointerDown={(event) => drag.begin(event, item.key)}
+                        consumeClick={() => drag.consumeClick(item.key)}
+                        shift={(delta) => reorder.shift(item.key, delta)}
+                      />
+                    </Show>
+                    {row}
+                  </div>
+                </Show>
+              )
+            }}
+          </For>
+        </div>
+        <Show when={reorderable()}>
+          <span class="sr-only" role="status">
+            {reorder.announcement()}
+          </span>
+        </Show>
+      </>
     )
   }
 
@@ -253,5 +334,50 @@ export function Rows<T extends CollectionItem>(props: {
         </For>
       </div>
     </div>
+  )
+}
+
+/** A row's handle: drag it, or press it for Move up and Move down. The project table's handle, in kit
+ *  form (features/workspaces/ProjectOrderHandle.tsx). */
+function ReorderGrip(props: {
+  label: string
+  busy: boolean
+  edges: { first: boolean; last: boolean }
+  onPointerDown: (event: PointerEvent) => void
+  consumeClick: () => boolean
+  shift: (delta: -1 | 1) => void
+}) {
+  return (
+    <span class="ui-rows-grip" onPointerDown={(event) => props.onPointerDown(event)}>
+      <Menu
+        ariaLabel={props.label}
+        trigger={({ open, toggle }) => (
+          <IconButton
+            icon="grip-vertical"
+            label={props.label}
+            tip="Drag to reorder"
+            tipSub="Or open the menu to move up or down."
+            tipKey="Alt+↑/↓"
+            disabled={props.busy || (props.edges.first && props.edges.last)}
+            opens="menu"
+            expanded={open()}
+            onPress={() => {
+              if (!props.consumeClick()) toggle()
+            }}
+          />
+        )}
+      >
+        {(menu) => (
+          <>
+            <Menu.Item context={menu} disabled={props.busy || props.edges.first} onSelect={() => props.shift(-1)}>
+              Move up
+            </Menu.Item>
+            <Menu.Item context={menu} disabled={props.busy || props.edges.last} onSelect={() => props.shift(1)}>
+              Move down
+            </Menu.Item>
+          </>
+        )}
+      </Menu>
+    </span>
   )
 }

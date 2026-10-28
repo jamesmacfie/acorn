@@ -15,6 +15,9 @@ export const INTENTS = [
   'expand',
   'collapse',
   'activate',
+  // Move the active row of a reorderable list one place, as dragging it would.
+  'moveUp',
+  'moveDown',
   'dismiss',
   'commit',
   'maximize',

@@ -2400,6 +2400,17 @@ a.ui-row:hover { background: var(--bg-hover); }
    rows are absolutely placed, which is the only geometry a virtualiser can produce. */
 .ui-rows-scroll { flex: 1; min-height: 0; overflow: auto; }
 
+/* A reorderable `Rows`: each row with its grip beside it, and the drag's marker on the row it would
+   land before or after. The project table's drag, drawn the same way (features/workspaces/projects.css). */
+.ui-rows-reorder { display: flex; align-items: center; }
+.ui-rows-reorder > .ui-row { flex: 1; min-width: 0; }
+.ui-rows-grip { display: inline-flex; flex: none; min-width: var(--row-h-sm); justify-content: center; touch-action: none; }
+.ui-rows-grip .ui-btn { cursor: grab; }
+.ui-rows-grip .ui-btn:disabled { cursor: default; }
+.ui-rows-reorder[data-dragging] { opacity: 0.5; }
+.ui-rows-reorder[data-drop-position='before'] { box-shadow: inset 0 var(--bw-strong) 0 var(--accent); }
+.ui-rows-reorder[data-drop-position='after'] { box-shadow: inset 0 calc(-1 * var(--bw-strong)) 0 var(--accent); }
+
 /* The kit Picker (kit/components/inputs/Picker.tsx): a button that opens a searchable popover. Here,
    with the other kit primitives, so a surface that loads only the kit's sheets, such as the browser
    extension, draws it too. */

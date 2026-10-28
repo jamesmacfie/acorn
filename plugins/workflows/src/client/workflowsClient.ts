@@ -262,6 +262,9 @@ function workflowApiAt(nodeId?: string | null) {
     updateDef: (id: string, def: unknown, revision: number) =>
       post<WorkflowDefRow>(workflowDefRoute(id), { def, revision }, 'PUT'),
     deleteDef: (id: string) => writeJson<{ ok: boolean }>(workflowDefRoute(id), { method: 'DELETE' }),
+    // Every id the rail shows, top first. The Node replaces the workspace's saved order with it.
+    defsOrder: (workspaceId: string, ids: string[]) =>
+      post<{ ok: boolean }>(`${workflowDefsRoute}/order`, { workspaceId, ids }, 'PUT'),
     validateDef: (def: unknown, projectId?: string) =>
       post<{ problems: string[] }>(workflowDefValidateRoute, { def, projectId }),
     authoringTurn: (request: AuthoringTurnRequest, signal: AbortSignal) =>
