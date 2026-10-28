@@ -28,6 +28,12 @@ describe('sanitizeAnnotationMark', () => {
       })
   })
 
+  it('keeps a busy flag only when it is true', () => {
+    expect(sanitizeAnnotationMark({ ...mark, busy: true }, 'node-a')).toEqual({ ...mark, busy: true })
+    expect(sanitizeAnnotationMark({ ...mark, busy: 'yes' }, 'node-a')).toEqual(mark)
+    expect(sanitizeAnnotationMark({ ...mark, busy: false }, 'node-a')).toEqual(mark)
+  })
+
   it('keeps detail at exactly the cap', () => {
     const value = 'a'.repeat(MAX_ANNOTATION_DETAIL_BYTES)
     expect(sanitizeAnnotationMark({ ...mark, detail: { kind: 'plaintext', value } }, 'node-a')?.detail?.value).toBe(

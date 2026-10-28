@@ -56,6 +56,7 @@ export const annotationRailMarkers = (marks: readonly StampedMark[]): RailMarker
     // no icon still gets a dot, so a mark is never invisible.
     ...(mark.icon ? { icon: mark.icon } : { dotTone: DOT[mark.severity] }),
     tone: TONE[mark.severity],
+    ...(mark.busy ? { busy: true } : {}),
     placements: RAIL_MARKER_CORNERS,
   }))
 

@@ -22,7 +22,7 @@ const registered: Disposable[] = []
 
 const contributor = (
   pluginId: string,
-  marks: { key: { task: string }; severity: 'info' | 'warn' | 'danger'; text: string; icon?: string }[],
+  marks: { key: { task: string }; severity: 'info' | 'warn' | 'danger'; text: string; icon?: string; busy?: boolean }[],
 ) => {
   registered.push(
     extensionRegistry.register({
@@ -68,6 +68,15 @@ describe('core:task', () => {
     await vi.waitFor(() => expect(markersFor({ kind: 'task', id: 't1' })).toHaveLength(1))
     expect(markersFor({ kind: 'task', id: 't1' })[0]).toMatchObject({ dotTone: 'warn' })
     expect(markersFor({ kind: 'task', id: 't1' })[0]!.icon).toBeUndefined()
+  })
+
+  it('spins a busy mark’s icon', async () => {
+    contributor('stack', [
+      { key: { task: 't1' }, severity: 'info', text: 'Starting', icon: 'loader-circle', busy: true },
+    ])
+    requestTaskAnnotations(['t1'])
+    await vi.waitFor(() => expect(markersFor({ kind: 'task', id: 't1' })).toHaveLength(1))
+    expect(markersFor({ kind: 'task', id: 't1' })[0]).toMatchObject({ icon: 'loader-circle', busy: true })
   })
 
   it('says nothing about a source or a pane, and nothing about a task nobody marked', async () => {

@@ -81,10 +81,10 @@ POST /v1/p/coverage/lines  { "keys": [{ "file": "src/auth.ts", "line": 42, "side
 → { "items": [{ "key": {…}, "severity": "info" | "warn" | "danger", "text": "Not covered by any test", "icon": "shield-off" }] }
 ```
 
-A mark holds scalar key fields, one of three severities, up to 200 characters of text, and an
-optional host-resolved icon. It holds no CSS, geometry, color, or action. The host builds the lookup
-from the owner's declared fields in the owner's order, so a contributor can't widen its match by
-inventing a field. The host stamps provenance on every mark.
+A mark holds scalar key fields, one of three severities, up to 200 characters of text, an
+optional host-resolved icon, and an optional `busy: true` for work in progress. It holds no CSS,
+geometry, color, or action. The host builds the lookup from the owner's declared fields in the
+owner's order, so a contributor can't widen its match by inventing a field. The host stamps provenance on every mark.
 
 A mark may also carry `detail`, `{ "kind": "markdown" | "plaintext", "value": "…" }`, for an owner to
 show on demand, such as in a tooltip. The host keeps it only for a point that sets `acceptsDetail`, and
@@ -125,8 +125,9 @@ has a complete example.
 
 `core:task` accepts at most 256 valid marks from one contributor per request. The desktop turns
 accepted marks into rail markers: severity chooses the tone, the optional icon is resolved by the
-host, and a missing icon becomes a status dot. The desktop still has only four corners, and every mark
-stays in the ordered tooltip legend and the accessible description. The terminal uses the same
+host, and a missing icon becomes a status dot. A `busy` mark spins its icon or pulses its dot. The
+desktop still has only four corners, and every mark stays in the ordered tooltip legend and the
+accessible description. The terminal uses the same
 legend ([rail controls and status markers](../ui-design/shell-hierarchy.md#rail-controls),
 [task markers](../tui/chrome.md#task-markers)).
 

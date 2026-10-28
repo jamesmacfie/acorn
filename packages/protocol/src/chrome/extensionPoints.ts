@@ -190,6 +190,8 @@ export type PluginAnnotationMark = {
   text: string
   // A Lucide name or a `brand:` mark, resolved client-side.
   icon?: string
+  /** Work in progress: a rail draws the icon spinning, or the dot pulsing. Other owners ignore it. */
+  busy?: boolean
   /** Longer content the owner may show on demand, such as in a tooltip. Kept only for a point that
    *  sets `acceptsDetail`, so a batch of thousands of diff-line marks never carries it. */
   detail?: AnnotationDetail

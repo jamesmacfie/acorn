@@ -45,6 +45,7 @@ export function sanitizeAnnotationMark(row: unknown, nodeId: string): PluginAnno
     // pane of its own.
     text: mark.text.slice(0, 200),
     ...(str(mark.icon) ? { icon: mark.icon } : {}),
+    ...(mark.busy === true ? { busy: true } : {}),
     ...(detail ? { detail } : {}),
   }
 }
