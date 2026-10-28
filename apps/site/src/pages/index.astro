@@ -1,12 +1,14 @@
 ---
-// The landing page, told in four chapters: the loop a task goes through, the window it happens in, the
-// plugins that window is made of, and what acorn keeps safe. Every claim links to the docs page that
-// owns it, and every picture is a specimen or a shell snapshot.
-import { Code } from '@astrojs/starlight/components'
-import Card from '../components/Card.astro'
+// The landing page, one idea a screen: what a task is, the panes it opens, the plugins they're made of,
+// answering agents from the browser and the phone, Nodes on other machines, and what acorn keeps from its
+// agents. Every claim links to the page that owns it. Every picture is a capture of acorn, or a drawing
+// made from the site fixture's facts.
+import Badge from '../components/Badge.astro'
 import Hero from '../components/Hero.astro'
 import InstallBlock from '../components/InstallBlock.astro'
+import SidebarPicture from '../components/SidebarPicture.astro'
 import Snapshot from '../components/Snapshot.astro'
+import SnapshotFrame from '../components/SnapshotFrame.astro'
 import SoftwareApplication from '../components/SoftwareApplication.astro'
 import Specimen from '../components/Specimen.astro'
 import Tour from '../components/Tour.astro'
@@ -22,7 +24,7 @@ import type { SnapshotId } from '../snapshots'
 
 export const meta = {
   description:
-    'A workspace for working with coding agents, one task at a time. Each task gets a branch, a Git worktree, terminals, and Claude Code and Codex sessions, in the desktop app or the terminal.',
+    'Run Claude Code and Codex in tasks, each on its own branch and worktree, and answer them from the desktop app, the terminal, the browser, or your phone.',
   sources: [
     'docs/features.md',
     'docs/workspaces-and-tasks.md',
@@ -35,53 +37,76 @@ export const meta = {
     'docs/extensibility.md',
     'docs/first-party-plugins.md',
     'docs/plugins/agent-install.md',
+    'docs/agent-tools/plugin-tools.md',
     'docs/workflows.md',
     'docs/browser-extension.md',
+    'docs/browser-extension/task-pages.md',
+    'docs/mobile.md',
+    'docs/mobile/phone-setup.md',
+    'docs/relay.md',
+    'docs/authentication.md',
+    'docs/node-distribution.md',
+    'docs/architecture/fleet.md',
+    'docs/cli/local-service.md',
+    'docs/security.md',
     'docs/security/credentials.md',
-    'docs/security/audit.md',
     'docs/security/plugin-bundles.md',
     'docs/telemetry.md',
-    'docs/node-distribution.md',
-    'docs/local-development.md',
-    'docs/agent-tools/plugin-tools.md',
-    'packages/create-acorn-plugin/index.mjs',
+    'apps/cli/src/output.ts',
     'apps/site/src/data/plugins.ts',
   ],
-  checked: '9aaaaf7d3',
+  checked: '5793babb4',
 } satisfies PageMeta
+
+// The site fixture's three tasks on billing-api, each on its own branch, with the agent working in it and
+// what that agent waits on. The phone's Needs you below lists the same three.
+const lanes = [
+  {
+    branch: 'retry-failed-webhooks',
+    title: 'Retry failed webhooks',
+    agent: 'Claude Code',
+    state: 'Finished its turn',
+    tone: 'neutral',
+  },
+  { branch: 'add-eu-vat', title: 'Add VAT to EU invoices', agent: 'Codex', state: 'Wants permission', tone: 'warn' },
+  {
+    branch: 'speed-up-the-overdue-invoices-query',
+    title: 'Speed up the overdue invoices query',
+    agent: 'Claude Code',
+    state: 'Asked a question',
+    tone: 'warn',
+  },
+] as const
 
 const steps = [
   {
     title: 'Open a task',
-    text: 'A task is one piece of work on one project. Give it a title, and acorn names a branch after it and creates its Git worktree the first time something needs the files.',
-    specimen: 'task-rows',
+    text: 'Give it a title. acorn names a branch after it and makes the worktree when something needs the files.',
     href: '/docs/using/tasks-and-worktrees/',
     link: 'Tasks and worktrees',
   },
   {
     title: 'Run agents in it',
-    text: 'Start Claude Code and Codex sessions in the task and answer their permission requests as they come. Queue the next turn while one runs, or delegate work to a session of its own.',
-    specimen: 'agent-turn',
+    text: 'Start Claude Code and Codex in the task, and answer their permission requests as they come.',
     href: '/docs/agents/agent-sessions/',
     link: 'Agent sessions',
   },
   {
     title: 'Review and ship',
-    text: 'Read the diff, open the pull request, and merge it without leaving the task. Archive the task and acorn stops its agents and terminals and removes its worktree, mess and all.',
-    specimen: 'ship',
+    text: 'Merge the pull request from the task. Archiving it stops its agents and removes the worktree, mess and all.',
     href: '/docs/using/archive-and-restore/',
     link: 'Archive and restore',
   },
 ]
 
-// One tab per feature group, in features.ts's order, leaving out the groups the chapters below cover:
-// the two clients, plugins, and Nodes.
+// One tab per feature group, in features.ts's order, leaving out what the chapters below cover: plugins,
+// the browser, Nodes, and security.
 const tour: { id: string; label: string; snapshot: SnapshotId; text: string; href: string; link: string }[] = [
   {
     id: 'tasks',
     label: 'Tasks',
     snapshot: 'palette',
-    text: 'A task holds a branch, a worktree, terminals, agent sessions, and a linked pull request or issue. Start one from GitHub, Linear, Rollbar, or the New task dialog, and press ⌘K for the command palette over it.',
+    text: 'Start a task from a pull request, a Linear issue, a Rollbar error, or the New task dialog. Press ⌘K for the command palette over it.',
     href: '/features/tasks/',
     link: 'More about tasks',
   },
@@ -89,7 +114,7 @@ const tour: { id: string; label: string; snapshot: SnapshotId; text: string; hre
     id: 'agents',
     label: 'Agents',
     snapshot: 'context',
-    text: "Claude Code and Codex run as managed sessions in the task's worktree, each with its transcript, usage, and requests. The Context pane is where you choose what the task tells them, and see how big it is.",
+    text: "Claude Code and Codex run as managed sessions in the task's worktree. The Context pane is where you choose what the task tells them.",
     href: '/features/agents/',
     link: 'More about agents',
   },
@@ -97,7 +122,7 @@ const tour: { id: string; label: string; snapshot: SnapshotId; text: string; hre
     id: 'review',
     label: 'Review',
     snapshot: 'review',
-    text: "The pull request pane has the checks, comments, review threads, and a diff in unified or split view with inline threads. Merge from the same pane, and the task's Changes tab commits and pushes.",
+    text: 'The pull request pane has the checks, the review threads, and the diff, unified or split. Merge from the same pane.',
     href: '/features/review/',
     link: 'More about review',
   },
@@ -105,17 +130,9 @@ const tour: { id: string; label: string; snapshot: SnapshotId; text: string; hre
     id: 'task-tools',
     label: 'Task tools',
     snapshot: 'database',
-    text: "Each task has panes for the tools you'd otherwise open beside it: an editor with ripgrep search, a PostgreSQL client, an HTTP client, Docker containers, and a browser preview. Connect Linear and Rollbar to bring their issues in too.",
+    text: 'An editor with ripgrep search, a PostgreSQL client, an HTTP client, Docker, and a browser preview, each a pane of the task.',
     href: '/features/task-tools/',
     link: 'More about task tools',
-  },
-  {
-    id: 'browser',
-    label: 'Browser',
-    snapshot: 'browser',
-    text: "The Chrome and Firefox extension shows the task behind the page you're on, and sends pages, selections, and screenshots to an agent.",
-    href: '/features/browser/',
-    link: 'More about the browser extension',
   },
   {
     id: 'automation',
@@ -129,60 +146,93 @@ const tour: { id: string; label: string; snapshot: SnapshotId; text: string; hre
 
 const plugins = Object.values(PLUGINS).sort((a, b) => a.name.localeCompare(b.name))
 
-// The command that scaffolds a plugin named Hello, and the pane entry it writes
-// (packages/create-acorn-plugin/index.mjs). The specimen beside them is the pane it draws.
-const scaffold = [{ label: 'Terminal', commands: ['npm create acorn-plugin hello-pane'] }]
-const paneEntry = `"frames": [{
-  "target": "pane",
-  "id": "hello",
-  "label": "Hello",
-  "glyph": "puzzle",
-  "order": 800,
-  "layout": "single",
-  "regions": {
-    "body": { "kind": "remote", "entry": "pane" }
-  }
-}]`
-
-// What a plugin can add, by where it shows up. Each is a guide's own title.
-const canAdd = [
+// The phone's two pictures, each captured in Catppuccin Latte and Mocha so it follows the page's light
+// and dark switch as the HTML pictures do.
+// shortcut: these are screenshots taken by hand from the site fixture on a throwaway Node, through a
+// stand-in account service and relay (docs/site/snapshots.md § The phone pictures), and nothing checks
+// them against the code. Add a phone scene to scripts/capture-shell.mjs when they need a refresh.
+const phone = [
   {
-    label: 'In the window',
-    guides: [
-      ['/docs/build-plugins/ui/add-a-pane/', 'Add a pane'],
-      ['/docs/build-plugins/ui/add-a-source-to-the-left-rail/', 'Add a source to the left rail'],
-      ['/docs/build-plugins/ui/add-commands-and-keybindings/', 'Add commands and keybindings'],
-      ['/docs/build-plugins/ui/add-a-settings-page/', 'Add a settings page'],
-      ['/docs/build-plugins/ui/put-a-badge-in-the-top-bar-or-task-footer/', 'Put a badge in the top bar or task footer'],
-      ['/docs/build-plugins/ui/add-to-another-plugins-view/', "Add to another plugin's view"],
-      ['/docs/build-plugins/ui/replace-the-top-bar-rail-or-pane-switcher/', 'Replace the top bar, rail, or pane switcher'],
-      ['/docs/build-plugins/ui/add-a-theme-or-a-style-pack/', 'Add a theme or a style pack'],
-      ['/docs/build-plugins/ui/draw-your-own-pixels-in-a-frame/', 'Draw your own pixels in a frame'],
-    ],
+    id: 'phone-waiting',
+    label: 'Needs you',
+    file: 'tasks',
+    title: 'Fernwood',
+    caption: "The workspace's tasks on a phone, under the three agents waiting on you.",
+    alt: "Needs you lists three agents: one wants permission, one asked a question, and one finished its turn. The workspace's three tasks follow.",
   },
   {
-    label: 'On the Node',
-    guides: [
-      ['/docs/build-plugins/node/give-agents-tools/', 'Give agents tools'],
-      ['/docs/build-plugins/node/add-task-context/', 'Add task context'],
-      ['/docs/build-plugins/node/act-on-agent-turns-with-hooks/', 'Act on agent turns with hooks'],
-      ['/docs/build-plugins/node/add-a-harness/', 'Add a harness'],
-      ['/docs/build-plugins/node/ship-custom-agents-and-skills/', 'Ship custom agents and skills'],
-      ['/docs/build-plugins/node/add-a-workflow-step/', 'Add a workflow step'],
-      ['/docs/build-plugins/node/run-work-on-a-schedule/', 'Run work on a schedule'],
-      ['/docs/build-plugins/node/connect-a-service/', 'Connect a service'],
-      ['/docs/build-plugins/node/add-a-command-line-command/', 'Add a command-line command'],
-    ],
+    id: 'phone-agent',
+    label: 'The agent',
+    file: 'agent',
+    title: 'Retry failed webhooks',
+    caption: "The webhooks task's agent on a phone, with the task's panes along the bottom.",
+    alt: "The agent's last answer in the Retry failed webhooks task, the message box under it, and a bar of the task's panes: Agent, Git, Notes, Context, Editor, and Terminal.",
   },
 ]
 
-const trust = [
-  ['/docs/security/the-trust-model/', 'Agents get a scoped token', 'An agent gets a token that reaches only its own task. acorn never puts your GitHub token or API keys in its environment.'],
-  ['/docs/security/credentials-and-secrets/', 'Credentials are encrypted', 'Stored credentials are encrypted at rest and never returned by the Node. Backups leave them out.'],
-  ['/docs/security/plugin-trust-and-permissions/', 'Plugins are sandboxed', 'An installed plugin draws from a sandbox and gets only the permissions you accept, on each device.'],
-  ['/docs/security/telemetry-and-privacy/', 'Telemetry is off', 'Telemetry is off by default. Nothing leaves the machine unless you turn it on and add a destination.'],
-  ['/docs/nodes/run-a-standalone-node/', 'Run it on a server', 'The desktop app runs a Node on your computer. Pair a standalone Node on a server and use it from either client or the command line.'],
-  [GITHUB, 'Open source', 'The code is on GitHub under the MIT license.'],
+// What `acorn node reach` and `acorn node pair` print on a server (apps/cli/src/output.ts), with a
+// documentation address, and the identity words and the code of a throwaway Node.
+const pairing = `$ acorn node reach build-box.local
+Connect to    https://build-box.local:4317
+Set by        node.json
+Addresses     192.0.2.10 (eth0)
+
+The Node restarted to apply the change.
+
+$ acorn node pair
+Connect to    https://build-box.local:4317
+Identity      helmet amber finch hedge forge bell
+Pairing code  ruBm8AwlUnz0hOUn4sLDwg   (valid 10 minutes)
+
+On the other machine, open Settings → Nodes, add a node, and check that the identity words match.`
+
+// Who can reach what on a Node (docs/security/the-trust-model): the tiles a Node holds, and each caller's
+// reach into them. The agent is the one working in the first task.
+const tiles = [
+  { id: 'webhooks', name: 'Retry failed webhooks', detail: 'Its worktree, terminals, and agents' },
+  { id: 'vat', name: 'Add VAT to EU invoices', detail: 'Its worktree, terminals, and agents' },
+  { id: 'query', name: 'Speed up the overdue invoices query', detail: 'Its worktree, terminals, and agents' },
+  { id: 'keys', name: 'Stored keys', detail: 'Your GitHub token and API keys' },
+  { id: 'admin', name: 'Devices and plugins', detail: 'Pairing, installs, and the audit log' },
+] as const
+type Reach = 'yes' | 'no' | 'write'
+const REACH: Record<Reach, { words: string; icon: string }> = {
+  yes: { words: 'Reaches', icon: 'check' },
+  no: { words: 'Out of reach', icon: 'lock' },
+  write: { words: 'Write-only', icon: 'key-round' },
+}
+const callers: {
+  id: string
+  label: string
+  text: string
+  href: string
+  link: string
+  reach: Record<(typeof tiles)[number]['id'], Reach>
+}[] = [
+  {
+    id: 'reach-you',
+    label: 'You',
+    text: 'A paired device has full owner access to its Node. The Node encrypts stored keys and never sends one back, even to you.',
+    href: '/docs/security/the-trust-model/',
+    link: 'The trust model',
+    reach: { webhooks: 'yes', vat: 'yes', query: 'yes', keys: 'write', admin: 'yes' },
+  },
+  {
+    id: 'reach-agent',
+    label: 'An agent',
+    text: 'Its token names one task, so the Node refuses its calls to any other, and it starts with none of your keys in its environment. Its shell still runs as you.',
+    href: '/docs/security/what-acorn-doesnt-protect-against/',
+    link: "What acorn doesn't protect against",
+    reach: { webhooks: 'yes', vat: 'no', query: 'no', keys: 'no', admin: 'no' },
+  },
+  {
+    id: 'reach-relay',
+    label: 'The relay',
+    text: "With remote access on, a phone's traffic goes through a relay that forwards bytes it can't read. Neither the relay nor the account service can approve a new device.",
+    href: '/docs/built-in-plugins/account/#turn-on-remote-access',
+    link: 'Remote access',
+    reach: { webhooks: 'no', vat: 'no', query: 'no', keys: 'no', admin: 'no' },
+  },
 ]
 
 const faq = [
@@ -194,39 +244,38 @@ const faq = [
   },
   {
     question: 'Do I need an API key?',
-    answer: 'Not for agents. acorn runs Claude Code and Codex, and each signs in with its own login. An API key is optional, for features such as SQL generation.',
+    answer:
+      'Not for agents. acorn runs Claude Code and Codex, and each signs in with its own login. An API key is optional, for features such as SQL generation.',
     href: '/docs/agents/model-providers-and-generating-text/',
     link: 'Model providers and generating text',
   },
   {
     question: 'Does my code leave my machine?',
-    answer: 'Your code stays on the machine that runs the Node. acorn talks to the services you connect, such as GitHub, and your agents talk to their own providers. Telemetry is off by default.',
+    answer:
+      'Your code stays on the machine that runs the Node. acorn talks to the services you connect, such as GitHub, and your agents talk to their own providers. Telemetry is off by default.',
     href: '/docs/security/telemetry-and-privacy/',
     link: 'Telemetry and privacy',
   },
   {
+    question: 'Does the phone app need an account?',
+    answer:
+      "Yes. A phone reaches your Node through a relay, so you sign in and turn on remote access first. Nothing else needs an account, and acorn contacts the account service only once you sign in.",
+    href: '/docs/built-in-plugins/account/',
+    link: 'Account',
+  },
+  {
     question: 'Which platforms?',
-    answer: 'The desktop app runs on macOS and Windows. The terminal client and the standalone Node run wherever Node.js runs, Linux included.',
+    answer:
+      "The desktop app runs on macOS and Windows. The terminal client and the standalone Node run wherever Node.js runs, Linux included. The phone app runs in a phone's browser.",
     href: '/docs/start/install/',
     link: 'Install',
   },
   {
     question: 'How is it different from a terminal multiplexer or an IDE?',
-    answer: 'A task owns its branch, worktree, terminals, agent sessions, and pull request, and they all sit in one window. Archiving the task stops what runs in it and removes its worktree.',
+    answer:
+      'A task owns its branch, worktree, terminals, agent sessions, and pull request, and they all sit in one window. Archiving the task stops what runs in it and removes its worktree.',
     href: '/docs/start/concepts/',
     link: 'Concepts',
-  },
-  {
-    question: 'Can a plugin break the app or read my keys?',
-    answer: "An installed plugin runs in a sandbox, draws only with acorn's components, and gets only the permissions its manifest declares and you accept on each device.",
-    href: '/docs/security/plugin-trust-and-permissions/',
-    link: 'Plugin trust and permissions',
-  },
-  {
-    question: 'Can I run it on another machine?',
-    answer: 'Yes. Run a standalone Node there, pair it, and use it from the desktop app, the terminal client, or the command line.',
-    href: '/docs/nodes/pair-a-device-or-a-remote-node/',
-    link: 'Pair a device or a remote Node',
   },
 ]
 
@@ -243,16 +292,7 @@ const nut = art.slice(4).join('\n')
 <Marketing title="A workspace for working with coding agents" meta={meta}>
   <SoftwareApplication slot="head" release={release} />
   <Hero slot="hero" title="Let your agents go nuts." highlight="go nuts." split>
-    <p>
-      acorn is a workspace for Claude Code and Codex. Each task gets its own branch, worktree, terminals, and agent
-      sessions, so your agents make their mess somewhere safe. Read the diff, merge the pull request, and archive the
-      rest.
-    </p>
-    <ul class="hero-meta">
-      <li><a href="/docs/start/install/">macOS and Windows</a></li>
-      <li><a href="/docs/start/desktop-and-terminal/">Terminal client</a></li>
-      <li><a href={`${GITHUB}/blob/main/LICENSE`}>MIT license</a></li>
-    </ul>
+    <p>Run Claude Code and Codex in tasks, each on its own branch and worktree.</p>
     <Fragment slot="actions">
       <a class="button" data-variant="primary" data-size="lg" href="/download/">{getAcorn}</a>
       <a class="button" data-size="lg" href="/docs/">Read the docs</a>
@@ -271,10 +311,30 @@ const nut = art.slice(4).join('\n')
     <header class="chapter-head">
       <h2 id="loop">Every mess gets its own branch.</h2>
       <p class="lede">
-        The usual task gets a branch and a worktree of its own, so agents on different tasks work in different checkouts
-        and don't trip over each other.
+        The usual task gets its own branch and worktree, so agents on different tasks work in different checkouts.
       </p>
     </header>
+    <figure class="lanes">
+      <p class="lanes-main"><code>main</code></p>
+      <ol>
+        {
+          lanes.map((lane) => (
+            <li class="lane">
+              <code class="lane-branch">{lane.branch}</code>
+              <span class="lane-title">{lane.title}</span>
+              <span class="lane-agent">
+                {lane.agent}
+                <Badge tone={lane.tone}>{lane.state}</Badge>
+              </span>
+            </li>
+          ))
+        }
+      </ol>
+      <figcaption class="sr-only">
+        Three tasks on the billing-api project, each on a branch off main, with the agent working in it and what
+        that agent is waiting on.
+      </figcaption>
+    </figure>
     <ol class="loop">
       {
         steps.map((step) => (
@@ -282,7 +342,6 @@ const nut = art.slice(4).join('\n')
             <h3>{step.title}</h3>
             <p>{step.text}</p>
             <a href={step.href}>{step.link}</a>
-            <Specimen id={step.specimen} />
           </li>
         ))
       }
@@ -336,68 +395,161 @@ const nut = art.slice(4).join('\n')
       </li>
     </ul>
 
-    <h3 class="build-head">Then add your own.</h3>
     <div class="build">
-      <div class="build-path">
-        <h4>Start from the scaffold</h4>
+      <div class="build-text">
+        <h3>Or ask an agent for one.</h3>
         <p>
-          <code>npm create acorn-plugin</code> writes a plugin with one pane. This is the pane's entry in its manifest,
-          beside the pane it draws in each client.{' '}
-          <a href="/docs/build-plugins/start/build-your-first-plugin/">Build your first plugin</a>
+          Tell an agent in any task what you're missing, such as a pane that lists the task's TODO comments. It reads
+          your Node's plugin reference, writes the plugin, and installs nothing until you approve it.
         </p>
-        <InstallBlock id="scaffold" methods={scaffold} />
-        <Code code={paneEntry} lang="json" title="acorn-plugin.json" />
-      </div>
-      <Specimen id="starter-pane" />
-      <div class="build-path">
-        <h4>Or ask your agent</h4>
         <p>
-          Ask an agent in any task for "a pane that lists this task's TODO comments". It reads your Node's plugin
-          vocabulary with <code>plugin_authoring</code>, writes the package, and asks to install it. Nothing installs
-          until you approve. In development mode, the Node reloads the plugin each time the agent saves.{' '}
-          <a href="/docs/build-plugins/start/have-your-agent-build-it/">Have your agent build it</a>
+          A plugin can add panes, rail sources, commands, agent tools, workflow steps, and themes. An installed one runs
+          in a sandbox, with only the permissions you accept.
         </p>
+        <ul class="actions">
+          <li><a href="/docs/build-plugins/start/have-your-agent-build-it/">Have your agent build it</a></li>
+          <li><a href="/docs/build-plugins/start/build-your-first-plugin/">Build your first plugin</a></li>
+          <li><a href="/docs/security/plugin-trust-and-permissions/">Plugin trust and permissions</a></li>
+        </ul>
       </div>
       <Specimen id="plugin-turn" />
     </div>
+  </section>
 
-    <div class="can">
-      <h4>What a plugin can add</h4>
-      {
-        canAdd.map((group) => (
-          <div class="can-group">
-            <p class="eyebrow">{group.label}</p>
-            <ul>
-              {group.guides.map(([href, title]) => (
-                <li>
-                  <a href={href}>{title}</a>
-                </li>
-              ))}
-            </ul>
+  <section class="section chapter" aria-labelledby="away">
+    <header class="chapter-head">
+      <h2 id="away">Step away from the desk.</h2>
+      <p class="lede">
+        The browser extension and the phone app open the same tasks, so you can answer an agent from wherever you are.
+      </p>
+    </header>
+    <div class="away">
+      <div class="away-item">
+        <div class="away-shot">
+          <div class="tabs segmented" role="tablist" aria-label="Browser panel" data-tabs hidden>
+            <button type="button" role="tab" aria-controls="browser-task">On the issue</button>
+            <button type="button" role="tab" aria-controls="browser-chat">In a chat</button>
           </div>
-        ))
-      }
+          <div id="browser-task" role="tabpanel" aria-label="On the issue">
+            <SidebarPicture id="sidebar-issue-task" />
+          </div>
+          <div id="browser-chat" role="tabpanel" aria-label="In a chat">
+            <SidebarPicture id="sidebar-issue-conversation" />
+          </div>
+        </div>
+        <h3>In the browser</h3>
+        <p>
+          Open the Linear issue, and the panel opens on its task: the agents, what they wait on, and a box to message
+          them. The browser never sees the Node's token.
+        </p>
+        <a href="/features/browser/">More about the browser extension</a>
+      </div>
+      <div class="away-item">
+        <div class="away-shot">
+          <div class="tabs segmented" role="tablist" aria-label="Phone screen" data-tabs hidden>
+            {
+              phone.map((screen) => (
+                <button type="button" role="tab" aria-controls={screen.id}>
+                  {screen.label}
+                </button>
+              ))
+            }
+          </div>
+          {
+            phone.map((screen) => (
+              <div id={screen.id} role="tabpanel" aria-label={screen.label}>
+                <SnapshotFrame host="phone" title={screen.title} caption={screen.caption}>
+                  <div class="phone-screen">
+                    {(['light', 'dark'] as const).map((scheme) => (
+                      <img
+                        src={`/phone/${screen.file}-${scheme}.webp`}
+                        data-scheme={scheme}
+                        width="390"
+                        height="844"
+                        alt={screen.alt}
+                        loading="lazy"
+                        decoding="async"
+                      />
+                    ))}
+                  </div>
+                </SnapshotFrame>
+              </div>
+            ))
+          }
+        </div>
+        <h3>On your phone</h3>
+        <p>
+          Turn on remote access, then pair the phone by matching three words on a device that's already paired. Needs
+          you lists every agent that's waiting on you.
+        </p>
+        <a href="/docs/built-in-plugins/account/#turn-on-remote-access">Turn on remote access</a>
+      </div>
     </div>
   </section>
 
-  <section class="section chapter" aria-labelledby="trust">
+  <section class="section chapter" aria-labelledby="nodes">
+    <header class="chapter-head">
+      <h2 id="nodes">Put the agents on a bigger machine.</h2>
+      <p class="lede">
+        The desktop app runs a Node on your computer. Run another on a server, and its agents keep working while your
+        laptop sleeps.
+      </p>
+    </header>
+    <div class="nodes">
+      <SnapshotFrame
+        host="terminal"
+        title="build-box"
+        caption="A standalone Node on a server, made reachable by its name, then opening a pairing window for a laptop."
+      >
+        <pre class="pairing">{pairing}</pre>
+      </SnapshotFrame>
+      <div class="nodes-text">
+        <dl>
+          <div>
+            <dt>Pair from any client</dt>
+            <dd>
+              Check that the six identity words match, then enter the code. The client pins the Node's certificate from
+              then on.
+            </dd>
+          </div>
+          <div>
+            <dt>Every Node in one place</dt>
+            <dd>Fleet home shows each Node you've paired, its tasks, and what waits on you there.</dd>
+          </div>
+        </dl>
+        <a href="/features/nodes/">More about Nodes</a>
+      </div>
+    </div>
+  </section>
+
+  <section class="section chapter band" aria-labelledby="trust">
     <header class="chapter-head">
       <h2 id="trust">The agents don't get your keys.</h2>
       <p class="lede">
-        Your code stays on the machine that runs the Node, and acorn limits what the agents and plugins there can reach.
+        Your code stays on the machine that runs the Node. Pick who's asking to see what each one can reach there.
       </p>
     </header>
-    <ul class="trust">
+    <Tour tabs={callers} label="Who's asking">
       {
-        trust.map(([href, title, text]) => (
-          <li>
-            <Card title={title} href={href}>
-              <p>{text}</p>
-            </Card>
-          </li>
+        callers.map((caller) => (
+          <figure slot={caller.id} class="reach">
+            <figcaption class="reach-head">What {caller.label.toLowerCase()} can reach on a Node</figcaption>
+            <ul>
+              {tiles.map((tile) => (
+                <li data-reach={caller.reach[tile.id]}>
+                  <span class="reach-name">{tile.name}</span>
+                  <span class="reach-detail">{tile.detail}</span>
+                  <span class="reach-state">
+                    <span class="reach-icon" aria-hidden="true" set:html={lucideIcon(REACH[caller.reach[tile.id]].icon)} />
+                    {REACH[caller.reach[tile.id]].words}
+                  </span>
+                </li>
+              ))}
+            </ul>
+          </figure>
         ))
       }
-    </ul>
+    </Tour>
   </section>
 
   <section class="section faq" aria-labelledby="questions">
@@ -427,6 +579,11 @@ const nut = art.slice(4).join('\n')
         <a class="button" data-variant="primary" data-size="lg" href="/download/">{getAcorn}</a>
         <a class="button" data-size="lg" href="/docs/">Read the docs</a>
       </div>
+      <ul class="finale-meta">
+        <li><a href="/docs/start/install/">macOS and Windows</a></li>
+        <li><a href="/docs/start/desktop-and-terminal/">Terminal client</a></li>
+        <li><a href={`${GITHUB}/blob/main/LICENSE`}>MIT license</a></li>
+      </ul>
     </div>
     <pre class="finale-art" aria-hidden="true"><span class="cap">{cap}</span>{'\n'}{nut}</pre>
   </section>
@@ -437,18 +594,6 @@ const nut = art.slice(4).join('\n')
 </script>
 
 <style>
-  /* ── Hero ──
-     Where acorn runs and its license: a row of three links, which wraps on a phone. */
-  .hero-meta {
-    display: flex;
-    flex-wrap: wrap;
-    gap: var(--space-3) var(--space-9);
-    margin: 0;
-    padding: 0;
-    list-style: none;
-    font-family: var(--font-mono);
-    font-size: var(--fs-sm);
-  }
   .hero-shot {
     display: grid;
     gap: var(--space-10);
@@ -459,8 +604,8 @@ const nut = art.slice(4).join('\n')
   }
 
   /* ── Chapters ──
-     Each of the four opens with a display heading and a lede. There's no label above the heading,
-     because a caps label over every heading is a mark of a generated page. */
+     Each opens with a display heading and a lede. There's no label above the heading, because a caps
+     label over every heading is a mark of a generated page. */
   .chapter-head {
     display: grid;
     gap: var(--space-8);
@@ -478,14 +623,12 @@ const nut = art.slice(4).join('\n')
     /* Mono at display size reads loose, as the hero's headline does. */
     letter-spacing: -0.04em;
     line-height: 1.02;
+    overflow-wrap: break-word;
+    min-inline-size: 0;
   }
   .chapter h3 {
     margin: 0;
     font-size: var(--fs-xl);
-  }
-  .chapter h4 {
-    margin: 0;
-    font-size: var(--fs-lg);
   }
 
   /* A chapter on its own band runs the subtle background to the window's edges, as the stage does. */
@@ -496,32 +639,138 @@ const nut = art.slice(4).join('\n')
     border-image: conic-gradient(var(--bg-subtle) 0 0) fill 0 / / 0 100vmax;
   }
 
+  /* ── The lanes ──
+     main down the left, and a branch off it for each task, as `git log --graph` draws one turned on its
+     side: each lane's rule leaves the trunk in a curve and ends at its branch's head. The rules only
+     draw the shape. The words carry it, so the trunk is a grey rule and each head a brass dot. */
+  .lanes {
+    --trunk: 0.375rem;
+    --elbow: clamp(2.5rem, 1rem + 4vw, 5rem);
+    --head: 0.75rem;
+    margin: 0;
+    font-family: var(--font-mono);
+    font-size: var(--fs-lg);
+  }
+  .lanes-main {
+    display: flex;
+    align-items: center;
+    gap: var(--space-5);
+    margin: 0;
+    font-weight: var(--fw-bold);
+  }
+  .lanes-main code {
+    font-size: var(--site-fs-body);
+  }
+  .lanes-main::before,
+  .lane-branch::before {
+    content: '';
+    flex: none;
+    inline-size: var(--head);
+    block-size: var(--head);
+    border: var(--bw-strong) solid var(--accent);
+    border-radius: 50%;
+  }
+  .lanes-main::before {
+    margin-inline-start: calc(var(--trunk) - var(--head) / 2 + var(--bw-strong) / 2);
+    background: var(--bg);
+  }
+  .lanes ol {
+    margin: 0;
+    padding: 0;
+    list-style: none;
+  }
+  /* A hairline under each lane, from its branch's head to the edge, so the row reads across. */
+  .lane {
+    position: relative;
+    display: grid;
+    grid-template-columns: minmax(0, 1.3fr) minmax(0, 1.2fr) minmax(0, 1fr);
+    align-items: center;
+    gap: var(--space-3) var(--space-11);
+    min-block-size: 5rem;
+    padding-inline-start: calc(var(--trunk) + var(--elbow));
+    background: linear-gradient(var(--border), var(--border)) no-repeat right bottom /
+      calc(100% - var(--trunk) - var(--elbow)) var(--bw);
+  }
+  .lane > * {
+    min-inline-size: 0;
+  }
+  /* The trunk past this lane, and this lane's curve off it. */
+  .lane::before,
+  .lane:not(:last-child)::after {
+    content: '';
+    position: absolute;
+    inset-inline-start: var(--trunk);
+    border-inline-start: var(--bw-strong) solid var(--border-strong);
+  }
+  .lane::before {
+    inset-block: 0 50%;
+    inline-size: calc(var(--elbow) - var(--head) / 2);
+    border-block-end: var(--bw-strong) solid var(--border-strong);
+    border-end-start-radius: var(--radius-xl);
+  }
+  .lane:not(:last-child)::after {
+    inset-block: 0;
+  }
+  .lane-branch {
+    display: flex;
+    align-items: center;
+    gap: var(--space-5);
+    margin-inline-start: calc(-1 * var(--head) / 2);
+    font-size: var(--site-fs-body);
+    font-weight: var(--fw-bold);
+    overflow-wrap: anywhere;
+  }
+  .lane-branch::before {
+    background: var(--accent);
+  }
+  .lane-title,
+  .lane-agent {
+    font-size: var(--fs-lg);
+  }
+  .lane-agent {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--space-4) var(--space-8);
+  }
+  /* Stacked, a lane's curve meets its branch's name on the first line, not the middle of the lane. */
+  @media (max-width: 63.99rem) {
+    .lane {
+      grid-template-columns: minmax(0, 1fr);
+      padding-block: var(--space-8);
+    }
+    .lane::before {
+      inset-block-end: auto;
+      block-size: calc(var(--space-8) + 1rem);
+    }
+    .lane-agent {
+      justify-content: start;
+    }
+  }
+
   /* ── The loop ──
      The three steps side by side on a wide screen, each under a length of track. The accent fills the
      track left to right as the steps scroll through the window: one task moving from open to merged. */
   .loop {
     display: grid;
-    gap: var(--site-section) var(--space-11);
-    margin: 0;
+    gap: var(--space-11);
+    margin: var(--space-11) 0 0;
     padding: 0;
     list-style: none;
   }
   .loop > li {
     position: relative;
     display: grid;
-    gap: var(--space-6);
+    gap: var(--space-5);
     align-content: start;
     justify-items: start;
-    padding-block-start: var(--space-10);
+    padding-block-start: var(--space-9);
     view-timeline-name: --step;
   }
   .loop > li > * {
     margin: 0;
     min-inline-size: 0;
-  }
-  .loop > li > :global(.specimen) {
-    justify-self: stretch;
-    margin-block-start: var(--space-6);
   }
   .loop > li::before,
   .loop > li::after {
@@ -534,26 +783,16 @@ const nut = art.slice(4).join('\n')
     border-color: var(--accent);
     transform-origin: left;
   }
-  /* Side by side, the steps share their rows, so the titles, the links, and the frames line up across
-     them, and each frame fills its row. The steps carry no numbers, because the list and the
-     track already give the order. */
+  /* Side by side, the steps share their rows, so the titles and the links line up across them. The
+     steps carry no numbers, because the list and the track already give the order. */
   @media (min-width: 64rem) {
     .loop {
       grid-template-columns: repeat(3, minmax(0, 1fr));
-      row-gap: var(--space-6);
+      row-gap: var(--space-5);
     }
     .loop > li {
-      grid-row: span 4;
+      grid-row: span 3;
       grid-template-rows: subgrid;
-      row-gap: var(--space-6);
-    }
-    .loop > li > :global(.specimen) {
-      display: flex;
-      flex-direction: column;
-      align-self: stretch;
-    }
-    .loop > li > :global(.specimen .views) {
-      flex: 1;
     }
   }
   @media (prefers-reduced-motion: no-preference) {
@@ -573,6 +812,13 @@ const nut = art.slice(4).join('\n')
       }
       .loop > li:nth-child(3)::after {
         animation-range: cover 35vh cover 65vh;
+      }
+      /* The lanes and this page's other new blocks rise in as they scroll into view, as the chapter heads
+         do (src/styles/site.css). */
+      :is(.lane, .away-item, .nodes > *) {
+        animation: site-enter linear both;
+        animation-timeline: view();
+        animation-range: entry 0% entry 30%;
       }
     }
   }
@@ -673,9 +919,9 @@ const nut = art.slice(4).join('\n')
   }
   /* A hairline grid: each cell draws its own end and bottom rules and the list draws the first ones, so
      a short last row just stops. */
-  .wall,
-  .trust {
+  .wall {
     display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(min(10rem, 50%), 1fr));
     max-inline-size: none;
     margin: 0;
     padding: 0;
@@ -683,22 +929,16 @@ const nut = art.slice(4).join('\n')
     border-block-start: var(--divider);
     border-inline-start: var(--divider);
   }
-  .wall > li,
-  .trust > li {
-    position: relative;
-    border-inline-end: var(--divider);
-    border-block-end: var(--divider);
-  }
-  .wall {
-    grid-template-columns: repeat(auto-fill, minmax(min(10rem, 50%), 1fr));
-  }
   .wall > li {
+    position: relative;
     display: flex;
     align-items: center;
     gap: var(--space-5);
     padding: var(--space-6) var(--space-7);
     font-size: var(--fs);
     line-height: var(--lh-tight);
+    border-inline-end: var(--divider);
+    border-block-end: var(--divider);
   }
   .wall a {
     text-decoration: none;
@@ -710,9 +950,7 @@ const nut = art.slice(4).join('\n')
     inset: 0;
   }
   .wall > li:hover,
-  .wall > li:has(a:focus-visible),
-  .trust > li:hover,
-  .trust > li:has(a:focus-visible) {
+  .wall > li:has(a:focus-visible) {
     background: var(--bg);
     box-shadow: inset var(--stripe-w) 0 var(--accent);
   }
@@ -735,36 +973,31 @@ const nut = art.slice(4).join('\n')
     outline-offset: calc(-1 * var(--bw-strong));
   }
 
-  /* A break inside the chapter, smaller than the one between chapters. Set here, because `.chapter h3`
-     zeroes a heading's margin. */
-  .chapter h3.build-head {
-    margin-block-start: calc(2 * var(--space-11));
-    font-size: var(--site-fs-h2);
-  }
-  /* Two rows, each with its words on the left and the picture they describe beside them, both starting
-     on the same line. */
+  /* Asking an agent for a plugin: the words beside the agent's turn that wrote one, both starting on the
+     same line. */
   .build {
     display: grid;
-    gap: calc(2 * var(--space-11));
+    gap: var(--space-11) calc(2 * var(--space-11));
     align-items: start;
+    margin-block-start: calc(2 * var(--space-11));
   }
   .build > * {
     min-inline-size: 0;
   }
-  .build-path {
+  .build-text {
     display: grid;
     gap: var(--space-8);
-    min-inline-size: 0;
+    justify-items: start;
   }
-  .build-path > * {
+  .build-text > * {
     margin: 0;
-    min-inline-size: 0;
   }
-  .build-path > p {
-    max-inline-size: var(--site-measure);
+  .chapter .build-text h3 {
+    font-size: var(--site-fs-h2);
   }
-  .build-path > :global(.install) {
-    max-inline-size: none;
+  .build-text ul {
+    flex-direction: column;
+    gap: var(--space-4);
   }
   @media (min-width: 64rem) {
     .build {
@@ -772,65 +1005,239 @@ const nut = art.slice(4).join('\n')
     }
   }
 
-  .can {
+  /* ── Away from the desk ──
+     The browser panel and the phone side by side at one height, each over its own words, with a switch
+     between two of its screens. Side by side, the two share their rows, so the pictures, the headings,
+     and the links line up across them. */
+  .away {
     display: grid;
-    gap: var(--space-10);
-    padding-block-start: var(--space-11);
-    border-block-start: var(--chrome-divider);
+    gap: var(--site-section) calc(2 * var(--space-11));
   }
-  .can-group {
+  .away-item {
     display: grid;
-    gap: var(--space-6);
+    gap: var(--space-8);
+    align-content: start;
+    justify-items: center;
+    min-inline-size: 0;
   }
-  .can-group > * {
+  .away-item > * {
+    inline-size: min(100%, 26rem);
     margin: 0;
   }
-  /* Each group of guides drawn the way `tree` prints a folder: the group's name, then a branch per
-     guide. The branches are drawing, so a screen reader skips them. */
-  .can ul {
+  .away-shot {
+    display: grid;
+    gap: var(--space-10);
+    align-content: start;
+    justify-items: center;
+    margin-block-end: var(--space-6);
+  }
+  .away-shot > [role='tabpanel'] {
+    inline-size: 100%;
+  }
+  /* Each frame hugs its picture: the panel at the width a browser gives it, the phone a little narrower,
+     both at one height. The panel runs to that height with its rail at the foot, as in a browser. */
+  .away-shot :global(.snapshot) {
+    max-inline-size: calc(360px + 2 * var(--bw));
+    margin-inline: auto;
+  }
+  .away-shot :global(.snapshot[data-host='phone']) {
+    max-inline-size: calc(300px + 2 * var(--bw));
+  }
+  .away-shot :global(.panel .snapshot-sidebar) {
+    min-block-size: 649px;
+  }
+  /* The words under each picture say what it shows, so the frames' own captions are for screen readers,
+     as the hero's is. */
+  .away-shot :global(.frame-caption),
+  .nodes :global(.frame-caption) {
+    position: absolute;
+    inline-size: 1px;
+    block-size: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
+  }
+  .phone-screen img {
+    display: block;
+    inline-size: 100%;
+    block-size: auto;
+  }
+  /* Each screen was captured in both of the site's themes. The page's light or dark switch picks one. */
+  :global(html[data-color-scheme='dark']) .phone-screen img[data-scheme='light'],
+  :global(html:not([data-color-scheme='dark'])) .phone-screen img[data-scheme='dark'] {
+    display: none;
+  }
+  @media (min-width: 64rem) {
+    .away {
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      row-gap: var(--space-8);
+    }
+    .away-item {
+      grid-template-rows: subgrid;
+      grid-row: span 4;
+    }
+  }
+
+  /* ── Nodes ──
+     The server's terminal beside the two things it means for you, centered on each other. */
+  .nodes {
+    display: grid;
+    gap: var(--space-11) calc(2 * var(--space-11));
+    align-items: center;
+  }
+  .nodes > * {
+    min-inline-size: 0;
+  }
+  .nodes-text {
+    display: grid;
+    gap: var(--space-10);
+    justify-items: start;
+  }
+  .nodes-text > * {
+    margin: 0;
+  }
+  .nodes dl {
+    display: grid;
+    gap: var(--space-10);
+    margin: 0;
+  }
+  .nodes dl > div {
+    display: grid;
+    gap: var(--space-4);
+    padding-block-start: var(--space-8);
+    border-block-start: var(--divider);
+  }
+  .nodes dt {
+    font-family: var(--font-mono);
+    font-weight: var(--fw-bold);
+  }
+  .nodes dd {
+    max-inline-size: 48ch;
+    margin: 0;
+  }
+  .pairing {
+    margin: 0;
+    padding: var(--space-10) var(--space-11);
+    font-family: var(--font-mono);
+    font-size: var(--fs-lg);
+    line-height: 1.8;
+    white-space: pre-wrap;
+    overflow-wrap: anywhere;
+  }
+  @media (min-width: 64rem) {
+    .nodes {
+      grid-template-columns: minmax(0, 7fr) minmax(0, 5fr);
+    }
+  }
+  /* On a phone the output steps down a size, so its columns of names and values wrap less. */
+  @media (max-width: 47.99rem) {
+    .pairing {
+      padding: var(--space-8);
+      font-size: var(--fs-sm);
+    }
+  }
+
+  /* ── Reach ──
+     A Node drawn as what it holds, for whoever the tabs pick: each task, the stored keys, and the devices
+     and plugins. What the caller reaches is drawn solid in the accent, what it can't is dashed and
+     locked. The words say which, so the lines only repeat them. */
+  .reach {
+    display: grid;
+    gap: var(--space-8);
+    margin: 0;
+    padding: var(--space-9);
+    font-family: var(--font-mono);
+    background: var(--bg);
+    border: var(--surface-border);
+    border-radius: var(--site-radius-window);
+  }
+  .reach-head {
+    font-size: var(--fs-sm);
+    font-weight: var(--fw-bold);
+  }
+  .reach ul {
+    display: grid;
+    grid-template-columns: repeat(6, minmax(0, 1fr));
+    gap: var(--space-6);
     max-inline-size: none;
     margin: 0;
     padding: 0;
     list-style: none;
-    font-size: var(--fs-md);
   }
-  .can li {
+  .reach li {
+    display: grid;
+    grid-column: span 2;
+    grid-template-rows: auto auto 1fr;
+    gap: var(--space-3);
+    min-block-size: 9rem;
+    padding: var(--space-9);
+    font-size: var(--fs);
+    line-height: var(--lh);
+    border: var(--bw-strong) dashed var(--border-strong);
+    border-radius: var(--radius-lg);
+  }
+  .reach li:nth-child(n + 4) {
+    grid-column: span 3;
+    min-block-size: 7rem;
+  }
+  .reach li[data-reach='yes'] {
+    background: var(--bg-subtle);
+    border-style: solid;
+    border-color: var(--accent);
+  }
+  .reach li[data-reach='write'] {
+    border-style: solid;
+    border-color: var(--accent);
+  }
+  .reach-name {
+    font-size: var(--fs-lg);
+    font-weight: var(--fw-bold);
+  }
+  .reach-state {
     display: flex;
-    gap: var(--space-4);
-    padding-block: var(--space-2);
+    align-items: center;
+    align-self: end;
+    gap: var(--space-3);
+    font-weight: var(--fw-semibold);
   }
-  .can li::before {
-    content: '├──';
-    content: '├──' / '';
+  .reach-icon {
+    display: block;
     flex: none;
-    font-family: var(--font-mono);
-    color: var(--border-strong);
+    inline-size: 1rem;
+    block-size: 1rem;
   }
-  .can li:last-child::before {
-    content: '└──';
-    content: '└──' / '';
+  [data-reach='yes'] .reach-icon,
+  [data-reach='write'] .reach-icon {
+    color: var(--accent);
   }
-  @media (min-width: 64rem) {
-    .can {
-      grid-template-columns: 1fr 1fr;
-    }
-    .can > h4 {
-      grid-column: 1 / -1;
-    }
-  }
-
-  /* ── Trust ── */
-  .trust {
-    grid-template-columns: repeat(auto-fill, minmax(min(20rem, 100%), 1fr));
-  }
-  /* The cell marks hover, so the card inside it stays flat and still. */
-  .trust :global(.card),
-  .trust :global(.card:hover) {
+  .reach-icon :global(svg) {
+    display: block;
+    inline-size: 100%;
     block-size: 100%;
-    background: none;
-    border: 0;
-    box-shadow: none;
-    translate: none;
+  }
+  @media (max-width: 47.99rem) {
+    .reach {
+      padding: var(--space-7);
+    }
+    .reach ul {
+      grid-template-columns: minmax(0, 1fr);
+    }
+    .reach li,
+    .reach li:nth-child(n + 4) {
+      grid-column: auto;
+      min-block-size: 0;
+    }
+  }
+  /* A newly picked caller's Node fades in, so the change reads as one picture changing. */
+  @media (prefers-reduced-motion: no-preference) {
+    :global(.tour-panel:has(> .tour-picture > .reach)) {
+      transition: opacity var(--dur-med) var(--ease-out);
+    }
+    @starting-style {
+      :global(.tour-panel:has(> .tour-picture > .reach)) {
+        opacity: 0;
+      }
+    }
   }
 
   /* ── Questions ── */
@@ -919,6 +1326,16 @@ const nut = art.slice(4).join('\n')
   }
   .finale-text > :global(.install) {
     justify-self: stretch;
+  }
+  /* Where acorn runs and its license: a row of three links, which wraps on a phone. */
+  .finale-meta {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--space-3) var(--space-9);
+    padding: 0;
+    list-style: none;
+    font-family: var(--font-mono);
+    font-size: var(--fs-sm);
   }
   /* The acorn from the header, at the size of a sign. It tips its cap to whoever reaches for the main
      button. */

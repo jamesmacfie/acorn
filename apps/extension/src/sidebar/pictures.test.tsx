@@ -40,6 +40,7 @@ beforeAll(() => {
 const NOW = Date.parse('2026-01-15T12:00:00Z')
 const PULL = 'https://github.com/fernwood/billing-api/pull/128'
 const OTHER_PULL = 'https://github.com/fernwood/billing-api/pull/131'
+const ISSUE = 'https://linear.app/fernwood/issue/FER-112/retry-failed-webhooks'
 
 type Request = Record<string, unknown> & { id: string; op: string }
 
@@ -86,14 +87,18 @@ const permission: BridgeAgentRequest = {
   unsupported: null,
 }
 
-// The pull request's page belongs to the task, as GitHub's address for its pull number.
+// The pull request's page belongs to the task, as GitHub's address for its pull number, and so does
+// the Linear issue the task is linked to.
 const pageTasks: BridgePageTask[] = [
   {
     id: 't1',
     title: 'Retry failed webhooks',
     branch: 'retry-webhooks',
     projectId: 'p1',
-    pages: [{ origin: 'https://github.com', pathPrefix: '/fernwood/billing-api/pull/128', source: 'github' }],
+    pages: [
+      { origin: 'https://github.com', pathPrefix: '/fernwood/billing-api/pull/128', source: 'github' },
+      { origin: 'https://linear.app', pathPrefix: '/fernwood/issue/FER-112', source: 'linear' },
+    ],
   },
   { id: 't2', title: 'Add VAT to EU invoices', branch: 'eu-vat', projectId: 'p1', pages: [] },
 ]
@@ -317,6 +322,27 @@ describe('the sidebar pictures on the site', () => {
     await settle(20)
     expect(root.querySelector('[aria-label="Conversation"]')?.textContent).toContain('backoff loop')
     picture('sidebar-conversation', root)
+  })
+
+  it("the task on its Linear issue's page, with a request waiting", async () => {
+    const { root } = mount({ url: ISSUE, title: 'FER-112 Retry failed webhooks', paired: true, waiting: true })
+    await settle(40)
+    // The panel opens on the issue's task, with what waits on you at the head of its Agents tab.
+    expect(root.querySelector('header')?.textContent).toContain('Retry failed webhooks')
+    expect(root.querySelector('.view[aria-label="Agents"]')?.textContent).toContain('Run pnpm test webhooks')
+    picture('sidebar-issue-task', root)
+  })
+
+  it("a conversation with the task's agent from its Linear issue", async () => {
+    const { root } = mount({ url: ISSUE, title: 'FER-112 Retry failed webhooks', paired: true })
+    await settle(40)
+    await openChat(root, 'Why do retries stop?')
+    const box = root.querySelector<HTMLTextAreaElement>('textarea[name="message"]')!
+    box.value = 'The issue says the scheduler times out at 10 seconds. Does five attempts still fit?'
+    box.dispatchEvent(new Event('input', { bubbles: true }))
+    await settle(20)
+    expect(root.querySelector('[aria-label="Conversation"]')?.textContent).toContain('backoff loop')
+    picture('sidebar-issue-conversation', root)
   })
 
   it('the handoff card for a pull request no task holds', async () => {

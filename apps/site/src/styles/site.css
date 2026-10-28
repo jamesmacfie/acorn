@@ -1,7 +1,7 @@
-/* Hallmark · shape: kept · genre: atmospheric · theme: lumen (by request: its colors; the type, the layout and the mark kept) · redesign: restyle
- * hero: kept (Split, the window hanging off the stage) · nav: kept (wordmark, four links, search, the scheme switch, the star) · footer: kept (four link columns over the mark line) · imagery: the product, in shell snapshots and specimens · signature: an oak sprig in glyphs over every stage, its twig a branch name from the fixture, its acorns brass, swaying when brushed
+/* Hallmark · shape: a product tour, one idea a screen (the landing page), kept elsewhere · genre: atmospheric · theme: lumen (by request: its colors; the type and the mark kept) · redesign: full (the landing page; the system kept), restyle (the other pages)
+ * hero: kept (Split, the window hanging off the stage; one sentence) · nav: kept (wordmark, four links, search, the scheme switch, the star) · footer: kept (four link columns over the mark line) · imagery: the product, in shell snapshots, specimens, the extension's sidebar pictures, and phone screenshots in Latte and Mocha · signature: an oak sprig in glyphs over every stage, its twig a branch name from the fixture, its acorns brass, swaying when brushed
  * axes: dark 14 290/mono JetBrains Mono/warm 68 · posture: restrained · contrast: pass · fold: pass · v2.0.0 */
-/* Hallmark · pre-emit critique: P4 H4 E4 S5 R4 V3 · weakest: V, the layout stays by request, so the change is the system and the sprig; each page grows its own sprig from its title */
+/* Hallmark · pre-emit critique: P4 H4 E4 S5 R4 V4 · weakest: R, ten sections counting the footer, because the landing page adds Nodes, the browser, the phone, and security at one screen each; the manifest example, the guide lists, and the trust cards went to make room */
 /* Hallmark · waive 38iii · go nuts. is lumen's verb, set once, in the hero · the hero's one rose verb is the joke the whole landing page tells */
 /* Hallmark · waive 47b · every frame holds a capture of acorn's own markup · the snapshots and specimens are the product, drawn by the app's own stylesheet */
 /* Hallmark · waive 64 · the headings, the nav and every control are JetBrains Mono · mono is the material of a workspace that also runs in a terminal */
@@ -14,6 +14,11 @@
 /* Hallmark · answered F8 · the loop's track and the plugin outlines each explain their own chapter, and both settle by a third of the way in */
 /* Hallmark · answered F19 · 600 in JetBrains Mono draws with its bold face, and 500 is the app's own, inside its screenshots */
 /* Hallmark · dismissed F3 · every heading takes text-wrap: balance in the site-base layer */
+/* Hallmark · dropped {href}, scaffold, starter-pane · the landing page's six trust cards, its two lists of plugin guides, and its manifest example, cut so the page stays brief with no JSON; the reach map and the plugins and Nodes pages carry them */
+/* Hallmark · waive 44c · the hero's window spans the page under the words and hangs off the stage's foot · a window under the headline is how every marketing page on the site opens */
+/* Hallmark · waive 77 · the closing band holds the install block and the two actions beside the acorn · the close only has to carry the download */
+/* Hallmark · dismissed 59 · ten sections counting the footer: the landing page adds Nodes, the browser, the phone, and security, and each keeps to one screen */
+/* Hallmark · dismissed 28a · the landing page's first img is the phone screenshot in its fifth section, far below the fold; the hero's headline and window are the largest paint */
 
 /* The site's stylesheet, written against acorn's own design tokens, which virtual:acorn-ui.css puts on
    <html>. The site picks Catppuccin Latte or Mocha with the visitor's light or dark mode
@@ -713,8 +718,11 @@ select {
 /* A split hero: the headline on the left, and the paragraph and actions in a column beside it, both
    starting under the breadcrumb when there is one. */
 @media (min-width: 64rem) {
+  /* The first row takes the headline's spare height, so the paragraph and the actions sit together at
+     its foot. */
   .hero[data-split] {
     grid-template-columns: minmax(0, 1fr) minmax(0, 26rem);
+    grid-template-rows: minmax(0, 1fr) auto;
     column-gap: calc(2 * var(--space-11));
     align-items: end;
   }
