@@ -240,7 +240,8 @@ ul.chips > .chip { cursor: default; font-weight: var(--fw-semibold); }
 .hint { display: flex; align-items: center; gap: var(--space-2); font-size: var(--fs-xs); color: var(--text-muted); }
 .handoff .divider { margin: 0; border: 0; border-top: var(--divider); }
 /* The item waiting for a task's next chat, above its Agents tab's list or centred in its empty state. */
-.pending-item { display: grid; justify-items: start; gap: var(--space-2); }
+/* The column is capped at the panel's width so a long title shortens in its chip rather than pushing it out. */
+.pending-item { display: grid; grid-template-columns: minmax(0, 1fr); justify-items: start; gap: var(--space-2); }
 .ui-empty .pending-item { justify-items: center; }
 .agents > .pending { padding: var(--space-4) var(--pane-pad) 0; }
 
