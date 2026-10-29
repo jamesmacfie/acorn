@@ -1513,32 +1513,19 @@ button.ui-chip:hover { background: var(--bg-hover); border-color: var(--accent);
 /* Collapsed: the list column is the width of the icon rails, and it is the same token they read, so a
    style pack that moves the rails moves this with them (tokens-style.css § --tabrail-w). */
 .ui-listdetail[data-list='collapsed'] { grid-template-columns: var(--tabrail-w) 1px minmax(0, 1fr); }
-.ui-listdetail[data-list='collapsed'][data-collapse-to='edge'] { grid-template-columns: 0 1px minmax(0, 1fr); }
-.ui-listdetail[data-list='collapsed'][data-collapse-to='edge'] > .ui-listdetail-list {
-  visibility: hidden;
-  padding-inline: 0;
-}
+/* A column with no rail form of its own stays mounted but empty, so the rail is a plain strip. */
+.ui-listdetail[data-list='collapsed'][data-collapse-content='empty'] > .ui-listdetail-list { visibility: hidden; }
 /* The collapse control rides the divider, half over each column's first bar, so those two bars make
    room for it rather than running under it. The bar can sit a wrapper or two down (a Stack, a remote
-   tree). Collapsed to the edge, the rule below owns the detail header instead. The host's layout has
-   the same rule in shell.css. */
+   tree). The host's layout has the same rule in shell.css. */
 .ui-listdetail:has(> .ui-listdetail-edge > .ui-btn):not([data-list='collapsed']) > .ui-listdetail-list > :is(.section-header, .ui-toolbar:not([data-variant='actions']), .ui-tabs, .ui-doctabs):first-child,
 .ui-listdetail:has(> .ui-listdetail-edge > .ui-btn):not([data-list='collapsed']) > .ui-listdetail-list > :first-child > :is(.section-header, .ui-toolbar:not([data-variant='actions']), .ui-tabs, .ui-doctabs):first-child,
 .ui-listdetail:has(> .ui-listdetail-edge > .ui-btn):not([data-list='collapsed']) > .ui-listdetail-list > :first-child > :first-child > :is(.section-header, .ui-toolbar:not([data-variant='actions']), .ui-tabs, .ui-doctabs):first-child {
   padding-inline-end: calc(var(--pane-pad) + var(--control-h-xs) / 2);
 }
-.ui-listdetail:has(> .ui-listdetail-edge > .ui-btn):not([data-collapse-to='edge'][data-list='collapsed']) > .ui-listdetail-detail > :is(.section-header, .ui-toolbar:not([data-variant='actions']), .ui-tabs, .ui-doctabs):first-child,
-.ui-listdetail:has(> .ui-listdetail-edge > .ui-btn):not([data-collapse-to='edge'][data-list='collapsed']) > .ui-listdetail-detail > :first-child > :is(.section-header, .ui-toolbar:not([data-variant='actions']), .ui-tabs, .ui-doctabs):first-child {
+.ui-listdetail:has(> .ui-listdetail-edge > .ui-btn) > .ui-listdetail-detail > :is(.section-header, .ui-toolbar:not([data-variant='actions']), .ui-tabs, .ui-doctabs):first-child,
+.ui-listdetail:has(> .ui-listdetail-edge > .ui-btn) > .ui-listdetail-detail > :first-child > :is(.section-header, .ui-toolbar:not([data-variant='actions']), .ui-tabs, .ui-doctabs):first-child {
   padding-inline-start: calc(var(--pane-pad) + var(--control-h-xs) / 2);
-}
-/* With no rail, put the toggle inside the detail header and give its label room. */
-.ui-listdetail[data-list='collapsed'][data-collapse-to='edge'] > .ui-listdetail-edge > .ui-btn {
-  left: var(--space-2);
-  right: auto;
-  transform: none;
-}
-.ui-listdetail[data-list='collapsed'][data-collapse-to='edge'] > .ui-listdetail-detail > .section-header {
-  padding-left: calc(var(--pane-pad) + var(--control-h-xs));
 }
 /* A collapsed column has no header left to hold the toggle, and in the `split` form it never had one
    this node could reach, so the control rides the divider instead (kit/components/layout/ListDetail.tsx).
@@ -2408,8 +2395,13 @@ a.ui-row:hover { background: var(--bg-hover); }
 .ui-rows-grip .ui-btn { cursor: grab; }
 .ui-rows-grip .ui-btn:disabled { cursor: default; }
 .ui-rows-reorder[data-dragging] { opacity: 0.5; }
-.ui-rows-reorder[data-drop-position='before'] { box-shadow: inset 0 var(--bw-strong) 0 var(--accent); }
-.ui-rows-reorder[data-drop-position='after'] { box-shadow: inset 0 calc(-1 * var(--bw-strong)) 0 var(--accent); }
+.ui-rows-reorder[data-drop-position] {
+  background-image: linear-gradient(var(--accent), var(--accent));
+  background-size: 100% var(--bw-strong);
+  background-repeat: no-repeat;
+}
+.ui-rows-reorder[data-drop-position='before'] { background-position: left top; }
+.ui-rows-reorder[data-drop-position='after'] { background-position: left bottom; }
 
 /* The kit Picker (kit/components/inputs/Picker.tsx): a button that opens a searchable popover. Here,
    with the other kit primitives, so a surface that loads only the kit's sheets, such as the browser

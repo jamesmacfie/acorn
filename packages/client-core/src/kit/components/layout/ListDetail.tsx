@@ -108,20 +108,18 @@ export function ListDetail(props: {
    *  page's `main`. */
   detailAs?: 'div' | 'main'
   /** This split's list column is a sidebar: offer the control that narrows it to the width of the
-   *  icon rails, and remember the answer under this key (../../lib/layout/collapseState.ts).
+   *  icon rails, and remember the answer under this key (../../lib/layout/collapseState.ts). A
+   *  collapsed column always keeps that rail, so the toggle never loses the strip it sits on.
    *
-   *  Opt in, because this node also draws splits that are two halves of one document. A pull
-   *  request's section nav has no rail form, so Sections closes the column to its edge. The host's
+   *  Opt in, because this node also draws splits that are two halves of one document. The host's
    *  `list-detail` *layout* needs no such flag, since a pane that names that layout is a sidebar by
    *  definition (host/layouts/ListDetail.tsx).
    *
    *  The rows collapse separately, from the same signal: read it with `sidebarCollapsed(key)` and
    *  pass each row a `collapsed` slot. */
   collapseKey?: string
-  /** `edge` removes the list column's width when collapsed, while leaving the shared toggle on the
-   *  divider. Use it when the column has no useful rail form. */
-  collapseTo?: 'rail' | 'edge'
-  /** Hide list contents in a collapsed rail while keeping them mounted. */
+  /** Hide list contents in a collapsed rail while keeping them mounted. Use it when the column has
+   *  no rail form of its own, such as a strip of tabs. */
   collapseContent?: 'rows' | 'empty'
   /** What the list has selected, as a key, or null for nothing. On a phone the split shows one column
    *  at a time, and a key that changes to a new value shows the detail. Leave it out and the list
@@ -209,7 +207,7 @@ export function ListDetail(props: {
       data-list={
         list() !== undefined || props.split ? (collapsed() ? 'collapsed' : (props.listWidth ?? 'default')) : undefined
       }
-      data-collapse-to={props.collapseTo}
+      data-collapse-content={props.collapseContent}
       style={width() && !collapsed() ? { 'grid-template-columns': `${width()}px 1px minmax(0, 1fr)` } : undefined}
     >
       <Show
@@ -227,11 +225,7 @@ export function ListDetail(props: {
         <>
           {/* <aside> rather than a div: the list is a complementary landmark, and naming it is how a
               screen reader tells two same-shaped columns apart. */}
-          <aside
-            class="ui-listdetail-list"
-            aria-label={props.listLabel}
-            style={collapsed() && props.collapseContent === 'empty' ? { visibility: 'hidden' } : undefined}
-          >
+          <aside class="ui-listdetail-list" aria-label={props.listLabel}>
             {list()}
           </aside>
           {showDetailSwitch()}

@@ -9,17 +9,19 @@ import {
   Icon,
   IconButton,
   Inline,
+  paneCollapseKey,
   Row,
   Rows,
   SectionHeader,
   SegmentedControl,
+  sidebarCollapsed,
   Stack,
   Text,
   Toolbar,
 } from '@acorn/plugin-api/ui'
 import { RunGraph } from './RunGraph'
 import { formatUsage, kindLabel, runGlyph, runTone, statusLabel, stepElapsed, stepGlyph, stepTone } from './runDisplay'
-import { isLiveRun, type RunPaneModel } from './runPaneModel'
+import { isLiveRun, type RunPaneModel, WORKFLOWS_PANE_ID } from './runPaneModel'
 import type { WorkflowRunProjection } from '../../contract/wire.ts'
 import { WORKFLOWS_SOURCE_ID, workflowsSurfacePath } from '../surfacePath'
 
@@ -44,6 +46,11 @@ const showNodes = (view: NodeView): void => {
   writeLocal(NODE_VIEW_KEY, view)
   setNodeView(view)
 }
+
+// Collapsed, the list is a rail of status glyphs, like the agents pane's. The graph has no rail form,
+// so the steps draw as rows while collapsed and the footer's status line, which would not fit, steps
+// aside.
+const railCollapsed = () => sidebarCollapsed(paneCollapseKey(WORKFLOWS_PANE_ID))
 
 /** The list header: how many runs this task has, and how to draw the selected run's steps. */
 export function RunPaneHeader(props: { task: Task; model: RunPaneModel }) {
@@ -72,6 +79,8 @@ export function RunPaneHeader(props: { task: Task; model: RunPaneModel }) {
 
 export function RunPaneList(props: { task: Task; model: RunPaneModel }) {
   const model = props.model
+  const collapsed = railCollapsed()
+  const stepView = (): NodeView => (collapsed() ? 'rows' : nodeView())
 
   const runItems = createMemo(() => model.runs().map((run) => ({ key: run.id, label: run.name })))
   const nodeItems = createMemo(() =>
@@ -86,7 +95,7 @@ export function RunPaneList(props: { task: Task; model: RunPaneModel }) {
 
   return (
     // Grown only for the graph: its canvas fills whatever height it is given and has none of its own.
-    <Stack gap="none" grow={nodeView() === 'graph'}>
+    <Stack gap="none" grow={stepView() === 'graph'}>
       <Show
         when={model.runs().length}
         fallback={
@@ -112,6 +121,16 @@ export function RunPaneList(props: { task: Task; model: RunPaneModel }) {
                     item={itemProps}
                     selected={selected()}
                     density="compact"
+                    title={current().name}
+                    collapsed={
+                      collapsed() ? (
+                        <Icon
+                          name={runGlyph(current().status)}
+                          tone={runTone(current().status)}
+                          spin={current().status === 'running'}
+                        />
+                      ) : undefined
+                    }
                     leading={
                       <Icon
                         name={runGlyph(current().status)}
@@ -135,10 +154,10 @@ export function RunPaneList(props: { task: Task; model: RunPaneModel }) {
         <SectionHeader level="group" count={model.nodes().length}>
           Steps
         </SectionHeader>
-        <Show when={nodeView() === 'graph'}>
+        <Show when={stepView() === 'graph'}>
           <RunGraph model={model} />
         </Show>
-        <Show when={nodeView() === 'rows'}>
+        <Show when={stepView() === 'rows'}>
           <Rows
             tree
             id={`workflows:nodes:${props.task.id}`}
@@ -157,11 +176,23 @@ export function RunPaneList(props: { task: Task; model: RunPaneModel }) {
                     depth={node().depth}
                     density="compact"
                     variant="tree"
+                    // The rail has no label, so its tooltip names the step.
                     title={
-                      node().parents.length > 1
-                        ? `Waits on ${node().parentLabels.join(', ')}`
-                        : (model.contributedKindLabel(node().step?.kind ?? 'agent') ??
-                          kindLabel(node().step?.kind ?? 'agent'))
+                      collapsed()
+                        ? node().label
+                        : node().parents.length > 1
+                          ? `Waits on ${node().parentLabels.join(', ')}`
+                          : (model.contributedKindLabel(node().step?.kind ?? 'agent') ??
+                            kindLabel(node().step?.kind ?? 'agent'))
+                    }
+                    collapsed={
+                      collapsed() ? (
+                        <Icon
+                          name={stepGlyph(node().step?.status)}
+                          tone={stepTone(node().step?.status)}
+                          spin={node().step?.status === 'running'}
+                        />
+                      ) : undefined
                     }
                     leading={
                       <Icon
@@ -217,9 +248,10 @@ const launchedByLabel = (launch: NonNullable<WorkflowRunProjection['launchedBy']
 export function RunPaneFooter(props: { task: Task; model: RunPaneModel }) {
   const model = props.model
   const navigate = useNavigate()
+  const collapsed = railCollapsed()
   const usage = createMemo(() => formatUsage(model.selectedRun()?.usage))
   return (
-    <Show when={model.selectedRun()}>
+    <Show when={collapsed() ? undefined : model.selectedRun()}>
       {(run) => (
         <Toolbar size="sm" ariaLabel="Run status">
           <Text emphasis="muted">

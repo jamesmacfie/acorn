@@ -78,7 +78,7 @@ export function Sections(props: {
       listWidth="wide"
       listLabel={props.ariaLabel}
       collapseKey={props.main ? `sections:${props.id}` : undefined}
-      collapseTo="edge"
+      collapseContent="empty"
     >
       <ListColumn label={props.ariaLabel}>
         <Tabs

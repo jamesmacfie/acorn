@@ -82,7 +82,7 @@ it wants a different arrangement on each host. So the shape is a kit node, and b
 can use it. Both hosts draw a strip of tabs over one panel, the header first. The desktop keeps the
 main region in a column beside the tabs, and the terminal makes it the last tab below 120 cells
 ([the closed kit](../ui-design/closed-kit.md)). When there's a main region, the desktop's shared
-`ListDetail` control closes the section column to its edge and keeps the content mounted.
+`ListDetail` control narrows the section column to an empty rail and keeps the content mounted.
 
 The node takes its two columns in two ways. A caller with an element to spare passes the left one as
 `list`. A caller that can't, such as a remote tree whose props are JSON on a message port, passes a

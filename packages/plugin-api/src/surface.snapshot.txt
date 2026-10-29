@@ -565,6 +565,7 @@ ui/host: IconPicker
 ui/host: InlineAnnotationMarks
 ui/host: McpConfigFiles
 ui/host: ModelPickerPopover
+ui/host: NodePathForm
 ui/host: PromoteToTaskModal
 ui/host: ProviderHtml
 ui/host: RefPanelBox
@@ -757,7 +758,6 @@ ui: Modal
 ui: ModalActions
 ui: ModalBody
 ui: ModelBackendPicker
-ui: NodePathForm
 ui: NonCodeRow
 ui: Only
 ui: Pane

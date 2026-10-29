@@ -8,6 +8,9 @@ export { confirmAction } from '@acorn/client-core/host/registries/shell/willPhas
 export { default as Acorn } from '@acorn/client-core/kit/components/content/Acorn.tsx'
 // A compiled composition over Picker, Icon, and its actions, shared with the task modal.
 export { IconPicker } from '@acorn/client-core/kit/components/inputs'
+// The typed folder field that stands in for `pickNodeFolder` where it can't browse the Node's disk,
+// such as on a remote Node. A compiled composition over Input and Button, not a kit node.
+export { NodePathForm } from '@acorn/client-core/features/workspaces/NodePathForm.tsx'
 // The app's one bottom dock. Host-only, and not a kit node: where the rails are and how tall the top
 // bar is are the shell's own geography, and its height is a pixel the drag handle produced, which is
 // exactly what a kit node's props may not be (docs/ui-design/closed-kit.md § The closed kit).

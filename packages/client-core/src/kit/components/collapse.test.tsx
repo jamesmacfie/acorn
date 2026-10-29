@@ -77,7 +77,6 @@ describe('a collapsed ListDetail', () => {
     // The toggle is the one button on the edge; the grip is a separator, not a button.
     host.querySelector<HTMLElement>('.ui-listdetail-edge .ui-btn')!.click()
     expect(root.dataset.list).toBe('collapsed')
-    expect(root.dataset.collapseTo).toBeUndefined()
     expect(host.querySelector('[role="separator"]')).toBe(null)
     // A width nobody can drag to is a width that must stop being applied.
     expect(root.style.gridTemplateColumns).toBe('')
@@ -97,17 +96,19 @@ describe('a collapsed ListDetail', () => {
       ),
       host,
     )
+    const root = host.querySelector<HTMLElement>('.ui-listdetail')!
     const list = host.querySelector<HTMLElement>('.ui-listdetail-list')!
     const input = list.querySelector('input')!
     const toggle = host.querySelector<HTMLButtonElement>('.ui-listdetail-edge .ui-btn')!
 
     toggle.click()
-    expect(list.style.visibility).toBe('hidden')
+    expect(root.dataset.list).toBe('collapsed')
+    expect(root.dataset.collapseContent).toBe('empty')
     expect(list.querySelector('input')).toBe(input)
     expect(toggle.getAttribute('aria-label')).toBe('Expand list')
 
     toggle.click()
-    expect(list.style.visibility).toBe('')
+    expect(root.dataset.list).toBe('default')
     expect(list.querySelector('input')).toBe(input)
     expect(mounted).toBe(1)
   })
@@ -139,7 +140,7 @@ describe('a pull request Sections sidebar', () => {
     expect(toggle.getAttribute('aria-label')).toBe('Collapse Pull request list')
     toggle.click()
     expect(root.dataset.list).toBe('collapsed')
-    expect(root.dataset.collapseTo).toBe('edge')
+    expect(root.dataset.collapseContent).toBe('empty')
     expect(localStorage.getItem('sidebar:sections:github.pull')).toBe('1')
     expect(host.querySelector('.ui-listdetail-list input')).toBe(input)
     expect(host.querySelector('.ui-listdetail-detail')?.textContent).toContain('diff')

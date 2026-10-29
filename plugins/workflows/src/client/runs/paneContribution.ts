@@ -25,6 +25,8 @@ export const workflowsPaneContribution: PaneLayoutContribution<RunPaneModel> = {
   // conversation here, and a composer in a narrow column is unusable.
   minWidth: 640,
   layout: 'list-detail',
+  // Collapsed, each run and step row keeps only its status glyph (RunPane.tsx).
+  collapsible: true,
   // The runs, the selection, the live tail and the four verbs, built once per task by the host.
   model: (task, pane) => createRunPaneModel(task, pane.shown),
   // The step is what the detail draws, and it belongs to a run, so picking either moves the key.

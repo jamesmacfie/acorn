@@ -46,8 +46,9 @@ A typed path adds no new authority. The owner can already type any folder on the
   form, so they'd ask twice. The app also has no dialog that takes typed text, only
   `confirmAction`. The inline form needs neither change.
 - **Export `NodePathForm` to plugins.** The importers are plugins and import UI from
-  `@acorn/plugin-api/ui`, which doesn't offer it. Adding it to that surface is additive: one export
-  and the line in `packages/plugin-api/src/surface.snapshot.txt`. Three plugins don't each rebuild
+  `@acorn/plugin-api/ui`, which doesn't offer it. It goes on `@acorn/plugin-api/ui/host`, the
+  compiled-only surface, because a kit node on `ui` would need a terminal host too. One export and
+  the line in `packages/plugin-api/src/surface.snapshot.txt`. Three plugins don't each rebuild
   the same field and button.
 - **Fill in the last folder.** **Clone** starts with the last folder typed for **Clone** in the open
   importer, so cloning five repositories into `/home/james/src` means typing it once. **Link
@@ -60,7 +61,7 @@ A typed path adds no new authority. The owner can already type any folder on the
 
 ## Changes
 
-1. Export `NodePathForm` from `@acorn/plugin-api/ui` and update the surface snapshot.
+1. Export `NodePathForm` from `@acorn/plugin-api/ui/host` and update the surface snapshot.
 2. In `GithubImporter.tsx`, `GitlabImporter.tsx`, and `BitbucketImporter.tsx`:
    - Show the repository list whenever the code host is connected, and delete both refusal lines.
      A host with no folder dialog, such as a browser, gets the typed field even on the local Node.

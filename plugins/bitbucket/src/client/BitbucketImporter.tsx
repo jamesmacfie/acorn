@@ -22,11 +22,11 @@ import {
   IconButton,
   Inline,
   Input,
-  NodePathForm,
   SettingRow,
   Stack,
   Text,
 } from '@acorn/plugin-api/ui'
+import { NodePathForm } from '@acorn/plugin-api/ui/host'
 import {
   importRoute,
   repositoriesRoute,
