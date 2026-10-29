@@ -74,6 +74,17 @@ describe('what a program can reach', () => {
     expect(Object.values(library.components).every((component) => typeof component.component === 'function')).toBe(true)
   })
 
+  it('lays a row of only cards out as equal columns, and keeps a mixed row at content width', async () => {
+    draw(
+      'a = Card("A", [Text("a")])\nb = Card("B", [Text("b")])\nroot = Stack([Stack([a, b], "row"), Stack([a, Button("Go", @ToAssistant("x"))], "row")])',
+    )
+    await settle()
+    const [cards, mixed] = document.querySelectorAll<HTMLElement>('.ui-inline')
+    expect(cards!.hasAttribute('data-even')).toBe(true)
+    expect(mixed!.hasAttribute('data-even')).toBe(false)
+    expect(mixed!.hasAttribute('data-wrap')).toBe(true)
+  })
+
   it('puts @ToAssistant text in the composer and sends nothing', async () => {
     draw('root = Stack([Button("Ask", @ToAssistant("Why did it fail?"))])')
     await settle()
