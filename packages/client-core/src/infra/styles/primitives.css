@@ -1549,6 +1549,9 @@ button.ui-chip:hover { background: var(--bg-hover); border-color: var(--accent);
   content: '';
   display: block;
   flex: none;
+  /* base.css's border-box rule skips pseudo-elements, and the border would make this band 1px taller
+     than the headers beside it. */
+  box-sizing: border-box;
   height: var(--pane-head-h);
   border-bottom: var(--chrome-divider);
   background: var(--bg-subtle);
