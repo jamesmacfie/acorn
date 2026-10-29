@@ -90,7 +90,11 @@ export const NODE_SUPPORT = {
   // Text that acts. `Text` is presentational and stays that way; the kit is one intent per node.
   Link: { dom: 'full', tui: 'full' },
   Heading: { dom: 'full', tui: 'full' },
-  Rows: { dom: 'full', tui: 'full' },
+  Rows: {
+    dom: 'full',
+    tui: 'reduced',
+    loss: 'a reorderable list has no grip to drag or open, so Alt+↑/↓ on the active row is the only way to move one',
+  },
   Row: { dom: 'full', tui: 'full' },
   TreeRow: { dom: 'full', tui: 'full' },
   RowActions: { dom: 'full', tui: 'full' },

@@ -443,6 +443,8 @@ const RECORDED: Record<string, { legacy?: string; kitty: string }> = {
   'ctrl+return': { kitty: '\x1b[13;5u' },
   'ctrl+shift+return': { kitty: '\x1b[13;6u' },
   'ctrl+f': { legacy: '\x06', kitty: '\x1b[102;5u' },
+  'meta+up': { legacy: '\x1b[1;3A', kitty: '\x1b[57352;3u' },
+  'meta+down': { legacy: '\x1b[1;3B', kitty: '\x1b[57353;3u' },
   'ctrl+meta+right': { legacy: '\x1b[1;7C', kitty: '\x1b[57351;7u' },
   'ctrl+meta+left': { legacy: '\x1b[1;7D', kitty: '\x1b[57350;7u' },
   j: { legacy: 'j', kitty: '\x1b[106u' },

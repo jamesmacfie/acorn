@@ -2,7 +2,7 @@ import { pluginChannel } from '@acorn/protocol/plugin/state.ts'
 import { homedir } from 'node:os'
 import type { NodePlugin, PluginDatabase } from '@acorn/plugin-api/node'
 import { loadWorkflowFiles } from './files'
-import { getDef, listDefs, mergedList, type StoredWorkflowDef } from './store'
+import { getDef, listDefs, mergedList, saveOrder, type StoredWorkflowDef } from './store'
 import type { WorkflowAgentOrigin } from '../../contract/wire.ts'
 import { workflowDraftQueries } from '../publication/draftQueries'
 import { workflowPublication } from '../publication/service'
@@ -115,6 +115,10 @@ export const workflowDefinitions = (
         userDir: homedir(),
         catalog: runner.validationCatalog(),
       }),
+    order: async (workspaceId, ids) => {
+      await saveOrder(store, workspaceId, ids)
+      defsChanged(workspaceId)
+    },
     // A row, or a committed file the editor opens read-only. The merged list carries a summary of
     // each definition and the editor needs the whole thing, so a file id resolves here rather than
     // fattening every list read (docs/workflows/authoring.md § Authoring).

@@ -492,6 +492,7 @@ describe('workflow definition routes', () => {
 
   const fakeDefs = (over: Partial<WorkflowDefsBridge> = {}): WorkflowDefsBridge => ({
     list: async () => ({ workflows: [], errors: [] }),
+    order: async () => undefined,
     get: async () => row,
     create: async () => ({ row }),
     update: async () => ({ row }),
@@ -536,6 +537,29 @@ describe('workflow definition routes', () => {
     expect((await app.fetch(req('/api/defs/def1', 'PUT', { def, revision: 3 }), {} as Env)).status).toBe(200)
     expect((await app.fetch(req('/api/defs/def1', 'DELETE'), {} as Env)).status).toBe(200)
     expect(calls).toEqual(['list:w1', 'create:w1', 'update:def1:3', 'remove:def1'])
+  })
+
+  it('saves a workspace order, and refuses a body it should not store', async () => {
+    const saved: unknown[] = []
+    setWorkflowDefsBridge(fakeDefs({ order: async (workspaceId, ids) => void saved.push({ workspaceId, ids }) }))
+    const app = asDevice()
+    const put = (body: unknown) => app.fetch(req('/api/defs/order', 'PUT', body), {} as Env)
+    expect((await put({ workspaceId: 'w1', ids: ['b', 'repo-file', 'a'] })).status).toBe(200)
+    expect((await put({ workspaceId: 'w1', ids: [] })).status).toBe(200)
+    for (const body of [
+      { workspaceId: 'w1', ids: ['a', 'a'] },
+      { workspaceId: 'w1', ids: Array.from({ length: 501 }, (_, index) => `id${index}`) },
+      { workspaceId: 'w1', ids: [''] },
+      { workspaceId: 'w1', ids: ['x'.repeat(257)] },
+      { workspaceId: '', ids: ['a'] },
+      { ids: ['a'] },
+    ]) {
+      expect((await put(body)).status).toBe(400)
+    }
+    expect(saved).toEqual([
+      { workspaceId: 'w1', ids: ['b', 'repo-file', 'a'] },
+      { workspaceId: 'w1', ids: [] },
+    ])
   })
 
   it('admits a JSON definition only with the current baseline before calling the bridge', async () => {
@@ -583,6 +607,7 @@ describe('workflow definition routes', () => {
       req('/api/defs', 'POST', { workspaceId: 'w1', def }),
       req('/api/defs/def1'),
       req('/api/defs/def1', 'PUT', { def, revision: 1 }),
+      req('/api/defs/order', 'PUT', { workspaceId: 'w1', ids: ['a'] }),
       req('/api/defs/def1', 'DELETE'),
       req('/api/defs/validate', 'POST', { def }),
       req('/api/defs/generate', 'POST', { backendId: 'c1', description: 'two agents', workspaceId: 'w1' }),

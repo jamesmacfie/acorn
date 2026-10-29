@@ -116,6 +116,15 @@ export const workflowDefs = sqliteTable(
   (table) => [index('workflow_defs_workspace_idx').on(table.workspaceId, table.updatedAt)],
 )
 
+// The order a person dragged the rail into, one row per workspace. Ids from every source, not just
+// rows, so it lives here rather than in a column on workflow_defs; and never in a file, so reordering
+// is not a change to commit (../server/definitions/store.ts `orderWorkflows`).
+export const workflowOrder = sqliteTable('workflow_order', {
+  workspaceId: text('workspace_id').primaryKey(), // → core workspaces.id (plain ID)
+  idsJson: text('ids_json').notNull(), // JSON array of workflow ids, first on top
+  updatedAt: integer('updated_at').notNull(),
+})
+
 // One agent tool call that wrote something, keyed by task, signed session, tool, and the MCP proxy's
 // stable call ID. The result is computed and stored before the write, so a repeated call returns the
 // same answer and a call whose response was lost is recovered after a restart

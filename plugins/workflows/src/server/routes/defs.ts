@@ -45,6 +45,8 @@ export type WorkflowDefsBridge = {
   // The merged read: this workspace's rows, every project's `.acorn/workflows/*.toml`, and the user
   // layer, with a repo id winning a collision.
   list(workspaceId: string): Promise<unknown>
+  // Replaces the workspace's saved order with these ids, top first, and tells the rail to re-read.
+  order(workspaceId: string, ids: string[]): Promise<void>
   // A row by id, or a definition the node loads from a file, addressed `repo:<fileId>` or
   // `user:<fileId>`. `projectId` says whose checkout to read a repo file from; a file answers with
   // `revision: 0`, which is how the editor knows it has no row to save into.
@@ -96,6 +98,15 @@ const editableDefSchema = z
   .passthrough()
 const createBody = z.object({ workspaceId: z.string().min(1), projectId: z.string().min(1).optional(), def: defSchema })
 const updateBody = z.object({ def: defSchema, revision: z.number().int().nonnegative() })
+// Every id the rail shows, in its new order. The cap is far past any real list and keeps a stray body
+// from writing a huge row.
+const orderBody = z.object({
+  workspaceId: z.string().min(1),
+  ids: z
+    .array(z.string().min(1).max(256))
+    .max(500)
+    .refine((ids) => new Set(ids).size === ids.length, 'Duplicate workflow id'),
+})
 const validateBody = z.object({ def: defSchema, projectId: z.string().min(1).optional() })
 const fileTarget = z
   .object({ projectId: z.string().min(1), source: z.enum(['repo', 'user']), path: z.string().min(1).max(256) })
@@ -358,6 +369,15 @@ export const workflowDefsRoutes = new Hono<AppEnv>()
   .get('/defs/model-connections', (c) =>
     withBridge(c, async (bridge) => c.json(await bridge.modelBackends(ownerId(c)))),
   )
+  // Before `PUT /defs/:id`, or the parameter eats the literal.
+  .put('/defs/order', async (c) => {
+    const parsed = await parseBody(c, orderBody)
+    if (!parsed) return respondError(c, 400, 'bad_request')
+    return withBridge(c, async (bridge) => {
+      await bridge.order(parsed.workspaceId, parsed.ids)
+      return c.json({ ok: true })
+    })
+  })
   .get('/defs/:id', (c) =>
     withBridge(c, async (bridge) => {
       const row = await bridge.get(c.req.param('id'), c.req.query('projectId'))

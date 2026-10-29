@@ -3,7 +3,17 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 import { makeTestPluginDb, type TestPluginDb } from '@acorn/plugin-api/testkit'
-import { createDef, defsForProject, getDef, mergedList, removeDef, updateDef } from './store'
+import {
+  createDef,
+  defsForProject,
+  getDef,
+  mergedList,
+  orderWorkflows,
+  removeDef,
+  saveOrder,
+  savedOrder,
+  updateDef,
+} from './store'
 import type { WorkflowValidationCatalog } from '../validation/definition'
 import type { WorkflowDef } from '../../shared/workflowContracts'
 
@@ -139,5 +149,49 @@ describe('workflow definitions stored as rows', () => {
     await createDef(store.db, { workspaceId: 'w1', projectId: 'gone', def: def('orphan') })
     const merged = await mergedList(store.db, 'w1', [{ id: 'p1', path: null }], { userDir: null, catalog })
     expect(merged.workflows[0].problems).toEqual(['The project this workflow was bound to has been removed.'])
+  })
+
+  it('puts saved ids first, keeps unplaced ones in merge order below, and skips ids that name nothing', () => {
+    const merged = ['a', 'b', 'c', 'd'].map((id) => ({ id }))
+    expect(orderWorkflows(merged, ['c', 'gone', 'a']).map((workflow) => workflow.id)).toEqual(['c', 'a', 'b', 'd'])
+    expect(orderWorkflows(merged, []).map((workflow) => workflow.id)).toEqual(['a', 'b', 'c', 'd'])
+  })
+
+  it('orders the merged list by the saved order, one row per id with the winning source', async () => {
+    const repo = join(dir, 'repo')
+    const user = join(dir, 'home')
+    mkdirSync(repo)
+    mkdirSync(user)
+    writeFile(
+      repo,
+      'shared',
+      'format_version = 1\nbaseline = "acorn-1"\nname = "the committed one"\n[[steps]]\nid = "a"\nname = "a"\nprompt = "x"\n',
+    )
+    writeFile(
+      user,
+      'mine-only',
+      'format_version = 1\nbaseline = "acorn-1"\nname = "user only"\n[[steps]]\nid = "a"\nname = "a"\nprompt = "x"\n',
+    )
+    await createDef(store.db, { id: 'shared', workspaceId: 'w1', def: def('a row the file shadows') })
+    const row = await createDef(store.db, { workspaceId: 'w1', def: def('a row') })
+    const list = async () =>
+      (await mergedList(store.db, 'w1', [{ id: 'p1', path: repo }], { userDir: user, catalog })).workflows
+
+    await saveOrder(store.db, 'w1', ['mine-only', 'gone', 'shared'])
+    await saveOrder(store.db, 'w2', [row.id])
+    const ordered = await list()
+    expect(ordered.map((workflow) => workflow.id)).toEqual(['mine-only', 'shared', row.id])
+    expect(ordered[1]).toMatchObject({ source: 'repo', name: 'the committed one' })
+
+    // An edit no longer moves a row.
+    await updateDef(store.db, row.id, def('a row, edited'), 1)
+    expect((await list()).map((workflow) => workflow.id)).toEqual(['mine-only', 'shared', row.id])
+  })
+
+  it('replaces a workspace’s saved order outright', async () => {
+    expect(await savedOrder(store.db, 'w1')).toEqual([])
+    await saveOrder(store.db, 'w1', ['a', 'b'])
+    await saveOrder(store.db, 'w1', ['b'])
+    expect(await savedOrder(store.db, 'w1')).toEqual(['b'])
   })
 })

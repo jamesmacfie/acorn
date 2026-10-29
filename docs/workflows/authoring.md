@@ -14,7 +14,8 @@ many steps the definition has, which project it belongs to, and which layer it c
 cycle error is a row of its own rather than a definition that is quietly missing.
 
 **New workflow** on the list toolbar creates a row named "Untitled workflow", bound to the project
-the rail is showing, and opens it. The same verb is a palette command, `workflows.new`.
+the rail is showing, and opens it. The same verb is a palette command, `workflows.new`. Each row has a
+grip that reorders the list for every picker ([workflow order](./routes-and-ui.md#workflow-order)).
 
 ### The editor
 
