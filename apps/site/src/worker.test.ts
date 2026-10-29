@@ -33,7 +33,9 @@ test('a download on the production site is counted and redirected to GitHub', as
     response.headers.get('location'),
     'https://github.com/jamesmacfie/acorn/releases/download/v1.0.0/acorn_1.0.0_aarch64.dmg',
   )
-  assert.deepEqual(bindings.points, [{ indexes: ['/download/macos-arm64'], blobs: ['/download/macos-arm64', 'v1.0.0', 'NZ'] }])
+  assert.deepEqual(bindings.points, [
+    { indexes: ['/download/macos-arm64'], blobs: ['/download/macos-arm64', 'v1.0.0', 'NZ'] },
+  ])
 })
 
 test('a download on a preview redirects without being counted', async () => {

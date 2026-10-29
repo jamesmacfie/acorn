@@ -29,8 +29,6 @@ import {
 import type { Intent } from './intents'
 import { bindIntents } from './keymapHost'
 
-export type { CollectionItem }
-
 export type CollectionOptions = {
   /** Stable across a rebuild of the data, because it keys the stored state. */
   id: () => string

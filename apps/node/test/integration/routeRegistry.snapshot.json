@@ -588,6 +588,7 @@
     "PUT /v1/p/git/projects/:projectId/settings/preference",
     "PUT /v1/p/notes/tasks/:id/notes/:slug",
     "PUT /v1/p/notes/workspaces/:wsId/notes/:slug",
-    "PUT /v1/p/workflows/defs/:id"
+    "PUT /v1/p/workflows/defs/:id",
+    "PUT /v1/p/workflows/defs/order"
   ]
 }

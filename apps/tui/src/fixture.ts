@@ -152,6 +152,22 @@ const AGENT_PROVIDERS = [
     skills: [],
     diagnostics: [],
   },
+  // A second harness that can start, so New is the picker rather than a lone harness's button.
+  {
+    id: 'codex',
+    profileId: 'codex',
+    label: 'Codex',
+    driverKind: 'codex-app-server' as const,
+    driverVersion: '1',
+    installed: true,
+    authenticated: true,
+    statusAuthority: 'driver',
+    capabilities: [],
+    configOptions: [],
+    commands: [],
+    skills: [],
+    diagnostics: [],
+  },
 ]
 
 const AGENT_SESSIONS = [

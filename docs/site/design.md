@@ -1,14 +1,16 @@
 # The public site's design
 
 This page covers how `apps/site` looks and why: the stylesheet, the mark, the light and dark
-themes, the components, Starlight's replaced parts, and the checks that hold the design to the app.
+themes, Starlight's replaced parts, and the checks that hold the design to the app.
 Read it before you style a page or add a component. [The public site](../site.md) covers running and
 deploying it, and [marketing copy](./marketing-copy.md) covers how the marketing pages read.
 
-Two topics have pages of their own:
+Four topics have pages of their own:
 
+- [Components](./design/components.md): each component, and the conventions for buttons, labels, and callouts.
 - [Fonts](./design/fonts.md): the faces, the JetBrains Mono subsets, and the preloads.
 - [Lighthouse](./design/lighthouse.md): the landing page's target, the command, and its scores.
+- [Motion](./design/motion.md): what moves, when, and how reduced motion stops it.
 
 The site is built from acorn's own design tokens, under the app's token names, with colors of its
 own. The page draws in the site's palette: a violet-black night with near-white ink, one brass
@@ -145,71 +147,6 @@ edges without widening the page. Keep the background on the element itself: axe 
 against an element's background, and it can't see paint from a pseudo-element or a border image. A
 hero's picture ends in a negative margin of `--site-overhang`, so the window hangs over the stage's
 edge onto the page, and whatever follows the hero starts that far down.
-
-## Components
-
-The components are in `apps/site/src/components/`. Each has a comment that says what it draws.
-
-| Component | What it is |
-| --- | --- |
-| `SiteHeader`, `SiteFooter` | The header and the footer on every page. Below 50rem the header's links fold into a menu. |
-| `GitHubStars` | **Star on GitHub**, a plain link to the repository. It shows the star count, read at build time, from 100 stars. |
-| `Hero` | The stage at the top of a page: headline, paragraph, the oak sprig behind them, and an optional link back to the page's section (`crumb`), actions, and picture. `highlight` sets the end of the headline apart as the hero's verb, in rose over a rule that draws in once. A marketing page puts it in the layout's `hero` slot, and the layout draws one with the page's title when there's none. With `split`, the paragraph and actions sit beside the headline on a wide screen, so the picture starts higher. |
-| `InstallBlock` | A tab per install method, its commands after a prompt, and **Copy**. |
-| `Specimen`, `SnapshotFrame` | A picture of acorn in a frame drawn like a pane, or a whole window or a phone's screen with rounder corners and a deeper shadow. Neither draws a desktop's window buttons. A specimen has a bar with its name and a caption under it. It switches between its desktop and terminal views with tabs, or shows them side by side with `both`. A snapshot has no bar, and its caption is for screen readers only, so the picture speaks for itself. Either takes a `caption` that replaces its own. |
-| `Snapshot`, `Cells` | A [shell snapshot](./snapshots.md) in its frame, and a terminal's cells, which specimens and snapshots share. |
-| `Feature`, `Tour`, `Card` | A feature section, the landing page's tour, and a card. A `.features` list already gives the order, so the sections carry no numbers. `Feature` takes `level={3}` under a section's own heading. A `Feature` with no picture keeps to the reading measure. The tour's tabs run down the side on a wide screen, beside the selected tab's words and window. On a marketing page a card is rounder, and its edge takes the accent under the pointer. |
-| `DownloadPage`, `BuildFromSource` | The download page, in `apps/site/src/layouts/`, for a release or for none, and its Build from source section. `src/scripts/platform.ts` moves the visitor's platform first. |
-| `FeaturePage` | The layout of a feature page, in `apps/site/src/layouts/`: the title and sentence from `apps/site/src/features.ts`, a picture, the page's sections, **In the terminal**, related features, and **Get started**. A new feature page needs an entry in `features.ts`, which the features index reads too. |
-| `Badge`, `Keys` | The kit's own `Badge` and `Kbd` markup, with the text kept in `--text`. |
-| `ReferenceTable`, `Checkpoint` | A table with a sticky header and an anchor per row, and a step's check. |
-| `SocialCard` | The 1200 by 630 picture a shared link shows ([social cards](./agent-outputs.md#social-cards)). |
-| `Search` | The header's search, drawn with the command palette's markup ([search](./agent-outputs.md#search)). |
-
-A primary button is the accent, with `--bg` as its ink, and `data-size="lg"` makes it a page's main
-action. A page has one. `.segmented` turns a tab strip into buttons in a tray, the selected one
-inverse, as the hero's desktop and terminal switch does. A heading is one color. The hero's verb is the
-only words set apart, and only on the landing page.
-
-A label, such as a footer column's name or a changelog entry's date, is mono, a step smaller, in
-sentence case and untracked. The app's own labels are uppercase and tracked in the Terminal pack, which
-suits a dense pane, so the docs' sidebar and tables keep them.
-
-Callouts are Starlight's asides, restyled in `site.css` as the kit's banner `Alert`. A marketing page
-writes `class="callout"` for the same look. Steps are
-Starlight's `<Steps>`. Tabs and copy buttons share two small scripts in `apps/site/src/scripts/`.
-
-## Motion
-
-Nothing moves under reduced motion: `site.css` sets the duration tokens to zero there, and every
-animation sits inside `@media (prefers-reduced-motion: no-preference)`.
-
-A marketing page's hero comes in as the page loads, each part rising a little after the one before.
-Further down, the landing page's chapter heads, steps, tour, windows, and grids, a feature page's
-sections, and the cards rise the same way as they scroll into view. They finish before they're a third
-of the way in, so nothing is still faint where you'd read it, and a browser without scroll timelines
-shows them in place. A primary button lifts on hover, a link's underline turns from a rule to the
-accent, and an FAQ answer slides open where the browser can animate to `height: auto`
-(`interpolate-size`).
-
-Three moments are the site's own. The rule under the hero's verb draws in once, after the headline
-lands. The oak sprig over a stage comes in from where its twig enters, over a second and a half, and
-sways where a pointer brushes it, settling in about two seconds. The closing acorn on the landing page
-tips its cap when the pointer or the keyboard reaches **Get acorn**.
-
-The Playwright accessibility tests run with reduced motion, so axe reads each block where it settles
-rather than partway through rising in.
-
-The landing page has two scroll-linked animations, CSS scroll-driven animations with no script. The
-track over the three steps of a task fills left to right as they scroll up the screen, and the
-plugins chapter's window outlines what plugins draw as it comes into view. Each sits inside
-`@media (prefers-reduced-motion: no-preference)` and `@supports (animation-timeline: view())`, and
-the static styles are the finished state, so a browser without scroll timelines shows the full track
-and every outline.
-
-The outlined window is the hero's snapshot again. Its selectors name each part by what the capture
-calls it, such as the Git pane's `Git list` region, so a new capture keeps the outlines in place. If a
-capture renames a pane, its outline and name disappear rather than land on the wrong part.
 
 ## Starlight's replaced parts
 
