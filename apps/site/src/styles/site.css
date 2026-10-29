@@ -994,8 +994,8 @@ ul.cards {
 
 /* ── Frames ──────────────────────────────────────────────────────────────────────────────────
    A picture of acorn sits in a frame drawn like a pane: a chrome bar, the divider under it, and the
-   picture. Specimens, snapshots, and the install block share it. A frame lifts off the page a little;
-   a snapshot is a whole window, so it's rounder and lifts further. A specimen or a snapshot draws in
+   picture. Specimens and the install block share it. A snapshot is a whole window, so it has no bar
+   and no visible caption, and it's rounder and lifts further. A specimen or a snapshot draws in
    the app's own theme (tokens.css), and the install block, a control of the site's, in the site's. */
 .frame {
   margin: 0;
@@ -1031,19 +1031,6 @@ ul.cards {
     0 24px 48px -24px var(--shadow-popover),
     0 48px 96px -48px var(--shadow-popover);
 }
-/* A snapshot's bar names what the picture shows on the left and which client drew it on the right. */
-.snapshot-bar {
-  justify-content: space-between;
-}
-.snapshot-title {
-  overflow: hidden;
-  font-weight: var(--fw-semibold);
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-.snapshot-bar > .frame-size {
-  flex: none;
-}
 .frame-bar .tabs {
   align-self: stretch;
 }
@@ -1063,15 +1050,6 @@ ul.cards {
   font-size: var(--fs);
   line-height: var(--lh);
   border-block-start: var(--chrome-divider);
-}
-/* Under the hero's window the page's own words say what it shows, so its caption is for screen readers. */
-.hero .frame-caption {
-  position: absolute;
-  inline-size: 1px;
-  block-size: 1px;
-  overflow: hidden;
-  clip-path: inset(50%);
-  white-space: nowrap;
 }
 .snapshot-body {
   overflow: auto;

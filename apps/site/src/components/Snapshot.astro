@@ -35,12 +35,7 @@ if (scene.host === 'terminal' ? !cells : html === undefined) {
 }
 ---
 
-<SnapshotFrame
-  host={scene.host}
-  title={scene.title}
-  caption={caption ?? scene.caption}
-  size={cells && `${cells.columns}×${cells.rows}`}
->
+<SnapshotFrame host={scene.host} caption={caption ?? scene.caption}>
   {
     scene.host !== 'terminal' ? (
       <div class="window" style={`--width: ${scene.width}; --height: ${scene.height}`}>

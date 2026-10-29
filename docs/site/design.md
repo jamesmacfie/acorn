@@ -86,7 +86,7 @@ Each kind of text on a marketing page has one size, so two things that do the sa
 | `--site-fs-body` | Paragraphs, and the tour's tabs. |
 | `--fs-lg` | Secondary words in Inter: a card's text and the plugin wall's names. |
 | `--fs-md` | Mono controls and links: the header, buttons, segmented switches, and the footer's links. Mono runs wider than Inter, so it sits a pixel under `--fs-lg`. |
-| `--fs` | Labels: a footer column's name, a frame's bar and caption. |
+| `--fs` | Labels: a footer column's name, a specimen's bar and caption. |
 
 Mono runs wide, and its space is as wide as a letter, so headings pull in. Every heading takes
 `--site-track-heading` and `--site-words-heading`, and a display heading takes the stronger
@@ -156,7 +156,7 @@ The components are in `apps/site/src/components/`. Each has a comment that says 
 | `GitHubStars` | **Star on GitHub**, a plain link to the repository. It shows the star count, read at build time, from 100 stars. |
 | `Hero` | The stage at the top of a page: headline, paragraph, the oak sprig behind them, and an optional link back to the page's section (`crumb`), actions, and picture. `highlight` sets the end of the headline apart as the hero's verb, in rose over a rule that draws in once. A marketing page puts it in the layout's `hero` slot, and the layout draws one with the page's title when there's none. With `split`, the paragraph and actions sit beside the headline on a wide screen, so the picture starts higher. |
 | `InstallBlock` | A tab per install method, its commands after a prompt, and **Copy**. |
-| `Specimen`, `SnapshotFrame` | A picture of acorn in a frame drawn like a pane, or a whole window or a phone's screen with a bar that names what it shows and which client drew it, rounder corners, and a deeper shadow. Neither draws a desktop's window buttons. A specimen switches between its desktop and terminal views with tabs, or shows them side by side with `both`. Either takes a `caption` that replaces its own. Under the hero, a window's caption is for screen readers only. |
+| `Specimen`, `SnapshotFrame` | A picture of acorn in a frame drawn like a pane, or a whole window or a phone's screen with rounder corners and a deeper shadow. Neither draws a desktop's window buttons. A specimen has a bar with its name and a caption under it. It switches between its desktop and terminal views with tabs, or shows them side by side with `both`. A snapshot has no bar, and its caption is for screen readers only, so the picture speaks for itself. Either takes a `caption` that replaces its own. |
 | `Snapshot`, `Cells` | A [shell snapshot](./snapshots.md) in its frame, and a terminal's cells, which specimens and snapshots share. |
 | `Feature`, `Tour`, `Card` | A feature section, the landing page's tour, and a card. A `.features` list already gives the order, so the sections carry no numbers. `Feature` takes `level={3}` under a section's own heading. A `Feature` with no picture keeps to the reading measure. The tour's tabs run down the side on a wide screen, beside the selected tab's words and window. On a marketing page a card is rounder, and its edge takes the accent under the pointer. |
 | `DownloadPage`, `BuildFromSource` | The download page, in `apps/site/src/layouts/`, for a release or for none, and its Build from source section. `src/scripts/platform.ts` moves the visitor's platform first. |

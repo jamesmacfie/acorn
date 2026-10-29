@@ -29,7 +29,7 @@ shell's sources change.
 | `browser` | The extension's panel beside the pull request's page | Chrome |
 | `terminal-small` | The task's Git pane, 80 by 24 | Terminal client |
 
-`apps/site/src/snapshots.ts` holds each scene's title, caption, and window size. The steps that drive
+`apps/site/src/snapshots.ts` holds each scene's caption, which only screen readers hear, and its window size. The steps that drive
 the app to each scene are in `apps/site/scripts/capture-shell.mjs`.
 
 ## The fixture
@@ -159,7 +159,7 @@ Compressed sizes on October 15, 2026, with Brotli:
 
 1. Add the scene's steps to `DESKTOP` or `TERMINAL` in `capture-shell.mjs`. Add any data it needs to
    the fixture.
-2. Add its title, caption, and size to `apps/site/src/snapshots.ts`.
+2. Add its caption and size to `apps/site/src/snapshots.ts`.
 3. Run `pnpm --filter @acorn/site snapshots <scene>`, then restart `pnpm dev:site`, which builds the
    stylesheet when it starts.
 4. Look at it on `/lab/snapshots/` in a light and a dark theme, and run

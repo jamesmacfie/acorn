@@ -155,7 +155,6 @@ const phone = [
     id: 'phone-waiting',
     label: 'Needs you',
     file: 'tasks',
-    title: 'Fernwood',
     caption: "The workspace's tasks on a phone, under the three agents waiting on you.",
     alt: "Needs you lists three agents: one wants permission, one asked a question, and one finished its turn. The workspace's three tasks follow.",
   },
@@ -163,7 +162,6 @@ const phone = [
     id: 'phone-agent',
     label: 'The agent',
     file: 'agent',
-    title: 'Retry failed webhooks',
     caption: "The webhooks task's agent on a phone, with the task's panes along the bottom.",
     alt: "The agent's last answer in the Retry failed webhooks task, the message box under it, and a bar of the task's panes: Agent, Git, Notes, Context, Editor, and Terminal.",
   },
@@ -412,7 +410,7 @@ const nut = art.slice(4).join('\n')
           {
             phone.map((screen) => (
               <div id={screen.id} role="tabpanel" aria-label={screen.label}>
-                <SnapshotFrame host="phone" title={screen.title} caption={screen.caption}>
+                <SnapshotFrame host="phone" caption={screen.caption}>
                   <div class="phone-screen">
                     {(['light', 'dark'] as const).map((scheme) => (
                       <img
@@ -452,7 +450,6 @@ const nut = art.slice(4).join('\n')
     <div class="nodes">
       <SnapshotFrame
         host="terminal"
-        title="build-box"
         caption="A standalone Node on a server, made reachable by its name, then opening a pairing window for a laptop."
       >
         <pre class="pairing">{pairing}</pre>
@@ -973,17 +970,6 @@ const nut = art.slice(4).join('\n')
   }
   .away-shot :global(.panel .snapshot-sidebar) {
     min-block-size: 649px;
-  }
-  /* The words under each picture say what it shows, so the frames' own captions are for screen readers,
-     as the hero's is. */
-  .away-shot :global(.frame-caption),
-  .nodes :global(.frame-caption) {
-    position: absolute;
-    inline-size: 1px;
-    block-size: 1px;
-    overflow: hidden;
-    clip-path: inset(50%);
-    white-space: nowrap;
   }
   .phone-screen img {
     display: block;

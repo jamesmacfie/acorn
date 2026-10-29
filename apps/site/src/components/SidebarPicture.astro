@@ -8,31 +8,24 @@ import SnapshotFrame from './SnapshotFrame.astro'
 
 const PICTURES = {
   'sidebar-pairing': {
-    title: 'Connect to Acorn',
     caption: 'Pairing, with the Node on this computer as the first choice.',
   },
   'sidebar-home': {
-    title: 'Home',
     caption: "Home on a pull request's page: a request waiting for you, the page's task, and the workspace's tasks.",
   },
   'sidebar-conversation': {
-    title: 'A conversation',
     caption: 'A conversation, with text selected on the page waiting in the draft.',
   },
   'sidebar-handoff': {
-    title: 'Home',
     caption: 'The handoff card, for a pull request no task holds yet.',
   },
   'sidebar-plugin-panel': {
-    title: 'Acme app',
     caption: "A plugin's panel on its task's app: the app's state and its links.",
   },
   'sidebar-issue-task': {
-    title: 'FER-112 Retry failed webhooks',
     caption: "The panel on a Linear issue's page, open on the issue's task: a request waiting for you, and its two agents.",
   },
   'sidebar-issue-conversation': {
-    title: 'FER-112 Retry failed webhooks',
     caption: "A conversation with the task's agent, from the Linear issue's page.",
   },
 } as const
@@ -47,7 +40,7 @@ const html = pages[`../generated/sidebar/${id}.html`]
 if (html === undefined) throw new Error(`There's no sidebar picture "${id}". Run UPDATE_SPECIMENS=1 pnpm --filter @acorn/site specimens.`)
 ---
 
-<SnapshotFrame host="browser" title={PICTURES[id].title} caption={PICTURES[id].caption}>
+<SnapshotFrame host="browser" caption={PICTURES[id].caption}>
   <div class="panel acorn-ui" inert set:html={html} />
 </SnapshotFrame>
 
