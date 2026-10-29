@@ -34,7 +34,7 @@ export const COMPONENTS: DefinedComponent<z.ZodObject, null>[] = [
   spec(
     'Stack',
     z.object({ children, direction: z.enum(['column', 'row']).optional(), gap: tone(['row', 'stack', 'section']) }),
-    'Lays its children out in a column (the default) or a row. A Card in a row is as wide as its content.',
+    'Lays its children out in a column (the default) or a row. A row of only Cards becomes equal columns that wrap on a narrow pane. A Card in a mixed row is as wide as its content.',
   ),
   spec(
     'Card',

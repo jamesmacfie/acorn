@@ -57,10 +57,16 @@ const act = (label: () => string, action: () => unknown) => {
 
 const StackBinding: ComponentRenderer<Props> = (p) => {
   const row = () => p.props.direction === 'row'
+  // A row of only Cards is equal columns of even height. Anything else, such as a row of buttons, keeps
+  // its content width. A fitted card still fills its column on the web, and the terminal ignores `even`.
+  const cards = () => {
+    const children = [p.props.children].flat(Infinity) as { typeName?: string }[]
+    return children.length > 0 && children.every((child) => child?.typeName === 'Card')
+  }
   return (
     <InRow.Provider value={row}>
       <Show when={row()} fallback={<Stack gap={p.props.gap ?? 'stack'}>{p.renderNode(p.props.children)}</Stack>}>
-        <Inline gap={p.props.gap ?? 'inline'} wrap>
+        <Inline gap={p.props.gap ?? 'inline'} wrap even={cards()}>
           {p.renderNode(p.props.children)}
         </Inline>
       </Show>

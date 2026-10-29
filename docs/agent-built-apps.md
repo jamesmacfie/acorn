@@ -60,9 +60,10 @@ hands the runtime.
 | Data | `Panel(plan, inputs)`, which draws one of the app's plans with the dashboard's own panel |
 | Functions | `@Includes(list, value)`, `@Toggled(list, value)`, `@GroupBy(rows, field)`, beside OpenUI's built-ins |
 
-A `Card` in a row `Stack` is as wide as its content. A set of ticked rows is a `$` variable holding a
-list: `@Includes($ticked, r._id)` checks a row's box, and `@Set($ticked, @Toggled($ticked, r._id))`
-flips it. The library has no chart or table besides `Panel`.
+A row `Stack` of only `Card`s lays them out as equal columns of the same height, which wrap onto
+their own lines on a narrow pane. A `Card` in a row with anything else is as wide as its content. A
+set of ticked rows is a `$` variable holding a list: `@Includes($ticked, r._id)` checks a row's box,
+and `@Set($ticked, @Toggled($ticked, r._id))` flips it. The library has no chart or table besides `Panel`.
 
 Programs pass props by position, so a stored program depends on their order. Add a prop only at the
 end, never reorder or remove one, give a new required prop a default, and raise `LIBRARY_VERSION`.
