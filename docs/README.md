@@ -479,6 +479,15 @@ Each plugin landing page above has topic pages in a folder of the same name:
 - [What's left for the mobile web app](./future/mobile.md): real-device checks, small fixes on a phone,
   the hosted steps for plugins and Preview on the phone, and later work.
 
+## Review guides proposal
+
+- [Review guides](./future/guide/README.md), an agent that walks you through a pull request, with
+  phases for [agent turns for installed plugins](./future/guide/01-session-execute-for-plugins.md),
+  [the target branch on a change request](./future/guide/02-change-request-base.md), [the review guide
+  plugin](./future/guide/03-review-guide-plugin.md), [the guide inside the pull request
+  view](./future/guide/04-guide-in-change-request-view.md), and [jumping from a guide step to the
+  code](./future/guide/05-reveal-in-diff.md).
+
 ## Node for other machines proposal
 
 - [Run a Node for clients on other machines](./future/node-tray/README.md), with phases for
