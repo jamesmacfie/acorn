@@ -135,11 +135,23 @@ describe('a Bitbucket task', () => {
       title: 'Fix the importer',
       body: expect.stringContaining('https://bitbucket.org/acme/api/issues/3'),
       changedFiles: ['src/app.ts'],
+      baseRef: 'main',
+      headSha: 'a'.repeat(40),
     })
     expect((await call('/12/checks?taskId=task-1')).body).toMatchObject({ failing: ['test'], pending: ['build'] })
     const feedback = (await call('/12/feedback?taskId=task-1')).body as { threads: { threadId: string }[] }
     expect(feedback.threads.map((thread) => thread.threadId)).toEqual(['3'])
     expect(((await call('/12/feedback?taskId=task-1&includeResolved=true')).body.threads as unknown[]).length).toBe(2)
+  })
+
+  it("answers a fork's pull request with the branch it merges into and its whole head commit", async () => {
+    repo.pullRequests[0] = makePullRequest({
+      sourceBranch: 'patch-1',
+      sourceRepository: 'alice/api',
+      destinationBranch: 'release/2.0',
+    })
+    await mirror()
+    expect((await call('/12?taskId=task-1')).body).toMatchObject({ baseRef: 'release/2.0', headSha: 'a'.repeat(40) })
   })
 
   it("opens a pull request from the task's branch, as the Node", async () => {

@@ -44,7 +44,14 @@ export async function mirroredPullRequest(
     .select({ path: prFiles.path })
     .from(prFiles)
     .where(and(eq(prFiles.userId, userId), eq(prFiles.repoId, repoId), eq(prFiles.number, pullNumber)))
-  return { number: pr.number, title: pr.title, body: pr.body, changedFiles: files.map((file) => file.path).sort() }
+  return {
+    number: pr.number,
+    title: pr.title,
+    body: pr.body,
+    changedFiles: files.map((file) => file.path).sort(),
+    baseRef: pr.baseRef,
+    headSha: pr.headSha,
+  }
 }
 
 /**

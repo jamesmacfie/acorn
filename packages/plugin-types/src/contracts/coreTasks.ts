@@ -55,6 +55,17 @@ export type TaskChangeRequest = {
   requestId?: string
 }
 
+/** A change request as its code host answers it. `baseRef` is the branch it merges into and `headSha`
+ *  its head commit. Either is missing or null when the code host's mirror doesn't know it yet. */
+export type TaskChangeRequestDetail = {
+  number: number
+  title: string
+  body: string | null
+  changedFiles: string[]
+  baseRef?: string | null
+  headSha?: string | null
+}
+
 export type RunTarget = {
   id: string
   command: string
@@ -110,6 +121,9 @@ export type CoreTaskService = {
   links(taskId: string): Promise<TaskLinkRef[]>
   /** Every change request linked to the task, oldest first. */
   changeRequests(taskId: string): Promise<TaskChangeRequest[]>
+  /** The primary change request's detail, read from its code host. `null` when the task has none, or
+   *  the code host doesn't answer within five seconds or answers something unusable. */
+  changeRequestDetail(taskId: string): Promise<TaskChangeRequestDetail | null>
   /** Link a change request an agent opened inside the task. The first one takes the task's empty primary
    *  slot, and later ones are related. Throws when the repository isn't the task project's. */
   attachChangeRequest(taskId: string, input: AttachChangeRequestInput): Promise<TaskChangeRequest>

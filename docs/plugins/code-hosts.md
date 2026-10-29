@@ -134,7 +134,7 @@ running plugin that holds its host, through the routes under its declared `api`:
 
 | Route | Answers |
 | --- | --- |
-| `GET {api}/{number}?taskId=` | The number, title, body, and changed file paths |
+| `GET {api}/{number}?taskId=` | The number, title, body, changed file paths, target branch (`baseRef`), and head commit (`headSha`) |
 | `GET {api}/{number}/checks?taskId=` | Each check's name, status, and URL, with the failing and pending names |
 | `GET {api}/{number}/feedback?taskId=` | Reviews, inline threads, and conversation comments. `includeResolved=true` adds resolved threads |
 | `POST {api}` | Opens a change request from `head`, the task's branch, and answers `{ number }` |
@@ -142,6 +142,8 @@ running plugin that holds its host, through the routes under its declared `api`:
 The shapes are `changeRequestDetail`, `changeRequestChecks`, `changeRequestFeedback`,
 `changeRequestCreateInput`, and `changeRequestCreated` in `packages/protocol/src/plugin/contract.ts`.
 Core parses every answer with them, so a compiled and a loaded plugin give an agent the same fields.
+`baseRef` and `headSha` may be missing or null. With the `tasks` grant, a plugin reads the primary's
+detail through `tasks.changeRequestDetail(taskId)`, which answers `null` when the section is empty.
 
 Core calls the three reads as the task, so a route should check the task with `mayActOnTask` and
 read only its own local data. A read waits at most 5 seconds. A 404, a timeout, or an answer that

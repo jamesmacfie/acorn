@@ -1,6 +1,55 @@
 # Phase 2: the target branch on a change request
 
-Date: October 30, 2026. Status: not started.
+Date: October 30, 2026. Status: done.
+
+## Completion note
+
+Landed October 30, 2026.
+
+What landed:
+
+- `changeRequestDetail` in `packages/protocol/src/plugin/contract.ts` has `baseRef` and `headSha`,
+  both `z.string().nullable().optional()`. It also exports the `ChangeRequestDetail` type.
+- GitHub, GitLab, and Bitbucket answer both from their mirrors' `baseRef` and `headSha` columns.
+  GitHub's `MirroredPullRequest`, which the `github.mirror` capability also returns, has the two
+  fields as well.
+- `tasks.changeRequestDetail(taskId)` in `packages/node-core/src/server/core/tasks.ts`. It calls
+  `primaryChangeRequestHost`, then `readChangeRequest` with the `changeRequestDetail` shape, as the
+  `pr` section does. It answers `null` for a task with no primary, a host with no `api`, no bound
+  identity, a non-2xx, a timeout, or a body that doesn't parse. Its call mode is in
+  `hostCallModes.ts`, so it crosses the worker for a loaded plugin with the `tasks` grant.
+- The published type is `TaskChangeRequestDetail` in `packages/plugin-types/src/contracts/coreTasks.ts`.
+  The published surface snapshot has the new members.
+- Docs: [code hosts](../../plugins/code-hosts.md#agent-context).
+
+Decisions and deviations:
+
+- The two fields accept null as well as a missing key. The mirrors store null until they've fetched a
+  pull request, and `.optional()` alone would refuse that body and empty the `pr` section. The
+  checks route's `runId` follows the same rule.
+- `createTaskService(db, env?)` and `createCoreServices({ env? })` take the node's bindings, because
+  `readChangeRequest` needs them to reach a plugin route. Boot passes `runtime`. The option is
+  optional so the 50 or so test callers that never read a detail need no `Env`. Called without one,
+  the method throws "Change request detail requires host bindings", the same rule the plugin
+  context's data source methods follow.
+- The method makes no task check of its own. No task facet method does: an unknown task has no
+  primary, so it answers `null`. The code host's route still checks the task with `mayActOnTask`,
+  because core asks it as the task.
+- The facet tests sit in `changeRequestTools.test.ts`, beside the `pr_*` tests, because that file
+  already stands up a fake code host. The timeout test shortens `AbortSignal.timeout` to 10 ms
+  rather than wait 5 seconds.
+- `docs/plugins/code-hosts.md` sits at the 200-line limit, so its addition is two lines. The next
+  change to that page has to split it.
+- The site page `code-host.mdx` cites that doc. It doesn't describe the route's fields, so it needed
+  no change, and it's marked checked.
+
+For later phases:
+
+- Read `baseRef` and `headSha` as possibly missing or null. A cold mirror has neither, and a code host
+  that predates this phase sends neither. Treat that the same as a `null` answer.
+- Bitbucket's `headSha` is the whole hash when the mirror's commit list has the head commit, and the
+  12-character short hash Bitbucket names it by otherwise. Git resolves either in the task's checkout.
+- The method reads only the primary change request.
 
 ## Goal
 

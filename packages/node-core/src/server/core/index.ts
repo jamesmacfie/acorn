@@ -22,6 +22,7 @@ import type { CapabilityRegistry } from '../pluginHost/capabilities'
 import { codeHostLabel, runningCodeHosts } from '../pluginHost/codeHosts'
 import type { NodeKeyCustody } from '../sessionKey'
 import { realpathSync } from 'node:fs'
+import type { Env } from '../bindings'
 
 // The three module-shaped facets, named rather than left as `typeof <module>`, so an export added to
 // the module reaches plugins, and the `fs` permission grant, only when someone adds it below too. The
@@ -132,8 +133,11 @@ export function createCoreServices(options: {
   // The boot's capability registry. Core reads the plugin state bridge from it at call time, because
   // the bridge only exists once the plugins have started.
   capabilities: CapabilityRegistry
+  // The node's bindings, for the one task read that asks a code host's route. Optional, so a test that
+  // never reads a change request's detail needs no Env.
+  env?: Env
 }): CompiledCoreServices {
-  const tasks = createTaskService(options.db)
+  const tasks = createTaskService(options.db, options.env)
   const projects = createProjectService(options.db, options.activeIdentity)
   const checkoutAdmission = createCheckoutAdmission(tasks, projects, git, async () =>
     options.db.select(TASK_REF_COLUMNS).from(schema.tasks).all(),

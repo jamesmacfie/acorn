@@ -88,6 +88,7 @@ export type {
   TaskPullRelation,
   AttachChangeRequestInput,
   TaskChangeRequest,
+  TaskChangeRequestDetail,
   RunTarget,
   LayoutRecipe,
   TaskRunConfig,

@@ -608,6 +608,7 @@ acorn-plugin-types: member CoreTaskService.attachChangeRequest
 acorn-plugin-types: member CoreTaskService.attachPull
 acorn-plugin-types: member CoreTaskService.branchClaims
 acorn-plugin-types: member CoreTaskService.cancel
+acorn-plugin-types: member CoreTaskService.changeRequestDetail
 acorn-plugin-types: member CoreTaskService.changeRequests
 acorn-plugin-types: member CoreTaskService.createChild
 acorn-plugin-types: member CoreTaskService.deleted
@@ -1222,6 +1223,12 @@ acorn-plugin-types: member TaskChangeRequest.sessionId
 acorn-plugin-types: member TaskChangeRequest.sourceBranch
 acorn-plugin-types: member TaskChangeRequest.sourceRepository
 acorn-plugin-types: member TaskChangeRequest.taskId
+acorn-plugin-types: member TaskChangeRequestDetail.baseRef
+acorn-plugin-types: member TaskChangeRequestDetail.body
+acorn-plugin-types: member TaskChangeRequestDetail.changedFiles
+acorn-plugin-types: member TaskChangeRequestDetail.headSha
+acorn-plugin-types: member TaskChangeRequestDetail.number
+acorn-plugin-types: member TaskChangeRequestDetail.title
 acorn-plugin-types: member TaskLinkRef.identifier
 acorn-plugin-types: member TaskLinkRef.integrationId
 acorn-plugin-types: member TaskLinkRef.provider
@@ -1447,6 +1454,7 @@ acorn-plugin-types: type SessionMessengerContribution
 acorn-plugin-types: type SetupTrigger
 acorn-plugin-types: type StarterTrigger
 acorn-plugin-types: type TaskChangeRequest
+acorn-plugin-types: type TaskChangeRequestDetail
 acorn-plugin-types: type TaskLinkRef
 acorn-plugin-types: type TaskPullRelation
 acorn-plugin-types: type TaskRef

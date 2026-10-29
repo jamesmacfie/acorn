@@ -113,6 +113,7 @@ describe('a GitLab task', () => {
   it("answers core's agent tools from the mirror, and nothing before it holds the merge request", async () => {
     expect((await call('/12?taskId=task-1')).status).toBe(404)
     project.mergeRequests[0] = makeMergeRequest({
+      targetBranch: 'release/2.0',
       pipeline: {
         sha: 'a'.repeat(40),
         jobs: [
@@ -155,6 +156,8 @@ describe('a GitLab task', () => {
       title: 'Fix the importer',
       body: expect.stringContaining('https://gitlab.com/group/sub/api/-/issues/3'),
       changedFiles: ['src/app.ts'],
+      baseRef: 'release/2.0',
+      headSha: 'a'.repeat(40),
     })
     expect((await call('/12/checks?taskId=task-1')).body).toMatchObject({ failing: ['test'], pending: ['build'] })
     const feedback = (await call('/12/feedback?taskId=task-1')).body as { threads: { threadId: string }[] }

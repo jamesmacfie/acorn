@@ -36,6 +36,8 @@ export const changeRequestRoutes = (db: PluginDatabase, core: TaskCore, servers:
           title: found.detail.request.title,
           body: found.detail.request.body,
           changedFiles: (await readFilePaths(db, found.key)).sort(),
+          baseRef: found.detail.request.baseRef,
+          headSha: found.detail.request.headSha,
         })
       })
       .get('/:number/checks', async (c) => {

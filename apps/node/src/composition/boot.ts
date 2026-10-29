@@ -197,6 +197,7 @@ export async function bootNode(options: BootNodeOptions): Promise<BootedNode> {
       activeIdentity: runtime.ACTIVE_IDENTITY,
       nodeKeys: nodeKeyCustody(dataDir, options.keys ? 'desktop' : 'files', keyCheck),
       capabilities,
+      env: runtime,
     })
     // Open task script waits are aborted, and a pending setup attempt is recorded as interrupted by
     // `shutdown` rather than by `restart` on the next boot.

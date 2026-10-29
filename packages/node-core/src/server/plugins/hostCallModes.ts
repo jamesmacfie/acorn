@@ -81,6 +81,7 @@ const modes = {
       inProject: 'async',
       links: 'async',
       changeRequests: 'async',
+      changeRequestDetail: 'async',
       attachChangeRequest: 'async',
       adoptChangeRequests: 'async',
       pulls: 'async',

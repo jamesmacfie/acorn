@@ -7,6 +7,9 @@ export type MirroredPullRequest = {
   body: string | null
   /** Sorted paths from `pr_files`. The section renders a capped, comma-joined list. */
   changedFiles: string[]
+  /** The branch it merges into and its head commit, null until the mirror has fetched them. */
+  baseRef: string | null
+  headSha: string | null
 }
 
 /** Repository metadata from one owner's disposable local GitHub mirror. */

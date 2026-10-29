@@ -19,6 +19,7 @@ const now = Date.now()
 // What a GitLab plugin's `changeRequest.api` routes answer, from fixed data. Core reaches them with no
 // GitHub code in the way (docs/plugins/code-hosts.md § Agent context).
 const MERGE_REQUEST = { number: 12, title: 'Fix the importer', body: 'Why', changedFiles: ['src/import.ts'] }
+let answerDetail: () => Promise<Response> = async () => Response.json(MERGE_REQUEST)
 const CHECKS = {
   number: 12,
   checks: [{ name: 'test', status: 'failed', url: 'https://gitlab.test/jobs/1' }],
@@ -36,8 +37,8 @@ async function gitlabRoutes(request: Request): Promise<Response> {
     ...(request.method === 'POST' ? { body: await request.json() } : {}),
   })
   if (request.method === 'POST') return Response.json({ number: 13 })
+  if (url.pathname === '/12') return answerDetail()
   const answers: Record<string, unknown> = {
-    '/12': MERGE_REQUEST,
     '/12/checks': CHECKS,
     '/12/feedback': url.searchParams.get('includeResolved') === 'true' ? { ...FEEDBACK, omitted: 1 } : FEEDBACK,
   }
@@ -53,6 +54,7 @@ describe('change request tools on a code host other than GitHub', () => {
   beforeEach(async () => {
     t = makeTestDb()
     asked.length = 0
+    answerDetail = async () => Response.json(MERGE_REQUEST)
     undeclare = declareCodeHost(
       'gitlab-test',
       {
@@ -162,5 +164,36 @@ describe('change request tools on a code host other than GitHub', () => {
     expect(await createTaskService(t.db).changeRequests('two')).toEqual([
       expect.objectContaining({ provider: 'gitlab-test', number: 13, role: 'primary', sessionId: 'session' }),
     ])
+  })
+
+  describe('the task facet', () => {
+    const detail = (taskId: string) => createTaskService(t.db, ENV).changeRequestDetail(taskId)
+
+    it("reads the primary's target branch and head commit from its code host", async () => {
+      answerDetail = async () => Response.json({ ...MERGE_REQUEST, baseRef: 'release/2.0', headSha: 'a'.repeat(40) })
+      expect(await detail('one')).toEqual({ ...MERGE_REQUEST, baseRef: 'release/2.0', headSha: 'a'.repeat(40) })
+      expect(asked.map((request) => request.path)).toEqual(['/12?taskId=one'])
+    })
+
+    it('answers null for a task with no change request, without asking', async () => {
+      expect(await detail('two')).toBeNull()
+      expect(asked).toEqual([])
+    })
+
+    it("answers null when the code host's answer doesn't parse", async () => {
+      answerDetail = async () => Response.json({ number: 12, title: 'Fix the importer' })
+      expect(await detail('one')).toBeNull()
+    })
+
+    it("answers null when the code host doesn't answer in time", async () => {
+      const timeout = AbortSignal.timeout.bind(AbortSignal)
+      vi.spyOn(AbortSignal, 'timeout').mockImplementation(() => timeout(10))
+      answerDetail = () => new Promise<Response>(() => {})
+      try {
+        expect(await detail('one')).toBeNull()
+      } finally {
+        vi.restoreAllMocks()
+      }
+    })
   })
 })

@@ -44,9 +44,17 @@ describe('the change request routes', () => {
     await testDb.db
       .insert(repos)
       .values({ userId: USER, id: 1, owner: 'acme', name: 'widget', private: false, fetchedAt: 1 })
-    await testDb.db
-      .insert(pullRequests)
-      .values({ userId: USER, repoId: 1, number: 7, state: 'open', title: 'Ship it', body: 'Why', fetchedAt: 1 })
+    await testDb.db.insert(pullRequests).values({
+      userId: USER,
+      repoId: 1,
+      number: 7,
+      state: 'open',
+      title: 'Ship it',
+      body: 'Why',
+      baseRef: 'release/2.0',
+      headSha: 'a'.repeat(40),
+      fetchedAt: 1,
+    })
   })
 
   afterEach(() => testDb.cleanup())
@@ -59,7 +67,7 @@ describe('the change request routes', () => {
     return { status: response.status, body: (await response.json()) as Record<string, unknown> }
   }
 
-  it("answers the pull request's title, body, and sorted changed files", async () => {
+  it("answers the pull request's title, body, sorted changed files, target branch, and head commit", async () => {
     await testDb.db.insert(prFiles).values(
       ['src/b.ts', 'src/a.ts'].map((path, position) => ({
         userId: USER,
@@ -76,7 +84,14 @@ describe('the change request routes', () => {
     )
     expect(await call('/7?taskId=task-1')).toEqual({
       status: 200,
-      body: { number: 7, title: 'Ship it', body: 'Why', changedFiles: ['src/a.ts', 'src/b.ts'] },
+      body: {
+        number: 7,
+        title: 'Ship it',
+        body: 'Why',
+        changedFiles: ['src/a.ts', 'src/b.ts'],
+        baseRef: 'release/2.0',
+        headSha: 'a'.repeat(40),
+      },
     })
   })
 

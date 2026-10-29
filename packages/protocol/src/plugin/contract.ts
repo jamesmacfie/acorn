@@ -187,7 +187,12 @@ export const changeRequestDetail = z.object({
   title: z.string(),
   body: z.string().nullable(),
   changedFiles: z.array(z.string()),
+  // The branch it merges into and its head commit, null while the mirror doesn't know them. Optional,
+  // so a code host that predates them still answers a shape core parses.
+  baseRef: z.string().nullable().optional(),
+  headSha: z.string().nullable().optional(),
 })
+export type ChangeRequestDetail = z.infer<typeof changeRequestDetail>
 
 // GET {api}/{number}/checks. A check that is still running is pending, not failing.
 export const changeRequestChecks = z.object({

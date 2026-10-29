@@ -23,7 +23,15 @@ import {
   type TaskRef,
 } from '../worktrees/taskWorktree'
 import { getProject, githubFacet, normalizeGithubPart, projectRepository } from '../projects/projects'
-import { changeRequestProvider, setPrimaryChangeRequest, type ChangeRequestRow } from './changeRequests'
+import { changeRequestDetail, type ChangeRequestDetail } from '@acorn/protocol/plugin/contract.ts'
+import type { Env } from '../bindings'
+import {
+  changeRequestProvider,
+  primaryChangeRequestHost,
+  readChangeRequest,
+  setPrimaryChangeRequest,
+  type ChangeRequestRow,
+} from './changeRequests'
 import { isTaskArchiving } from '../worktrees/archiveGate'
 
 // What `taskRunConfig` answers: the merged run-target config plus the cwd to run it in. Named,
@@ -156,6 +164,10 @@ export type TaskService = {
   links(taskId: string): Promise<TaskLinkRef[]>
   // Every change request linked to the task, oldest first (docs/plugins/code-hosts.md § Change requests).
   changeRequests(taskId: string): Promise<TaskChangeRequest[]>
+  // The primary change request as its code host answers it, the read behind the `pr` section, so a
+  // plugin can diff against the real target branch on any host. Null when the task has no primary, or
+  // the code host gives no usable answer in time (docs/plugins/code-hosts.md § Agent context).
+  changeRequestDetail(taskId: string): Promise<ChangeRequestDetail | null>
   // Attach a change request created through a task-scoped agent tool. The first one takes the task's
   // empty primary slot and later ones are related. The row keeps the agent provenance either way.
   attachChangeRequest(taskId: string, input: AttachChangeRequestInput): Promise<TaskChangeRequest>
@@ -199,7 +211,9 @@ export type CompiledTaskService = TaskService & {
   archivedBefore(before: number): Promise<string[]>
 }
 
-export function createTaskService(db: AppDatabase): CompiledTaskService {
+// `env` reaches the code host's routes. Only `changeRequestDetail` needs it, so a caller that never
+// reads one, such as a test, may leave it out.
+export function createTaskService(db: AppDatabase, env?: Env): CompiledTaskService {
   const table = schema.taskChangeRequests
 
   const toChangeRequest = (row: ChangeRequestRow): TaskChangeRequest => ({
@@ -485,6 +499,12 @@ export function createTaskService(db: AppDatabase): CompiledTaskService {
         .where(eq(schema.taskLinks.taskId, taskId)),
     changeRequests: async (taskId) =>
       (await db.select().from(table).where(eq(table.taskId, taskId)).orderBy(table.createdAt)).map(toChangeRequest),
+    changeRequestDetail: async (taskId) => {
+      if (!env) throw new Error('Change request detail requires host bindings')
+      const host = await primaryChangeRequestHost(db, taskId)
+      const userId = env.ACTIVE_IDENTITY.get()
+      return host && userId ? readChangeRequest(env, host, '', changeRequestDetail, { userId, taskId }) : null
+    },
     attachChangeRequest: async (taskId, input) =>
       attach(
         taskId,
