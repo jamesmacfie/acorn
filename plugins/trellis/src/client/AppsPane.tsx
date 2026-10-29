@@ -52,20 +52,18 @@ export function AppList(props: { task: Task; model: AppsPaneModel }) {
           variant="stacked"
           selected={props.model.selected()?.appId === entry.app.appId}
           onPress={() => props.model.select(entry.app.appId)}
-          meta={<Text emphasis="muted">{`v${entry.app.head}`}</Text>}
+          title={entry.app.description || entry.app.name}
+          meta={<Text emphasis="muted">{`v${entry.app.head} · ${formatRelativeTime(entry.app.updatedAt)}`}</Text>}
         >
           <Text emphasis="strong">{entry.app.name}</Text>
           <Show when={entry.app.description}>
-            <Text emphasis="muted" wrap>
-              {entry.app.description}
-            </Text>
+            <Text emphasis="muted">{entry.app.description}</Text>
           </Show>
           <Show when={entry.app.draftOf}>
             {(draftOf) => (
               <Text emphasis="muted">{`Draft of ${appById(draftOf().appId)?.name ?? 'a removed app'} v${draftOf().revision}`}</Text>
             )}
           </Show>
-          <Text emphasis="muted">{`Changed ${formatRelativeTime(entry.app.updatedAt)}`}</Text>
         </Row>
       )}
     </Rows>
