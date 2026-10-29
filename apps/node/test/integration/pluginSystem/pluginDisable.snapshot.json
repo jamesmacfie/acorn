@@ -158,6 +158,7 @@
       "agents.loopHooksRoute",
       "agents.managedRoute",
       "agents.mcpServersRoute",
+      "agents.profiles",
       "agents.requests",
       "agents.reviewInput.v1",
       "agents.runtime",

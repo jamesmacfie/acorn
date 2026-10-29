@@ -15,12 +15,18 @@ import {
   type NodePlugin,
   resolveCommand,
 } from '@acorn/plugin-api/node'
+import { BIND_CAPABILITY_CALLER } from '@acorn/protocol/plugin/ids.ts'
 import { TERMINAL_SESSIONS } from '@acorn/plugin-terminal/contract/sessions.ts'
 import { NOTES_SPAWN_SNAPSHOT } from '@acorn/plugin-notes/contract/spawnSnapshot.ts'
 import { randomUUID } from 'node:crypto'
 import { join } from 'node:path'
 import type { McpPackageManager } from '../server/mcpPackageManager'
-import { AGENTS_SESSION_CONTROL, AGENTS_SESSION_EXECUTE } from '../contract/sessionExecute'
+import {
+  AGENTS_PROFILES,
+  AGENTS_SESSION_CONTROL,
+  AGENTS_SESSION_EXECUTE,
+  type AgentSessionExecute,
+} from '../contract/sessionExecute'
 import { claudeHarness } from '../server/drivers/claudeHarness'
 import { CodexAgentDriver } from '../server/drivers/codexDriver'
 import { agentDriverRegistry } from '../server/drivers/registry'
@@ -729,13 +735,27 @@ export const agentsPlugin = (dataDir: string, deps: AgentsPluginDeps): NodePlugi
       const executeRuntime = runtime
       // The judge is the same one interactive goals use, so a step's completion check runs through its own harness.
       const goalJudge = { models: ctx.core.models, currentUserId: () => ctx.core.identity.active() }
-      ctx.capabilities.provide(AGENTS_SESSION_EXECUTE, async (request) =>
-        (await import('../server/sessions/sessionExecute')).createSessionExecute(
-          executeRuntime,
-          followUpRegistry,
-          goalJudge,
-        )(request),
+      const sessionExecute =
+        (caller?: string): AgentSessionExecute =>
+        async (request) =>
+          (await import('../server/sessions/sessionExecute')).createSessionExecute(
+            executeRuntime,
+            followUpRegistry,
+            goalJudge,
+            caller,
+          )(request)
+      // Workflows gets this unbound. A loaded plugin gets the copy for its id, as with session control.
+      ctx.capabilities.provide(
+        AGENTS_SESSION_EXECUTE,
+        Object.assign(sessionExecute(), { [BIND_CAPABILITY_CALLER]: sessionExecute }),
       )
+      ctx.capabilities.provide(AGENTS_PROFILES, {
+        list: async () =>
+          agentProfileRegistry
+            .list()
+            .filter((profile) => profile.managedProvider)
+            .map(({ id, label }) => ({ id, label })),
+      })
       ctx.capabilities.provide(AGENTS_SESSION_CONTROL, createSessionControl(runtime))
       // Who a signed tool call came from, for another plugin's tools (`AgentToolCallerLookup`).
       toolCallers = createToolCallers(runtime.store)

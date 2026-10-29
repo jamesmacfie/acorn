@@ -1,5 +1,5 @@
 // The Agents plugin's contracts a plugin outside this repository calls or answers: hook payloads,
-// extension point entries, and four capabilities. Written out rather than aliased to `HostOwned`, as
+// extension point entries, and capabilities. Written out rather than aliased to `HostOwned`, as
 // attachments.ts is, because their owner is `plugins/agents/src/contract/`, which a loaded plugin
 // cannot import. tools/arch/agentContract.test.ts holds each one to its source.
 
@@ -108,6 +108,91 @@ export type AgentSessionControl = {
   cancel(taskId: string, sessionId: string): Promise<void>
   setConfig(taskId: string, sessionId: string, optionId: string, value: string): Promise<void>
 }
+
+/** One event of a turn, as `onEvent` receives it. */
+export type AgentStreamEvent = Record<string, unknown> & { type?: string }
+
+/** The tools a turn may call: names it may use, and the highest risk among them. */
+export type AgentToolCeiling = { allow?: string[]; maxRisk?: 'read' | 'write' | 'execute' }
+
+export type AgentExecuteUsage = {
+  costUsd: number | null
+  usage:
+    | { inputTokens?: number; outputTokens?: number; cachedInputTokens?: number; cacheWriteInputTokens?: number }
+    | undefined
+}
+
+export type AgentGoalVerdict = {
+  turnId: string
+  satisfied: boolean
+  blocker: 'none' | 'missing_evidence' | 'needs_user_input' | 'run_failed' | 'external_wait' | 'goal_not_met_yet'
+  reason: string
+  evidence_summary: string
+  relied_on_assumption: boolean
+}
+
+export type AgentExecuteGoalSummary = {
+  objective: string
+  status: 'checking' | 'continuing' | 'satisfied' | 'blocked' | 'exhausted' | 'unavailable' | 'stopped'
+  continuations: number
+  repairs: number
+  verdict: AgentGoalVerdict | null
+  automaticTurns: { turnId: string; reason: 'goal' | 'repair' }[]
+  reason?: string
+}
+
+/** One turn for `agents.sessionExecute` (docs/managed-agents/session-control.md § Running a turn from a
+ *  plugin). The turn runs gated, with the harness's own permission checks on. */
+export type AgentSessionExecuteRequest = {
+  taskId: string
+  /** An id from `agents.profiles`. Another profile answers null. */
+  profileId: string | undefined
+  /** Used only when a new session is created. */
+  title: string
+  prompt: string
+  /** Material the prompt works on. Each item reaches the model as its own context block. */
+  context?: { label: string; source: string; content: string }[]
+  /** A JSON schema the answer must match. The result's `capture.structuredOutput` holds it. */
+  schema?: object
+  model?: string
+  /** Harness option ids to the values this turn wants, such as `model` and `reasoning`. */
+  configOptions?: Record<string, string>
+  tools?: AgentToolCeiling
+  timeoutMs?: number
+  /** Continue a session this plugin started, from an earlier result's `agentSessionId`. */
+  managedSessionId?: string
+  /** Your own id for the turn. A retry with the same one reuses its session instead of starting another. */
+  stepId?: string
+  /** A completion condition the turn keeps working towards, checked after each turn. */
+  goal?: string
+  admitAutomatic?: (request: { kind: 'turn' | 'check'; usage: AgentExecuteUsage }) => Promise<string | null>
+  onGoal?: (summary: AgentExecuteGoalSummary) => void
+  onEvent?: (event: AgentStreamEvent) => void
+  signal?: AbortSignal
+}
+
+export type AgentSessionExecuteResult = {
+  status: 'ok' | 'error' | 'timeout' | 'malformed' | 'cancelled'
+  exitCode: number | null
+  capture: {
+    result: string | null
+    structuredOutput: unknown | null
+    sessionId: string | null
+    costUsd: number | null
+    usage?: AgentExecuteUsage['usage']
+    events: AgentStreamEvent[]
+  }
+  /** Why the turn ended without `ok`. */
+  stderrTail: string
+  agentSessionId?: string
+  goal?: AgentExecuteGoalSummary
+}
+
+/** `agents.sessionExecute`. Null when the profile has no managed driver. */
+export type AgentSessionExecute = (request: AgentSessionExecuteRequest) => Promise<AgentSessionExecuteResult | null>
+
+/** `agents.profiles`: the profiles `agents.sessionExecute` can run on. */
+export type AgentProfiles = { list(): Promise<{ id: string; label: string }[]> }
 
 /** One row of a task's input-request inbox. */
 export type AgentRequestState = {

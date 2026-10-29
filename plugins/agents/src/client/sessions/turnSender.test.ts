@@ -54,6 +54,14 @@ describe('senderLabel', () => {
     expect(senderLabel(turn('plugin'))).toBe('From a plugin')
   })
 
+  it('names the plugin that ran a step, and acorn for its nudge', () => {
+    const step = { ...turn('workflow'), effectivePolicy: { sentBy: { pluginId: 'acme' } } }
+    expect(senderLabel(step)).toBe('From acme')
+    expect(senderLabel({ ...step, effectivePolicy: { ...step.effectivePolicy, continuationOf: 'first' } })).toBe(
+      'Acorn',
+    )
+  })
+
   it('ignores an unrelated context part and falls back for older turns', () => {
     expect(senderLabel(turn('delegation', [sender('agents', 'History copied from X')]))).toBe(
       'From the delegating agent',

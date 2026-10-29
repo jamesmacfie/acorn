@@ -1,6 +1,6 @@
 # Review guides: an agent walks you through a pull request
 
-Date: October 30, 2026. Status: proposed. No phase started.
+Date: October 30, 2026. Status: in progress. Phase 1 is done.
 
 ## What this is
 

@@ -72,8 +72,9 @@ These pages cover harnesses and the work agents do:
 - [Activity](./managed-agents/session-events.md#activity): `plugin:agents:activity` and
   `agents.activity.v1`, a session's tool calls, subagents, and context fill, without content.
 - [Session control](./managed-agents/session-control.md): `agents.sessionControl`, stopping a turn or
-  changing an advertised option from another plugin, named in the transcript, and `agents.toolCaller`,
-  the signed session behind another plugin's agent tool call.
+  changing an advertised option from another plugin, named in the transcript, `agents.sessionExecute`
+  for a loaded plugin's own turn, and `agents.toolCaller`, the signed session behind another plugin's
+  agent tool call.
 
 - [Subagents](./managed-agents/subagents.md): provider-native subagents.
 - [Background commands](./managed-agents/background-commands.md): shell commands that run past their turn.

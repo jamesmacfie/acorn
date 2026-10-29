@@ -396,6 +396,79 @@ describe('agents.sessionExecute config options', () => {
     })
   })
 
+  // The copy the host hands a loaded plugin (docs/managed-agents/session-control.md § Running a turn
+  // from a plugin). The unbound value above is what workflows gets.
+  describe('a loaded plugin’s bound copy', () => {
+    const turn = (caller: string, extra: Partial<Parameters<ReturnType<typeof createSessionExecute>>[0]> = {}) =>
+      createSessionExecute(
+        runtime,
+        undefined,
+        undefined,
+        caller,
+      )({
+        taskId,
+        profileId: 'claude-code',
+        title: 'Review guide',
+        prompt: 'Group the hunks.',
+        stepId: 'guide-1',
+        ...extra,
+      })
+
+    it('refuses each field only workflows set, by name, before any work', async () => {
+      await expect(turn('acme', { posture: 'autonomous' })).rejects.toThrow("A plugin can't set 'posture'")
+      await expect(turn('acme', { posture: 'gated' })).rejects.toThrow("'posture'")
+      await expect(turn('acme', { allowUnguardedAgents: true })).rejects.toThrow("'allowUnguardedAgents'")
+      await expect(turn('acme', { runId: 'run-1' })).rejects.toThrow("'runId'")
+      expect((await runtime.store.listSessions({ taskId })).sessions).toEqual([])
+      expect(driver.turns).toHaveLength(0)
+    })
+
+    it('runs gated, and names the plugin on the session, its turn, and its context', async () => {
+      const result = await turn('acme', {
+        context: [{ label: 'Hunks', source: 'acme.hunks', content: '@@ -1 +1 @@' }],
+      })
+      expect(result?.status).toBe('ok')
+      const session = await runtime.store.requireSession(result!.agentSessionId!)
+      expect(session.config).toMatchObject({ startedByPlugin: 'acme', initialAttendance: 'supervised' })
+      expect(driver.turns[0]!.turn.effectivePolicy).toMatchObject({
+        attendance: 'supervised',
+        sentBy: { pluginId: 'acme' },
+      })
+      expect(driver.turns[0]!.input.at(-1)).toMatchObject({ type: 'context', provenance: 'Plugin acme' })
+      // A client's config patch can't rename the plugin that started it.
+      const patched = await runtime.patchSession(session.id, { config: { startedByPlugin: 'someone-else' } })
+      expect(patched.config.startedByPlugin).toBe('acme')
+    })
+
+    it('refuses a harness mode that skips its permission checks, even though the turn is gated', async () => {
+      driver.startMode = 'bypassPermissions'
+      await expect(turn('acme')).rejects.toBeInstanceOf(UnguardedAgentError)
+      driver.startMode = 'default'
+      await expect(
+        turn('acme', { stepId: 'guide-2', configOptions: { mode: 'bypassPermissions' } }),
+      ).rejects.toBeInstanceOf(UnguardedAgentError)
+      expect(driver.turns).toHaveLength(0)
+    })
+
+    it('continues only a session the same plugin started', async () => {
+      const first = await turn('acme')
+      const managedSessionId = first!.agentSessionId!
+      expect((await turn('acme', { stepId: 'guide-2', managedSessionId }))?.status).toBe('ok')
+      await expect(turn('other', { stepId: 'guide-3', managedSessionId })).rejects.toThrow('does not match')
+      const workflow = await execute()
+      await expect(turn('acme', { stepId: 'guide-4', managedSessionId: workflow!.agentSessionId! })).rejects.toThrow(
+        'does not match',
+      )
+    })
+
+    it('keeps a plugin’s step ids apart from a workflow’s and another plugin’s', async () => {
+      const workflow = await execute()
+      const mine = await turn('acme', { stepId: 'step-1' })
+      const theirs = await turn('other', { stepId: 'step-1' })
+      expect(new Set([workflow, mine, theirs].map((result) => result!.agentSessionId)).size).toBe(3)
+    })
+  })
+
   describe('a turn that ends without what the step needs', () => {
     const answerSchema = { type: 'object', properties: { answer: { type: 'string' } }, required: ['answer'] }
     const executeWithSchema = () =>

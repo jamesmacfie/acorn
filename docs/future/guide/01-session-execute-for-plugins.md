@@ -1,6 +1,52 @@
 # Phase 1: agent turns for installed plugins
 
-Date: October 30, 2026. Status: not started.
+Date: October 30, 2026. Status: done.
+
+## Completion note
+
+Landed October 30, 2026.
+
+What landed:
+
+- `agents.sessionExecute` carries a `BIND_CAPABILITY_CALLER` entry, set in `plugins/agents/src/node/index.ts`.
+  `createSessionExecute` takes an optional `caller`. The workflows plugin still gets the unbound value.
+- The bound copy refuses `posture`, `allowUnguardedAgents`, and `runId` by name, runs gated, stores
+  `startedByPlugin` on the session it creates, and stamps `sentBy: { pluginId }` on its turns.
+- A new read-only `agents.profiles` capability. Its `list()` returns `{ id, label }` for each profile
+  with a managed driver. Nothing a loaded plugin could reach listed profiles before.
+- Published types in `packages/plugin-types/src/contracts/agents.ts`: `AgentSessionExecute`, its
+  request and result, and `AgentProfiles`. `tools/arch/agentContract.test.ts` pins them to the source,
+  with the request minus the three refused fields.
+- Trust lines for both capabilities. `agents.sessionExecute` is high.
+- The transcript labels the plugin's turn "From acme", and the session list row shows "by acme".
+- Docs: [session control](../../managed-agents/session-control.md#running-a-turn-from-a-plugin),
+  and [permissions](../../plugin-authoring/permissions.md).
+
+Decisions and deviations:
+
+- `runId` is refused too. A session's `workflowRunId` decides which workflow runs its agent may read
+  through the workflow tools, so a plugin must not be able to set it.
+- The bound copy also refuses an unguarded harness mode, such as `bypassPermissions`, with
+  `UnguardedAgentError`, even though it runs gated. A gated workflow step allows that mode, because
+  the person chose the workflow. A plugin's turn has nobody who chose it. A person whose harness
+  starts in `bypassPermissions` gets that error from any plugin turn.
+- A plugin may continue only a session it started. Its session idempotency key includes the plugin
+  ID and task ID, so its `stepId` can't land on a workflow's session or another task's.
+- `startedByPlugin` is a server-owned session config key, so a client's config patch can't change it.
+  The HTTP turn schema also refuses `sentBy` in `effectivePolicy`, so a client can't claim a plugin's name.
+- Plugin sessions are still `kind: 'workflow'`. The sidebar groups them with workflow sessions.
+- The refusal test and the fix landed in one commit. Against the old unbound value, the refusal test
+  fails.
+
+For later phases:
+
+- Every callback crosses the worker. `onEvent` reaches the plugin while the turn runs, and aborting
+  the plugin's `signal` returns a `cancelled` result. `reload.test.ts` covers both with a stand-in
+  provider.
+- Pass a stable `stepId`, for example one built from the head commit, so a retry reuses the session
+  instead of spending a new one.
+- Loaded plugin tests need a patched Node runtime (`>=24.18.1 <25` or `>=26.5.1 <27`). A 24.11 shell
+  skips the worker and fails the test.
 
 ## Goal
 

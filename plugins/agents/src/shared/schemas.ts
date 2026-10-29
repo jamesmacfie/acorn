@@ -113,7 +113,7 @@ export const enqueueAgentTurnSchema = z.object({
     .record(z.string(), z.unknown())
     .default({})
     .superRefine((policy, context) => {
-      for (const key of ['attendance', 'initialAttendance', 'followUpOf', 'continuationOf', 'posture']) {
+      for (const key of ['attendance', 'initialAttendance', 'followUpOf', 'continuationOf', 'posture', 'sentBy']) {
         if (Object.hasOwn(policy, key)) context.addIssue({ code: 'custom', message: `${key} is resolved by the host.` })
       }
     }),

@@ -89,6 +89,28 @@ describe('the two permission groups', () => {
     ])
   })
 
+  it('marks running agent turns high, because they spend usage and act in the task', () => {
+    const lines = nodePermissionLines(
+      permissions({
+        node: {
+          core: [],
+          capabilities: ['agents.sessionExecute', 'agents.profiles'],
+          secrets: false,
+          exec: false,
+          net: [],
+          sockets: false,
+        },
+      }),
+    )
+    expect(lines.map(({ text, high }) => ({ text, high }))).toEqual([
+      {
+        text: 'Run turns in your agent sessions, which spends their usage and lets them act in the task',
+        high: true,
+      },
+      { text: 'See which agent harnesses can run its turns', high: false },
+    ])
+  })
+
   it('marks model generation high, because it spends the owner’s provider usage', () => {
     const lines = nodePermissionLines(
       permissions({

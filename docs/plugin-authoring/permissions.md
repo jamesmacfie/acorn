@@ -26,7 +26,13 @@ process, and network access are also absent unless declared.
   commands the Node runs, so they're separate grants. An unknown token is skipped, not rejected, so a
   manifest naming a facet from a newer build loses only that grant.
 - `capabilities` lists capability ids this plugin may `get` or `require`. `provide` is never filtered,
-  because exporting a capability is a contribution, not an access grant.
+  because exporting a capability is a contribution, not an access grant. The trust prompt describes
+  a few capabilities in the host's words, and shows any other one as "Use capability" with its ID.
+  `agents.sessionExecute` reads "Run turns in your agent sessions, which spends their usage and lets
+  them act in the task", and `agents.sessionControl` reads "Stop your agent sessions’ turns, and
+  change their model, reasoning effort, and other options, which changes what they spend". Both are
+  marked high. `agents.profiles` reads "See which agent harnesses can run its turns"
+  ([session control](../managed-agents/session-control.md)).
 - `secrets` and `exec` are Booleans, separate from `core`, because a reviewer should see them spelled
   out. `secrets` gives use-scoped credential access through `ctx.core.secrets`, and `exec` gives the
   process broker, `ctx.core.proc`.

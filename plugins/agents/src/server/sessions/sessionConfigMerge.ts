@@ -9,6 +9,8 @@ const serverOwnedKeys = [
   'workflowRunId',
   'workflowStepId',
   'delegationSpawnId',
+  // The loaded plugin that started the session through `agents.sessionExecute`.
+  'startedByPlugin',
   'customAgent',
   'standingContext',
   // The memory index the agent was last told about, once it changed after the start.

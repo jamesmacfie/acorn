@@ -410,6 +410,8 @@ export default function AgentTaskSidebar(props: { task: Task; model: AgentPaneMo
                       <Text emphasis="muted">
                         {[
                           current().providerId,
+                          typeof current().config.startedByPlugin === 'string' &&
+                            `by ${current().config.startedByPlugin}`,
                           !rowAccountIcon() && rowAccountLabel(),
                           sessionModelSummary(current()),
                           current().runtimeState,

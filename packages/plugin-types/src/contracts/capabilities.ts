@@ -4,9 +4,11 @@ import type { EditorFilesCapability } from './editorFiles.js'
 import type { TranscriptMediaCapability } from './transcriptMedia.js'
 import type {
   AgentActivityCapability,
+  AgentProfiles,
   AgentRequestsCapability,
   AgentReviewInputCapability,
   AgentSessionControl,
+  AgentSessionExecute,
 } from './agents.js'
 
 // ── Capabilities ──────────────────────────────────────────────────────────────────────────────────
@@ -53,8 +55,11 @@ export type PluginCapabilities = {
  *
  * The signature is the call acorn promises; each provider's contract module holds the rest. */
 export type CapabilityCatalogue = {
-  /** Run a prompt in a managed agent session. */
-  'agents.sessionExecute': HostOwned<'plugins/agents/contract/sessionExecute.AgentSessionExecute'>
+  /** Run a turn in a managed agent session of a task, gated, with the harness's permission checks on.
+   *  The host binds your plugin id, which the session list and the transcript name. */
+  'agents.sessionExecute': AgentSessionExecute
+  /** The agent profiles `agents.sessionExecute` can run on, for a person to pick from. */
+  'agents.profiles': AgentProfiles
   /** Stop a session's turn, or pick one of the values its harness advertised for an option such as the
    *  model or reasoning effort. The host binds your plugin id, which the transcript names. */
   'agents.sessionControl': AgentSessionControl

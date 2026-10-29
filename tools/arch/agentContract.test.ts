@@ -12,7 +12,12 @@ import type {
   SessionMessengerContribution,
 } from '../../plugins/agents/src/contract/sessionMessages'
 import type { TurnFollowUpContribution, TurnFollowUpWindow } from '../../plugins/agents/src/contract/turnFollowUp'
-import type { AgentSessionControl } from '../../plugins/agents/src/contract/sessionExecute'
+import type {
+  AgentProfiles,
+  AgentSessionControl,
+  AgentSessionExecuteRequest,
+  AgentSessionExecuteResult,
+} from '../../plugins/agents/src/contract/sessionExecute'
 import type {
   AgentActivityCapability,
   AgentLifecycleFrame,
@@ -40,6 +45,13 @@ const messengerEntry: Mutual<SessionMessengerContribution, Published.SessionMess
 const followUpWindow: Mutual<TurnFollowUpWindow, Published.TurnFollowUpWindow> = [true, true]
 const followUpEntry: Mutual<TurnFollowUpContribution, Published.TurnFollowUpContribution> = [true, true]
 const sessionControl: Mutual<AgentSessionControl, Published.AgentSessionControl> = [true, true]
+// A loaded plugin's copy refuses the fields only workflows resolve, so the published request leaves them out.
+const executeRequest: Mutual<
+  Omit<AgentSessionExecuteRequest, 'posture' | 'allowUnguardedAgents' | 'runId'>,
+  Published.AgentSessionExecuteRequest
+> = [true, true]
+const executeResult: Mutual<AgentSessionExecuteResult, Published.AgentSessionExecuteResult> = [true, true]
+const profiles: Mutual<AgentProfiles, Published.AgentProfiles> = [true, true]
 const requests: Mutual<AgentRequestsCapability, Published.AgentRequestsCapability> = [true, true]
 const reviewInput: Mutual<AgentReviewInputCapability, Published.AgentReviewInputCapability> = [true, true]
 const activity: Mutual<AgentActivityCapability, Published.AgentActivityCapability> = [true, true]
@@ -65,6 +77,9 @@ it('keeps the published Agents hook payloads, entries, and capabilities aligned 
     followUpWindow,
     followUpEntry,
     sessionControl,
+    executeRequest,
+    executeResult,
+    profiles,
     requests,
     reviewInput,
     activity,

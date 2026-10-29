@@ -59,16 +59,19 @@ export type AgentSessionExecuteRequest = {
   tools?: ToolCeiling
   timeoutMs?: number
   // Reuse an existing managed session rather than creating one. Validated by the provider against
-  // taskId, providerId and kind: a mismatched id is an error, not a silent new session.
+  // taskId, providerId and kind: a mismatched id is an error, not a silent new session. A loaded
+  // plugin may reuse only a session it started.
   managedSessionId?: string
   // Correlation ids stored on the session and turn, so the owner can trace a turn back to its run. Also
-  // the basis of the idempotency keys, so a retried step doesn't double-spend a turn.
+  // the basis of the idempotency keys, so a retried step doesn't double-spend a turn. A loaded plugin's
+  // copy refuses `runId`, because a session's run decides which workflow runs its agent may read.
   runId?: string
   stepId?: string
-  /** Resolved from the workflow run by the workflows plugin, never from an HTTP or tool body. */
+  /** Resolved from the workflow run by the workflows plugin, never from an HTTP or tool body. A loaded
+   *  plugin's copy refuses it and runs the turn gated. */
   posture?: 'gated' | 'autonomous'
   /** Lets an autonomous turn run with the harness's checks off. Without it the step is refused with
-   *  UnguardedAgentError. Resolved by the workflows plugin like `posture`. */
+   *  UnguardedAgentError. Resolved by the workflows plugin like `posture`, and refused like it. */
   allowUnguardedAgents?: boolean
   /** A completion condition, already rendered. The step continues in the same session until a
    *  check finds it satisfied, or the step reaches a blocker or a limit. Needs a profile with a
@@ -128,3 +131,10 @@ export const AGENTS_SESSION_CONTROL = capabilityId<AgentSessionControl>('agents.
 // harness a manifest contributes (`createHarnessRegistry`).
 export const managedProviderForProfile = (profileId: string | undefined): string | null =>
   (profileId ? agentProfileRegistry.get(profileId)?.managedProvider : undefined) ?? null
+
+/** The profiles a turn can run on, the ones `managedProviderForProfile` names a driver for, for a plugin
+ *  that lets the person pick a harness (docs/managed-agents/session-control.md § Running a turn from a
+ *  plugin). */
+export type AgentProfiles = { list(): Promise<{ id: string; label: string }[]> }
+
+export const AGENTS_PROFILES = capabilityId<AgentProfiles>('agents.profiles')

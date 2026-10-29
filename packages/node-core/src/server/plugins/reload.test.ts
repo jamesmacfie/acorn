@@ -876,3 +876,103 @@ describe('a folder plugin’s granted model call through the loader and the host
     }
   })
 })
+
+// `agents.sessionExecute` across a real loaded worker (docs/managed-agents/session-control.md § Running a
+// turn from a plugin). The provider stands in for agents, whose own tests cover the bound copy's rules.
+// This proves the binding, a lent `onEvent` called while the turn runs, and the plugin's abort arriving.
+describe('a folder plugin’s agent turn through the loader and the host', () => {
+  it('completes a turn, streams its events to the plugin, and stops it on the plugin’s abort', async () => {
+    const { mkdirSync, mkdtempSync, rmSync, writeFileSync } = await import('node:fs')
+    const { tmpdir } = await import('node:os')
+    const { join } = await import('node:path')
+    const { installPlugin } = await import('./installer')
+    const { loadExternalPlugins, loadedPluginBinding } = await import('./loader')
+    const { PLUGIN_API_MAJOR } = await import('./manifest')
+    const root = mkdtempSync(join(tmpdir(), 'acorn-execute-folder-'))
+    const options = hostOptions()
+    const callers: string[] = []
+    type Request = { prompt: string; onEvent?: (event: unknown) => void; signal?: AbortSignal }
+    const execute = (caller: string) => async (request: Request) => {
+      callers.push(caller)
+      request.onEvent?.({ type: 'assistant_message', text: `${request.prompt} started` })
+      if (request.prompt === 'wait')
+        await new Promise((resolve) => request.signal?.addEventListener('abort', resolve, { once: true }))
+      return { status: request.signal?.aborted ? 'cancelled' : 'ok', capture: { result: 'done' } }
+    }
+    const provided = options.capabilities.provide(
+      capabilityId('agents.sessionExecute'),
+      Object.assign(execute('unbound'), { [BIND_CAPABILITY_CALLER]: execute }),
+    )
+    try {
+      const source = join(root, 'source')
+      mkdirSync(join(source, 'dist'), { recursive: true })
+      writeFileSync(
+        join(source, 'acorn-plugin.json'),
+        JSON.stringify({
+          id: 'execute-fixture',
+          name: 'Execute fixture',
+          version: '1.0.0',
+          baseline: 'acorn-1',
+          apiVersion: PLUGIN_API_MAJOR,
+          node: './dist/node.js',
+          permissions: {
+            node: { core: [], capabilities: ['agents.sessionExecute'], secrets: false, exec: false, net: [] },
+          },
+        }),
+      )
+      writeFileSync(
+        join(source, 'dist', 'node.js'),
+        `export default { name: "execute-fixture", init(ctx) {
+        ctx.routes.fetch(async (request) => {
+          const body = await request.json()
+          const events = []
+          const controller = new AbortController()
+          if (body.abortAfterMs) setTimeout(() => controller.abort(), body.abortAfterMs)
+          const result = await ctx.capabilities.get("agents.sessionExecute")({
+            taskId: "t", profileId: "claude-code", title: "Guide", prompt: body.prompt,
+            onEvent: (event) => events.push(event), signal: controller.signal,
+          })
+          return Response.json({ status: result.status, result: result.capture.result, events })
+        })
+      } }\n`,
+      )
+      await installPlugin(root, { path: source })
+      const { loaded } = await loadExternalPlugins(root, { builtins: [] })
+      const host = await initPlugins(
+        loaded.map((entry) => entry.plugin),
+        {
+          ...options,
+          dataDir: root,
+          loaded: new Map(loaded.map((entry) => [entry.manifest.id, loadedPluginBinding(entry)])),
+        },
+      )
+      const call = async (body: Record<string, unknown>) =>
+        (
+          await new Hono<AppEnv>()
+            .use('/v1/*', ...testGate({ kind: 'device', userId: 'owner-1', deviceId: 'device-1' }))
+            .all(`${PLUGIN_NAMESPACE}/:plugin/*`, dispatchPluginFetch)
+            .fetch(
+              new Request('http://acorn.test/v1/p/execute-fixture/run', { method: 'POST', body: JSON.stringify(body) }),
+              {} as Env,
+            )
+        ).json()
+
+      expect(await call({ prompt: 'guide' })).toEqual({
+        status: 'ok',
+        result: 'done',
+        events: [{ type: 'assistant_message', text: 'guide started' }],
+      })
+      expect(await call({ prompt: 'wait', abortAfterMs: 20 })).toEqual({
+        status: 'cancelled',
+        result: 'done',
+        events: [{ type: 'assistant_message', text: 'wait started' }],
+      })
+      expect(callers).toEqual(['execute-fixture', 'execute-fixture'])
+      await host.dispose()
+    } finally {
+      provided.dispose()
+      clearRegistrations('execute-fixture')
+      rmSync(root, { recursive: true, force: true })
+    }
+  })
+})

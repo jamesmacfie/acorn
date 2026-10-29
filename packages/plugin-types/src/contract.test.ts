@@ -249,6 +249,7 @@ it('names every capability the first-party plugins publish', () => {
   const ids: Array<keyof Published.CapabilityCatalogue> = [
     'agents.sessionExecute',
     'agents.sessionControl',
+    'agents.profiles',
     'agents.runtime',
     'agents.turns',
     'agents.requests',
@@ -273,7 +274,7 @@ it('names every capability the first-party plugins publish', () => {
     'workflows.gates',
     'workflows.notices',
   ]
-  expect(new Set(ids).size).toBe(25)
+  expect(new Set(ids).size).toBe(26)
 })
 
 it('keeps every published declaration module free of runtime statements', () => {

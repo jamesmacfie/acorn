@@ -55,7 +55,11 @@ const goalInstruction = (goal: string): string =>
 // The step's prompt, then its context as parts of their own. The model reads the same tagged blocks
 // either way. Past the per-turn context cap the blocks go inline in the text instead, which only the
 // larger whole-input cap bounds, so a step with a big diff upstream still runs.
-function stepInput(request: AgentSessionExecuteRequest, goal: string | undefined): AgentInputPart[] {
+function stepInput(
+  request: AgentSessionExecuteRequest,
+  goal: string | undefined,
+  caller: string | undefined,
+): AgentInputPart[] {
   const text = promptWithResultContract(
     goal ? [request.prompt, goalInstruction(goal)].join('\n\n') : request.prompt,
     request.schema,
@@ -70,7 +74,7 @@ function stepInput(request: AgentSessionExecuteRequest, goal: string | undefined
       type: 'context',
       contextId: randomUUID(),
       ...item,
-      provenance: request.runId ? `Workflow run ${request.runId}` : 'Workflow',
+      provenance: caller ? `Plugin ${caller}` : request.runId ? `Workflow run ${request.runId}` : 'Workflow',
       byteSize: Buffer.byteLength(item.content, 'utf8'),
       estimatedTokens: Math.ceil(Buffer.byteLength(item.content, 'utf8') / 4),
       freshness: 'live',
@@ -182,16 +186,25 @@ function resultFromSnapshot(
   return { status: 'ok', exitCode: 0, capture, stderrTail: '', agentSessionId: snapshot.session.id }
 }
 
-async function sessionFor(runtime: ManagedAgentRuntime, request: AgentSessionExecuteRequest, providerId: string) {
+async function sessionFor(
+  runtime: ManagedAgentRuntime,
+  request: AgentSessionExecuteRequest,
+  providerId: string,
+  posture: AgentSessionExecuteRequest['posture'],
+  caller: string | undefined,
+) {
   if (request.managedSessionId) {
     const session = await runtime.store.requireSession(request.managedSessionId)
-    if (session.taskId !== request.taskId || session.providerId !== providerId || session.kind !== 'workflow') {
+    if (
+      session.taskId !== request.taskId ||
+      session.providerId !== providerId ||
+      session.kind !== 'workflow' ||
+      (caller !== undefined && session.config.startedByPlugin !== caller)
+    ) {
       throw new Error('The persisted managed workflow session does not match this step.')
     }
     const attendance =
-      request.posture === undefined
-        ? sessionAttendance(session)
-        : resolveAttendance(session, 'workflow', request.posture)
+      posture === undefined ? sessionAttendance(session) : resolveAttendance(session, 'workflow', posture)
     if (session.config.initialAttendance === undefined) {
       return runtime.store.patchSession(session.id, { config: { ...session.config, initialAttendance: attendance } })
     }
@@ -210,10 +223,14 @@ async function sessionFor(runtime: ManagedAgentRuntime, request: AgentSessionExe
         workflowRunId: request.runId,
         workflowStepId: request.stepId,
         toolCeiling: request.tools ?? {},
+        ...(caller ? { startedByPlugin: caller } : {}),
       },
     },
-    `workflow-session:${request.stepId ?? randomUUID()}`,
-    request.posture,
+    // A plugin's step id is its own, so its key can't land on a workflow's session or another task's.
+    caller
+      ? `plugin-session:${caller}:${request.taskId}:${request.stepId ?? randomUUID()}`
+      : `workflow-session:${request.stepId ?? randomUUID()}`,
+    posture,
   )
 }
 
@@ -250,6 +267,10 @@ function withJudgeUsage(
   }
 }
 
+// What only the workflows plugin resolves. A loaded plugin's copy refuses each one rather than dropping
+// it, so its author learns why the turn didn't run as asked.
+const WORKFLOW_ONLY_FIELDS = ['posture', 'allowUnguardedAgents', 'runId'] as const
+
 /** The step ends on `reason` with whatever its last turn produced. */
 const stopped = (result: HeadlessResult, reason: string): HeadlessResult => ({
   ...result,
@@ -267,13 +288,23 @@ const stopped = (result: HeadlessResult, reason: string): HeadlessResult => ({
  * `judge` runs completion checks for a step with a goal (docs/workflows/agent-steps.md § Completion
  * conditions). A goal is checked once the step's turns settle, before the review window, and again
  * whenever a repair or a joined note changes the step's turns.
+ *
+ * `caller` is set on the copy the host binds for a loaded plugin (docs/managed-agents/session-control.md
+ * § Running a turn from a plugin). That copy refuses the fields only workflows resolve, runs gated with
+ * the harness's checks on, and names the plugin on the session and its turns.
  */
 export function createSessionExecute(
   runtime: ManagedAgentRuntime,
   followUps?: () => Promise<TurnFollowUps>,
   judge?: GoalJudgePorts,
+  caller?: string,
 ): AgentSessionExecute {
   return async (request) => {
+    if (caller) {
+      const field = WORKFLOW_ONLY_FIELDS.find((key) => request[key] !== undefined)
+      if (field) throw new Error(`A plugin can't set '${field}' on an agent turn. Only workflows set it.`)
+    }
+    const posture = caller ? 'gated' : request.posture
     const providerId = managedProviderForProfile(request.profileId)
     if (!providerId) return null
     // Checked before any work starts, so a goal never runs without its check.
@@ -286,9 +317,11 @@ export function createSessionExecute(
         : 'This node has no completion checker.'
       if (unavailable) throw new Error(unavailable)
     }
-    const session = await sessionFor(runtime, request, providerId)
+    const session = await sessionFor(runtime, request, providerId, posture, caller)
     await applyRequestedConfig(runtime, session.id, request.configOptions)
-    if (request.posture === 'autonomous' && !request.allowUnguardedAgents) {
+    // A plugin's turn is checked even though it runs gated: the person didn't start it, so nobody chose
+    // to let it run with the harness's checks off.
+    if (caller || (posture === 'autonomous' && !request.allowUnguardedAgents)) {
       // Read after the requested options are applied, and before the first turn is queued.
       const { config } = await runtime.store.requireSession(session.id)
       const unguarded = Array.isArray(config.configOptions) ? unguardedSetting(config.configOptions) : undefined
@@ -302,7 +335,7 @@ export function createSessionExecute(
       const first = await runtime.enqueueTurn(
         session.id,
         {
-          input: stepInput(request, objective),
+          input: stepInput(request, objective, caller),
           source: 'workflow',
           effectivePolicy: {
             // Codex reads the model and the effort off the policy at turn time; the Claude driver takes
@@ -315,10 +348,12 @@ export function createSessionExecute(
             workflowStepId: request.stepId,
             schema: request.schema,
             toolCeiling: request.tools ?? {},
+            // The transcript names the plugin as it does a plugin's note. Continuations copy it.
+            ...(caller ? { sentBy: { pluginId: caller } } : {}),
           },
           idempotencyKey: `workflow-turn:${request.stepId ?? randomUUID()}:${beforeSeq}`,
         },
-        { posture: request.posture },
+        { posture },
       )
       persistedAttendance(first.effectivePolicy)
       // Every turn the step owns, in the order they were queued. Notes join through the operation.

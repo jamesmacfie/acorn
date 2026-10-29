@@ -111,6 +111,12 @@ const NODE_CORE_DESCRIPTIONS: Readonly<Record<string, GrantDescription>> = {
 // The capabilities that act on something the owner is doing rather than read it, in the host's words.
 // Any other id keeps the generic line.
 const CAPABILITY_DESCRIPTIONS: Readonly<Record<string, GrantDescription>> = {
+  'agents.sessionExecute': {
+    text: 'Run turns in your agent sessions, which spends their usage and lets them act in the task',
+    icon: 'bot',
+    high: true,
+  },
+  'agents.profiles': { text: 'See which agent harnesses can run its turns', icon: 'bot' },
   'agents.sessionControl': {
     text: 'Stop your agent sessions’ turns, and change their model, reasoning effort, and other options, which changes what they spend',
     icon: 'sliders-horizontal',
