@@ -21,8 +21,8 @@ export type ReviewPanelProps = SummaryBadgesProps & { taskId: string }
 
 /** The three points, as `ctx.extensionPoints.register` takes them. `noun` is the host's word, such as
  *  `Pull request`. Marks on a line of the diff, keyed the way the shared viewer keys a row, room
- *  beside the state and checks on the overview, where the owner's own facts stay, and one view the
- *  reader can switch the diff for, such as a review guide. */
+ *  beside the state and checks on the overview, where the owner's own facts stay, and a tab of its own
+ *  beside the diff, such as a review guide. */
 export const changeRequestPoints = (noun: string) =>
   [
     { id: 'diff-line', label: `${noun} diff line`, kind: 'annotation', key: [...DIFF_LINE_KEY], max: 4 },

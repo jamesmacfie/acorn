@@ -12,7 +12,6 @@ import { ChangeRequestDescription, changeRequestSections } from './sections'
 // so the view that knows what a change request is made of says so, and the host decides whether the
 // diff gets a column beside the tabs or a tab of its own (docs/ui-design/closed-kit.md § The closed
 // kit). A browse surface and a task pane draw the same view, with their own diff and file selection.
-
 export function ChangeRequestView(props: {
   /** The `Sections` id, such as `github.pull`. */
   id: string

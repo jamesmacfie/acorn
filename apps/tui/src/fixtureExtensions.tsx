@@ -59,7 +59,7 @@ function installDiffMark(): Disposable {
   })
 }
 
-/** A compiled contribution into github's `review-panel` point, which the reader switches the diff for. */
+/** A compiled contribution into github's `review-panel` point, which the view draws as a tab. */
 function installReviewPanel(): Disposable {
   return extensionRegistry.register({
     id: 'fixture:review-panel',
