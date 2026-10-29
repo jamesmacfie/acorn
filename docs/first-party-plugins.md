@@ -11,8 +11,9 @@ What makes a plugin first-party is using something a loaded plugin can't be give
 
 The compiled plugins are account, agents, browser, context, docker, editor, git, github, memory, notes,
 onboarding, preview, terminal, and workflows. agent-cost, database, http, linear, model-providers,
-rollbar, and sentry-telemetry ship as loaded packages, and nodes-file is a loaded package that isn't
-bundled. All of them live in `plugins/` as source.
+review-guide ([the review guide plugin](./first-party-plugins/review-guide.md)), rollbar, and
+sentry-telemetry ship as loaded packages, and nodes-file is a loaded package that isn't bundled. All of
+them live in `plugins/` as source.
 
 ## What a loaded plugin can't have
 

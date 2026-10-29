@@ -1,0 +1,73 @@
+---
+title: Review guide
+description: Have the agent harness you pick arrange a task's pull request into sections in reading order, with every hunk shown exactly once.
+sources:
+  - docs/first-party-plugins/review-guide.md
+  - plugins/review-guide/acorn-plugin.config.mjs
+  - plugins/review-guide/src/tree/GuidePane.tsx
+checked: bebaee036
+---
+
+import { Steps } from '@astrojs/starlight/components'
+import Checkpoint from '../../../../components/Checkpoint.astro'
+import PluginFacts from '../../../../components/PluginFacts.astro'
+
+The Review guide plugin walks you through a task's pull request. The agent harness you pick, such as
+Claude Code or Codex, reads the change in the task's worktree and arranges its hunks into sections in the
+order you'd read them. Core changes come first, and tests, docs, and wiring come after. Each section says
+why its change exists, then shows its hunks.
+
+<PluginFacts id="review-guide">
+  <Fragment slot="adds">The **Guide** pane on a task, and the **Open review guide** command.</Fragment>
+  <Fragment slot="needs">A task with a pull request on GitHub, a merge request on GitLab, or a pull request on Bitbucket, and Claude Code or Codex installed.</Fragment>
+</PluginFacts>
+
+## Write a guide
+
+<Steps>
+
+1. Open a task that has a pull request or merge request, and open the **Guide** pane.
+
+2. Pick a harness in the pane's header, and click **Generate guide**.
+
+   <Checkpoint>The pane says the harness is writing the guide, with a link to its session. When it finishes, the pane shows a summary and the sections.</Checkpoint>
+
+</Steps>
+
+The harness runs one turn in an agent session of the task, so a guide spends that harness's usage. The
+turn can read the worktree but can't change it. **Stop** ends the turn.
+
+## What a guide shows
+
+- A summary of the whole change, and which harness wrote it for which commit.
+- One section per part of the change, in reading order. Each says why the change exists and shows its
+  hunks. A binary file, a rename, or a mode change shows its path and what changed.
+- **Not covered by the guide**, last, with any hunk the harness left out.
+
+acorn checks the harness's answer against the diff before it shows it. Every hunk appears exactly once:
+a hunk the harness left out goes to **Not covered by the guide**, a hunk it put in two sections stays in
+the first, and an ID that isn't in the change is dropped. The pane says when it moved or dropped
+anything, so a guide can arrange the change but can't hide any of it.
+
+## When the change moves on
+
+A new commit on the task marks the guide out of date, and the pane says the change has new commits.
+acorn doesn't write a new guide on its own, because each one spends usage. Click **Regenerate** when you
+want one.
+
+## What it can reach
+
+It reads the task's pull request from its code host plugin, and the change from the task's worktree with
+git. It has no network access of its own, runs no other programs, and reads no secrets. The guide is
+kept on the Node until the task is deleted.
+
+## In the terminal
+
+The terminal client draws the same pane.
+
+## Limits
+
+- A guide covers the task's own pull request, not a related one.
+- A change larger than 16 MB can't have a guide.
+- The guide covers the worktree's latest commit, which can be ahead of the pull request when a commit
+  hasn't been pushed.

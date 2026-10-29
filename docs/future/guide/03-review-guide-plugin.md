@@ -1,6 +1,61 @@
 # Phase 3: the review guide plugin
 
-Date: October 30, 2026. Status: not started. Needs phases 1 and 2.
+Date: October 30, 2026. Status: done.
+
+## Completion note
+
+Landed October 30, 2026.
+
+What landed:
+
+- `plugins/review-guide`, a bundled loaded package in `scripts/bundled-plugins.mjs`, built like
+  rollbar and stored like http. The reference page is
+  [the review guide plugin](../../first-party-plugins/review-guide.md). The site has
+  `/docs/built-in-plugins/review-guide/` and an entry in `apps/site/src/data/plugins.ts` with a reason
+  for each grant.
+- `src/server/diff.ts` parses `git diff` into items, tested on a fixture of real git output.
+  `src/server/coverage.ts` checks the answer. `src/server/prompt.ts` holds the prompt and the schema.
+  `src/server/guides.ts` owns storage, one generation per task, stop, and stale marking.
+  `src/server/routes.ts` serves the three routes. `src/tree/GuidePane.tsx` draws the pane.
+- Tests: the parser, the coverage check, the routes over a real git repository and plugin database with
+  a stand-in `agents.sessionExecute`, and the pane through a remote root.
+- The Node service graph is unchanged at 1,942,974 bytes.
+- Live checks: in `pnpm dev:agent` and `pnpm dev:tui:agent`, the bundled package loads, the trust
+  prompt lists every grant, **Open review guide** opens the pane, and a task with no change request
+  shows the empty state. Neither session had a signed-in code host, so a guide over a real pull request
+  wasn't generated. That check is still open. `dev:tui:agent` installs no loaded packages, so the
+  plugin was built into its data root with `ACORN_DATA_DIR=... build:plugin review-guide`.
+
+Decisions and deviations:
+
+- No saved choice uses the first profile `agents.profiles` lists, which is Claude Code, the Agents
+  plugin's default. `agents.defaultProfile` isn't in the published catalogue, and adding it wasn't worth
+  a contract change.
+- `build-plugin.mjs` and the testkit's `validatePluginConfig` now pass a config's `requires` into the
+  manifest. Both dropped it before, so the manifest's `requires.plugins: agents` would have vanished.
+- The context is one block that lists every hunk, not one block per hunk. The headers-only cap is 256 KiB
+  of hunk text, half the Agents plugin's 512 KiB context limit.
+- A task keeps one guide. Generating removes the rows for earlier commits.
+- Reading the change happens inside `POST /guide/generate`, so a missing target branch, a missing
+  worktree, or an empty diff comes back as an error the pane shows, with nothing stored. Only the turn
+  runs in the background.
+- A turn that finishes after HEAD moved stores `stale`. A restart marks `generating` rows `failed`.
+- `stepId` is `<profile>:<head>`, so a retry on the same commit and harness reuses the session. The
+  profile is in it because the Agents plugin refuses a reused session on another provider.
+- The tree caps its first draw at 256 KiB of hunk text, because the host refuses a batch over 1 MiB.
+  Later sections open on demand.
+- The transcript link uses a `session` destination with target kind `managed-agent`.
+- The site page's `checked` is the commit before this one, so `stale` lists it once.
+- The pane's open sections are kept by index, so after **Regenerate** the open set can point at
+  different sections. Small, and left as it is.
+
+For later phases:
+
+- The tree's entry is `pane`, mounted with `{ taskId }`. Phase 4 can mount the same `GuidePane` from a
+  `review-panel` point, since it needs only the task.
+- Each item has `path` and its hunk's `@@` header, which is what phase 5 needs to jump to a line.
+- `plugin:review-guide:changed` carries `taskId`.
+
 
 ## Goal
 

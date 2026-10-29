@@ -650,6 +650,7 @@ describe('architecture boundaries', () => {
       'plugins/http/src/tree',
       'plugins/database/src/tree',
       'plugins/linear/src/tree',
+      'plugins/review-guide/src/tree',
       'plugins/rollbar/src/tree',
       'plugins/sentry/src/tree',
       'plugins/sentry-telemetry/src/tree',

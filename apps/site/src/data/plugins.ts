@@ -228,6 +228,24 @@ export const PLUGINS = {
     worksInNote: "The terminal client can't show a web page.",
     docs: '/docs/built-in-plugins/preview/',
   },
+  'review-guide': {
+    name: 'Review guide',
+    sentence: "Has the agent harness you pick walk you through a task's pull request, section by section.",
+    icon: 'list-checks',
+    ships: 'package',
+    worksIn: both,
+    docs: '/docs/built-in-plugins/review-guide/',
+    reasons: {
+      'events:head:changed': 'Marks a guide out of date when the task gets a new commit.',
+      'events:plugin:review-guide:changed': 'Redraws the pane when a guide starts, finishes, or goes out of date.',
+      'node.core:tasks': "Reads the task's pull request and finds its worktree.",
+      'node.core:git': "Reads the change from the task's worktree with git.",
+      'node.core:prefs': 'Remembers the harness you picked.',
+      'node.capabilities:agents.sessionExecute':
+        'Runs the turn that writes the guide, in an agent session of the task, with read-only tools.',
+      'node.capabilities:agents.profiles': 'Lists the harnesses you can pick from.',
+    },
+  },
   rollbar: {
     name: 'Rollbar',
     sentence: 'Lists your Rollbar errors in the rail, shows each with its stack trace, and starts a task from one.',

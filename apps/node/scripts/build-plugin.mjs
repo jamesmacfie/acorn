@@ -263,6 +263,7 @@ writeFileSync(
     baseline,
     apiVersion: apiMajor,
     ...(spec.emits?.length ? { emits: spec.emits } : {}),
+    ...(spec.requires ? { requires: spec.requires } : {}),
     ...(spec.clients ? { clients: spec.clients } : {}),
     ...(spec.entry ? { node: './dist/node.js' } : {}),
     ...(spec.client ? { client: './dist/client.js' } : {}),

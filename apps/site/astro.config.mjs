@@ -252,6 +252,7 @@ export default defineConfig({
             'docs/built-in-plugins/model-providers',
             'docs/built-in-plugins/notes',
             'docs/built-in-plugins/preview',
+            'docs/built-in-plugins/review-guide',
             'docs/built-in-plugins/rollbar',
             'docs/built-in-plugins/sentry',
             'docs/built-in-plugins/sentry-telemetry',

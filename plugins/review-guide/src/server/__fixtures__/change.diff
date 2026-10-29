@@ -1,0 +1,83 @@
+diff --git a/added.txt b/added.txt
+new file mode 100644
+index 0000000..3e75765
+--- /dev/null
++++ b/added.txt
+@@ -0,0 +1 @@
++new
+diff --git a/before.txt b/after.txt
+similarity index 58%
+rename from before.txt
+rename to after.txt
+index 7853fa3..2e3fe77 100644
+--- a/before.txt
++++ b/after.txt
+@@ -1,4 +1,4 @@
+ keep me
+ line2
+ line3
+-line4
++line4 changed
+diff --git "a/caf\303\251.txt" "b/caf\303\251.txt"
+new file mode 100644
+index 0000000..45b983b
+--- /dev/null
++++ "b/caf\303\251.txt"
+@@ -0,0 +1 @@
++hi
+diff --git a/empty.txt b/empty.txt
+new file mode 100644
+index 0000000..e69de29
+diff --git a/img.png b/img.png
+new file mode 100644
+index 0000000..f584f40
+Binary files /dev/null and b/img.png differ
+diff --git a/nonl.txt b/nonl.txt
+index c1b0730..e25f181 100644
+--- a/nonl.txt
++++ b/nonl.txt
+@@ -1 +1 @@
+-x
+\ No newline at end of file
++y
+\ No newline at end of file
+diff --git a/old.txt b/old.txt
+deleted file mode 100644
+index 286c5f5..0000000
+--- a/old.txt
++++ /dev/null
+@@ -1 +0,0 @@
+-gone
+diff --git a/moved.txt b/renamed.txt
+similarity index 100%
+rename from moved.txt
+rename to renamed.txt
+diff --git a/script.sh b/script.sh
+old mode 100644
+new mode 100755
+diff --git a/src.txt b/src.txt
+index e8823e1..02ed27e 100644
+--- a/src.txt
++++ b/src.txt
+@@ -1,5 +1,5 @@
+ 1
+-2
++two
+ 3
+ 4
+ 5
+@@ -25,6 +25,6 @@
+ 25
+ 26
+ 27
+-28
++twenty-eight
+ 29
+ 30
+diff --git a/with space.txt b/with space.txt
+index 1275430..a67a12a 100644
+--- a/with space.txt	
++++ b/with space.txt	
+@@ -1 +1,2 @@
+ same
++more
