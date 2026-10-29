@@ -1,12 +1,19 @@
-// The site deploys as a Cloudflare Worker with static assets and no script (docs/site.md).
+// The site deploys as a Cloudflare Worker with static assets and one small script (docs/site.md).
 {
   "name": "acorn-site",
   "compatibility_date": "2026-10-01",
+  // Counts downloads and redirects them to GitHub. Only the paths in run_worker_first reach it.
+  "main": "./src/worker.ts",
   "assets": {
     "directory": "./dist",
+    "binding": "ASSETS",
     // Serve dist/404.html, with a 404 status, for any address the build didn't write.
-    "not_found_handling": "404-page"
+    "not_found_handling": "404-page",
+    // /download/<file>, but not the download page itself.
+    "run_worker_first": ["/download/*", "!/download/"]
   },
+  // Cloudflare creates the dataset on the first write and keeps each data point for three months.
+  "analytics_engine_datasets": [{ "binding": "DOWNLOADS", "dataset": "acorn_site_downloads" }],
   // Each pull request uploads a version under a `pr-<number>` alias, served on workers.dev.
   "preview_urls": true
 }

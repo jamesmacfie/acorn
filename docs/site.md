@@ -140,7 +140,9 @@ formatted by hand, to the same style.
 
 ## Deploy it
 
-The site is a Cloudflare Worker with static assets and no script, configured in `apps/site/wrangler.jsonc`.
+The site is a Cloudflare Worker with static assets, configured in `apps/site/wrangler.jsonc`. Its one
+script, `apps/site/src/worker.ts`, runs only for download links. It counts each download and redirects
+it to GitHub ([counting downloads](site/releases.md#counting-downloads)).
 `.github/workflows/site.yml` deploys it. The workflow runs on a pull request or a push to `main` that
 touches the site or anything it reads from, such as `docs/`, `packages/protocol/`, or the kit. It
 type-checks the site, then builds and tests the production and preview builds side by side.

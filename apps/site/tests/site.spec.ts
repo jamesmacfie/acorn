@@ -79,21 +79,22 @@ test('with no release, the download page says so and puts Build from source firs
   await page.goto('/lab/download/none/')
   await expect(page.locator('main > .callout').first()).toContainText('acorn has no signed release.')
   await expect(page.locator('main h2').first()).toHaveText('Build from source')
-  await expect(page.locator('main a[href*="/releases/download/"]')).toHaveCount(0)
+  await expect(page.locator('main a[href^="/download/"]')).toHaveCount(0)
 })
 
+// Each button goes to a path that src/worker.ts counts and redirects. src/worker.test.ts checks the redirects.
 test('with a release for every platform, the download page links every file', async ({ page }) => {
   test.skip(!previewBuild, 'The fixture releases are lab pages, which only a preview build has.')
   await page.goto('/lab/download/every-platform/')
-  const files = {
-    'macOS, Apple silicon': 'acorn_1.0.0_aarch64.dmg',
-    'macOS, Intel': 'acorn_1.0.0_x64.dmg',
-    'Windows installer': 'acorn_1.0.0_x64-setup.exe',
-    'Standalone Node': 'acorn-node-1.0.0.tar.gz',
-    Checksums: 'SHA256SUMS',
+  const paths = {
+    'macOS, Apple silicon': '/download/macos-arm64',
+    'macOS, Intel': '/download/macos-x64',
+    'Windows installer': '/download/windows',
+    'Standalone Node': '/download/node',
+    Checksums: '/download/checksums',
   }
-  for (const [name, file] of Object.entries(files)) {
-    await expect(page.getByRole('link', { name, exact: true })).toHaveAttribute('href', new RegExp(`/${file}$`))
+  for (const [name, path] of Object.entries(paths)) {
+    await expect(page.getByRole('link', { name, exact: true })).toHaveAttribute('href', path)
   }
   await expect(page.getByText('acorn has no signed release.')).toHaveCount(0)
   const { violations } = await new AxeBuilder({ page }).withTags(['wcag2a', 'wcag2aa']).analyze()

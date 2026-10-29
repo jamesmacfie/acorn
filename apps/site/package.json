@@ -13,7 +13,7 @@
     "og": "node scripts/og.mjs",
     "reference": "node scripts/reference.mjs",
     "stale": "node scripts/stale.mjs",
-    "test": "node --test scripts/*.test.mjs src/lib/*.test.ts && vitest run scripts/referenceExamples.test.ts && node scripts/budget.mjs && playwright test",
+    "test": "node --test scripts/*.test.mjs src/lib/*.test.ts src/worker.test.ts && vitest run scripts/referenceExamples.test.ts && node scripts/budget.mjs && playwright test",
     "github:refresh": "node scripts/githubRefresh.ts"
   },
   "dependencies": {

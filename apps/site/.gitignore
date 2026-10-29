@@ -1,6 +1,8 @@
 .astro/
 test-results/
 playwright-report/
+# Wrangler's local state from `wrangler dev`.
+.wrangler/
 
 # The plugin reference and the components, built from src/content/reference/ and
 # src/content/components/ by scripts/reference.mjs.
