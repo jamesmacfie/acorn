@@ -1513,8 +1513,10 @@ button.ui-chip:hover { background: var(--bg-hover); border-color: var(--accent);
 /* Collapsed: the list column is the width of the icon rails, and it is the same token they read, so a
    style pack that moves the rails moves this with them (tokens-style.css § --tabrail-w). */
 .ui-listdetail[data-list='collapsed'] { grid-template-columns: var(--tabrail-w) 1px minmax(0, 1fr); }
-/* A column with no rail form of its own stays mounted but empty, so the rail is a plain strip. */
-.ui-listdetail[data-list='collapsed'][data-collapse-content='empty'] > .ui-listdetail-list { visibility: hidden; }
+/* A column with no rail form of its own stays mounted but empty, so the rail is a plain strip. Its
+   children hide rather than the column, so the blank header band below still lines up with the rails. */
+.ui-listdetail[data-list='collapsed'][data-collapse-content='empty'] > .ui-listdetail-list { overflow: hidden; }
+.ui-listdetail[data-list='collapsed'][data-collapse-content='empty'] > .ui-listdetail-list > * { visibility: hidden; }
 /* The collapse control rides the divider, half over each column's first bar, so those two bars make
    room for it rather than running under it. The bar can sit a wrapper or two down (a Stack, a remote
    tree). The host's layout has the same rule in shell.css. */
