@@ -228,6 +228,7 @@ function actionFields(node, prefix = '') {
 
 // The frame scope table, read as text: client-core's broker owns it, and client-core doesn't load in
 // plain Node. Each rule is one `path: shape(...)` with its `scopes`, and a rule the read skips fails here.
+// A verb scope, from `VERB_SCOPES`, lists the bridge verb it grants instead of routes.
 function apiScopes() {
   const text = source('packages/client-core/src/host/frames/scopes.ts')
   const rules = text.slice(text.indexOf('const RULES'))
@@ -243,6 +244,9 @@ function apiScopes() {
       scopes.set(scope, routes)
     }
   }
+  const verbs = text.match(/const VERB_SCOPES[^=]*= \{([^}]*)\}/)?.[1]
+  if (!verbs) throw new Error('Read no VERB_SCOPES in scopes.ts. Update apiScopes().')
+  for (const [, scope, verb] of verbs.matchAll(/'([^']+)': '([^']+)'/g)) scopes.set(scope, [...(scopes.get(scope) ?? []), verb])
   return [...scopes].sort(([a], [b]) => a.localeCompare(b))
 }
 
@@ -309,7 +313,7 @@ function permissionsFacts() {
   const facets = facetCopy()
   return [
     '## Frame scopes',
-    `Your frames and trees may call these acorn routes through the bridge, each under the scope in ${code('permissions.api')} that grants it. Your own ${code('/v1/p/<id>/')} routes need no scope. Every scope is **Enforced**.`,
+    `Your frames and trees may call these acorn routes and bridge verbs, each under the scope in ${code('permissions.api')} that grants it. Your own ${code('/v1/p/<id>/')} routes need no scope. Every scope is **Enforced**.`,
     table(
       ['Scope', 'What it allows'],
       apiScopes().map(([scope, routes]) => ({ id: anchor('scope', scope), cells: [scope, routes.map(code).join(', ')] })),

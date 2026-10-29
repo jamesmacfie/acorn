@@ -17,6 +17,14 @@ offset is exact before any rows load. The GitHub pane reads it from `?file=`. Co
 its segments from the list and keeps its header. Collapsing one from the sticky header scrolls back to
 that header, so you stay on the file you collapsed.
 
+A pane with no router drives its diff with `presentation:file-scroll`, which names the diff's route
+key, a path, and optionally a line and its side. Send it with `requestFileScroll`, which holds the last
+one until a diff with that route key takes it, so a diff that's still mounting gets it. The diff goes
+to the file's header once the topology arrives, and to the line once the segment that covers it loads,
+centered in the view. A line no segment covers, such as one outside every hunk or one from an older
+patch, lands on the file's header. A held place counts as explicit navigation, so the saved place
+isn't put back over it.
+
 The file filter at the start of the toolbar hides every file whose path doesn't match, header and
 all, and scrolls the list to the top (`packages/client-core/src/features/diff/fileFilter.ts`). The
 query matches whole, ignoring case, at its last position in the path, which is usually the file name.

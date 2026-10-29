@@ -3,7 +3,7 @@ import { prefsKey } from '@acorn/protocol/api.ts'
 import { parsePluginChannel } from '@acorn/protocol/plugin/state.ts'
 import { sendRaw, sendRawBytes } from '../../infra/node/apiClient'
 import { toast } from '../../features/notifications/toast'
-import { clientEvents, openPane } from '../registries/commands/clientEvents'
+import { clientEvents, openPane, type DiffPlace } from '../registries/commands/clientEvents'
 import { openTarget } from '../../features/notifications/notifications'
 import { executeCommand } from '../registries/commands/commands'
 import { openInAppUrl } from '../registries/panes/contentLinks'
@@ -77,6 +77,10 @@ export type FrameServiceHost = {
   // window to open one in. Optional, so the desktop keeps the browser's answers by omission.
   copy?(text: string): void
   openExternal?(url: string): void
+  // Where a change request line is shown. A terminal can't reach the diff column beside its tabs by
+  // keyboard, so it opens the file in the editor instead. The desktop leaves it out and shows the line
+  // in the code host's diff.
+  revealChangeRequestLine?(taskId: string, place: DiffPlace): void
 }
 
 /**
@@ -175,6 +179,16 @@ export function createFrameServices(props: PluginFrameProps, host: FrameServiceH
         activateTaskSignals(task)
         host.navigate(pathForTask(task))
       }
+    },
+    // The bound task's own change request, in the pane its code host declared. The pane takes the
+    // intent and scrolls its diff (docs/plugins/frames.md § Showing a line in the change request).
+    revealChangeRequestLine: (place) => {
+      const task = props.binding.taskId ? taskById(props.binding.taskId) : undefined
+      const pane = task?.changeRequest?.pane
+      if (!task || !pane) return false
+      if (host.revealChangeRequestLine) host.revealChangeRequestLine(task.id, place)
+      else openPane(task.id, pane, { kind: 'change-request:reveal', place })
+      return true
     },
     // A link clicked inside a frame's rendered content, resolved on the host's side of the port through
     // the same content-link ladder and rung-preference rule every shell surface follows

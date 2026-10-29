@@ -5,7 +5,7 @@ sources:
   - docs/first-party-plugins/review-guide.md
   - plugins/review-guide/acorn-plugin.config.mjs
   - plugins/review-guide/src/tree/GuidePane.tsx
-checked: '6f8862c01'
+checked: '574139413'
 ---
 
 import { Steps } from '@astrojs/starlight/components'
@@ -42,6 +42,8 @@ turn can read the worktree but can't change it. **Stop** ends the turn.
 - A summary of the whole change, and which harness wrote it for which commit.
 - One section per part of the change, in reading order. Each says why the change exists and shows its
   hunks. A binary file, a rename, or a mode change shows its path and what changed.
+- Above each hunk, a link with its file and first line, such as `src/billing/invoice.ts:42`. Click it to
+  open the pull request's diff at that line, where you can see the code around it and comment.
 - **Not covered by the guide**, last, with any hunk the harness left out.
 
 acorn checks the harness's answer against the diff before it shows it. Every hunk appears exactly once:
@@ -58,18 +60,21 @@ want one.
 ## What it can reach
 
 It reads the task's pull request from its code host plugin, and the change from the task's worktree with
-git. It has no network access of its own, runs no other programs, and reads no secrets. The guide is
+git. It has no network access of its own, runs no other programs, and reads no secrets. It may open the
+task's pull request diff at a line, which is what a hunk's link does. The guide is
 kept on the Node until the task is deleted.
 
 The **Guide** tab sits beside the diff, so you can read a section and its code in the diff side by side.
 
 ## In the terminal
 
-The terminal client draws the same pane and the same tab.
+The terminal client draws the same pane and the same tab. A hunk's link opens the file in the **Editor**
+pane at that line, rather than in the diff.
 
 ## Limits
 
 - A guide covers the task's own pull request, not a related one.
 - A change larger than 16 MB can't have a guide.
 - The guide covers the worktree's latest commit, which can be ahead of the pull request when a commit
-  hasn't been pushed.
+  hasn't been pushed. A hunk's link then lands on its file's header when the pull request's diff doesn't
+  have the line.

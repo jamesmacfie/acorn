@@ -109,7 +109,7 @@ function build(task: Task) {
 
   // "Open this pull in the PR pane", from a content link or a dashboard row. Subscribed once per
   // task rather than once per panel, which is the other reason this model exists.
-  const initial = consumePaneIntent(task.id, 'pr')
+  const initial = consumePaneIntent(task.id, 'pr', 'plugin:select')
   if (initial?.kind === 'plugin:select') selectItem(initial.item)
   const offIntent = clientEvents.on('presentation:pane-intent', (event) => {
     if (event.taskId !== task.id || event.paneId !== 'pr' || event.intent.kind !== 'plugin:select') return
@@ -191,6 +191,10 @@ function build(task: Task) {
     setTaskError('')
     setSelectedKey(key)
   }
+  const selectPrimary = () => {
+    const pull = primary()
+    if (pull) selectTab(pullRefKey(pull))
+  }
 
   const offersTaskCreation = () => {
     const tab = selected()
@@ -228,6 +232,7 @@ function build(task: Task) {
     selectedKey,
     isPrimary,
     selectTab,
+    selectPrimary,
     linkedTaskRows,
     openTask,
     openAgent,

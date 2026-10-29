@@ -88,6 +88,14 @@ export type AcornBridge = {
      */
     openTask(taskId: string): Promise<void>
     /**
+     * Show a file in the diff of this surface's task's primary change request, at a line when you
+     * know one. `side` is `new` by default, and `old` for a deleted line. The host opens the code
+     * host's pane for it. A line the diff doesn't show lands on the file's header. Needs the
+     * `core.changeRequests:reveal` scope, and rejects with `not_found` when the task has no change
+     * request.
+     */
+    revealChangeRequestLine(path: string, line?: number, side?: 'old' | 'new'): Promise<void>
+    /**
      * Hand an `https` URL to the host. It resolves in-app when something recognises it, such as another
      * provider's reference panel or a task pane, and opens the owner's browser otherwise. Anything but
      * `https` is refused. The promise resolving says only that the host accepted the URL: which of those

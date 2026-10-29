@@ -21,6 +21,7 @@ client: ContributedCommand
 client: DashboardCellDefinition
 client: DashboardCellMenuProps
 client: DashboardCellProps
+client: DiffPlace
 client: DocumentServiceRoute
 client: FileMenuTarget
 client: InAppTarget
@@ -185,6 +186,7 @@ client: registerWsChannel
 client: remotePreviewBlocked
 client: replaceAttentionSource
 client: requestDiagnostics
+client: requestFileScroll
 client: requestTaskLaunch
 client: requestTerminalFocusIntent
 client: resolveDocumentServices

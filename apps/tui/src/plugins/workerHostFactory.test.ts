@@ -109,6 +109,7 @@ it('rotates held detection authority repeatedly without overlapping native repla
           copy: unavailable,
           openPane: unavailable,
           openTask: unavailable,
+          revealChangeRequestLine: unavailable,
           openUrl: unavailable,
           frameHasFocus: hasFocus,
           importerDone: unavailable,

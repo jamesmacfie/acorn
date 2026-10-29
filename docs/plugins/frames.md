@@ -108,6 +108,28 @@ field wrong. `allowApi` decides the path before either handler reads a body, so 
 another plugin's namespace is refused unread. Only GET and POST are supported, capped at 12 MiB each
 way, with no streaming. `type` and `filename` are advisory. The receiver decides what the bytes are.
 
+## Showing a line in the change request
+
+`bridge.ui.revealChangeRequestLine(path, line?, side?)` shows a file in the diff of the task's primary
+change request, at a line when you pass one. `side` is `new` by default, and `old` for a deleted line. A
+frame or a remote tree can call it.
+
+The frame never names a pane. The host reads the pane the task's code host declared
+([change requests](./code-hosts.md#change-requests)), opens it, and hands it a `change-request:reveal`
+pane intent. GitHub, GitLab, and Bitbucket each take it with `onChangeRequestReveal` from
+`@acorn/change-request-ui/views` and send it to their diff, so all three scroll the same way
+([review threads and state](../diff-rendering/review.md#review-threads-and-state)). GitHub selects the
+primary pull's tab first.
+
+The verb needs the `core.changeRequests:reveal` scope
+([frame scopes](../plugin-authoring/permissions.md#frame-scopes)). It rejects a place it can't parse
+with `bad_request`, and a surface whose task has no change request with `not_found`. Like `openPane`, it
+needs no focus, because it moves nothing outside the task.
+
+The terminal client opens the file in the **Editor** pane instead, at the line, or at the top for a
+deleted line. Its diff column beside the tabs isn't a keyboard stop, so a line shown there couldn't be
+reached.
+
 ## Browser features a frame lacks
 
 The iframe is sandboxed `allow-scripts allow-same-origin`, without `allow-modals` or `allow-popups`:

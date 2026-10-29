@@ -1,8 +1,8 @@
 import { createMemo, Show } from 'solid-js'
 import { useNavigate } from '@solidjs/router'
-import { clientEvents, handlePluginContentLinkClick, type Task } from '@acorn/plugin-api/client'
+import { handlePluginContentLinkClick, requestFileScroll, type DiffPlace, type Task } from '@acorn/plugin-api/client'
 import { EmptyState } from '@acorn/plugin-api/ui'
-import { ChangeRequestView, useChangedFiles } from '@acorn/change-request-ui/views'
+import { ChangeRequestView, onChangeRequestReveal, useChangedFiles } from '@acorn/change-request-ui/views'
 import { DiffForPullRequest, type PullRequestRoute } from '../DiffForPullRequest'
 import { splitRepository, taskPullRequest } from '../clientRoutes'
 import { prModel } from './prModel'
@@ -26,11 +26,12 @@ export function PrPane(props: { task: Task }) {
     null,
     { equals: (a, b) => a?.key === b?.key },
   )
-  const select = (path: string) => {
-    changedFiles.selectFile(path)
+  const select = (place: DiffPlace) => {
+    changedFiles.selectFile(place.path)
     const key = route()?.key
-    if (key) clientEvents.emit('presentation:file-scroll', { routeKey: key, path })
+    if (key) requestFileScroll({ routeKey: key, ...place })
   }
+  onChangeRequestReveal(props.task, select)
   const onLinkClick = (event: MouseEvent) =>
     handlePluginContentLinkClick(event, { taskId: props.task.id, prefer: 'refPanel', navigate })
 
@@ -48,7 +49,7 @@ export function PrPane(props: { task: Task }) {
           id="bitbucket.pull-request"
           model={loaded()}
           currentFile={changedFiles.currentFile}
-          onOpenFile={select}
+          onOpenFile={(path) => select({ path })}
           onLinkClick={onLinkClick}
           diff={() => (
             <Show when={route()} keyed>

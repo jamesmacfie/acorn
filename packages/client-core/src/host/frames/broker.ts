@@ -94,6 +94,9 @@ export type FrameServices = {
   // Find a task in the reader's task list and hand back the move to it, or nothing when the list does
   // not have it. Two steps so the broker can reply between them (see the `openTask` case).
   openTask(taskId: string): (() => void) | undefined
+  // Show a place in the diff of the bound task's primary change request. False when the frame has no
+  // task, or its task has no change request.
+  revealChangeRequestLine(place: { path: string; line?: number; side?: 'old' | 'new' }): boolean
   // Resolve an https URL somewhere: in-app if a content-link recogniser claims it, the owner's browser
   // otherwise. Returns nothing on purpose; see the `openUrl` case below for why the frame is told neither
   // the outcome nor when it happened.
@@ -552,6 +555,36 @@ export function createFrameBridge(input: {
         post({ id, ok: true, status: 200, body: null })
         go()
         return
+      }
+      case 'revealChangeRequestLine': {
+        if (!binding.api.includes('core.changeRequests:reveal')) {
+          return void post(denied(id, 'revealChangeRequestLine needs the core.changeRequests:reveal scope'))
+        }
+        const { path, line, side } = data
+        if (
+          typeof path !== 'string' ||
+          !path ||
+          path.length > 1024 ||
+          (line !== undefined && (!Number.isSafeInteger(line) || (line as number) < 1)) ||
+          (side !== undefined && side !== 'old' && side !== 'new')
+        ) {
+          return void post(
+            failed(
+              id,
+              'bad_request',
+              'revealChangeRequestLine needs a path, and a line from 1 and a side of old or new',
+            ),
+          )
+        }
+        const place = {
+          path,
+          ...(line === undefined ? {} : { line: line as number }),
+          ...(side === undefined ? {} : { side: side as 'old' | 'new' }),
+        }
+        if (!services.revealChangeRequestLine(place)) {
+          return void post(failed(id, 'not_found', "this surface's task has no change request"))
+        }
+        return void post({ id, ok: true, status: 200, body: null })
       }
       case 'openUrl': {
         const url = data.url

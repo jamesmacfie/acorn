@@ -1,5 +1,5 @@
 import { measure, recordDuration, recordSample } from '../../infra/telemetry/emitter'
-import { batch, createEffect, createMemo, createSignal, on, onCleanup, onMount, Show } from 'solid-js'
+import { batch, createEffect, createMemo, createSignal, on, onCleanup, onMount, Show, untrack } from 'solid-js'
 import { createStore, unwrap } from 'solid-js/store'
 import { createQuery, useQueryClient } from '@tanstack/solid-query'
 import { segmentContentKey, type DiffDocumentTopology, type DiffSearchMatch } from '@acorn/diff-document/document'
@@ -9,7 +9,7 @@ import { readDraft, writeDraft } from '../../kit/lib/state/draftState'
 import { latestSignal, type LatestSignal } from '../../kit/lib/state/latestSignal'
 import { PrefKeys } from '../../infra/persistence/prefKeys'
 import { prefsOptions } from '../../infra/queries'
-import { clientEvents } from '../../host/registries/commands/clientEvents'
+import { clientEvents, consumeFileScroll, type DiffPlace } from '../../host/registries/commands/clientEvents'
 import { registerCommands } from '../../host/registries/commands/commands'
 import { registerKeybindings } from '../../host/registries/commands/keybindings'
 import { savePref } from '../settings/savePref'
@@ -47,6 +47,7 @@ import { bandBlock, createDiffLayout, lineBlock, rowBlocks, threadBlock, type Di
 import {
   createDocumentView,
   overlayKey,
+  segmentOfLine,
   threadAnchor,
   type DiffItem,
   type GapOverlay,
@@ -133,6 +134,9 @@ export function DiffPane(props: {
     composerSlot.abort()
   })
   let lastTarget = ''
+  // Where a file-scroll asked to go, held until the diff can show it. One asked for before this diff
+  // mounted was held for it by its route key.
+  const [wanted, setWanted] = createSignal<DiffPlace | undefined>(consumeFileScroll(props.source.scope.routeKey))
 
   const viewMode = (): ViewMode => (prefs.data?.[PrefKeys.diffView] === 'split' ? 'split' : 'unified')
   const setViewMode = async (mode: ViewMode) => {
@@ -635,7 +639,8 @@ export function DiffPane(props: {
     scope: props.source.scope,
     viewMode,
     filesSignature: signature,
-    selectedPath,
+    // A place somebody asked for is explicit navigation too, so the saved place isn't put back over it.
+    selectedPath: () => selectedPath() || wanted()?.path || '',
     scrollEl,
     setScrollEl,
     layout,
@@ -660,10 +665,36 @@ export function DiffPane(props: {
   onMount(() => {
     const off = clientEvents.on('presentation:file-scroll', (detail) => {
       if (!detail || detail.routeKey !== source().scope.routeKey) return
-      lastTarget = ''
-      scrollToFile(detail.path, true)
+      consumeFileScroll(detail.routeKey)
+      setWanted(detail)
     })
     onCleanup(off)
+  })
+
+  // Take the reader to the place a file-scroll asked for, once the diff can show it: the file's header
+  // once the scroller and topology exist, and a line once its segment has loaded. A line no segment
+  // covers, such as one outside every hunk or one from an older patch, lands on the file's header.
+  createEffect(() => {
+    const place = wanted()
+    if (!place || !items().length || !scrollEl()) return
+    const side = place.side ?? 'new'
+    const file = view.fileByPath().get(place.path)
+    const ordinal = file && place.line ? segmentOfLine(file, side, place.line) : -1
+    const index = view.indexByKey().get(`s:${place.path}:${ordinal}`)
+    const item = index == null ? undefined : items()[index]
+    if (!file?.patchKey || index == null || item?.kind !== 'segment') {
+      setWanted(undefined)
+      lastTarget = ''
+      return void untrack(() => scrollToFile(place.path, true))
+    }
+    const rows = loader.rows(item.segment)
+    // On screen, the segment loads, and its rows arriving runs this again.
+    if (!rows) return void untrack(() => layout.scrollToIndex(index))
+    const row = rows.findIndex((r) => isCodeRow(r) && (side === 'old' ? r.oldNo : r.newNo) === place.line)
+    setWanted(undefined)
+    untrack(() =>
+      revealMatch({ path: place.path, patchKey: file.patchKey!, ordinal, row: Math.max(row, 0), start: 0, end: 0 }),
+    )
   })
 
   // Scroll to the selected file once its header exists, which is as soon as the topology does: its

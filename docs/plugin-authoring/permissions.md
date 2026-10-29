@@ -127,9 +127,14 @@ core.projects:config   core.projects:read   core.projects:write
 core.tasks:read        core.tasks:write     core.workspaces:read
 ```
 
-That's the whole grantable list (`GRANTABLE_SCOPES`, derived from the table). Much of core can't be
-granted to a frame at all, including the plugin install route. An unknown scope parses, and the bridge
-denies it.
+One more scope grants a bridge verb rather than a route. `core.changeRequests:reveal` lets
+`ui.revealChangeRequestLine` open the task's change request diff at a line, and the trust prompt reads
+"Open a task's pull or merge request diff at a line"
+([showing a line in the change request](../plugins/frames.md#showing-a-line-in-the-change-request)).
+
+That's the whole grantable list (`GRANTABLE_SCOPES`, derived from the table and the verb scopes). Much
+of core can't be granted to a frame at all, including the plugin install route. An unknown scope
+parses, and the bridge denies it.
 
 ## Event channels
 

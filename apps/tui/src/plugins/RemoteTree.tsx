@@ -8,7 +8,7 @@ import type { FrameBinding } from '@acorn/client-core/host/frames/broker.ts'
 import { eligiblePlugins, isTaskPane } from '@acorn/client-core/host/plugins'
 import { recordSurfaceFailure } from '@acorn/client-core/host/plugins'
 import { activeNodeId } from '@acorn/client-core/infra/node/activeNode.ts'
-import { clientEvents, consumePaneIntent } from '@acorn/client-core/host/registries/commands'
+import { clientEvents, consumePaneIntent, openPane, type DiffPlace } from '@acorn/client-core/host/registries/commands'
 import {
   acquireTreeWorker,
   treeAuthorityKey,
@@ -73,6 +73,15 @@ const copy = (text: string): void => {
   if (!copyToTerminal(text)) toast(`Copy by hand: ${text}`)
 }
 const openExternal = (url: string): void => toast(`Open in a browser: ${url}`)
+// The diff column beside the change request's tabs isn't a keyboard stop here, so a change request
+// line opens in the editor. The editor shows the new side, so a deleted line opens the file at its top.
+const revealChangeRequestLine = (taskId: string, place: DiffPlace): void =>
+  openPane(
+    taskId,
+    'editor',
+    { kind: 'editor:reveal', path: place.path, line: place.side === 'old' ? 1 : (place.line ?? 1) },
+    'add',
+  )
 const navigate = (): void => {}
 
 let slotSeq = 0
@@ -155,7 +164,7 @@ export function RemoteTree(componentProps: RemoteTreeProps) {
     onRefused: refuse,
     connect: createTreeBridgeFactory(
       { binding: bound, hash: contribution.hash, ...(documentGrant ? { document: documentGrant } : {}) },
-      { qc, navigate, copy, openExternal },
+      { qc, navigate, copy, openExternal, revealChangeRequestLine },
       context,
       refuse,
     ),

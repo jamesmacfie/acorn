@@ -40,7 +40,7 @@ vi.mock('../../features/settings/savePref', () => ({
   saveJsonPref: (...args: unknown[]) => saveJsonPref(...args),
 }))
 
-const tasks = new Map<string, { id: string }>()
+const tasks = new Map<string, { id: string; changeRequest?: { pane: string } }>()
 vi.mock('../../features/tasks/taskLookup', () => ({ taskById: (id: string) => tasks.get(id) }))
 const activateTaskSignals = vi.fn()
 vi.mock('../../features/tasks/activate', () => ({
@@ -210,6 +210,36 @@ describe('openPane', () => {
     // A pane is a slot in a task's layout, so a settings page or a project surface has nothing to open
     // into. The broker's allowlist check is separate and comes first; this is the second wall.
     build().openPane('board-pane')
+    expect(openPane).not.toHaveBeenCalled()
+  })
+})
+
+describe('revealChangeRequestLine', () => {
+  afterEach(() => tasks.clear())
+
+  it("sends the place to the pane the bound task's change request names", () => {
+    tasks.set('task-1', { id: 'task-1', changeRequest: { pane: 'mr' } })
+    const place = { path: 'src/a.ts', line: 4, side: 'new' as const }
+    expect(build({ binding: binding({ taskId: 'task-1' }) }).revealChangeRequestLine(place)).toBe(true)
+    expect(openPane).toHaveBeenCalledWith('task-1', 'mr', { kind: 'change-request:reveal', place })
+  })
+
+  it('opens nothing for a task with no change request, or a frame with no task', () => {
+    tasks.set('task-1', { id: 'task-1' })
+    expect(build({ binding: binding({ taskId: 'task-1' }) }).revealChangeRequestLine({ path: 'a.ts' })).toBe(false)
+    expect(build().revealChangeRequestLine({ path: 'a.ts' })).toBe(false)
+    expect(openPane).not.toHaveBeenCalled()
+  })
+
+  it('hands the place to a host that shows it somewhere else', () => {
+    tasks.set('task-1', { id: 'task-1', changeRequest: { pane: 'pr' } })
+    const reveal = vi.fn()
+    const services = createFrameServices(
+      { binding: binding({ taskId: 'task-1' }), hash: 'a'.repeat(64) },
+      { qc: queryClient(), frameHasFocus: () => false, navigate: () => {}, revealChangeRequestLine: reveal },
+    )
+    services.revealChangeRequestLine({ path: 'a.ts', line: 2 })
+    expect(reveal).toHaveBeenCalledWith('task-1', { path: 'a.ts', line: 2 })
     expect(openPane).not.toHaveBeenCalled()
   })
 })

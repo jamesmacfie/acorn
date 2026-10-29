@@ -61,6 +61,9 @@ const UI_OPS = {
   openPane: 'open a pane by id',
   openDestination: 'open a manifest-declared cooperative destination with a bounded resource id',
   openTask: "go to a task by id. Needs core.tasks:read, a focused frame, and shares openUrl's once-a-second budget",
+  revealChangeRequestLine:
+    "show a path, and an optional line and side, in the diff of the task's primary change request. Needs " +
+    'core.changeRequests:reveal, and is not_found when the task has none',
   openUrl: 'https only, focused frame only, at most once a second, and you learn nothing back',
   'importer.done': 'importer surfaces only: close and run the host refresh',
   'importer.close':

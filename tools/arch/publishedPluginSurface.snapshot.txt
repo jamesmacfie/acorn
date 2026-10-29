@@ -279,6 +279,7 @@ acorn-plugin-sdk: member AcornBridge.ui.openDestination
 acorn-plugin-sdk: member AcornBridge.ui.openPane
 acorn-plugin-sdk: member AcornBridge.ui.openTask
 acorn-plugin-sdk: member AcornBridge.ui.openUrl
+acorn-plugin-sdk: member AcornBridge.ui.revealChangeRequestLine
 acorn-plugin-sdk: member AcornBridge.ui.toast
 acorn-plugin-sdk: member AcornBridge.webview
 acorn-plugin-sdk: member AcornBridge.webview.back

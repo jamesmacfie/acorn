@@ -17,6 +17,10 @@ import { createLogger } from '../../../infra/telemetry/logger'
 
 const log = createLogger('client-event')
 
+/** A place in a diff: a file, and a line on one side of it when the caller knows one. `side` is
+ *  `new` when it's missing. */
+export type DiffPlace = { path: string; line?: number; side?: 'old' | 'new' }
+
 export type PaneIntent =
   | { kind: 'notes:open'; slug: string; scope: NoteScope }
   | { kind: 'editor:reveal'; path: string; line: number; column?: number }
@@ -39,12 +43,15 @@ export type PaneIntent =
   // runs and the agent pane's chip, all of which name a run and none of which can be sure the pane
   // is mounted.
   | { kind: 'workflows:show-run'; runId: string; stepId?: string }
+  // Show a place in the diff of a task's primary change request, sent to the code host's pane the
+  // task names (docs/plugins/frames.md § Showing a line in the change request).
+  | { kind: 'change-request:reveal'; place: DiffPlace }
 
 type ClientEventMap = {
   'boot:restored': { phases: ('workspace' | 'view' | 'panes')[] }
   'presentation:pane-intent': { taskId: string; paneId: string; intent: PaneIntent }
   'presentation:terminal-focus': { taskId: string; sessionId: string }
-  'presentation:file-scroll': { routeKey: string; path: string }
+  'presentation:file-scroll': DiffPlace & { routeKey: string }
   // Deep-link into a settings page from a pane. The shell owns settings, and a pane cannot reach the
   // UiSlotContext's `openSettings`, so the request is an event rather than a prop threaded through
   // every pane that might ever need one.
@@ -150,6 +157,20 @@ export function consumePaneIntent(taskId: string, paneId: string, kind?: PaneInt
   if (kind && intent?.kind !== kind) return undefined
   pendingPaneIntents.delete(key)
   return intent
+}
+
+// A diff that isn't mounted yet can't hear a file-scroll, so the last one asked for is held until a diff
+// with its route key takes it, the same race the pane intents above close.
+let pendingFileScroll: ClientEventMap['presentation:file-scroll'] | undefined
+export function requestFileScroll(detail: ClientEventMap['presentation:file-scroll']): void {
+  pendingFileScroll = detail
+  clientEvents.emit('presentation:file-scroll', detail)
+}
+export function consumeFileScroll(routeKey: string): DiffPlace | undefined {
+  if (pendingFileScroll?.routeKey !== routeKey) return undefined
+  const detail = pendingFileScroll
+  pendingFileScroll = undefined
+  return detail
 }
 
 const pendingTerminalFocus = new Map<string, string>()

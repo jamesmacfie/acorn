@@ -40,6 +40,7 @@ describe('the route table covers every core route', () => {
 
   it('grants only scopes on the published list', () => {
     expect(GRANTABLE_SCOPES).toEqual([
+      'core.changeRequests:reveal',
       'core.projects:config',
       'core.projects:read',
       'core.projects:write',
@@ -54,6 +55,7 @@ describe('the route table covers every core route', () => {
     // (plugins/permissions.ts). What must not drift is that every grantable scope has a description,
     // and that the three handing over where code lives on disk are marked high.
     expect(GRANTABLE_SCOPES.map((scope) => [scope, describeScope(scope)?.text])).toEqual([
+      ['core.changeRequests:reveal', 'Open a task’s pull or merge request diff at a line'],
       ['core.projects:config', 'Read every project’s build, dev and database scripts'],
       ['core.projects:read', 'Read projects, including where every codebase lives on disk'],
       ['core.projects:write', 'Create and update projects, including their on-disk locations'],

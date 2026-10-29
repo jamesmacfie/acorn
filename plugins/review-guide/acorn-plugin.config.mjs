@@ -10,7 +10,8 @@ export default {
   // The two capabilities below are the Agents plugin's.
   requires: { plugins: [{ id: 'agents' }] },
   permissions: {
-    api: [],
+    // A hunk's link opens the task's change request diff at its first line.
+    api: ['core.changeRequests:reveal'],
     // `head:changed` marks a guide stale. The pane reads the guide again on its own `changed`.
     events: ['head:changed', 'plugin:review-guide:changed'],
     // `tasks` reads the change request and the worktree, `git` diffs it, and `prefs` keeps the

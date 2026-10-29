@@ -21,7 +21,8 @@ It ships as a bundled loaded package, so it reaches the Node only through its ma
 - The profiles the person may pick from, through `agents.profiles`. With no saved choice it uses the
   first, which is the Agents plugin's default.
 
-It asks for no network, no processes, and no secrets.
+It asks for no network, no processes, and no secrets. Its tree has one frame scope,
+`core.changeRequests:reveal`, for the hunk links.
 
 ## What it spends
 
@@ -88,9 +89,15 @@ A status change sends `plugin:review-guide:changed`, and the pane reads the view
 
 **Guide** is a task pane drawn as a remote tree, so the desktop and the terminal client draw the same
 one. Its header has the harness picker and **Generate guide**, **Regenerate**, or **Stop**. Each section
-is a fold with its "why" and each hunk in `StackedDiff`. A tree batch is capped at 1 MiB, so the first
-draw opens sections only until their hunk text reaches 256 KiB, and the rest open on demand. While a guide
-generates, the pane links to the session's transcript through its `session` destination.
+is a fold with its "why" and each hunk in `StackedDiff`, under a link named by its path and first line,
+such as `src/billing/invoice.ts:42`. A hunk with no new side, such as a deleted file's, starts on its
+old side, and its link shows only the path. Pressing a link opens the task's change request diff at that
+line ([showing a line in the change request](../plugins/frames.md#showing-a-line-in-the-change-request)).
+In the terminal client it opens the file in the editor instead.
+
+A tree batch is capped at 1 MiB, so the first draw opens sections only until their hunk text reaches
+256 KiB, and the rest open on demand. While a guide generates, the pane links to the session's
+transcript through its `session` destination.
 
 The same tree fills the `review-panel` point on GitHub, GitLab, and Bitbucket, so a task's change
 request view has a **Guide** tab beside the diff
@@ -102,4 +109,5 @@ with no change request view open.
 - Only the primary change request has a guide, because only it has a checkout.
 - A diff larger than core's git output cap, 16 MiB, fails with a message instead of a partial guide.
 - The guide covers the worktree's HEAD, which can differ from the change request's head when a commit
-  hasn't been pushed.
+  hasn't been pushed. A hunk link whose line the change request's diff doesn't have lands on the
+  file's header.

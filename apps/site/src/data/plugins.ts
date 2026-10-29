@@ -236,6 +236,7 @@ export const PLUGINS = {
     worksIn: both,
     docs: '/docs/built-in-plugins/review-guide/',
     reasons: {
+      'api:core.changeRequests:reveal': "Opens the pull request's diff at a hunk's first line when you press its link.",
       'events:head:changed': 'Marks a guide out of date when the task gets a new commit.',
       'events:plugin:review-guide:changed': 'Redraws the pane when a guide starts, finishes, or goes out of date.',
       'node.core:tasks': "Reads the task's pull request and finds its worktree.",

@@ -139,6 +139,10 @@ export type PluginBridgeUiRequest =
   // not read tasks has no business knowing which ones exist, and held to the same person's-act rule
   // as `openUrl`.
   | { id: number; kind: 'ui'; op: 'openTask'; taskId: string }
+  // Show a file, and a line on one side of it, in the diff of the frame's task's primary change
+  // request. The host picks the pane from the task, so the frame never names another plugin's pane.
+  // Granted by `core.changeRequests:reveal`.
+  | { id: number; kind: 'ui'; op: 'revealChangeRequestLine'; path: string; line?: number; side?: 'old' | 'new' }
   // Hand an `https` URL to the host, which runs the same content-link ladder every shell surface
   // runs: in-app when a recogniser claims it, the owner's browser otherwise. The frame passes a URL
   // and learns nothing back, because the host is the side that knows which surface this port belongs

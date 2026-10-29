@@ -1,4 +1,4 @@
-import { onCleanup, type Accessor } from 'solid-js'
+import { batch, onCleanup, type Accessor } from 'solid-js'
 import type { DiffLayout } from './diffLayout'
 import { diffScroll, rememberDiffScroll, type DiffScrollState, type DiffViewScope } from './viewState'
 
@@ -86,11 +86,15 @@ export function createDiffScrollRestoration(options: DiffScrollRestorationOption
   }
   const publish = (element: HTMLDivElement) => {
     cancelAnimationFrame(publishFrame)
-    publishFrame = requestAnimationFrame(() => {
-      options.setScrollEl(element)
-      options.layout.attach(element)
-      prepare()
-    })
+    // One batch, so an effect that waits for the scroller, such as a held file-scroll, runs once the
+    // layout is attached and the saved place is settled, and isn't undone by them.
+    publishFrame = requestAnimationFrame(() =>
+      batch(() => {
+        options.setScrollEl(element)
+        options.layout.attach(element)
+        prepare()
+      }),
+    )
   }
 
   onCleanup(() => {

@@ -7,7 +7,7 @@ import { segmentContentKey, type DiffDocumentFile, type DiffSegmentRequest } fro
 import type { DiffThread } from '../../kit/diff/diffModel'
 import { _resetSurfaceHealth, surfaceHealthSnapshot } from '../../kit/lib/telemetry/surfaceHealth'
 import { shouldPersistQuery } from '../../infra/persistence/queryPersistence'
-import { clientEvents } from '../../host/registries/commands/clientEvents'
+import { clientEvents, requestFileScroll } from '../../host/registries/commands/clientEvents'
 import { commandRegistry } from '../../host/registries/commands/commands'
 import { largeDiffFiles, largeDiffSource, type LargeDiffFile } from '../../testkit/largeDiff'
 import { installDiffLayout } from './layout.helper'
@@ -158,6 +158,41 @@ describe('a segmented diff', () => {
       { timeout: 5_000 },
     )
     expect(requests.filter((request) => middle.has(request.path))).toEqual([])
+  }, 30_000)
+
+  it('holds a file-scroll until it mounts, then goes to the line once its segment loads', async () => {
+    const files = [...largeDiffFiles('small', 1)]
+    const topology = largeDiffSource(files).topology()!
+    // Not the first file, whose header sits at the top whether the scroll worked or not.
+    const file = topology.files
+      .slice(1)
+      .find((candidate) => candidate.segments.length > 3 && candidate.segments[2]!.lines[2] > 0)!
+    const line = file.segments[2]!.lines[3]
+    // Where a file-scroll with no line, or with a line no segment covers, leaves the scroller.
+    const landing = async (scope: string, place: { line?: number }) => {
+      requestFileScroll({ routeKey: scope, path: file.path, ...place })
+      const host = mount(largeDiffSource(files, { scope }))
+      const scroller = () => host.querySelector<HTMLElement>('.diff')
+      await vi.waitFor(() => expect(scroller()?.scrollTop).toBeGreaterThan(0), { timeout: 5_000 })
+      await settle()
+      return scroller()!.scrollTop
+    }
+
+    const header = await landing('reveal-header', {})
+    expect(await landing('reveal-missing', { line: 9_999_999 })).toBe(header)
+
+    const { requests, onLoad } = recorded()
+    requestFileScroll({ routeKey: 'reveal-line', path: file.path, line })
+    const host = mount(largeDiffSource(files, { scope: 'reveal-line', onLoad }))
+    await vi.waitFor(
+      () => expect(requests.some((request) => request.path === file.path && request.ordinal === 2)).toBe(true),
+      { timeout: 5_000 },
+    )
+    await settle()
+    // Centred on the line, which sits two segments below the file's header.
+    expect(host.querySelector<HTMLElement>('.diff')!.scrollTop).toBeGreaterThan(header + 1_000)
+    const drawn = [...host.querySelectorAll('.diff-row .diff-gutter')].map((cell) => cell.textContent)
+    expect(drawn).toContain(String(line))
   }, 30_000)
 
   it('keeps unchanged segments across a revision and reloads only the file that moved', async () => {

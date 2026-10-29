@@ -1,11 +1,11 @@
 import { createMemo, For, Show } from 'solid-js'
 import { useNavigate } from '@solidjs/router'
-import type { Task } from '@acorn/plugin-api/client'
+import { requestFileScroll, type DiffPlace, type Task } from '@acorn/plugin-api/client'
 import { Alert, Button, EmptyState, Icon, IconButton, Menu, Only, Stack, Tabs } from '@acorn/plugin-api/ui'
-import { ChangeRequestView } from '@acorn/change-request-ui/views'
+import { ChangeRequestView, onChangeRequestReveal } from '@acorn/change-request-ui/views'
 import { usePullChangedFiles } from '../changedFiles'
 import { makeContentLinkHandler } from '../contentLinks'
-import { requestFileScroll, routeKey } from '../fileNavigation'
+import { routeKey } from '../fileNavigation'
 import GithubChecksPanel from '../checks/GithubChecksPanel'
 import { DiffForPull, type PullRoute } from '../DiffForPull'
 import { prModel, type PrModel } from './prModel'
@@ -174,11 +174,16 @@ export function PrPane(props: { task: Task }) {
     null,
     { equals: (a, b) => a?.key === b?.key && a?.readOnly === b?.readOnly },
   )
-  const select = (path: string) => {
-    changedFiles.selectFile(path)
+  const select = (place: DiffPlace) => {
+    changedFiles.selectFile(place.path)
     const pull = tabs.selected()?.pull
-    if (pull) requestFileScroll({ routeKey: routeKey(pull.owner, pull.repo, pull.number), path })
+    if (pull) requestFileScroll({ routeKey: routeKey(pull.owner, pull.repo, pull.number), ...place })
   }
+  // A line is in the task's own pull request, so a related pull's tab gives way to it first.
+  onChangeRequestReveal(props.task, (place) => {
+    tabs.selectPrimary()
+    select(place)
+  })
 
   return (
     <Show
@@ -196,7 +201,7 @@ export function PrPane(props: { task: Task }) {
           header={() => <PullStrip tabs={tabs} />}
           hideNumber={tabs.tabs().length > 1}
           currentFile={changedFiles.currentFile}
-          onOpenFile={select}
+          onOpenFile={(path) => select({ path })}
           onLinkClick={onLinkClick}
           actions={() => (
             <RefreshPullButton owner={loaded().scope.owner} repo={loaded().scope.repo} number={loaded().scope.number} />

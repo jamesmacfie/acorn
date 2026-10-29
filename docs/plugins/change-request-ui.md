@@ -96,7 +96,10 @@ label, after the host's own sections. The contributor gets `{ owner, repo, numbe
 window the tab's column sits beside the diff, so a reader follows the panel with the diff in view. In a
 narrow terminal it's the tab before **Diff**. The tab appears only in a task, for its own change request,
 and only when a plugin fills the point, so the browse surface and a related change request draw none.
-The review guide fills it ([the review guide plugin](../first-party-plugins/review-guide.md)).
+The review guide fills it ([the review guide plugin](../first-party-plugins/review-guide.md)), and
+its hunk links show their line in the diff beside it
+([showing a line in the change request](./frames.md#showing-a-line-in-the-change-request)). A host's task
+pane takes those requests with `onChangeRequestReveal(task, reveal)`.
 
 A contributor that wants every host files the same code against each host's point
 ([cooperative extension points](./cooperative-extension-points.md)).

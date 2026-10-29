@@ -37,10 +37,11 @@ export {
   consumeTerminalFocusIntent,
   copyLink,
   openPane,
+  requestFileScroll,
   requestTerminalFocusIntent,
 } from '@acorn/client-core/host/registries/commands'
 export { openTarget } from '@acorn/client-core/features/notifications'
-export type { PaneIntent } from '@acorn/client-core/host/registries/commands'
+export type { DiffPlace, PaneIntent } from '@acorn/client-core/host/registries/commands'
 // prune candidate: the raw socket. Plugins should be reaching for registerWsChannel (below) or a
 // ctx-provided subscription rather than attaching to the shared client themselves.
 export {

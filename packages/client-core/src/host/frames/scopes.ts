@@ -435,9 +435,14 @@ export function classifyPath(path: string): Partial<Record<ApiMethod, string>> |
 // Type-only, so it is erased and creates no runtime edge back to the module that consumes these.
 import type { GrantDescription } from '../trust/permissions'
 
-/** Every scope name the table can grant. The trust dialog and the docs read from this, not a copy. */
+// Scopes that grant a bridge verb rather than a route, with the verb each grants. The broker checks
+// each by name.
+const VERB_SCOPES: Readonly<Record<string, string>> = { 'core.changeRequests:reveal': 'ui.revealChangeRequestLine' }
+
+/** Every scope name the table and the verbs can grant. The trust dialog and the docs read from this,
+ *  not a copy. */
 export const GRANTABLE_SCOPES: readonly string[] = [
-  ...new Set(RULES.flatMap((rule) => Object.values(rule.scopes))),
+  ...new Set([...RULES.flatMap((rule) => Object.values(rule.scopes)), ...Object.keys(VERB_SCOPES)]),
 ].sort()
 
 // Consent copy for every scope this table can grant, with how the trust prompt draws it. The severity
@@ -447,6 +452,10 @@ export const GRANTABLE_SCOPES: readonly string[] = [
 // The copy is free to change: the update diff keys on the scope name, not the sentence
 // (trust/permissions.ts).
 const SCOPE_DESCRIPTIONS: Readonly<Record<string, GrantDescription>> = {
+  'core.changeRequests:reveal': {
+    text: 'Open a task’s pull or merge request diff at a line',
+    icon: 'git-pull-request',
+  },
   'core.projects:config': {
     text: 'Read every project’s build, dev and database scripts',
     icon: 'file-cog',

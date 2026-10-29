@@ -28,6 +28,16 @@ const message = (error: unknown) =>
 
 const plural = (count: number, one: string, many: string) => `${count} ${count === 1 ? one : many}`
 
+/** Where a hunk starts: its first new-side line, or its first old-side line when it has no new side,
+ *  as in a deleted file. Null for an item with no hunk text. */
+export function hunkStart(patch: string): { line: number; side: 'old' | 'new' } | null {
+  const header = /^@@ -(\d+)(?:,\d+)? \+(\d+)(?:,(\d+))? @@/.exec(patch)
+  if (!header) return null
+  return header[3] === '0' || header[2] === '0'
+    ? { line: Number(header[1]), side: 'old' }
+    : { line: Number(header[2]), side: 'new' }
+}
+
 /** What the coverage check changed, as sentences. Empty when the harness placed every hunk once. */
 function coverageNotes(guide: Guide): string[] {
   return [
@@ -146,6 +156,12 @@ export function GuidePane(props: { taskId?: string; bridge: AcornBridge }) {
                 stored={stored()}
                 label={profileLabel(stored().profileId)}
                 onSession={(id) => void props.bridge.ui.openDestination('session', id)}
+                onReveal={(item) => {
+                  const start = hunkStart(item.patch)
+                  props.bridge.ui
+                    .revealChangeRequestLine(item.path, start?.line, start?.side)
+                    .catch((error: unknown) => setFailure(message(error)))
+                }}
                 onRetry={() => void send('generate')}
               />
             )}
@@ -160,6 +176,7 @@ function StoredGuideView(props: {
   stored: StoredGuide
   label: string
   onSession: (sessionId: string) => void
+  onReveal: (item: DiffItem) => void
   onRetry: () => void
 }) {
   const session = () =>
@@ -201,7 +218,7 @@ function StoredGuideView(props: {
               {session()}
             </Stack>
             <For each={coverageNotes(guide())}>{(note) => <Alert tone="warn">{note}</Alert>}</For>
-            <GuideSections guide={guide()} />
+            <GuideSections guide={guide()} onReveal={props.onReveal} />
           </Stack>
         )}
       </Match>
@@ -209,7 +226,7 @@ function StoredGuideView(props: {
   )
 }
 
-function GuideSections(props: { guide: Guide }) {
+function GuideSections(props: { guide: Guide; onReveal: (item: DiffItem) => void }) {
   const blocks = () => [
     ...props.guide.sections,
     ...(props.guide.uncovered.length
@@ -248,7 +265,7 @@ function GuideSections(props: { guide: Guide }) {
               <Show when={block.why}>
                 <Markdown text={block.why} />
               </Show>
-              <For each={block.items}>{(item) => <Hunk item={item} />}</For>
+              <For each={block.items}>{(item) => <Hunk item={item} onReveal={props.onReveal} />}</For>
             </Stack>
           </Show>
         </Fold>
@@ -257,10 +274,16 @@ function GuideSections(props: { guide: Guide }) {
   )
 }
 
-function Hunk(props: { item: DiffItem }) {
+/** A hunk under a link to it in the change request's diff, named by its path and first line. */
+function Hunk(props: { item: DiffItem; onReveal: (item: DiffItem) => void }) {
+  const start = () => hunkStart(props.item.patch)
+  const label = () => (start()?.side === 'new' ? `${props.item.path}:${start()!.line}` : props.item.path)
   return (
-    <Show when={props.item.patch} fallback={<Text>{`${props.item.path}: ${props.item.note}`}</Text>}>
-      <StackedDiff path={props.item.path} patch={props.item.patch} />
-    </Show>
+    <Stack gap="row">
+      <Link onPress={() => props.onReveal(props.item)}>{label()}</Link>
+      <Show when={props.item.patch} fallback={<Text>{props.item.note}</Text>}>
+        <StackedDiff path={props.item.path} patch={props.item.patch} />
+      </Show>
+    </Stack>
   )
 }

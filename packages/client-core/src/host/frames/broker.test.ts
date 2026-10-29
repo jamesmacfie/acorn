@@ -56,6 +56,7 @@ const services = (over: Partial<FrameServices> = {}): FrameServices => ({
   openPane: vi.fn(),
   openTarget: vi.fn(),
   openTask: vi.fn(() => vi.fn()),
+  revealChangeRequestLine: vi.fn(() => true),
   openUrl: vi.fn(),
   frameHasFocus: vi.fn(() => true),
   importerDone: vi.fn(),
@@ -565,6 +566,40 @@ describe('ui verbs', () => {
     await h.settled(3)
     expect(replyTo(h, 65)).toMatchObject({ ok: false, error: { code: PLUGIN_BRIDGE_DENIED } })
     expect(h.svc.openTask).not.toHaveBeenCalled()
+  })
+
+  it('shows a change request line only for a frame with the reveal scope, and only one it can parse', async () => {
+    const unscoped = withBridge()
+    unscoped.send({ id: 66, kind: 'ui', op: 'revealChangeRequestLine', path: 'src/a.ts', line: 3 })
+    await unscoped.settled(2)
+    expect(replyTo(unscoped, 66)).toMatchObject({ ok: false, error: { code: PLUGIN_BRIDGE_DENIED } })
+    expect(unscoped.svc.revealChangeRequestLine).not.toHaveBeenCalled()
+    unscoped.dispose()
+
+    const h = withBridge({ api: ['core.changeRequests:reveal'] })
+    h.send({ id: 67, kind: 'ui', op: 'revealChangeRequestLine', path: 'src/a.ts', line: 3, side: 'old' })
+    h.send({ id: 68, kind: 'ui', op: 'revealChangeRequestLine', path: 'src/a.ts' })
+    h.send({ id: 69, kind: 'ui', op: 'revealChangeRequestLine', path: 'src/a.ts', line: 0 })
+    h.send({ id: 70, kind: 'ui', op: 'revealChangeRequestLine', path: 'src/a.ts', line: 3, side: 'left' })
+    await h.settled(5)
+    expect(replyTo(h, 67)).toMatchObject({ ok: true })
+    expect(replyTo(h, 68)).toMatchObject({ ok: true })
+    expect(replyTo(h, 69)).toMatchObject({ ok: false, error: { code: 'bad_request' } })
+    expect(replyTo(h, 70)).toMatchObject({ ok: false, error: { code: 'bad_request' } })
+    expect(vi.mocked(h.svc.revealChangeRequestLine).mock.calls).toEqual([
+      [{ path: 'src/a.ts', line: 3, side: 'old' }],
+      [{ path: 'src/a.ts' }],
+    ])
+  })
+
+  it('answers not_found for a reveal when the task has no change request', async () => {
+    const h = withBridge(
+      { api: ['core.changeRequests:reveal'] },
+      services({ revealChangeRequestLine: vi.fn(() => false) }),
+    )
+    h.send({ id: 71, kind: 'ui', op: 'revealChangeRequestLine', path: 'src/a.ts' })
+    await h.settled(2)
+    expect(replyTo(h, 71)).toMatchObject({ ok: false, error: { code: 'not_found' } })
   })
 
   it('rejects a verb outside the closed set', async () => {

@@ -61,6 +61,7 @@ function host(target: FrameBinding['target'] = 'pane', authorize?: () => boolean
     copy: vi.fn(),
     openPane: vi.fn(),
     openTask: vi.fn(),
+    revealChangeRequestLine: vi.fn(() => true),
     openUrl: vi.fn(),
     frameHasFocus: () => true,
     importerDone: vi.fn(),

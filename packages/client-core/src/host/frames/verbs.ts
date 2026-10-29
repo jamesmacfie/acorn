@@ -66,6 +66,7 @@ type AuthorSurface = {
   'ui:openPane': AcornBridge['ui']['openPane']
   'ui:openDestination': AcornBridge['ui']['openDestination']
   'ui:openTask': AcornBridge['ui']['openTask']
+  'ui:revealChangeRequestLine': AcornBridge['ui']['revealChangeRequestLine']
   'ui:openUrl': AcornBridge['ui']['openUrl']
   // The wire spelling stays `importer.*` so every shipped frame SDK keeps working; what an author
   // calls is `done()` / `close()`.
@@ -101,6 +102,7 @@ type HostSurface = {
   'ui:openPane': FrameServices['openPane']
   'ui:openDestination': NonNullable<FrameServices['openTarget']>
   'ui:openTask': FrameServices['openTask']
+  'ui:revealChangeRequestLine': FrameServices['revealChangeRequestLine']
   'ui:openUrl': FrameServices['openUrl']
   'ui:importer.done': FrameServices['importerDone']
   'ui:importer.close': FrameServices['importerClose']

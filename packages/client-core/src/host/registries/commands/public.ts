@@ -3,9 +3,10 @@ export {
   consumePaneIntent,
   consumeTerminalFocusIntent,
   openPane,
+  requestFileScroll,
   requestTerminalFocusIntent,
 } from './clientEvents.ts'
-export type { PaneIntent } from './clientEvents.ts'
+export type { DiffPlace, PaneIntent } from './clientEvents.ts'
 export {
   COMMAND_CLOSED,
   commandAvailable,

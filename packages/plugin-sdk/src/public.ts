@@ -97,6 +97,11 @@ export type AcornBridge = {
     /** Go to a task on this node. Needs the `core.tasks:read` scope and a click or key handler, like
      * `openUrl`. Rejects when the reader's task list does not have the task. */
     openTask(taskId: string): Promise<void>
+    /** Show a file in the diff of this surface's task's primary change request, at a line when you
+     * know one. `side` is `new` by default, and `old` for a deleted line. A line the diff doesn't show
+     * lands on the file's header. Needs the `core.changeRequests:reveal` scope, and rejects with
+     * `not_found` when the task has no change request. */
+    revealChangeRequestLine(path: string, line?: number, side?: 'old' | 'new'): Promise<void>
     /** Hand an `https` URL to the host. Anything else is refused, and resolving says only that the host
      * accepted it: where it lands is the host's business, because the frame does not know which surface
      * it is. */
