@@ -153,7 +153,7 @@ These stay with other plans:
 
 - Reaching a Node that has no reachable address belongs to the [relay](../../relay.md).
   Until it exists, Tailscale or an SSH tunnel covers that case.
-- The preview pane on a remote Node is [the remote preview proxy](../split/10-remote-preview-proxy.md).
+- The preview pane on a remote Node is [a remote Node's preview](../../shell/webviews.md#a-remote-nodes-preview).
 - The browser extension pairs over loopback only, so it can't drive a remote Node
   ([browser extension](../../browser-extension.md)).
 - The container image is [cloud phase 1](../cloud/01-node-image.md).

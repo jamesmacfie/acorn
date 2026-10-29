@@ -5,7 +5,11 @@ Date: October 28, 2026. Status: the app is built, and the work below is open. It
 
 [The mobile web app](../mobile.md) and the pages under `docs/mobile/` own the shipped behavior. Its
 [limits](../mobile.md#limits) list what the app leaves out on purpose. This page lists only work someone
-still has to do. Plugins on the phone have their own plan in [mobile-plugin/](./mobile-plugin/README.md).
+still has to do. It also holds what's left of the `docs/future/mobile-plugin/` phases, which built
+installed plugins, the terminal, pixel frames, and Preview on the phone on October 23, 2026. Their
+checkpoint steps are in Git history at commit `0443c247a`. [Plugin custody](../mobile/plugin-custody.md),
+[the plugin sandbox](../mobile/plugin-sandbox.md), and [previews on a
+phone](../relay/phone-channel.md#previews) own the shipped behavior.
 
 ## Run it on real phones
 
@@ -22,10 +26,32 @@ The phases left these device checks that the checklist doesn't name. Do them in 
 - A row's twist and a native check box can be hit with a finger. Both are smaller than 44 pixels and sit
   inside a 44 pixel row.
 - A pinned footer stays above the on-screen keyboard.
+- In the terminal, pressing an extra key keeps the iOS keyboard up, and xterm doesn't read the iOS
+  keyboard's composition events twice.
+- A tap inside a plugin's pixel frame gives the frame focus on iOS.
+- Preview: Safari takes the **Open preview** path and the app works as its own page, hot reload
+  included. Android Chrome keeps it in the frame. Safari applies the app's `frame-src` to the frame's
+  own navigation, and the Partitioned cookie holds in Chrome.
+- Once the hosted sandbox domain exists, a plugin's tree draws from its own origin in Safari, in the
+  app installed to the home screen, and in Android Chrome. Record the iOS and Android versions.
+
+## Finish plugins and Preview on the phone
+
+- **Hosted service: the sandbox domain.** Register it, add the wildcard DNS record and certificate,
+  and serve the built relay folder on every name with its header policies. `headers.json` gives `/*`
+  and `/frame.html` separate sets, with no merging. Then make it the phone build's default and add it
+  to the app's `frame-src`. Until then, the phone draws no plugin tree bundle.
+- **Hosted service: the preview domain.** Point its wildcard DNS at the relay, and add the challenge
+  route to the account API, the stand-in, and the conformance suite
+  ([test an account service](../account-api/testing.md)).
+- **A trusted preview certificate.** Against a staging certificate authority, the Node gets and renews
+  a certificate for its preview names, and a browser accepts it. It's only been checked against the
+  stand-in authority.
+- **Runn's opt-in.** Add `formFactor: ['desktop', 'mobile']` to Runn's manifest in its own repository.
 
 ## Fix small things on a phone
 
-These were seen in Chromium at 390 by 844 and left alone:
+These were seen during the phases, mostly in Chromium at 390 by 844, and left alone:
 
 - With the keyboard up, the agent composer is about 280 pixels tall and the transcript nearly disappears.
   Trimming the composer's notice and hint lines on a phone would give the transcript room.
@@ -34,6 +60,11 @@ These were seen in Chromium at 390 by 844 and left alone:
   task list, and the layout's **Back**, back to the list.
 - In Git, switching to a tab that remembers a selection can push that tab's detail, because the selection
   key changed.
+- HTTP's results take two taps, because a loaded plugin's pane can't report a selection, so the layout
+  keeps the list and offers **Show detail**.
+- The drawer grip's arrow keys run backwards: ArrowUp shrinks the drawer. `createSplitDrag` flips the
+  key for `invert`, and the drawer's `onDelta` subtracts the delta again.
+- The phone can't forget a plugin trust decision. A denial stays until the site's storage is cleared.
 
 ## Check what nobody walked
 

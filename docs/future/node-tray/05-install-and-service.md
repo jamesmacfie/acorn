@@ -108,7 +108,7 @@ data.
   ([boot order](../../node-distribution.md#boot-order)). A service manager hands it a short default
   `PATH`, so `claude` or `codex` in the person's home folder isn't found.
 - `acorn agent providers` lists the harnesses the Node found ([the CLI](../../cli.md#commands)).
-- Version skew, from phase 4 of the [split programme](../split/README.md): a client and a Node from different builds still work
+- Version skew, from phase 4 of the split programme, in Git history under `docs/future/split/`: a client and a Node from different builds still work
   together, but the client asks to trust every bundled plugin again.
 
 ## Design

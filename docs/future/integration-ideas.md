@@ -113,9 +113,9 @@ beside the editor in a task, `CollectionContribution` for dashboard rows,
 ### Observability, errors, and logs
 
 - Sentry, the integration. The rail of a project's unresolved issues ships as `sentry`, and the
-  export half as `sentry-telemetry` ([Sentry](../integrations/sentry.md)). Still open: a
-  source-mapped stack trace, assign, resolve, and link to a task, which
-  [acorn-sentry](./acorn-sentry/README.md) plans.
+  export half as `sentry-telemetry` ([Sentry](../integrations/sentry.md)). Making a task from an
+  issue and source-mapped release stacks shipped October 26 and 27, 2026. Still open: assign and
+  resolve.
 - Bugsnag, Honeybadger, Airbrake, Raygun. The rollbar shape again.
 - Datadog. Log search, the APM service map, monitor state, an embedded dashboard, and a latency and
   error-rate row.
