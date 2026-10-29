@@ -2,7 +2,7 @@
 
 /** One reviewable piece of the change: a hunk, or a whole file change with no text to show. */
 export type DiffItem = {
-  /** The path and the item's 1-based position in that file, such as `src/billing/invoice.ts#2`. */
+  /** The path and the item's 1-based position in that file, such as `README.md#2`. */
   id: string
   path: string
   /** The path before a rename or copy. */
