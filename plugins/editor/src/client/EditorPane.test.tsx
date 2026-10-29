@@ -1332,14 +1332,15 @@ describe('the editor pane', () => {
     const tree = host.querySelector<HTMLElement>('[data-testid="file-tree-selection"]')!
     const toggle = host.querySelector<HTMLButtonElement>('.ui-listdetail-edge .ui-btn')!
 
+    const root = host.querySelector<HTMLElement>('.ui-listdetail')!
     toggle.click()
-    expect(host.querySelector<HTMLElement>('.ui-listdetail')?.dataset.list).toBe('collapsed')
-    expect(sidebar.style.visibility).toBe('hidden')
+    expect(root.dataset.list).toBe('collapsed')
+    // The kit's stylesheet hides an empty rail's contents by this attribute.
+    expect(root.dataset.collapseContent).toBe('empty')
     expect(sidebar.querySelector('[data-testid="file-tree-selection"]')).toBe(tree)
 
     toggle.click()
-    expect(host.querySelector<HTMLElement>('.ui-listdetail')?.dataset.list).toBe('default')
-    expect(sidebar.style.visibility).toBe('')
+    expect(root.dataset.list).toBe('default')
     expect(sidebar.querySelector('[data-testid="file-tree-selection"]')).toBe(tree)
   })
 
