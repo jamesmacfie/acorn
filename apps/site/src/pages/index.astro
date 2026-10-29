@@ -514,6 +514,10 @@ const nut = art.slice(4).join('\n')
 </script>
 
 <style>
+  :global(.hero) {
+    --site-fs-hero: clamp(2.5rem, 1rem + 4.5vw, 5rem);
+  }
+
   .hero-shot {
     display: grid;
     gap: var(--space-10);
