@@ -31,7 +31,7 @@ The download page doesn't link to GitHub. Each button goes to a path on the site
 `/download/macos-arm64`. The build writes `/download/links.json`, which maps each path to the newest
 release's file. For those paths, `apps/site/src/worker.ts` reads that map, writes a data point to the
 `acorn_site_downloads` dataset in Workers Analytics Engine, and redirects to the file. Only visits to
-`acorn.sh` count, because preview versions share the dataset.
+`getacorn.dev` count, because preview versions share the dataset.
 
 Each data point holds the path in `blob1`, the release tag in `blob2`, and the visitor's country in
 `blob3`. Cloudflare keeps data points for three months. For a total that outlasts that, each file on a

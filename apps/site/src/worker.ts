@@ -14,7 +14,7 @@ interface Links {
 }
 
 // Preview versions share the dataset, so only visits to the production site count.
-const PRODUCTION_HOST = 'acorn.sh'
+const PRODUCTION_HOST = 'getacorn.dev'
 
 export default {
   async fetch(request: Request & { cf?: { country?: string } }, env: Env): Promise<Response> {

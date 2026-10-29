@@ -33,7 +33,7 @@ missing files or dependencies.
 
 ```json
 {
-  "$schema": "https://acorn.sh/schemas/acorn-plugin.schema.json",
+  "$schema": "https://getacorn.dev/schemas/acorn-plugin.schema.json",
   "id": "kimi",
   "name": "Kimi Code",
   "version": "0.1.0",

@@ -30,4 +30,4 @@ npm run build
 the plugin reads before it reads anything. Then pick it as a source in a panel, and choose an account
 for each input.
 
-The full guide is [Add a data source](https://acorn.sh/docs/build-plugins/node/add-a-data-source/).
+The full guide is [Add a data source](https://getacorn.dev/docs/build-plugins/node/add-a-data-source/).

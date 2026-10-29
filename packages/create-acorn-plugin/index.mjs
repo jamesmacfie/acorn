@@ -17,7 +17,7 @@ export const BASELINE = 'acorn-1'
  * Where the manifest JSON Schema is published. Same reason as the constant above: this package is
  * published standalone. index.test.ts holds the copy against the generated artifact.
  */
-export const SCHEMA_URL = 'https://acorn.sh/schemas/acorn-plugin.schema.json'
+export const SCHEMA_URL = 'https://getacorn.dev/schemas/acorn-plugin.schema.json'
 
 /** Manifest ids: `/^[a-z][a-z0-9-]{1,31}$/`. See docs/plugin-authoring/the-manifest.md § The manifest for the
  * dot-ban rule. Returns null when nothing usable survives. */

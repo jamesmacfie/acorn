@@ -276,7 +276,7 @@ for (const file of schemaFiles) {
   test(`/schemas/${file} is served at its $id`, async ({ request }) => {
     const response = await request.get(`/schemas/${file}`)
     expect(response.status()).toBe(200)
-    expect((await response.json()).$id).toBe(`https://acorn.sh/schemas/${file}`)
+    expect((await response.json()).$id).toBe(`https://getacorn.dev/schemas/${file}`)
   })
 }
 
@@ -300,7 +300,7 @@ test('every page has a title and a description no other page has, and a card the
       else if (seen[key].has(value)) problems.push(`${file} has the same ${key} as ${seen[key].get(value)}: ${value}`)
       else seen[key].set(value, file)
     }
-    const card = html.match(/<meta property="og:image" content="https:\/\/acorn\.sh\/([^"]+)"/)?.[1]
+    const card = html.match(/<meta property="og:image" content="https:\/\/getacorn\.dev\/([^"]+)"/)?.[1]
     if (!card) problems.push(`${file} has no og:image`)
     else if (!existsSync(new URL(card, dist)))
       problems.push(`${file} points og:image at ${card}, which the build didn't write`)
@@ -323,9 +323,9 @@ test('/llms-small.txt leaves out the generated component pages', () => {
   expect(small).not.toContain('# IconButton')
 })
 
-test('every acorn.sh link in the agent guide goes to a file the build wrote', () => {
+test('every getacorn.dev link in the agent guide goes to a file the build wrote', () => {
   const guide = readFileSync(new URL('agent-guide.md', dist), 'utf8')
-  const paths = [...guide.matchAll(/https:\/\/acorn\.sh(\/[^)\s]*)/g)].map(([, path]) => path)
+  const paths = [...guide.matchAll(/https:\/\/getacorn\.dev(\/[^)\s]*)/g)].map(([, path]) => path)
   expect(paths.length).toBeGreaterThan(0)
   for (const path of paths) expect(existsSync(new URL(`.${path.replace(/\/$/, '/index.html')}`, dist)), path).toBe(true)
 })

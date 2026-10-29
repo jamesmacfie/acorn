@@ -1,5 +1,5 @@
 {
-  "$schema": "https://acorn.sh/schemas/acorn-plugin.schema.json",
+  "$schema": "https://getacorn.dev/schemas/acorn-plugin.schema.json",
   "id": "acme-data",
   "name": "Acme deploys",
   "version": "1.0.0",

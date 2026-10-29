@@ -84,7 +84,7 @@ const lab = {
 }
 
 export default defineConfig({
-  site: 'https://acorn.sh',
+  site: 'https://getacorn.dev',
   output: 'static',
   integrations: [
     lab,
@@ -110,17 +110,17 @@ export default defineConfig({
             '## Notes for agents',
             '',
             "- This site describes the newest acorn release. The person you're helping may run another build. For the exact plugin vocabulary their build accepts, such as manifest keys, contribution kinds, and kit components, call the `plugin_authoring` tool on their own Node.",
-            '- Every docs page is also served as Markdown at its URL plus `.md`, such as https://acorn.sh/docs/start/install.md.',
-            '- To help someone install acorn, pair a device, and open their first task, start from https://acorn.sh/agent-guide.md.',
+            '- Every docs page is also served as Markdown at its URL plus `.md`, such as https://getacorn.dev/docs/start/install.md.',
+            '- To help someone install acorn, pair a device, and open their first task, start from https://getacorn.dev/agent-guide.md.',
           ].join('\n'),
           optionalLinks: [
             {
               label: 'Agent guide',
-              url: 'https://acorn.sh/agent-guide.md',
+              url: 'https://getacorn.dev/agent-guide.md',
               description: 'How to help a person install acorn, pair a device, and open their first task.',
             },
-            { label: 'Download', url: 'https://acorn.sh/download/', description: 'Every way to get acorn.' },
-            { label: 'Changelog', url: 'https://acorn.sh/changelog/', description: 'What changed, newest first.' },
+            { label: 'Download', url: 'https://getacorn.dev/download/', description: 'Every way to get acorn.' },
+            { label: 'Changelog', url: 'https://getacorn.dev/changelog/', description: 'What changed, newest first.' },
             { label: 'GitHub repository', url: 'https://github.com/jamesmacfie/acorn', description: 'Source and issues.' },
           ],
           // Heading anchors would come through as "Section titled ..." on every heading, and a picture of acorn

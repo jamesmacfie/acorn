@@ -1,7 +1,7 @@
 {
   "name": "@acorn/site",
   "version": "0.1.0",
-  "description": "The public website at acorn.sh: marketing pages and the docs, built as a static Astro and Starlight site.",
+  "description": "The public website at getacorn.dev: marketing pages and the docs, built as a static Astro and Starlight site.",
   "private": true,
   "type": "module",
   "scripts": {

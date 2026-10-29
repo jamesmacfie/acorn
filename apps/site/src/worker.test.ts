@@ -27,7 +27,7 @@ const visit = (url: string, bindings: ReturnType<typeof env>) =>
 
 test('a download on the production site is counted and redirected to GitHub', async () => {
   const bindings = env()
-  const response = await visit('https://acorn.sh/download/macos-arm64', bindings)
+  const response = await visit('https://getacorn.dev/download/macos-arm64', bindings)
   assert.equal(response.status, 302)
   assert.equal(
     response.headers.get('location'),
@@ -45,7 +45,7 @@ test('a download on a preview redirects without being counted', async () => {
 
 test('an unknown download path gets the 404 page and no count', async () => {
   const bindings = env()
-  const response = await visit('https://acorn.sh/download/linux-riscv', bindings)
+  const response = await visit('https://getacorn.dev/download/linux-riscv', bindings)
   assert.equal(response.status, 404)
   assert.deepEqual(bindings.points, [])
 })
