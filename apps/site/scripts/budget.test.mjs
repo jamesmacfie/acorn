@@ -22,7 +22,7 @@ const bigScript = `console.log("${randomBytes(37_500).toString('base64')}")`
 test('a small site that loads only its own files passes', () => {
   const dist = site({
     'index.html': page('<link rel="stylesheet" href="/_astro/a.css"><script type="module" src="/_astro/a.js"></script>'),
-    'docs/x/index.html': page('<link rel="canonical" href="https://acorn.sh/docs/x/">'),
+    'docs/x/index.html': page('<link rel="canonical" href="https://getacorn.dev/docs/x/">'),
     '_astro/a.css': 'body{}',
     '_astro/a.js': 'import"./b.js"',
     '_astro/b.js': 'export const b=1',

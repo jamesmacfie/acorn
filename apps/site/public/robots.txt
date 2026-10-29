@@ -1,4 +1,4 @@
 User-agent: *
 Allow: /
 
-Sitemap: https://acorn.sh/sitemap-index.xml
+Sitemap: https://getacorn.dev/sitemap-index.xml

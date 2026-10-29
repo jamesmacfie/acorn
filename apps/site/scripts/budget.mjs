@@ -5,7 +5,7 @@ import { join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { brotliCompressSync } from 'node:zlib'
 
-const SITE = 'https://acorn.sh'
+const SITE = 'https://getacorn.dev'
 const KB = 1024
 
 // Brotli-compressed bytes of the HTML plus every stylesheet and script the page loads. Images and

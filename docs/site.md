@@ -1,6 +1,6 @@
 # The public site
 
-This page covers `apps/site`, the static site for `acorn.sh`: how to run it, build it, check it, deploy
+This page covers `apps/site`, the static site for `getacorn.dev`: how to run it, build it, check it, deploy
 it, and add a page. The site is Astro with Starlight. Marketing pages are hand-written Astro pages, and
 the docs are a Starlight content collection served under `/docs/`.
 
@@ -91,7 +91,7 @@ on `PATH`. It writes `apps/site/src/generated/snapshots/`. Look at the result on
 
 `apps/site/scripts/snapshotPrivacy.test.mjs` fails when a committed snapshot holds a home folder path,
 an email address outside `example.com`, something shaped like a token, or a host outside
-`example.com`, `localhost`, `127.0.0.1`, `github.com`, and `acorn.sh`. Fix the fixture or the capture,
+`example.com`, `localhost`, `127.0.0.1`, `github.com`, and `getacorn.dev`. Fix the fixture or the capture,
 never the test. [Shell snapshots](./site/snapshots.md) covers the fixture, the scenes, how the capture
 works, and adding a scene.
 
@@ -140,7 +140,9 @@ formatted by hand, to the same style.
 
 ## Deploy it
 
-The site is a Cloudflare Worker with static assets and no script, configured in `apps/site/wrangler.jsonc`.
+The site is a Cloudflare Worker with static assets, configured in `apps/site/wrangler.jsonc`. Its one
+script, `apps/site/src/worker.ts`, runs only for download links. It counts each download and redirects
+it to GitHub ([counting downloads](site/releases.md#counting-downloads)).
 `.github/workflows/site.yml` deploys it. The workflow runs on a pull request or a push to `main` that
 touches the site or anything it reads from, such as `docs/`, `packages/protocol/`, or the kit. It
 type-checks the site, then builds and tests the production and preview builds side by side.

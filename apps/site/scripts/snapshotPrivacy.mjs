@@ -3,7 +3,7 @@
 // captured it. Fix the fixture or the capture, never the rule.
 
 // 127.0.0.1 is localhost by number: a paired Node on the same computer shows its endpoint that way.
-const HOSTS = ['example.com', 'localhost', '127.0.0.1', 'github.com', 'acorn.sh']
+const HOSTS = ['example.com', 'localhost', '127.0.0.1', 'github.com', 'getacorn.dev']
 
 const allowedHost = (host) => HOSTS.some((allowed) => host === allowed || host.endsWith(`.${allowed}`))
 

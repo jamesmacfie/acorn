@@ -29,7 +29,7 @@ export const meta = {
 <FeaturePage feature="agents" meta={meta} related={['tasks', 'review', 'security']} docs={{ href: '/docs/agents/agent-sessions/', label: 'Read about agent sessions' }}>
   <Snapshot slot="picture" id="hero" />
 
-  <Feature number={1} title="Claude Code and Codex, on their own logins" href="/docs/agents/harnesses-and-defaults/" link="Harnesses and defaults">
+  <Feature title="Claude Code and Codex, on their own logins" href="/docs/agents/harnesses-and-defaults/" link="Harnesses and defaults">
     <p>
       acorn runs Claude Code and Codex as managed sessions in a task, working in the task's worktree. Each signs in
       with its own command-line login. Add a second account, such as work beside personal, and acorn gives it its own
@@ -38,7 +38,7 @@ export const meta = {
     </p>
   </Feature>
 
-  <Feature number={2} title="Read every step, and answer what it waits on" href="/docs/agents/agent-sessions/" link="Agent sessions">
+  <Feature title="Read every step, and answer what it waits on" href="/docs/agents/agent-sessions/" link="Agent sessions">
     <p>
       The transcript draws each tool call as one card, and a file edit opens onto its diff. When the agent asks for a
       permission or asks you a question, the request draws where it asked, as buttons, a list, or a text box, and the
@@ -47,7 +47,7 @@ export const meta = {
     <Specimen slot="picture" id="agent-turn" />
   </Feature>
 
-  <Feature number={3} title="Queue the next message, or steer the turn" href="/docs/agents/steering-queues-and-follow-ups/" link="Steering, queues, and follow-ups">
+  <Feature title="Queue the next message, or steer the turn" href="/docs/agents/steering-queues-and-follow-ups/" link="Steering, queues, and follow-ups">
     <p>
       Send a message while the agent works and it waits in the queue for the next turn. Press <strong>Steer</strong>{' '}
       instead, or <strong>Steer now</strong> on a queued row, and the agent reads it after its current step. The
@@ -55,7 +55,7 @@ export const meta = {
     </p>
   </Feature>
 
-  <Feature number={4} title="Hand work to another session" href="/docs/agents/delegation-and-subagents/" link="Delegation and subagents">
+  <Feature title="Hand work to another session" href="/docs/agents/delegation-and-subagents/" link="Delegation and subagents">
     <p>
       A session can start another managed session and give it work, either on the same task or in a child task with a
       worktree of its own. It can queue more turns, wait, read what the child found, or cancel it. The child's first
@@ -63,7 +63,7 @@ export const meta = {
     </p>
   </Feature>
 
-  <Feature number={5} title="Save a setup as a custom agent" href="/docs/agents/custom-agents/" link="Custom agents">
+  <Feature title="Save a setup as a custom agent" href="/docs/agents/custom-agents/" link="Custom agents">
     <p>
       A custom agent is a saved start: a harness, its options such as the model, instructions added to its system
       prompt, and a ceiling on which of acorn's tools it may call. It shows under <strong>New</strong> in the Agent
@@ -71,7 +71,7 @@ export const meta = {
     </p>
   </Feature>
 
-  <Feature number={6} title="Memory you can read and undo" href="/docs/using/memory/" link="Memory">
+  <Feature title="Memory you can read and undo" href="/docs/using/memory/" link="Memory">
     <p>
       Agents save what they learn as Markdown files for later sessions. The project's <strong>Memory</strong> page
       lists and searches them, lets you edit one, and keeps its last 20 versions. <strong>Recent changes</strong>{' '}

@@ -1,14 +1,39 @@
+/* Hallmark · shape: a product tour, one idea a screen (the landing page), kept elsewhere · genre: atmospheric · theme: lumen (by request: its colors; the type and the mark kept) · redesign: full (the landing page; the system kept), restyle (the other pages)
+ * hero: kept (Split, the window hanging off the stage; one sentence) · nav: kept (wordmark, four links, search, the scheme switch, the star) · footer: kept (four link columns over the mark line) · imagery: the product, in shell snapshots, specimens, the extension's sidebar pictures, and phone screenshots in Latte and Mocha · signature: an oak sprig in glyphs over every stage, its twig a branch name from the fixture, its acorns brass, swaying when brushed
+ * axes: dark 14 290/mono JetBrains Mono/warm 68 · posture: restrained · contrast: pass · fold: pass · v2.0.0 */
+/* Hallmark · pre-emit critique: P4 H4 E4 S5 R4 V4 · weakest: R, ten sections counting the footer, because the landing page adds Nodes, the browser, the phone, and security at one screen each; the manifest example, the guide lists, and the trust cards went to make room */
+/* Hallmark · waive 38iii · go nuts. is lumen's verb, set once, in the hero · the hero's one rose verb is the joke the whole landing page tells */
+/* Hallmark · waive 47b · every frame holds a capture of acorn's own markup · the snapshots and specimens are the product, drawn by the app's own stylesheet */
+/* Hallmark · waive 64 · the headings, the nav and every control are JetBrains Mono · mono is the material of a workspace that also runs in a terminal */
+/* Hallmark · waive 26b · no button or link on these pages can be disabled · nothing here waits on a form or a request */
+/* Hallmark · waive 49b · each wrapping link at 320 is a docs page title, two lines at most · the FAQ and footer links name the docs pages they open */
+/* Hallmark · waive 39b · the 19 to 21px controls are inside the app's screenshots · the hero window shows acorn's own compact controls at its own scale */
+/* Hallmark · waive 75 · the 10px text is the app's own, scaled down inside its screenshots · a snapshot draws the whole acorn window at a reduced size */
+/* Hallmark · waive 72 · the crowded boxes are acorn's own cards inside its screenshots · each card is captured exactly as the app draws it */
+/* Hallmark · answered F1 · the site's copy keeps straight quotes, as its docs pages do */
+/* Hallmark · answered F8 · the loop's track and the plugin outlines each explain their own chapter, and both settle by a third of the way in */
+/* Hallmark · answered F19 · 600 in JetBrains Mono draws with its bold face, and 500 is the app's own, inside its screenshots */
+/* Hallmark · dismissed F3 · every heading takes text-wrap: balance in the site-base layer */
+/* Hallmark · dropped {href}, scaffold, starter-pane · the landing page's six trust cards, its two lists of plugin guides, and its manifest example, cut so the page stays brief with no JSON; the reach map and the plugins and Nodes pages carry them */
+/* Hallmark · waive 44c · the hero's window spans the page under the words and hangs off the stage's foot · a window under the headline is how every marketing page on the site opens */
+/* Hallmark · waive 77 · the closing band holds the install block and the two actions beside the acorn · the close only has to carry the download */
+/* Hallmark · dismissed 59 · ten sections counting the footer: the landing page adds Nodes, the browser, the phone, and security, and each keeps to one screen */
+/* Hallmark · dismissed 28a · the landing page's first img is the phone screenshot in its fifth section, far below the fold; the hero's headline and window are the largest paint */
+
 /* The site's stylesheet, written against acorn's own design tokens, which virtual:acorn-ui.css puts on
-   <html>. The site draws in Catppuccin Latte or Mocha (AppearanceScript.astro) in the Terminal style
-   pack, and those tokens style the site and every specimen together. A `.site-dark` element draws in
-   Mocha whichever the page is in, from a token block virtual:acorn-ui.css builds from the app's own.
+   <html>. The site picks Catppuccin Latte or Mocha with the visitor's light or dark mode
+   (AppearanceScript.astro), always in the Terminal style pack, and tokens.css then gives the page
+   the site's own colors under the same token names. A specimen or a snapshot keeps the app's theme. A
+   `.site-dark` element draws in the site's night colors whichever mode the page is in.
    A color, font, or length the app has a token for comes from that token. The few the app has no token
-   for are the --site-* ones below. scripts/siteCss.test.mjs fails on a color written here, and
-   scripts/contrast.test.mjs checks the pairs of colors the site sets text in. */
+   for are the --site-* ones below and in tokens.css. scripts/siteCss.test.mjs fails on a color written
+   anywhere but tokens.css, and scripts/contrast.test.mjs checks the pairs of colors the site sets text
+   in. */
 
 /* The app's own faces. Inter sets a marketing page's paragraphs. The other two belong to style packs
    the site never sets, and a browser fetches a face only when a rule uses it. */
 @import '@acorn/client-core/infra/styles/fonts.css';
+@import './tokens.css';
 
 /* Arial, stretched to Inter's size, so a paragraph keeps its lines when Inter arrives and swaps in. */
 @font-face {
@@ -48,6 +73,8 @@
 html:root {
   /* The app's mono stack, with the face the site serves first. No style pack moves it. */
   --font-mono: 'JetBrains Mono', ui-monospace, 'SF Mono', 'Cascadia Code', Menlo, Consolas, monospace;
+  /* Headings are mono on every page, as they are in the Terminal pack the site draws in. */
+  --font-display: var(--font-mono);
 
   /* The widest a page's content runs: where a pane stops widening in the app. */
   --site-width: var(--pane-measure);
@@ -73,8 +100,16 @@ html:root {
   --site-fs-lede: clamp(1.125rem, 1rem + 0.45vw, 1.375rem);
   --site-fs-h1: 2rem;
   --site-fs-h2: 1.5rem;
+  /* Mono runs wide, and its space is as wide as a letter, so a heading pulls its letters in and its
+     spaces in further: a little at a section's size, more at display size. */
+  --site-track-heading: -0.01em;
+  --site-words-heading: -0.15em;
+  --site-track-display: -0.04em;
+  --site-words-display: -0.2em;
+  /* Inter over 20 pixels reads loose at its text spacing. */
+  --site-track-lede: -0.012em;
   /* How far a hero's picture hangs below the stage onto the page. */
-  --site-overhang: clamp(4rem, 2rem + 12vw, 14rem);
+  --site-overhang: clamp(4rem, 2rem + 12vw, 16rem);
   /* A window is rounder than a pane, as a desktop draws one. */
   --site-radius-window: var(--radius-xl);
   /* Lets a closing <details> animate to and from its content's height. */
@@ -189,7 +224,8 @@ html:root {
   :where(h1, h2, h3, h4):not(.acorn-ui *) {
     font-family: var(--font-display);
     font-weight: var(--heading-weight);
-    letter-spacing: var(--heading-tracking);
+    letter-spacing: var(--site-track-heading);
+    word-spacing: var(--site-words-heading);
     text-transform: var(--heading-transform);
     line-height: var(--lh-tight);
     text-wrap: balance;
@@ -198,10 +234,15 @@ html:root {
   :where(p):not(.acorn-ui *) {
     text-wrap: pretty;
   }
+  /* A link's underline is a quiet rule until the pointer reaches it, so the accent stays a signal. */
   :where(a):not(.acorn-ui *) {
     color: var(--text);
-    text-decoration-color: var(--accent);
+    text-decoration-color: var(--border-strong);
     text-underline-offset: 0.2em;
+    transition: text-decoration-color var(--dur-short) var(--ease-out);
+  }
+  :where(a):not(.acorn-ui *):hover {
+    text-decoration-color: var(--accent);
   }
   :where(a, button, summary, select, input):not(.acorn-ui *):focus-visible {
     outline: var(--focus-ring-w) var(--focus-ring-style) var(--focus);
@@ -211,6 +252,12 @@ html:root {
   :where(code, kbd, samp, pre):not(.acorn-ui *) {
     font-family: var(--font-mono);
   }
+}
+/* A band's paint can run past the window's edge without a sideways scroll. `clip`, not `hidden`, so a
+   sticky header still sticks. Outside the layer, so it holds on a docs page too. */
+html,
+body {
+  overflow-x: clip;
 }
 [hidden] {
   display: none !important;
@@ -224,14 +271,13 @@ html:root {
   white-space: nowrap;
 }
 
-/* The label: the app's uppercase, tracked mono label in the Terminal pack, sentence case in Modern. */
+/* The label: mono, a step smaller, in sentence case and untracked. The app's own labels are uppercase
+   and tracked in the Terminal pack, which suits a dense pane but shouts on a page. */
 .eyebrow {
   margin: 0;
   font-family: var(--font-ui);
-  font-size: var(--label-size);
+  font-size: var(--fs);
   font-weight: var(--label-weight);
-  letter-spacing: var(--label-tracking);
-  text-transform: var(--label-transform);
   line-height: var(--lh-tight);
 }
 
@@ -244,7 +290,7 @@ html:root {
   padding: var(--pad-control-lg);
   font: inherit;
   font-family: var(--font-mono);
-  font-size: var(--fs-sm);
+  font-size: var(--fs-md);
   line-height: var(--lh-tight);
   color: var(--text);
   text-decoration: none;
@@ -255,7 +301,6 @@ html:root {
   cursor: pointer;
   transition:
     var(--transition-color),
-    box-shadow var(--dur-short) var(--ease-out),
     translate var(--dur-short) var(--ease-out);
 }
 .button:hover {
@@ -264,18 +309,15 @@ html:root {
 .button:active {
   translate: 0 1px;
 }
-/* Inverse, not the accent: text on Latte's accent is under 4.5:1. */
+/* The one solid button a page has: the accent, with the ink tokens.css pairs with it. */
 .button[data-variant='primary'] {
   font-weight: var(--fw-bold);
-  color: var(--bg);
-  background: var(--text);
-  border-color: var(--text);
+  color: var(--accent-fg);
+  background: var(--accent);
+  border-color: var(--accent);
 }
 .button[data-variant='primary']:hover {
   translate: 0 -1px;
-  box-shadow:
-    0 0 0 var(--bw-strong) var(--accent),
-    0 8px 24px -8px var(--shadow-popover);
 }
 .button[data-variant='primary']:active {
   translate: 0 1px;
@@ -284,15 +326,8 @@ html:root {
 .button[data-size='lg'] {
   min-block-size: 3rem;
   padding: 0 var(--space-10);
-  font-size: var(--fs-md);
+  font-size: var(--fs-lg);
   border-radius: var(--radius-lg);
-}
-/* An arrow after a primary action, which leans toward where the link goes. */
-.button .arrow {
-  transition: translate var(--dur-short) var(--ease-out);
-}
-.button:hover .arrow {
-  translate: var(--space-1) 0;
 }
 .actions {
   display: flex;
@@ -359,7 +394,7 @@ select {
   align-items: center;
   gap: var(--space-8);
   block-size: var(--site-bar-h);
-  font-size: var(--fs);
+  font-size: var(--fs-md);
 }
 .site-header .site-mark {
   margin-inline-end: var(--space-6);
@@ -399,6 +434,10 @@ select {
   list-style: none;
 }
 .site-header-menu > summary::-webkit-details-marker {
+  display: none;
+}
+/* A closed menu draws nothing, so nothing measures its links either. */
+.site-header-menu:not([open]) > div {
   display: none;
 }
 .site-header-menu > div {
@@ -453,7 +492,7 @@ select {
   font-family: inherit;
   min-block-size: var(--control-h);
   padding: var(--pad-control);
-  font-size: var(--fs-sm);
+  font-size: var(--fs-md);
   color: var(--text);
   background: var(--bg);
   border: var(--control-border);
@@ -466,7 +505,7 @@ select {
 .search-open > kbd {
   padding-inline: var(--space-3);
   font-family: var(--font-ui);
-  font-size: var(--fs-xs);
+  font-size: var(--fs-sm);
   color: var(--text);
   background: var(--bg-subtle);
   border: var(--control-border);
@@ -499,7 +538,7 @@ select {
   display: grid;
   gap: var(--space-11);
   padding-block: calc(2 * var(--space-11)) var(--space-11);
-  font-size: var(--fs);
+  font-size: var(--fs-md);
   line-height: var(--lh);
 }
 .site-footer-columns {
@@ -556,14 +595,10 @@ select {
 .site-page h2 {
   font-size: var(--site-fs-h2);
 }
-/* A display heading's closing words, in the accent. Display sizes count as large text, where Latte's
-   accent clears 3:1. */
-.accent {
-  color: var(--accent);
-}
 .lede {
   max-inline-size: 60ch;
   font-size: var(--site-fs-lede);
+  letter-spacing: var(--site-track-lede);
   line-height: 1.55;
 }
 .section {
@@ -606,16 +641,55 @@ select {
   margin: 0;
   min-inline-size: 0;
 }
-.hero > .eyebrow {
-  color: var(--accent);
+.hero-crumb {
+  font-size: var(--fs-md);
 }
 .hero h1 {
   max-inline-size: 16ch;
   font-size: var(--site-fs-hero);
   font-weight: var(--fw-bold);
-  /* Mono at display size reads loose, so the hero's own line pulls in. */
+  /* The hero's line is the largest, so it pulls in a touch further than a display heading. */
   letter-spacing: -0.045em;
+  word-spacing: var(--site-words-display);
   line-height: 1;
+  overflow-wrap: break-word;
+}
+/* The hero's one verb, in rose, underlined by a rule that draws in once as the page loads. It holds
+   together on one line so the rule runs under all of it. */
+.hero h1 .verb {
+  display: inline-block;
+  color: var(--site-verb);
+}
+.hero h1 .verb::after {
+  content: '';
+  display: block;
+  block-size: var(--bw-strong);
+  margin-block-start: -0.06em;
+  background: currentcolor;
+  transform-origin: left;
+}
+@media (prefers-reduced-motion: no-preference) {
+  .hero h1 .verb::after {
+    animation: draw-rule 900ms 500ms var(--ease-out) both;
+  }
+}
+@keyframes draw-rule {
+  from {
+    scale: 0 1;
+  }
+}
+/* The sprig behind the words. Its script sizes it to run from the window's left edge to its right. */
+.glyph-field {
+  position: absolute;
+  inset-block-start: 0;
+  inset-inline-start: 0;
+  z-index: -1;
+  pointer-events: none;
+}
+@media (max-width: 47.99rem) {
+  .glyph-field {
+    display: none;
+  }
 }
 /* A page whose hero is only a heading, such as the changelog, keeps it at a section heading's scale. */
 .hero:not(:has(> .hero-text, > .hero-picture)) h1 {
@@ -626,6 +700,7 @@ select {
   gap: var(--space-8);
   max-inline-size: 60ch;
   font-size: var(--site-fs-lede);
+  letter-spacing: var(--site-track-lede);
   line-height: 1.55;
 }
 .hero-text > * {
@@ -653,22 +728,22 @@ select {
   padding-block-start: 0;
 }
 /* A split hero: the headline on the left, and the paragraph and actions in a column beside it, both
-   starting under the eyebrow when there is one. */
+   starting under the breadcrumb when there is one. */
 @media (min-width: 64rem) {
+  /* The first row takes the headline's spare height, so the paragraph and the actions sit together at
+     its foot. */
   .hero[data-split] {
     grid-template-columns: minmax(0, 1fr) minmax(0, 26rem);
+    grid-template-rows: minmax(0, 1fr) auto;
     column-gap: calc(2 * var(--space-11));
     align-items: end;
   }
-  .hero[data-split] > .eyebrow {
+  .hero[data-split] > .hero-crumb {
     grid-column: 1 / -1;
   }
   .hero[data-split] > h1 {
     grid-row: span 2;
     align-self: start;
-  }
-  .hero[data-split] > .hero-text {
-    font-size: var(--fs-xl);
   }
   .hero[data-split] > .hero-picture {
     grid-column: 1 / -1;
@@ -695,6 +770,10 @@ select {
      it shows, so it's there from the first frame and only rises. */
   .hero > h1 {
     animation-name: site-rise;
+  }
+  /* The sprig has its own way in, from where its twig enters. */
+  .hero > .glyph-field {
+    animation: none;
   }
 }
 @keyframes site-enter {
@@ -729,7 +808,8 @@ select {
 .closing h2 {
   font-size: var(--site-fs-display);
   font-weight: var(--fw-bold);
-  letter-spacing: -0.04em;
+  letter-spacing: var(--site-track-display);
+  word-spacing: var(--site-words-display);
   line-height: 1.02;
 }
 
@@ -822,7 +902,6 @@ select {
   .tour-tabs [role='tab'] {
     min-block-size: auto;
     padding: var(--space-6) var(--space-9);
-    font-size: var(--fs-xl);
     text-align: start;
   }
   /* The selected tab takes the accent rule the sidebar marks the current page with, on the strip's own line. */
@@ -867,7 +946,7 @@ ul.cards {
   gap: var(--space-4);
   align-content: start;
   padding: var(--pad-surface);
-  font-size: var(--fs);
+  font-size: var(--fs-lg);
   line-height: var(--lh);
   text-decoration: none;
   background: var(--card-bg);
@@ -876,28 +955,27 @@ ul.cards {
   box-shadow: var(--elev-card);
   transition: var(--transition-color);
 }
-.card:hover,
-.card:has(a:focus-visible) {
+/* Under the pointer a card's edge takes the accent. Its link is the whole card, so the card draws the
+   focus ring, at once rather than through the edge's transition. */
+.card:hover {
   border-color: var(--accent);
 }
-/* On a marketing page a card is rounder, and it lifts under the pointer. */
+.card:has(a:focus-visible) {
+  outline: var(--focus-ring-w) var(--focus-ring-style) var(--focus);
+  outline-offset: var(--focus-ring-offset);
+}
+.card h3 a:focus-visible {
+  outline: none;
+}
+/* On a marketing page a card is rounder. */
 .site-page .card {
   border-radius: var(--radius-lg);
-  transition:
-    var(--transition-color),
-    translate var(--dur-med) var(--ease-out),
-    box-shadow var(--dur-med) var(--ease-out);
-}
-.site-page .card:hover,
-.site-page .card:has(a:focus-visible) {
-  translate: 0 calc(-1 * var(--space-1));
-  box-shadow: 0 16px 32px -16px var(--shadow-popover);
 }
 .card > * {
   margin: 0;
 }
 .card h3 {
-  font-size: var(--fs-lg);
+  font-size: var(--fs-xl);
 }
 .card h3 a {
   text-decoration: none;
@@ -917,7 +995,8 @@ ul.cards {
 /* ── Frames ──────────────────────────────────────────────────────────────────────────────────
    A picture of acorn sits in a frame drawn like a pane: a chrome bar, the divider under it, and the
    picture. Specimens, snapshots, and the install block share it. A frame lifts off the page a little;
-   a snapshot is a whole window, so it's rounder, has a window's buttons, and lifts further. */
+   a snapshot is a whole window, so it's rounder and lifts further. A specimen or a snapshot draws in
+   the app's own theme (tokens.css), and the install block, a control of the site's, in the site's. */
 .frame {
   margin: 0;
   overflow: hidden;
@@ -938,7 +1017,7 @@ ul.cards {
   gap: var(--space-6);
   min-block-size: var(--tab-h);
   padding-inline: var(--space-6);
-  font-size: var(--fs-sm);
+  font-size: var(--fs);
   line-height: var(--lh-tight);
   background: var(--bg-subtle);
   border-block-end: var(--chrome-divider);
@@ -952,49 +1031,25 @@ ul.cards {
     0 24px 48px -24px var(--shadow-popover),
     0 48px 96px -48px var(--shadow-popover);
 }
-/* A window's title sits in the middle of its bar, between its buttons and the host's name, as a
-   desktop draws a title bar. */
-.window-bar {
-  display: grid;
-  grid-template-columns: 1fr auto 1fr;
-  min-block-size: var(--space-11);
+/* A snapshot's bar names what the picture shows on the left and which client drew it on the right. */
+.snapshot-bar {
+  justify-content: space-between;
 }
-.window-buttons {
-  display: flex;
-  gap: var(--space-4);
-}
-.window-buttons > i {
-  inline-size: var(--space-6);
-  block-size: var(--space-6);
-  background: var(--border-strong);
-  border-radius: var(--radius-circle);
-}
-.window-buttons > i:nth-child(1) {
-  background: var(--danger);
-}
-.window-buttons > i:nth-child(2) {
-  background: var(--warn);
-}
-.window-buttons > i:nth-child(3) {
-  background: var(--success);
-}
-.window-title {
+.snapshot-title {
   overflow: hidden;
   font-weight: var(--fw-semibold);
   text-overflow: ellipsis;
   white-space: nowrap;
 }
-.window-bar > .frame-size {
-  justify-self: end;
+.snapshot-bar > .frame-size {
+  flex: none;
 }
 .frame-bar .tabs {
   align-self: stretch;
 }
+/* A specimen's name, set as a snapshot's title is, rather than in the app's tracked capitals. */
 .frame-title {
-  font-size: var(--label-size);
-  font-weight: var(--label-weight);
-  letter-spacing: var(--label-tracking);
-  text-transform: var(--label-transform);
+  font-weight: var(--fw-semibold);
 }
 .frame-title + .tabs,
 .frame-title + .frame-size {
@@ -1002,11 +1057,10 @@ ul.cards {
 }
 .frame-size {
   font-family: var(--font-mono);
-  font-size: var(--fs-xs);
 }
 .frame-caption {
   padding: var(--space-4) var(--space-6);
-  font-size: var(--fs-sm);
+  font-size: var(--fs);
   line-height: var(--lh);
   border-block-start: var(--chrome-divider);
 }
@@ -1062,7 +1116,7 @@ ul.cards {
   min-block-size: var(--control-h);
   padding-inline: var(--space-9);
   font-family: var(--font-mono);
-  font-size: var(--fs-sm);
+  font-size: var(--fs-md);
   border-radius: var(--radius-control);
   transition: var(--transition-color);
 }
@@ -1472,7 +1526,7 @@ site-search .search-group {
   padding: calc(2 * var(--space-11));
   overflow: hidden;
   color: var(--text);
-  background: var(--bg);
+  background: var(--bg-subtle);
   border-block-start: calc(2 * var(--space-4)) solid var(--accent);
 }
 .social-card > * {

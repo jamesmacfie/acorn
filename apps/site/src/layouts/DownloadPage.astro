@@ -8,7 +8,7 @@ import InstallBlock from '../components/InstallBlock.astro'
 import SoftwareApplication from '../components/SoftwareApplication.astro'
 import { installMethods } from '../install'
 import type { Release } from '../lib/github'
-import { sortAssets } from '../lib/releaseAssets'
+import { downloadPath, sortAssets } from '../lib/releaseAssets'
 import type { PageMeta } from '../meta'
 import { GITHUB } from '../nav'
 import Marketing from './Marketing.astro'
@@ -20,11 +20,11 @@ interface Props {
 
 const { meta, release } = Astro.props
 const downloads = sortAssets(release?.assets ?? [])
-const desktop = [
-  { asset: downloads.macosArm64, label: 'macOS, Apple silicon', platform: 'macos' },
-  { asset: downloads.macosX64, label: 'macOS, Intel', platform: 'macos' },
-  { asset: downloads.windows, label: 'Windows installer', platform: 'windows' },
-].filter((download) => download.asset)
+const desktop = ([
+  { kind: 'macosArm64', label: 'macOS, Apple silicon', platform: 'macos' },
+  { kind: 'macosX64', label: 'macOS, Intel', platform: 'macos' },
+  { kind: 'windows', label: 'Windows installer', platform: 'windows' },
+] as const).filter(({ kind }) => downloads[kind])
 const NO_RELEASE = 'acorn has no signed release. Build from source, or watch the repository for the first release.'
 const releases = `${GITHUB}/releases`
 const released = release && new Date(release.publishedAt).toLocaleDateString('en-US', { dateStyle: 'long', timeZone: 'UTC' })
@@ -60,9 +60,9 @@ const released = release && new Date(release.publishedAt).toLocaleDateString('en
         desktop.length > 0 ? (
           <Fragment>
             <ul class="actions" data-platform-order>
-              {desktop.map(({ asset, label, platform }) => (
+              {desktop.map(({ kind, label, platform }) => (
                 <li data-platforms={platform}>
-                  <a class="button" data-variant="primary" href={asset!.url}>
+                  <a class="button" data-variant="primary" href={downloadPath(kind)}>
                     {label}
                   </a>
                 </li>
@@ -151,13 +151,13 @@ const released = release && new Date(release.publishedAt).toLocaleDateString('en
         downloads.node ? (
           <ul class="actions">
             <li>
-              <a class="button" data-variant="primary" href={downloads.node.url}>
+              <a class="button" data-variant="primary" href={downloadPath('node')}>
                 Standalone Node
               </a>
             </li>
             {downloads.checksums && (
               <li>
-                <a class="button" href={downloads.checksums.url}>
+                <a class="button" href={downloadPath('checksums')}>
                   Checksums
                 </a>
               </li>

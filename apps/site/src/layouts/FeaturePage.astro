@@ -24,7 +24,7 @@ const getAcorn = (await readGithub()).release ? 'Download' : 'Get acorn'
 ---
 
 <Marketing title={`${title} · Features`} meta={meta}>
-  <Hero slot="hero" eyebrow="Features" title={title}>
+  <Hero slot="hero" crumb={{ href: '/features/', label: 'Features' }} title={title}>
     <p>{sentence}</p>
     <slot name="picture" slot="picture" />
   </Hero>
@@ -54,9 +54,7 @@ const getAcorn = (await readGithub()).release ? 'Download' : 'Get acorn'
   <section class="section closing stage site-dark">
     <h2>Get started</h2>
     <div class="actions">
-      <a class="button" data-variant="primary" data-size="lg" href="/download/">
-        {getAcorn} <span class="arrow" aria-hidden="true">→</span>
-      </a>
+      <a class="button" data-variant="primary" data-size="lg" href="/download/">{getAcorn}</a>
       <a class="button" data-size="lg" href={docs.href}>{docs.label}</a>
     </div>
   </section>

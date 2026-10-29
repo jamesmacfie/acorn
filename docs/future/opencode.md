@@ -58,7 +58,7 @@ This is the whole package. It differs from the example in the authoring doc in o
 
 ```json
 {
-  "$schema": "https://acorn.sh/schemas/acorn-plugin.schema.json",
+  "$schema": "https://getacorn.dev/schemas/acorn-plugin.schema.json",
   "id": "opencode",
   "name": "OpenCode",
   "version": "0.1.0",

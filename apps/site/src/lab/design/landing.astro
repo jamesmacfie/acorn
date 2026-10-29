@@ -43,7 +43,7 @@ const security = [
 ---
 
 <Marketing title="Landing, restyled" meta={meta}>
-  <Hero slot="hero" eyebrow="For developers who run coding agents" title={headline}>
+  <Hero slot="hero" title={headline}>
     <p>{paragraph}</p>
     <Fragment slot="actions">
       <a class="button" data-variant="primary" href="/download/">Get acorn</a>
@@ -62,8 +62,8 @@ const security = [
     <h2>How it works</h2>
     <div class="features">
       {
-        steps.map(([title, text, specimen], index) => (
-          <Feature number={index + 1} title={title} href="/docs/start/concepts/" link="Read the concepts">
+        steps.map(([title, text, specimen]) => (
+          <Feature title={title} href="/docs/start/concepts/" link="Read the concepts">
             <p>{text}</p>
             <Specimen slot="picture" id={specimen} />
           </Feature>

@@ -9,13 +9,13 @@ are. Where this guide and a page disagree, the page is right.
 
 ## 1. Install acorn
 
-Read [Install](https://acorn.sh/docs/start/install.md). It covers what each way of running acorn
+Read [Install](https://getacorn.dev/docs/start/install.md). It covers what each way of running acorn
 needs, building from source, the desktop app, the terminal client and the command line, and the
-first-run setup. The [download page](https://acorn.sh/download/) says whether there's a release to
+first-run setup. The [download page](https://getacorn.dev/download/) says whether there's a release to
 download.
 
 - Ask the person which machine acorn runs on, and whether they want the desktop app, the terminal
-  client, or both. [Desktop and terminal](https://acorn.sh/docs/start/desktop-and-terminal.md) says
+  client, or both. [Desktop and terminal](https://getacorn.dev/docs/start/desktop-and-terminal.md) says
   how the two differ.
 - You can run the commands on Install for them. The first-run setup is in the app's window, so walk
   the person through its steps rather than doing them.
@@ -27,25 +27,25 @@ download.
 Skip this step when the person uses only the desktop app on one computer.
 
 - The terminal client asks to pair with the desktop app's Node the first time it runs.
-  [Desktop and terminal](https://acorn.sh/docs/start/desktop-and-terminal.md) has the steps.
-- For a Node on another machine, read [Run a standalone Node](https://acorn.sh/docs/nodes/run-a-standalone-node.md),
-  then [Pair a device or a remote Node](https://acorn.sh/docs/nodes/pair-a-device-or-a-remote-node.md).
+  [Desktop and terminal](https://getacorn.dev/docs/start/desktop-and-terminal.md) has the steps.
+- For a Node on another machine, read [Run a standalone Node](https://getacorn.dev/docs/nodes/run-a-standalone-node.md),
+  then [Pair a device or a remote Node](https://getacorn.dev/docs/nodes/pair-a-device-or-a-remote-node.md).
 - Pairing shows the Node's identity words in two places. Ask the person to compare them. Don't
   compare them for the person, because the words are how the person knows the Node is theirs.
 
 ## 3. Open their first task
 
-Follow the [quick start](https://acorn.sh/docs/start/quick-start-first-project-first-task-first-agent.md).
+Follow the [quick start](https://getacorn.dev/docs/start/quick-start-first-project-first-task-first-agent.md).
 It adds a project, opens a task, runs an agent session, and commits, pushes, and archives the change.
 It needs a Git repository with a remote the person can push to. Its **In the terminal** section has
 the same steps for the terminal client.
 
-[Concepts](https://acorn.sh/docs/start/concepts.md) explains workspaces, projects, tasks, and panes,
+[Concepts](https://getacorn.dev/docs/start/concepts.md) explains workspaces, projects, tasks, and panes,
 if the person asks what they're looking at.
 
 ## For anything else
 
-- [/llms.txt](https://acorn.sh/llms.txt) lists the docs, and
-  [/llms-full.txt](https://acorn.sh/llms-full.txt) holds all of them in one file.
-- The [command line reference](https://acorn.sh/docs/reference/command-line-reference.md) lists every
+- [/llms.txt](https://getacorn.dev/llms.txt) lists the docs, and
+  [/llms-full.txt](https://getacorn.dev/llms-full.txt) holds all of them in one file.
+- The [command line reference](https://getacorn.dev/docs/reference/command-line-reference.md) lists every
   `acorn` command and its options.

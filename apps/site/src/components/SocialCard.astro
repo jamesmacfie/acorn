@@ -1,6 +1,6 @@
 ---
-// The picture a link to a page shows when someone shares it: 1200 by 630 pixels, in the current theme
-// and style pack. A screenshot of this component is the card.
+// The picture a link to a page shows when someone shares it: 1200 by 630 pixels, drawn at night as the
+// stage is, whichever mode the page is in. A screenshot of this component is the card.
 import Mark from './Mark.astro'
 
 interface Props {
@@ -13,12 +13,12 @@ interface Props {
 const { section, title, description } = Astro.props
 ---
 
-<div class="social-card">
+<div class="social-card site-dark">
   <p class="eyebrow">{section}</p>
   <p class="social-card-title">{title}</p>
   <p>{description}</p>
   <div class="social-card-foot">
     <Mark />
-    <span>acorn.sh</span>
+    <span>getacorn.dev</span>
   </div>
 </div>

@@ -80,8 +80,9 @@ as its empty frame.
 
 The extension's panel isn't a plugin tree, so its pictures are a third generator.
 `apps/extension/src/sidebar/pictures.test.tsx` mounts the real sidebar under jsdom against a scripted
-Node, the way the extension's own sidebar tests do, for each scene: pairing, Home, a conversation, and
-the handoff card. It writes the markup to `apps/site/src/generated/sidebar/<id>.html`, inside the
+Node, the way the extension's own sidebar tests do, for each scene: pairing, Home, a conversation, the
+handoff card, a plugin's panel, and a Linear issue's task and a conversation from that issue's page. It
+writes the markup to `apps/site/src/generated/sidebar/<id>.html`, inside the
 `.snapshot-sidebar` wrapper the panel's own sheet is scoped to, and copies a text box's value into its
 markup. `pnpm --filter @acorn/site specimens` runs it last, with the same `UPDATE_SPECIMENS=1` switch,
 and the extension's test suite runs it too, so a sidebar change fails until someone regenerates the

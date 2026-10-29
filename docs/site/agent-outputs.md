@@ -99,4 +99,4 @@ The Playwright suite in `apps/site/tests/site.spec.ts` covers all of this, on bo
 - Search indexes every published docs page and nothing else. A contribution key, a component, a setting's
   label, and a command each put the page that documents it first.
 - The palette opens from the keyboard, groups its results, passes axe, and goes to the selected page.
-- Every `acorn.sh` link in the agent guide goes to a file the build wrote.
+- Every `getacorn.dev` link in the agent guide goes to a file the build wrote.

@@ -16,7 +16,7 @@ const showDraftOnPreview = <T extends { draft: boolean; pagefind: boolean; banne
         ...page,
         draft: false,
         pagefind: false,
-        banner: { content: 'Draft: this page is not published to acorn.sh yet.' },
+        banner: { content: 'Draft: this page is not published to getacorn.dev yet.' },
       }
     : page
 

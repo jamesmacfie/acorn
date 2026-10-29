@@ -30,14 +30,14 @@ export const meta = {
 <FeaturePage feature="task-tools" meta={meta} related={['tasks', 'plugins', 'automation']} docs={{ href: '/docs/built-in-plugins/', label: 'Read about the built-in plugins' }}>
   <Snapshot slot="picture" id="database" />
 
-  <Feature number={1} title="Editor" href="/docs/built-in-plugins/editor/" link="Editor">
+  <Feature title="Editor" href="/docs/built-in-plugins/editor/" link="Editor">
     <p>
       Edit the task's worktree in a CodeMirror editor, with the same colors a file has in a diff. Press{' '}
       <code>⌘P</code> to open a file by name, and <code>⌘⇧F</code> to search every file with ripgrep.
     </p>
   </Feature>
 
-  <Feature number={2} title="Database" href="/docs/built-in-plugins/database/" link="Database">
+  <Feature title="Database" href="/docs/built-in-plugins/database/" link="Database">
     <p>
       A PostgreSQL client for the task: a SQL editor over a table list and a result grid. It finds the connection
       from the project's connection script, a <code>DATABASE_URL</code> in the worktree's <code>.env</code>, or the
@@ -45,7 +45,7 @@ export const meta = {
     </p>
   </Feature>
 
-  <Feature number={3} title="HTTP" href="/docs/built-in-plugins/http/" link="HTTP">
+  <Feature title="HTTP" href="/docs/built-in-plugins/http/" link="HTTP">
     <p>
       Build and send API requests from the task, saved to the project or kept to the task. Variables can be plain,
       secret, or the output of a command, and secret values are encrypted on the Node. A workflow step can send a
@@ -53,7 +53,7 @@ export const meta = {
     </p>
   </Feature>
 
-  <Feature number={4} title="Docker" href="/docs/built-in-plugins/docker/" link="Docker">
+  <Feature title="Docker" href="/docs/built-in-plugins/docker/" link="Docker">
     <p>
       The Docker pane shows the containers that belong to the task's worktree, with their logs, stats, details, and
       a shell inside each one. Start, stop, restart, and remove them there. When you archive the task, acorn offers
@@ -61,7 +61,7 @@ export const meta = {
     </p>
   </Feature>
 
-  <Feature number={5} title="Preview" href="/docs/built-in-plugins/preview/" link="Preview">
+  <Feature title="Preview" href="/docs/built-in-plugins/preview/" link="Preview">
     <p>
       A browser pane that opens the task's running app, from a run target's address or the project's preview
       setting. Each task keeps its own page. It works only with the Node on your own computer, because a page served
@@ -69,21 +69,21 @@ export const meta = {
     </p>
   </Feature>
 
-  <Feature number={6} title="Notes" href="/docs/using/notes/" link="Notes">
+  <Feature title="Notes" href="/docs/using/notes/" link="Notes">
     <p>
       Markdown notes for a task, a workspace, or everything, kept as plain files on the Node that you can open by
       hand. Choose which notes go into an agent's context. Agents can read a task's notes and add to them.
     </p>
   </Feature>
 
-  <Feature number={7} title="Context" href="/docs/using/task-context/" link="Task context">
+  <Feature title="Context" href="/docs/using/task-context/" link="Task context">
     <p>
       The Context pane shows what an agent reads about its task: the pull request, linked issues, notes, and
       sections other plugins add. Pick the sections it gets.
     </p>
   </Feature>
 
-  <Feature number={8} title="Linear" href="/docs/built-in-plugins/linear/" link="Linear">
+  <Feature title="Linear" href="/docs/built-in-plugins/linear/" link="Linear">
     <p>
       Connect Linear to list issues in the rail, start a task from one on the issue's suggested branch, and read the
       linked issue in the task's pane. An agent in the task can read the issue, comment on it, and view its
@@ -91,7 +91,7 @@ export const meta = {
     </p>
   </Feature>
 
-  <Feature number={9} title="Rollbar" href="/docs/built-in-plugins/rollbar/" link="Rollbar">
+  <Feature title="Rollbar" href="/docs/built-in-plugins/rollbar/" link="Rollbar">
     <p>
       Connect Rollbar to list active errors in the rail, read an item with its newest occurrence and stack, and start
       a task from it. Payloads pass a privacy allowlist before acorn stores or shows them.

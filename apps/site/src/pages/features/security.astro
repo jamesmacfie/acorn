@@ -26,7 +26,7 @@ export const meta = {
 <FeaturePage feature="security" meta={meta} related={['agents', 'plugins', 'nodes']} docs={{ href: '/docs/security/the-trust-model/', label: 'Read the trust model' }}>
   <Snapshot slot="picture" id="permissions" />
 
-  <Feature number={1} title="Agents get a token for their own task" href="/docs/security/the-trust-model/" link="The trust model">
+  <Feature title="Agents get a token for their own task" href="/docs/security/the-trust-model/" link="The trust model">
     <p>
       An agent gets a token that reaches only its own task's routes on the Node and can't spend a credential acorn
       holds. Every process acorn starts gets an environment built from an allowlist, never a copy of the Node's, so it
@@ -34,7 +34,7 @@ export const meta = {
     </p>
   </Feature>
 
-  <Feature number={2} title="Files and instructions are checked" href="/docs/security/files-processes-and-project-configuration/" link="Files, processes, and project configuration">
+  <Feature title="Files and instructions are checked" href="/docs/security/files-processes-and-project-configuration/" link="Files, processes, and project configuration">
     <p>
       acorn's own file reads and writes stay inside the data folder and the worktrees, and follow symlinks before
       they decide, so a link a branch adds to <code>~/.ssh</code> is refused. Committed project configuration that
@@ -44,7 +44,7 @@ export const meta = {
     </p>
   </Feature>
 
-  <Feature number={3} title="Plugins run sandboxed, with the grants you accept" href="/docs/security/plugin-trust-and-permissions/" link="Plugin trust and permissions">
+  <Feature title="Plugins run sandboxed, with the grants you accept" href="/docs/security/plugin-trust-and-permissions/" link="Plugin trust and permissions">
     <p>
       An installed plugin's client code runs in a sandbox and draws only with acorn's components or inside its own
       frame. Its Node half runs in a worker that gets only the network, file, environment, and process grants its
@@ -52,7 +52,7 @@ export const meta = {
     </p>
   </Feature>
 
-  <Feature number={4} title="Where your credentials live" href="/docs/security/credentials-and-secrets/" link="Credentials and secrets">
+  <Feature title="Where your credentials live" href="/docs/security/credentials-and-secrets/" link="Credentials and secrets">
     <p>
       The credentials you connect, such as GitHub's, are encrypted on the Node, write-only, and never sent back in an
       answer, a log, or an event. A backup blanks them. Claude Code and Codex keep their logins in their own
@@ -60,7 +60,7 @@ export const meta = {
     </p>
   </Feature>
 
-  <Feature number={5} title="An audit log, and telemetry off" href="/docs/security/the-audit-log/" link="The audit log">
+  <Feature title="An audit log, and telemetry off" href="/docs/security/the-audit-log/" link="The audit log">
     <p>
       <strong>Settings → Audit log</strong> lists 90 days of security decisions: pairings, devices revoked, secrets
       changed, plugins installed or turned off, and backups. Telemetry is off by default, and nothing leaves the
@@ -68,7 +68,7 @@ export const meta = {
     </p>
   </Feature>
 
-  <Feature number={6} title="What acorn doesn't protect against" href="/docs/security/what-acorn-doesnt-protect-against/" link="What acorn doesn't protect against">
+  <Feature title="What acorn doesn't protect against" href="/docs/security/what-acorn-doesnt-protect-against/" link="What acorn doesn't protect against">
     <p>
       An agent runs shell commands as you, so it can read what you can, including the rest of acorn's data folder.{' '}
       <strong>Keep agents out of Acorn's data folder</strong> closes that for Claude Code sessions. It's off by

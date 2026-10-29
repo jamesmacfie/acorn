@@ -59,11 +59,25 @@ const plugins = Object.values(PLUGINS).sort((a, b) => a.name.localeCompare(b.nam
 </Marketing>
 
 <style>
+  /* A plugin's icon sits on its name's line, before the name. */
+  .cards :global(.card) {
+    grid-template-columns: auto minmax(0, 1fr);
+    align-items: center;
+    column-gap: var(--space-4);
+  }
+  .cards :global(.card > :not(h3, .plugin-icon)) {
+    grid-column: 1 / -1;
+  }
+  .cards :global(.card > h3) {
+    grid-row: 1;
+    grid-column: 2;
+  }
   .plugin-icon {
     display: block;
-    order: -1;
-    inline-size: 1.5rem;
-    block-size: 1.5rem;
+    grid-row: 1;
+    grid-column: 1;
+    inline-size: 1.25rem;
+    block-size: 1.25rem;
     color: var(--accent);
   }
   .plugin-icon :global(svg) {

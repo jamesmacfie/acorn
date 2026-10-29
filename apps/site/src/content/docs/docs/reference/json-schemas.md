@@ -19,10 +19,10 @@ them, says what each covers, and shows how to use one in your editor or a script
 
 | Schema | Address | What it describes |
 | --- | --- | --- |
-| Plugin manifest | `https://acorn.sh/schemas/acorn-plugin.schema.json` | A plugin's `acorn-plugin.json`. |
-| Device config | `https://acorn.sh/schemas/acorn-device.schema.json` | `acorn.json`, the settings file for one device ([Configuration files](/docs/reference/configuration-files/#the-device-config-file)). |
-| Command line resources | `https://acorn.sh/schemas/cli/resources-v1.schema.json` | What `acorn … --output json` writes on success. |
-| Command line errors | `https://acorn.sh/schemas/cli/error-v1.schema.json` | What `acorn … --output json` writes to standard error when a command fails. |
+| Plugin manifest | `https://getacorn.dev/schemas/acorn-plugin.schema.json` | A plugin's `acorn-plugin.json`. |
+| Device config | `https://getacorn.dev/schemas/acorn-device.schema.json` | `acorn.json`, the settings file for one device ([Configuration files](/docs/reference/configuration-files/#the-device-config-file)). |
+| Command line resources | `https://getacorn.dev/schemas/cli/resources-v1.schema.json` | What `acorn … --output json` writes on success. |
+| Command line errors | `https://getacorn.dev/schemas/cli/error-v1.schema.json` | What `acorn … --output json` writes to standard error when a command fails. |
 
 Each file is served from the address in its own `$id`, and is the same file the code checks itself
 against. The plugin manifest and device config schemas also ship in the `acorn-plugin-types` npm
@@ -35,7 +35,7 @@ and show each field's description as you type:
 
 ```json
 {
-  "$schema": "https://acorn.sh/schemas/acorn-device.schema.json",
+  "$schema": "https://getacorn.dev/schemas/acorn-device.schema.json",
   "themeFollowSystem": true
 }
 ```
@@ -50,7 +50,7 @@ that's `json.schemas` in your settings:
 ```json
 {
   "json.schemas": [
-    { "fileMatch": ["acorn.json"], "url": "https://acorn.sh/schemas/acorn-device.schema.json" }
+    { "fileMatch": ["acorn.json"], "url": "https://getacorn.dev/schemas/acorn-device.schema.json" }
   ]
 }
 ```

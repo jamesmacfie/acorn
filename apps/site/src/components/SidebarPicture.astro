@@ -27,6 +27,14 @@ const PICTURES = {
     title: 'Acme app',
     caption: "A plugin's panel on its task's app: the app's state and its links.",
   },
+  'sidebar-issue-task': {
+    title: 'FER-112 Retry failed webhooks',
+    caption: "The panel on a Linear issue's page, open on the issue's task: a request waiting for you, and its two agents.",
+  },
+  'sidebar-issue-conversation': {
+    title: 'FER-112 Retry failed webhooks',
+    caption: "A conversation with the task's agent, from the Linear issue's page.",
+  },
 } as const
 
 interface Props {
@@ -55,5 +63,10 @@ if (html === undefined) throw new Error(`There's no sidebar picture "${id}". Run
   }
   .panel :global(.snapshot-sidebar) {
     contain: layout;
+  }
+  /* The task's rail is fixed to the panel's foot, so the panel leaves room under the view for it, as the
+     sidebar's own body does. */
+  .panel :global(.snapshot-sidebar:has(.rail)) {
+    padding-block-end: var(--pane-head-h);
   }
 </style>

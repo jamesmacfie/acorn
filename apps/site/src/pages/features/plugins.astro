@@ -43,7 +43,7 @@ const guides = [
 <FeaturePage feature="plugins" meta={meta} related={['desktop-and-terminal', 'security', 'task-tools']} docs={{ href: '/docs/build-plugins/start/build-your-first-plugin/', label: 'Build your first plugin' }}>
   <Specimen slot="picture" id="issues-pane" both />
 
-  <Feature number={1} title="Most of acorn is plugins" href="/docs/build-plugins/start/how-plugins-work/" link="How plugins work">
+  <Feature title="Most of acorn is plugins" href="/docs/build-plugins/start/how-plugins-work/" link="How plugins work">
     <p>
       Git, GitHub, the Agent pane, the editor, and workflows are all plugins. Database, HTTP, Linear, and Rollbar ship
       with acorn as installed packages, and run through the same loader, sandbox, and permission checks as a plugin
@@ -51,7 +51,7 @@ const guides = [
     </p>
   </Feature>
 
-  <Feature number={2} title="Drawn with acorn's own components" href="/docs/build-plugins/start/choose-how-your-plugin-draws/" link="Choose how your plugin draws">
+  <Feature title="Drawn with acorn's own components" href="/docs/build-plugins/start/choose-how-your-plugin-draws/" link="Choose how your plugin draws">
     <p>
       A plugin's pane code runs in a worker and sends a tree of acorn's components, which the app draws. So the pane
       gets the app's keys, focus, screen reader labels, and themes, and the terminal client draws it too. A plugin
@@ -59,7 +59,7 @@ const guides = [
     </p>
   </Feature>
 
-  <Feature number={3} title="What a plugin can add" href="/docs/build-plugins/reference/contributions/" link="Contributions">
+  <Feature title="What a plugin can add" href="/docs/build-plugins/reference/contributions/" link="Contributions">
     <p>Each of these is an entry in the plugin's manifest, and each has a guide.</p>
     <ul class="cards">
       {
@@ -74,7 +74,7 @@ const guides = [
     </ul>
   </Feature>
 
-  <Feature number={4} title="Plugins extending each other" href="/docs/build-plugins/ui/add-to-another-plugins-view/" link="Add to another plugin's view">
+  <Feature title="Plugins extending each other" href="/docs/build-plugins/ui/add-to-another-plugins-view/" link="Add to another plugin's view">
     <p>
       A plugin can open places in its own view for others to fill. GitHub takes marks on the lines of a pull
       request's diff and badges on its overview, and the Context pane takes a section from any plugin. Each
@@ -82,7 +82,7 @@ const guides = [
     </p>
   </Feature>
 
-  <Feature number={5} title="Permissions you accept on each device" href="/docs/security/plugin-trust-and-permissions/" link="Plugin trust and permissions">
+  <Feature title="Permissions you accept on each device" href="/docs/security/plugin-trust-and-permissions/" link="Plugin trust and permissions">
     <p>
       An installed plugin's manifest lists what it needs, and its Node half runs in a worker that gets only those
       grants. Each device decides whether to run a plugin's exact bytes, and an update asks again with what changed.
@@ -91,7 +91,7 @@ const guides = [
     <Snapshot slot="picture" id="permissions" />
   </Feature>
 
-  <Feature number={6} title="Ask your agent to write one" href="/docs/build-plugins/start/have-your-agent-build-it/" link="Have your agent build it">
+  <Feature title="Ask your agent to write one" href="/docs/build-plugins/start/have-your-agent-build-it/" link="Have your agent build it">
     <p>
       acorn's agents read the plugin vocabulary from your Node with the <code>plugin_authoring</code> tool. When the
       plugin is ready, the agent asks to install it, and nothing is installed until you approve it.

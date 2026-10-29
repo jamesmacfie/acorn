@@ -79,21 +79,22 @@ test('with no release, the download page says so and puts Build from source firs
   await page.goto('/lab/download/none/')
   await expect(page.locator('main > .callout').first()).toContainText('acorn has no signed release.')
   await expect(page.locator('main h2').first()).toHaveText('Build from source')
-  await expect(page.locator('main a[href*="/releases/download/"]')).toHaveCount(0)
+  await expect(page.locator('main a[href^="/download/"]')).toHaveCount(0)
 })
 
+// Each button goes to a path that src/worker.ts counts and redirects. src/worker.test.ts checks the redirects.
 test('with a release for every platform, the download page links every file', async ({ page }) => {
   test.skip(!previewBuild, 'The fixture releases are lab pages, which only a preview build has.')
   await page.goto('/lab/download/every-platform/')
-  const files = {
-    'macOS, Apple silicon': 'acorn_1.0.0_aarch64.dmg',
-    'macOS, Intel': 'acorn_1.0.0_x64.dmg',
-    'Windows installer': 'acorn_1.0.0_x64-setup.exe',
-    'Standalone Node': 'acorn-node-1.0.0.tar.gz',
-    Checksums: 'SHA256SUMS',
+  const paths = {
+    'macOS, Apple silicon': '/download/macos-arm64',
+    'macOS, Intel': '/download/macos-x64',
+    'Windows installer': '/download/windows',
+    'Standalone Node': '/download/node',
+    Checksums: '/download/checksums',
   }
-  for (const [name, file] of Object.entries(files)) {
-    await expect(page.getByRole('link', { name, exact: true })).toHaveAttribute('href', new RegExp(`/${file}$`))
+  for (const [name, path] of Object.entries(paths)) {
+    await expect(page.getByRole('link', { name, exact: true })).toHaveAttribute('href', path)
   }
   await expect(page.getByText('acorn has no signed release.')).toHaveCount(0)
   const { violations } = await new AxeBuilder({ page }).withTags(['wcag2a', 'wcag2aa']).analyze()
@@ -275,7 +276,7 @@ for (const file of schemaFiles) {
   test(`/schemas/${file} is served at its $id`, async ({ request }) => {
     const response = await request.get(`/schemas/${file}`)
     expect(response.status()).toBe(200)
-    expect((await response.json()).$id).toBe(`https://acorn.sh/schemas/${file}`)
+    expect((await response.json()).$id).toBe(`https://getacorn.dev/schemas/${file}`)
   })
 }
 
@@ -299,7 +300,7 @@ test('every page has a title and a description no other page has, and a card the
       else if (seen[key].has(value)) problems.push(`${file} has the same ${key} as ${seen[key].get(value)}: ${value}`)
       else seen[key].set(value, file)
     }
-    const card = html.match(/<meta property="og:image" content="https:\/\/acorn\.sh\/([^"]+)"/)?.[1]
+    const card = html.match(/<meta property="og:image" content="https:\/\/getacorn\.dev\/([^"]+)"/)?.[1]
     if (!card) problems.push(`${file} has no og:image`)
     else if (!existsSync(new URL(card, dist)))
       problems.push(`${file} points og:image at ${card}, which the build didn't write`)
@@ -322,9 +323,9 @@ test('/llms-small.txt leaves out the generated component pages', () => {
   expect(small).not.toContain('# IconButton')
 })
 
-test('every acorn.sh link in the agent guide goes to a file the build wrote', () => {
+test('every getacorn.dev link in the agent guide goes to a file the build wrote', () => {
   const guide = readFileSync(new URL('agent-guide.md', dist), 'utf8')
-  const paths = [...guide.matchAll(/https:\/\/acorn\.sh(\/[^)\s]*)/g)].map(([, path]) => path)
+  const paths = [...guide.matchAll(/https:\/\/getacorn\.dev(\/[^)\s]*)/g)].map(([, path]) => path)
   expect(paths.length).toBeGreaterThan(0)
   for (const path of paths) expect(existsSync(new URL(`.${path.replace(/\/$/, '/index.html')}`, dist)), path).toBe(true)
 })

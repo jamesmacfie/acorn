@@ -1,6 +1,6 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://acorn.sh/schemas/acorn-plugin.schema.json",
+  "$id": "https://getacorn.dev/schemas/acorn-plugin.schema.json",
   "title": "acorn plugin manifest (plugin API major 5)",
   "type": "object",
   "properties": {

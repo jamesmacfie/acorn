@@ -4,14 +4,16 @@
 // script every panel shows.
 interface Props {
   tabs: { id: string; label: string; text: string; href: string; link: string }[]
+  /** What the tabs choose between, for a screen reader. */
+  label?: string
 }
 
-const { tabs } = Astro.props
+const { tabs, label = 'Features' } = Astro.props
 const panels = await Promise.all(tabs.map(async (tab) => ({ ...tab, picture: await Astro.slots.render(tab.id) })))
 ---
 
 <div class="tour">
-  <div class="tabs tour-tabs" role="tablist" aria-label="Features" aria-orientation="vertical" data-tabs hidden>
+  <div class="tabs tour-tabs" role="tablist" aria-label={label} aria-orientation="vertical" data-tabs hidden>
     {
       tabs.map((tab) => (
         <button type="button" role="tab" aria-controls={`tour-${tab.id}`}>

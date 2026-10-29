@@ -37,7 +37,7 @@ your manifest at it and every contribution array is validated as you type:
 
 ```json
 {
-  "$schema": "https://acorn.sh/schemas/acorn-plugin.schema.json",
+  "$schema": "https://getacorn.dev/schemas/acorn-plugin.schema.json",
   "id": "my-widget",
   "name": "My widget",
   "version": "1.0.0",
@@ -78,7 +78,7 @@ exported here without adding a runtime dependency. The rest of the surface is ex
 the acorn repository fails if it drifts.
 
 `apiVersion` is a range over plugin API majors. Write the major the host speaks, which
-[Compatibility and versions](https://acorn.sh/docs/build-plugins/reference/compatibility-and-versions/)
+[Compatibility and versions](https://getacorn.dev/docs/build-plugins/reference/compatibility-and-versions/)
 shows and the schema's hover text for `apiVersion` repeats. A range such as `"<previous> || <current>"`
 covers two majors, but declare one only after testing the plugin against each included host. Additive descriptor fields do not change the major; removing a
 published field does.

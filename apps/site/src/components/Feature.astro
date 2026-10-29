@@ -1,9 +1,8 @@
 ---
-// One feature: its number, a heading, a paragraph in the default slot, a link into the docs, and its
-// picture, if it has one. On a wide screen the picture sits beside the text, on alternate sides down a
-// `.features` list.
+// One feature: a heading, a paragraph in the default slot, a link into the docs, and its picture, if it
+// has one. On a wide screen the picture sits beside the text, on alternate sides down a `.features`
+// list, which already gives the order, so the sections carry no numbers.
 interface Props {
-  number: number
   title: string
   href: string
   link: string
@@ -11,13 +10,12 @@ interface Props {
   level?: 2 | 3
 }
 
-const { number, title, href, link, level = 2 } = Astro.props
+const { title, href, link, level = 2 } = Astro.props
 const Heading = `h${level}` as const
 ---
 
 <section class="feature">
   <div class="feature-text">
-    <p class="eyebrow">{String(number).padStart(2, '0')}</p>
     <Heading>{title}</Heading>
     <slot />
     <a href={href}>{link}</a>
