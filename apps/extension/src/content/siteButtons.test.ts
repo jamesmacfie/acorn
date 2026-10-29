@@ -107,8 +107,9 @@ describe('task chips in the page', () => {
     expect(drawn()).toHaveLength(1)
     expect(drawn()[0]!.parentElement?.className).toBe('actions')
     expect(drawn()[0]!.previousElementSibling?.textContent).toBe('Edit')
-    expect(chip().querySelector('.name')!.textContent).toBe('<img src=x onerror=alert(1)>')
-    expect(main().getAttribute('aria-label')).toBe('<img src=x onerror=alert(1)>2 working (<b>label</b>)')
+    expect(chip().querySelector('.name')!.textContent).toBe('Open task')
+    expect(main().title).toBe('<img src=x onerror=alert(1)>')
+    expect(main().getAttribute('aria-label')).toBe('<img src=x onerror=alert(1)>, 2 working (<b>label</b>)')
     expect(chip().querySelector('img, b')).toBeNull()
     expect(document.querySelector('img, b')).toBeNull()
   })
@@ -141,9 +142,21 @@ describe('task chips in the page', () => {
     expect(chip().querySelector<HTMLElement>('.chip')!.style.getPropertyValue('--height')).toBe('28px')
   })
 
-  it("shows the task's name and agents, opens the panel on it, and offers the task's verbs", async () => {
+  it("takes the site button's font, and the header's gap in place of its own margin", () => {
+    show([button(task)])
+    expect(drawn()[0]!.getAttribute('style')).toContain('margin-left: 8px')
+    document.body.innerHTML =
+      '<header class="item"><div class="actions" style="display: flex; column-gap: 8px">' +
+      '<button style="font-weight: 500; font-size: 14px; font-family: Arial">Edit</button></div></header>'
+    show([button(task)])
+    expect(drawn()[0]!.getAttribute('style')).toContain('margin-left: 0')
+    expect(chip().querySelector<HTMLElement>('.chip')!.style.getPropertyValue('--font')).toBe('500 14px/1 Arial')
+  })
+
+  it("reads Open task with the task's agents, opens the panel on it, and offers the task's verbs", async () => {
     show([button({ ...task, state: { label: '1 waiting', tone: 'warn' } })])
-    expect(main().textContent).toBe('Fix billing rounding1 waiting')
+    expect(main().textContent).toBe('Open task1 waiting')
+    expect(main().title).toBe('Fix billing rounding')
     expect(chip().querySelector<HTMLElement>('.state')!.dataset.tone).toBe('warn')
     press(main())
     expect(sent).toEqual([{ type: 'acorn:chip', key: 'tracker:item', action: 'show' }])

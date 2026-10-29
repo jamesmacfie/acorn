@@ -82,12 +82,9 @@ describe('every pane at 80 by 24', () => {
     expect(frame).toContain('#42')
     expect(frame).toContain('Invalidate the old password on reset')
     expect(frame).toContain('(fix-login) → (main)')
-    // The overview, and not the file list: at 80 by 24 the pane is 77 cells and the navigator's folds
-    // run past the bottom, so `Files 2` is a count on the first screen and the names are a scroll away.
-    // That is the pane behaving — the thing it is for is what this pull request is — and it is written
-    // down rather than fixed, because closing the folds by default would cost the reader a press on
-    // every host (docs/tui.md).
-    expect(frame).toContain('Description')
+    // The overview, and not the file list: the Details tab is what this pull request is, with its
+    // description under it, and the files are a tab away.
+    expect(frame).toContain('DESCRIPTION')
   }, 60_000)
 
   it("git: the Changes tab's tracked group, its counts, and the commit line at the foot", async () => {

@@ -27,8 +27,7 @@ import type { ChangeRequestModel } from './detailModel'
 // A verb the host has no action for is left out.
 //
 // The header of the surface rather than a section of it, which is why it is not in `prSections` with
-// the rest: a desktop pins it above the folds and a terminal makes it the first tab, and both of those
-// are the host's call.
+// the rest: every host makes it the first tab, ahead of the sections.
 //
 // The Solid-rendered twin of the host's `linkifyRefs`: same split, different mechanism, because a
 // title is text this component owns and its body is opaque provider HTML. The kit has a word

@@ -32,17 +32,17 @@ describe('spatial focus', () => {
     await screen.press('ARROW_RIGHT', { ctrl: true, meta: true })
     expect(focusedRegion()?.regionId).toBe('source')
 
-    // Once inside, the detail's Sections node owns bare h/l. The second tab is the PR description,
+    // Once inside, the detail's Sections node owns bare h/l. The second tab is the PR's labels,
     // proving focus moved into the content rather than only lighting its frame.
     await screen.press('l')
-    expect(await screen.frame()).toContain('Loads the account first')
+    expect(await screen.frame()).toContain('No labels')
 
     await screen.press('ARROW_LEFT', { ctrl: true, meta: true })
     const returned = await screen.frame()
 
     expect(focusedRegion()?.regionId).toBe('browse')
-    // Compare the rail half only: the right half deliberately still shows Description, so the
-    // whole terminal line is different even though column memory restored the same Browse row.
+    // Compare the rail half only: the right half deliberately still shows Labels, so the whole
+    // terminal line is different even though column memory restored the same Browse row.
     expect(caretLine(returned).split('│').slice(0, 2)).toEqual(browseCaret.split('│').slice(0, 2))
 
     // Enter is the discoverable spelling of the same rail-to-main edge, after the Browse row's own

@@ -9,6 +9,7 @@ import { requestFileScroll, routeKey } from '../fileNavigation'
 import GithubChecksPanel from '../checks/GithubChecksPanel'
 import { DiffForPull, type PullRoute } from '../DiffForPull'
 import { prModel, type PrModel } from './prModel'
+import { RefreshPullButton } from './RefreshPullButton'
 import { destinationKind, prTabsModel, type PrTabsModel } from './prTabs'
 import { pullRefKey, taskPullTabTooltip } from './taskPullTabs'
 
@@ -197,6 +198,9 @@ export function PrPane(props: { task: Task }) {
           currentFile={changedFiles.currentFile}
           onOpenFile={select}
           onLinkClick={onLinkClick}
+          actions={() => (
+            <RefreshPullButton owner={loaded().scope.owner} repo={loaded().scope.repo} number={loaded().scope.number} />
+          )}
           diff={() => (
             <Show when={diffRoute()} keyed>
               {(route) => <DiffForPull route={route} router={false} taskId={props.task.id} readOnly={route.readOnly} />}

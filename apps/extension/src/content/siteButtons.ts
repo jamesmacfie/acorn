@@ -20,13 +20,13 @@ const MARKER_ATTRIBUTE = 'data-acorn-marker'
 const HOST_STYLE = 'all:initial;display:inline-flex;vertical-align:middle;margin-left:8px;'
 // The branch marker sits in the bottom-right corner, above the page.
 const MARKER_HOST_STYLE = 'all:initial;position:fixed;right:16px;bottom:16px;z-index:2147483647;display:flex;'
-// Fixed here, so no page or plugin value reaches a style. A pill takes the page's light or dark theme,
-// the chip its buttons' height, and both borrow only Acorn's mark, a monospaced name, and the state
-// dot's colours from Acorn's tokens.
+// Fixed here, so no plugin value reaches a style. A pill takes the page's light or dark theme, the chip
+// its buttons' height and font, and both borrow only Acorn's mark, the marker's monospaced branch, and
+// the state dot's colours from Acorn's tokens.
 const CSS = `
 .chip { position: relative; display: inline-flex; height: var(--height); box-sizing: border-box;
   border: 1px solid var(--line); border-radius: 6px; background: var(--fill); color: var(--text);
-  font: 500 12px/1 system-ui, sans-serif; }
+  font: var(--font, 500 12px/1 system-ui, sans-serif); }
 .chip[data-theme='light'] { --text: #242424; --fill: #f6f8fa; --line: #d0d7de; --menu: #ffffff;
   --ok: #1a7f37; --warn: #9a6700; --bad: #cf222e; }
 .chip[data-theme='dark'] { --text: #dddddd; --fill: #21262d; --line: #3d444d; --menu: #161b22;
@@ -37,8 +37,8 @@ button, a { all: unset; box-sizing: border-box; cursor: pointer; display: inline
 button:focus-visible, a:focus-visible { outline: 2px solid var(--text); outline-offset: -2px; }
 .main { height: 100%; }
 .more { height: 100%; padding: 0 8px; border-left: 1px solid var(--line); }
-.name { font: 600 12px/1 ui-monospace, SFMono-Regular, Menlo, monospace; max-width: 24em; overflow: hidden;
-  text-overflow: ellipsis; white-space: nowrap; }
+.name { max-width: 24em; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.marker .name { font: 600 12px/1 ui-monospace, SFMono-Regular, Menlo, monospace; }
 .state { display: inline-flex; align-items: center; gap: 4px; }
 .state[data-tone='warn'] { color: var(--warn); font-weight: 600; }
 .state[data-tone='bad'] { color: var(--bad); font-weight: 600; }
@@ -128,9 +128,22 @@ if (api && !scope.acornSiteButtons) {
     const [red, green, blue] = (getComputedStyle(element).color.match(/[\d.]+/g) ?? []).map(Number)
     return red !== undefined && 0.299 * red + 0.587 * (green ?? 0) + 0.114 * (blue ?? 0) > 128
   }
-  // The height of the site's own buttons beside the chip, or a common toolbar height.
-  const buttonHeight = (anchor: Element): number =>
-    anchor.querySelector(`button:not([${ATTRIBUTE}]), a`)?.getBoundingClientRect().height || 28
+  // The tallest of the site's own buttons beside the chip, which the chip copies. The tallest, because a
+  // header often leads with a smaller icon button.
+  const siteButton = (anchor: Element): Element | undefined => {
+    const height = (element: Element) => element.getBoundingClientRect().height
+    const found = [...anchor.querySelectorAll('button, a')]
+    return found.length ? found.reduce((tallest, each) => (height(each) > height(tallest) ? each : tallest)) : undefined
+  }
+  // The site button's height, font, and weight, or a common toolbar height and Acorn's own font.
+  const matchSite = (chip: HTMLElement, anchor: Element): void => {
+    const site = siteButton(anchor)
+    chip.style.setProperty('--height', `${site?.getBoundingClientRect().height || 28}px`)
+    if (!site) return
+    const { fontWeight, fontSize, fontFamily } = getComputedStyle(site)
+    if (fontWeight && fontSize && fontFamily)
+      chip.style.setProperty('--font', `${fontWeight} ${fontSize}/1 ${fontFamily}`)
+  }
 
   const report = (message: ButtonClick) => void api.runtime.sendMessage(message)
   const pickElement = () => scope.acornPicker?.('hover')
@@ -287,11 +300,16 @@ if (api && !scope.acornSiteButtons) {
     const host = document.createElement('span')
     host.setAttribute(ATTRIBUTE, button.key)
     host.style.cssText = HOST_STYLE
+    // A header that spaces its buttons with a gap spaces the chip too.
+    if (parseFloat(getComputedStyle(anchor).columnGap) > 0) host.style.marginLeft = '0'
     const task = button.task
-    const { root, chip, main } = pill(host, anchor, task ? task.title : 'Start task', task?.state ?? null)
-    chip.style.setProperty('--height', `${buttonHeight(anchor)}px`)
-    // The plugin's label stays in the accessible name, beside what the chip shows.
-    main.setAttribute('aria-label', `${main.textContent} (${button.label})`)
+    // A short label keeps the chip the size of the site's buttons; the task's name is in its tooltip.
+    const { root, chip, main } = pill(host, anchor, task ? 'Open task' : 'Start task', task?.state ?? null)
+    matchSite(chip, anchor)
+    if (task) main.title = task.title
+    // The task's name and the plugin's label stay in the accessible name, beside what the chip shows.
+    const spoken = task ? [task.title, task.state?.label].filter(Boolean).join(', ') : main.textContent
+    main.setAttribute('aria-label', `${spoken} (${button.label})`)
 
     // The menu: the task's verbs in the panel's order, or with no task the two ways to start one, as the
     // panel's issue card offers them. In Firefox, where a page can't open the sidebar, it says how to

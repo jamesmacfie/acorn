@@ -317,10 +317,18 @@
   margin-inline: calc(-1 * var(--pane-pad));
   max-width: calc(100% + 2 * var(--pane-pad));
 }
+/* A `Sections` column pads each tab panel rather than itself, so the strip there takes the panel's top
+   pad back as well and meets the section tabs above it. */
+.ui-listdetail-list > .ui-tab-panel[data-padding='pane'] .ui-tabs[data-level='pane'] {
+  margin: calc(-1 * var(--pane-pad)) calc(-1 * var(--pane-pad)) 0;
+  max-width: calc(100% + 2 * var(--pane-pad));
+}
 /* A scrolling list column pads itself like a pane body, so its chrome takes the pad back the same way,
    out by a pane pad and in by one. Without it a pull request's rows started at 31 and its fold labels
-   at 35 under a heading at 14. A card or an alert keeps its own inset, as above. */
-.ui-listdetail-list[data-scroll] :is(.ui-row, .section-header, .ui-toolbar:not([data-variant='actions'])):not(:is(.ui-card, .ui-alert) *) {
+   at 35 under a heading at 14. A card or an alert keeps its own inset, as above. A `Sections` tab panel
+   in a list column is the same document column, padded one level down. */
+:is(.ui-listdetail-list[data-scroll], .ui-listdetail-list > .ui-tab-panel[data-padding='pane'])
+  :is(.ui-row, .section-header, .ui-toolbar:not([data-variant='actions'])):not(:is(.ui-card, .ui-alert) *) {
   margin-inline: calc(-1 * var(--pane-pad));
   padding-inline: var(--pane-pad);
   width: auto;

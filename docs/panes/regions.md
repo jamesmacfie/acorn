@@ -79,10 +79,10 @@ over one model, not regions the host mounts apart.
 
 `Sections` exists because a browse source's detail region isn't a pane and can't name a layout, yet
 it wants a different arrangement on each host. So the shape is a kit node, and both pane and source
-can use it. The desktop draws a header over a column of folds beside the main region. The terminal
-draws a strip of tabs over one panel ([the closed kit](../ui-design/closed-kit.md)). When there's a
-main region, the desktop's shared `ListDetail` control closes the section column to its edge and
-keeps the content mounted.
+can use it. Both hosts draw a strip of tabs over one panel, the header first. The desktop keeps the
+main region in a column beside the tabs, and the terminal makes it the last tab below 120 cells
+([the closed kit](../ui-design/closed-kit.md)). When there's a main region, the desktop's shared
+`ListDetail` control closes the section column to its edge and keeps the content mounted.
 
 The node takes its two columns in two ways. A caller with an element to spare passes the left one as
 `list`. A caller that can't, such as a remote tree whose props are JSON on a message port, passes a

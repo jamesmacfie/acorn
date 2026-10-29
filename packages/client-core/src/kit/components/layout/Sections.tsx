@@ -1,54 +1,77 @@
-import { For, Show, untrack, type JSX } from 'solid-js'
+import { createSignal, For, Show, untrack, type JSX } from 'solid-js'
 import { DetailColumn, ListColumn, ListDetail } from './ListDetail'
 import { SectionHeader } from './SectionHeader'
-import { Fold } from './Fold'
+import { TabPanel, Tabs } from './Tabs'
 
 // One surface as a header, a set of named sections, and the one thing that gets the room: the shape
 // a pull request has, and a ticket, and a build.
 //
-// The node exists because that shape draws two completely different ways and the difference is the
-// host's business rather than the caller's. A window has room for the sections down one side of the
-// thing they are about, so they are folds beside a column (docs/ui-design/closed-kit.md § The closed kit).
-// A terminal has no second column to spend on six folds nobody can see the bottom of, so the same
-// declaration is a strip of tabs and one panel.
+// Both hosts draw the sections as a strip of tabs over one panel, the header first. Stacked folds made
+// a reader scroll past the description to reach the checks, and the other detail views (an issue, an
+// error, a container) already switch with tabs. The node stays because the hosts still differ on
+// `main`: a window gives it a column beside the tabs, and a narrow terminal makes it the last tab.
 //
-// Every part of a section is a thunk rather than an element, and both halves of that matter. A
-// section a host has decided not to draw must not be built — on this host that saves nothing, because
-// every fold is mounted whether it is open or not, and on the terminal it is the difference between
-// opening one tree and opening six. And the list itself has to be safe to ask for from outside a
-// render: the terminal reads it in a key handler to answer `l`, and a cell renderable built there
-// throws "No renderer found".
+// Every part of a section is a thunk rather than an element, and both halves of that matter. The
+// list has to be safe to ask for from outside a render: the terminal reads it in a key handler to
+// answer `l`, and a cell renderable built there throws "No renderer found". And `render` runs once
+// per section, so a caller that rebuilds its list does not rebuild what is on screen.
 
 /** One named part of a surface. `render` is called only by a host that is drawing it. */
 export type KitSection = {
   id: string
   label: string
   count?: number
-  /** A fact about the section rather than a control on it: the rolled-up state of its checks, a
-   *  count that is not a count. Beside the label where a host has room for it. */
-  meta?: () => JSX.Element
   /** The verbs that belong to this section rather than to the surface: a refresh on a diff, a copy on
-   *  a description. Drawn in whatever header the host gives the section. */
+   *  a description. Drawn at the end of the strip while the section is open. */
   actions?: () => JSX.Element
   render: () => JSX.Element
 }
 
+// Remembering the tab you left open is the part a caller gets wrong, the same reason `Fold` keeps its
+// own state (./Fold.tsx).
+const readTab = (key: string): string => {
+  try {
+    return localStorage.getItem(`sections-tab:${key}`) ?? ''
+  } catch {
+    return ''
+  }
+}
+
+const writeTab = (key: string, id: string): void => {
+  try {
+    localStorage.setItem(`sections-tab:${key}`, id)
+  } catch {
+    // A private-mode or quota failure must not take the strip with it.
+  }
+}
+
 /* Sections: a header, its sections, and the main region. See docs/ui-design/closed-kit.md § The closed kit.
 
-   At 80×24: a strip of tabs over one panel — the header first, then each section, then `main` where
-   the terminal is too narrow to give it a column of its own. */
+   At 80×24: the same strip of tabs over one panel, with `main` as the last tab where the terminal is
+   too narrow to give it a column of its own. */
 export function Sections(props: {
-  /** Distinguishes this surface's stored fold state from another's. Persisted per section. */
+  /** Distinguishes this surface's stored tab and column state from another's. */
   id: string
   /** Names the column of sections. It is a landmark; name it. */
   ariaLabel?: string
-  /** What the surface is about, above the sections. The terminal's first tab; on desktop it stays
-   *  mounted when the section column is collapsed. */
+  /** What the surface is about: the first tab. */
   header?: KitSection
   sections: readonly KitSection[]
   /** The region the surface exists to show: a diff, a log, a preview. */
   main?: KitSection
 }) {
+  const tabs = (): KitSection[] => [...(props.header ? [props.header] : []), ...props.sections]
+  const [chosen, setChosen] = createSignal(readTab(props.id))
+  // Falls back rather than storing a default, so a surface whose section set changes under it lands
+  // on its first tab instead of on nothing. The terminal's strip keeps the same rule.
+  const active = () => (tabs().some((tab) => tab.id === chosen()) ? chosen() : (tabs()[0]?.id ?? ''))
+  const idPrefix = () => `sections-${props.id}`
+  const activeActions = () => tabs().find((tab) => tab.id === active())?.actions
+  const choose = (id: string) => {
+    setChosen(id)
+    writeTab(props.id, id)
+  }
+
   return (
     <ListDetail
       split
@@ -57,30 +80,33 @@ export function Sections(props: {
       collapseKey={props.main ? `sections:${props.id}` : undefined}
       collapseTo="edge"
     >
-      {/* No header on the column: the surface opens with its own heading, which names the column
-          better than a label would. The same call github's PR surfaces made before this node. */}
-      <ListColumn scroll label={props.ariaLabel}>
-        <Show when={props.header}>{(header) => header().render()}</Show>
+      <ListColumn label={props.ariaLabel}>
+        <Tabs
+          tabs={tabs().map((tab) => ({
+            id: tab.id,
+            label: tab.label,
+            ...(tab.count === undefined ? {} : { count: tab.count }),
+          }))}
+          active={active()}
+          onChange={choose}
+          idPrefix={idPrefix()}
+          ariaLabel={props.ariaLabel ?? 'Sections'}
+          actions={<Show when={activeActions()}>{(actions) => actions()()}</Show>}
+        />
         {/* Keyed by id, not by object. A caller may rebuild its list whenever a count moves, as the
-            change request's does. Keyed by object, every fold is torn down and rebuilt each time,
-            and the column loses its scroll position. */}
-        <For each={props.sections.map((section) => section.id)}>
-          {(id) => {
-            const section = () => props.sections.find((candidate) => candidate.id === id)!
-            return (
-              <Fold
-                persistKey={`${props.id}.${id}`}
-                defaultOpen
-                label={section().label}
-                {...(section().count === undefined ? {} : { count: section().count })}
-                {...(section().meta ? { meta: section().meta!() } : {})}
-                {...(section().actions ? { actions: section().actions!() } : {})}
-              >
-                {/* Built once per fold: a rebuilt list hands over a new `render`, not new content. */}
-                {untrack(() => section().render())}
-              </Fold>
-            )
-          }}
+            change request's does. Keyed by object, every panel is torn down and rebuilt each time,
+            and the panel loses its scroll position. Hidden panels stay mounted for the same reason. */}
+        <For each={tabs().map((tab) => tab.id)}>
+          {(id) => (
+            <TabPanel idPrefix={idPrefix()} id={id} active={active()} padding="pane">
+              {/* Built once per panel: a rebuilt list hands over a new `render`, not new content. */}
+              {untrack(() =>
+                tabs()
+                  .find((candidate) => candidate.id === id)!
+                  .render(),
+              )}
+            </TabPanel>
+          )}
         </For>
       </ListColumn>
       <Show when={props.main}>

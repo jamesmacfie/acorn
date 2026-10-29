@@ -150,8 +150,8 @@ describe('a pull request Sections sidebar', () => {
     expect(mounted).toBe(1)
   })
 
-  it('keeps a fold mounted when the caller rebuilds its section list', () => {
-    // The change request rebuilds its list whenever a count moves. Remounting the folds then threw
+  it('keeps a panel mounted when the caller rebuilds its section list', () => {
+    // The change request rebuilds its list whenever a count moves. Remounting the panels then threw
     // away the column's scroll position mid-read.
     let mounted = 0
     const Files = () => {
@@ -168,11 +168,43 @@ describe('a pull request Sections sidebar', () => {
       ),
       host,
     )
-    const input = host.querySelector('.ui-fold input')
+    const input = host.querySelector('.ui-tab-panel input')
     setCount(2)
-    expect(host.querySelector('.ui-fold input')).toBe(input)
-    expect(host.querySelector('.ui-section-header-count')?.textContent).toBe('2')
+    expect(host.querySelector('.ui-tab-panel input')).toBe(input)
+    expect(host.querySelector('.ui-tab-count')?.textContent).toBe('2')
     expect(mounted).toBe(1)
+  })
+
+  it('remembers the chosen tab, and falls back to the first when that section goes away', () => {
+    const [sections, setSections] = createSignal([
+      { id: 'files', label: 'Files', render: () => <span>files</span> },
+      { id: 'checks', label: 'Checks', render: () => <span>checks</span> },
+    ])
+    const draw = () =>
+      render(
+        () => (
+          <Sections
+            id="github.pull"
+            header={{ id: 'details', label: 'Details', render: () => <span>details</span> }}
+            sections={sections()}
+          />
+        ),
+        host,
+      )
+    const shown = () => host.querySelector('.ui-tab-panel:not([hidden])')?.textContent
+
+    let dispose = draw()
+    expect(shown()).toBe('details')
+    host.querySelector<HTMLButtonElement>('#sections-github\\.pull-tab-checks')!.click()
+    expect(shown()).toBe('checks')
+
+    dispose()
+    dispose = draw()
+    expect(shown()).toBe('checks')
+
+    setSections([{ id: 'files', label: 'Files', render: () => <span>files</span> }])
+    expect(shown()).toBe('details')
+    dispose()
   })
 })
 

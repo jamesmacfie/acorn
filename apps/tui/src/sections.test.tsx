@@ -20,14 +20,16 @@ describe('a surface drawn as sections', () => {
     const wide = await screen.until('Conversation', 45)
 
     // Every section is on the strip, and the header is the first tab rather than a fold.
-    for (const tab of ['Details', 'Description', 'Labels', 'Checks', 'Reviewers', 'Files', 'Conversation']) {
+    for (const tab of ['Details', 'Labels', 'Checks', 'Reviewers', 'Files', 'Conversation']) {
       expect(wide, tab).toContain(tab)
     }
     // `main` has a column, so the diff is beside the strip rather than behind a tab.
     expect(wide).toContain('Diff')
     expect(wide).toContain('src/login.ts')
-    // The header tab is the one showing: the pull's own heading, not a fold's label.
+    // The header tab is the one showing: the pull's own heading, with its description under it. The
+    // description is a `ProviderHtml` body, so what it draws is the pull's own text.
     expect(wide).toContain('#42')
+    expect(wide).toContain('Loads the account first')
 
     // This fixture deliberately opens a task, so it starts in Tasks. Tab reaches the outer task-pane
     // strip; Down enters the PR pane on its own section strip; Right changes that inner strip, not the
@@ -38,8 +40,8 @@ describe('a surface drawn as sections', () => {
     expect(focusedRegion()?.paneId).toBe('pr')
     await screen.press('ARROW_RIGHT')
     const switched = await screen.frame()
-    // Description is a `ProviderHtml` body, so what it draws is the pull's own text.
-    expect(switched).toContain('Loads the account first')
+    expect(switched).toContain('[Labels]')
+    expect(switched).toContain('No labels')
 
     // Narrow, and `main` becomes the last tab rather than half a screen of wrapped diff.
     screen.resize(100, 38)

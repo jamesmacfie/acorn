@@ -94,8 +94,8 @@ describe('the pull request from the keyboard', () => {
       await screen.until('[Merge]', 45)
       await screen.press('TAB')
       await screen.press('ARROW_DOWN')
-      // Right along the strip to Comments, which is the seventh tab.
-      for (let step = 0; step < 6; step += 1) await screen.press('ARROW_RIGHT')
+      // Right along the strip to Conversation, which is the sixth tab.
+      for (let step = 0; step < 5; step += 1) await screen.press('ARROW_RIGHT')
       expect(await screen.frame()).toContain('[Conversation]')
 
       // Down into the panel lands on the composer's field, because it is the first stop in it.
@@ -136,7 +136,7 @@ describe('the pull request from the keyboard', () => {
       const { focusedRegion } = await import('./keys/regions')
       await screen.press('TAB')
       await screen.press('ARROW_DOWN')
-      for (let step = 0; step < 6; step += 1) await screen.press('ARROW_RIGHT')
+      for (let step = 0; step < 5; step += 1) await screen.press('ARROW_RIGHT')
       await screen.press('ARROW_DOWN')
       expect(await screen.frame()).toContain('tab next')
 

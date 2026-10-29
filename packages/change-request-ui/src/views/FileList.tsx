@@ -14,7 +14,7 @@ export function ChangedFileList(props: {
   current: () => string | undefined
   onSelect: (path: string) => void
   /** Draw only the rows on screen, in a scroller of the list's own. True where the list is a column
-   *  of its own, false inside a fold that is already in one — a scroller nested in a scroller has no
+   *  of its own, false inside a tab panel that is already in one — a scroller nested in a scroller has no
    *  height to fill. */
   virtual?: boolean
 }) {

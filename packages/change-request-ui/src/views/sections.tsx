@@ -1,13 +1,6 @@
 import { For, Show } from 'solid-js'
-import { clientEvents, railDotProps } from '@acorn/plugin-api/client'
-import {
-  CHECK_TONE,
-  FAILED_STATUSES,
-  checkStatusTone,
-  checkStatusWord,
-  checksState,
-  checksSummary,
-} from '../model/checkStatus'
+import { clientEvents } from '@acorn/plugin-api/client'
+import { FAILED_STATUSES, checkStatusTone, checkStatusWord } from '../model/checkStatus'
 import {
   Button,
   Chip,
@@ -17,6 +10,7 @@ import {
   Picker,
   Row,
   Rows,
+  Section,
   Stack,
   StatusDot,
   Text,
@@ -31,22 +25,30 @@ import type { ChangeRequestModel } from './detailModel'
 
 // What a change request is made of, as a list a host arranges
 // (`Sections`, docs/ui-design/closed-kit.md § The closed kit). The list is here once, and each host
-// decides what a section is: a fold beside the diff on a desktop, a tab in a terminal.
+// draws it as a strip of tabs.
 //
 // A section that has nothing to say is left out rather than drawn empty. That is a decision about the
 // change request rather than about the screen, which is why it is made here and not in either host: a
 // repository with no Linear links has no Linked issues tab, on any host.
 
-// The copy button is the section's action, in its header, and reads the text this body hands the
-// model.
-function Description(props: { model: ChangeRequestModel; onLinkClick: (event: MouseEvent) => void }) {
+// The description sits under the overview in the first tab rather than in a tab of its own: it is
+// what a reader opens a change request to read, and a tab hid it behind a click. The copy button is in
+// its header and reads the text this body hands the model.
+export function ChangeRequestDescription(props: {
+  model: ChangeRequestModel
+  onLinkClick: (event: MouseEvent) => void
+}) {
   return (
-    <ProviderHtml
-      html={props.model.request()?.body ?? ''}
-      refs={props.model.refPrefixes()}
-      onLinkClick={props.onLinkClick}
-      onText={props.model.setDescriptionText}
-    />
+    <Show when={props.model.request()?.body}>
+      <Section label="Description" actions={<CopyButton text={props.model.descriptionText} title="Copy description" />}>
+        <ProviderHtml
+          html={props.model.request()?.body ?? ''}
+          refs={props.model.refPrefixes()}
+          onLinkClick={props.onLinkClick}
+          onText={props.model.setDescriptionText}
+        />
+      </Section>
+    </Show>
   )
 }
 
@@ -244,16 +246,6 @@ export function changeRequestSections(input: {
 }): KitSection[] {
   const model = input.model
   return [
-    ...(model.request()?.body
-      ? [
-          {
-            id: 'description',
-            label: 'Description',
-            actions: () => <CopyButton text={model.descriptionText} title="Copy description" />,
-            render: () => <Description model={model} onLinkClick={input.onLinkClick} />,
-          },
-        ]
-      : []),
     ...(model.linearRefs().length
       ? [
           {
@@ -273,12 +265,6 @@ export function changeRequestSections(input: {
             id: 'checks',
             label: 'Checks',
             count: model.checks().length,
-            meta: () => (
-              <StatusDot
-                {...railDotProps(CHECK_TONE[checksState(model.checks())])}
-                tip={checksSummary(model.checks())}
-              />
-            ),
             render: () => <Checks model={model} />,
           },
         ]
