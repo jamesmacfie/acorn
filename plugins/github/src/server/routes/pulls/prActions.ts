@@ -23,6 +23,7 @@ import { type GithubEmit, NO_EMIT, prChangedPayload } from '../../events'
 // keeps the code.
 const MERGE_METHODS = ['merge', 'squash', 'rebase'] as const
 const mergeBody = z.object({ method: z.enum(MERGE_METHODS).default('merge') })
+const MERGE_TIMEOUT_MS = 25_000
 const draftBody = z.object({ draft: z.boolean().default(false) })
 const commentBody = z.object({ body: z.string().optional() })
 const viewedBody = z.object({ path: z.string().min(1), viewed: z.boolean().default(false) })
@@ -63,6 +64,9 @@ export const prActions = (db: PluginDatabase, emit: GithubEmit = NO_EMIT) =>
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ merge_method: parsed.method }),
+        // GitHub can take longer than the usual four seconds to merge, and it finishes the merge even
+        // after we stop waiting. Under the broker's 30 seconds, so this route still gets to answer.
+        signal: AbortSignal.timeout(MERGE_TIMEOUT_MS),
       })
       if (res.status === 405 || res.status === 409) return respondError(c, 409, 'merge_failed')
       const err = ghError(res)
