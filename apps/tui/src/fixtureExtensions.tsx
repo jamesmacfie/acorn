@@ -59,6 +59,19 @@ function installDiffMark(): Disposable {
   })
 }
 
+/** A compiled contribution into github's `review-panel` point, which the reader switches the diff for. */
+function installReviewPanel(): Disposable {
+  return extensionRegistry.register({
+    id: 'fixture:review-panel',
+    pluginId: 'fixture',
+    point: 'github:review-panel',
+    label: 'Fixture guide',
+    order: 10,
+    carrier: 'component',
+    component: (props: { taskId: string }) => <Text>fixture guide for {props.taskId}</Text>,
+  })
+}
+
 /** A plugin's own chord, on a host where the command key is Ctrl.
  *
  *  A manifest chord carries a command modifier and the desktop's is `meta`, which `toKeymapKey` spells
@@ -94,6 +107,7 @@ export function installFixtureExtensions(): void {
   const badge = process.env.ACORN_FIXTURE_BADGE
   if (badge) installed.push(installBadge(badge))
   if (process.env.ACORN_FIXTURE_DIFF_MARK) installed.push(installDiffMark())
+  if (process.env.ACORN_FIXTURE_REVIEW_PANEL) installed.push(installReviewPanel())
   if (process.env.ACORN_FIXTURE_PLUGIN_CHORD) installed.push(...installChord())
   fixtureBadgePresses.length = 0
 }

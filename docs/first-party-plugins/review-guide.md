@@ -92,6 +92,11 @@ is a fold with its "why" and each hunk in `StackedDiff`. A tree batch is capped 
 draw opens sections only until their hunk text reaches 256 KiB, and the rest open on demand. While a guide
 generates, the pane links to the session's transcript through its `session` destination.
 
+The same tree fills the `review-panel` point on GitHub, GitLab, and Bitbucket, so a task's change
+request view has a **Guide** tab beside the diff
+([shared review views](../plugins/change-request-ui.md#extension-points)). The pane stays for a task
+with no change request view open.
+
 ## Limits
 
 - Only the primary change request has a guide, because only it has a checkout.

@@ -103,7 +103,7 @@ The review offers a comment, **Approve**, and **Request changes**. Merging offer
 squash, or fast-forward. Reviewers come from the workspace's members, and the plugin writes the whole
 reviewer list back by each person's uuid. A person is named by their Bitbucket nickname.
 
-The plugin opens `bitbucket:diff-line` and `bitbucket:summary-badges`, and registers the data sources
+The plugin opens `bitbucket:diff-line`, `bitbucket:summary-badges`, and `bitbucket:review-panel`, and registers the data sources
 `pull-requests`, `review-comments`, and `pipeline-steps`. The pull request source reads every state
 of each selected repository's pull requests, with the author and reviewers, so a panel filters to a
 person's own or to the ones they review. The step source reads the steps of each repository's five

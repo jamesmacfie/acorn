@@ -5,7 +5,7 @@ sources:
   - docs/first-party-plugins/review-guide.md
   - plugins/review-guide/acorn-plugin.config.mjs
   - plugins/review-guide/src/tree/GuidePane.tsx
-checked: bebaee036
+checked: '6f8862c01'
 ---
 
 import { Steps } from '@astrojs/starlight/components'
@@ -18,7 +18,7 @@ order you'd read them. Core changes come first, and tests, docs, and wiring come
 why its change exists, then shows its hunks.
 
 <PluginFacts id="review-guide">
-  <Fragment slot="adds">The **Guide** pane on a task, and the **Open review guide** command.</Fragment>
+  <Fragment slot="adds">The **Guide** pane on a task, a **Guide** tab in a task's pull request or merge request view, and the **Open review guide** command.</Fragment>
   <Fragment slot="needs">A task with a pull request on GitHub, a merge request on GitLab, or a pull request on Bitbucket, and Claude Code or Codex installed.</Fragment>
 </PluginFacts>
 
@@ -26,11 +26,11 @@ why its change exists, then shows its hunks.
 
 <Steps>
 
-1. Open a task that has a pull request or merge request, and open the **Guide** pane.
+1. Open a task that has a pull request or merge request. In its **Pull request** or **Merge request** pane, click the **Guide** tab, or open the **Guide** pane.
 
-2. Pick a harness in the pane's header, and click **Generate guide**.
+2. Pick a harness at the top of the guide, and click **Generate guide**.
 
-   <Checkpoint>The pane says the harness is writing the guide, with a link to its session. When it finishes, the pane shows a summary and the sections.</Checkpoint>
+   <Checkpoint>The guide says the harness is writing it, with a link to its session. When it finishes, the guide shows a summary and the sections.</Checkpoint>
 
 </Steps>
 
@@ -61,9 +61,11 @@ It reads the task's pull request from its code host plugin, and the change from 
 git. It has no network access of its own, runs no other programs, and reads no secrets. The guide is
 kept on the Node until the task is deleted.
 
+The **Guide** tab sits beside the diff, so you can read a section and its code in the diff side by side.
+
 ## In the terminal
 
-The terminal client draws the same pane.
+The terminal client draws the same pane and the same tab.
 
 ## Limits
 

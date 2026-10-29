@@ -128,6 +128,7 @@ the owner declared. The `plugin_authoring` tool lists every point's props and ke
 | A view of a workflow step's result | `workflows:step-body` | Tree | Workflows | The same |
 | A tool call's card | `agents:tool-card` | Tree | Agents | The same |
 | A toolbar control | `preview:toolbar-actions`, `terminal:toolbar-actions` | Tree | The owner declares `reload` or `interrupt` | Terminal's only |
+| A tab beside a change request's diff | `github:review-panel`, `gitlab:review-panel`, `bitbucket:review-panel` | Tree | Each code host | The same |
 | A section above a loaded owner's detail view | `linear:issue-summary`, `rollbar:item-summary` | Tree | The owner declares `mounts` | The same |
 | Hover and diagnostics for a language | `documentServices` | Routes | Editor; a tie needs the person's pick | **Diagnostics** checks the saved file |
 

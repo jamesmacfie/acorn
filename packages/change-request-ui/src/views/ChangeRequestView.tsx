@@ -1,5 +1,8 @@
 import { Show, type JSX } from 'solid-js'
-import { Sections, Stack } from '@acorn/plugin-api/ui'
+import { slotLabel } from '@acorn/plugin-api/client'
+import { Sections, Stack, type KitSection } from '@acorn/plugin-api/ui'
+import { Slot } from '@acorn/plugin-api/ui/host'
+import { changeRequestPointIds, type ReviewPanelProps } from '../model/points'
 import type { Check } from '../model/types'
 import type { ChangeRequestModel } from './detailModel'
 import { ChangeRequestOverview } from './Overview'
@@ -9,6 +12,7 @@ import { ChangeRequestDescription, changeRequestSections } from './sections'
 // so the view that knows what a change request is made of says so, and the host decides whether the
 // diff gets a column beside the tabs or a tab of its own (docs/ui-design/closed-kit.md § The closed
 // kit). A browse surface and a task pane draw the same view, with their own diff and file selection.
+
 export function ChangeRequestView(props: {
   /** The `Sections` id, such as `github.pull`. */
   id: string
@@ -32,6 +36,32 @@ export function ChangeRequestView(props: {
   // The strip draws only the open tab's actions, so every tab carries the same ones. No section here
   // has actions of its own to lose.
   const actions = () => (props.actions ? { actions: props.actions } : {})
+
+  // The `review-panel` point is about the task's own change request, so the browse surface, which has
+  // no task, and a related change request draw no tab for it. Nobody filling it draws none either. A
+  // tab rather than a switch over the diff, because the terminal reaches a tab with h and l and can't
+  // reach the diff column's header. In a window the tab's column sits beside the diff, so the reader
+  // follows the panel with the diff in view.
+  const panelPoint = () => changeRequestPointIds(props.model.host.pluginId).reviewPanel
+  const panelTaskId = () => (props.model.readOnly ? undefined : props.model.scope.taskId)
+  const panelLabel = () => (panelTaskId() ? slotLabel(panelPoint()) : undefined)
+  const panelSection = (label: string): KitSection => ({
+    id: 'review-panel',
+    label,
+    render: () => (
+      <Slot
+        point={panelPoint()}
+        taskId={panelTaskId()}
+        props={(): ReviewPanelProps => ({
+          owner: props.model.scope.owner,
+          repo: props.model.scope.repo,
+          number: props.model.scope.number,
+          taskId: panelTaskId()!,
+        })}
+      />
+    ),
+  })
+
   return (
     <>
       <Sections
@@ -54,12 +84,15 @@ export function ChangeRequestView(props: {
             </Stack>
           ),
         }}
-        sections={changeRequestSections({
-          model: props.model,
-          currentFile: props.currentFile,
-          onOpenFile: props.onOpenFile,
-          onLinkClick: props.onLinkClick,
-        }).map((section) => ({ ...section, ...actions() }))}
+        sections={[
+          ...changeRequestSections({
+            model: props.model,
+            currentFile: props.currentFile,
+            onOpenFile: props.onOpenFile,
+            onLinkClick: props.onLinkClick,
+          }),
+          ...(panelLabel() ? [panelSection(panelLabel()!)] : []),
+        ].map((section) => ({ ...section, ...actions() }))}
         main={{
           id: 'diff',
           label: 'Diff',

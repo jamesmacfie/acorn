@@ -203,6 +203,7 @@ client: setActiveNode
 client: setSelectedSource
 client: setTerminalOpen
 client: slotFills
+client: slotLabel
 client: splitRefTokens
 client: storageKeyFor
 client: summarizeFileStats

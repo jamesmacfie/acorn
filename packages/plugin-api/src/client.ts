@@ -362,9 +362,10 @@ export { latestSignal } from '@acorn/client-core/kit/lib'
 export type { LatestSignal } from '@acorn/client-core/kit/lib'
 export { onClosePaneWhen, onClosePaneWithin } from '@acorn/client-core/host/keys'
 
-// "Is anyone offering to fill this slot?", for an owner's model that decides whether to draw the box.
-// From the rule's own module, so a plugin model asking it doesn't load the tree host on ./ui/host.
-export { slotFills } from '@acorn/client-core/host/tree/arbitration.ts'
+// "Is anyone offering to fill this slot?", and under what name, for an owner's model that decides
+// whether to draw the box. From the rule's own module, so a plugin model asking it doesn't load the tree
+// host on ./ui/host.
+export { slotFills, slotLabel } from '@acorn/client-core/host/tree/arbitration.ts'
 
 // Per-device scraps — an unsent draft, a closed fold — through one guarded accessor. On this barrel
 // rather than on ./ui because a plugin's own model is a `.ts` file with a node-environment test, and

@@ -85,12 +85,20 @@ host owns the reads, the search past the loaded pages, each row's checks, and th
 
 ## Extension points
 
-Each code host opens its own `diff-line` and `summary-badges` points, so GitHub's are
-`github:diff-line` and `github:summary-badges`, GitLab's are `gitlab:diff-line` and
-`gitlab:summary-badges`, and Bitbucket's are `bitbucket:diff-line` and `bitbucket:summary-badges`. Register both with `changeRequestPoints(noun)`. `DIFF_LINE_KEY` is the
-`diff-line` key, `file`, `line`, and `side`. A `summary-badges` contributor gets
-`{ owner, repo, number }`, where `owner` is the repository's namespace. A contributor that wants every
-host files the same code against each host's point
+Each code host opens its own `diff-line`, `summary-badges`, and `review-panel` points, so GitHub's are
+`github:diff-line`, `github:summary-badges`, and `github:review-panel`, and GitLab's and Bitbucket's
+start `gitlab:` and `bitbucket:`. Register all three with `changeRequestPoints(noun)`. `DIFF_LINE_KEY`
+is the `diff-line` key, `file`, `line`, and `side`. A `summary-badges` contributor gets
+`{ owner, repo, number }`, where `owner` is the repository's namespace.
+
+`review-panel` holds one tree, which `ChangeRequestView` draws as a tab named by the contributor's
+label, after the host's own sections. The contributor gets `{ owner, repo, number, taskId }`. In a
+window the tab's column sits beside the diff, so a reader follows the panel with the diff in view. In a
+narrow terminal it's the tab before **Diff**. The tab appears only in a task, for its own change request,
+and only when a plugin fills the point, so the browse surface and a related change request draw none.
+The review guide fills it ([the review guide plugin](../first-party-plugins/review-guide.md)).
+
+A contributor that wants every host files the same code against each host's point
 ([cooperative extension points](./cooperative-extension-points.md)).
 
 ## Limits

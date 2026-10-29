@@ -36,6 +36,14 @@ export default {
       // the Agent pane.
       destinations: [{ id: 'session', label: 'Agent session', targetKind: 'managed-agent' }],
     }],
+    // The same tree as the pane, beside the diff in each code host's change request view. It reads
+    // only the `taskId` the host mounts it with.
+    extensions: ['github', 'gitlab', 'bitbucket'].map((host) => ({
+      id: `${host}-review-panel`,
+      point: `${host}:review-panel`,
+      label: 'Guide',
+      remote: 'pane',
+    })),
     commands: [{
       id: 'open',
       kind: 'action',

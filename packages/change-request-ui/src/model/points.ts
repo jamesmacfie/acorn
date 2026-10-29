@@ -1,4 +1,4 @@
-// The two places another plugin may say something inside a code host's change request surfaces
+// The three places another plugin may say something inside a code host's change request surfaces
 // (docs/plugins/cooperative-extension-points.md § Cooperative extension points). Each code host opens
 // its own pair, such as `github:diff-line` and `gitlab:diff-line`, from these declarations, so a
 // contributor that wants every host files the same code against each host's point.
@@ -16,17 +16,23 @@ export const SUMMARY_BADGES_MAX = 4
  *  or a GitLab group path such as `group/sub`. */
 export type SummaryBadgesProps = { owner: string; repo: string; number: string }
 
-/** The two points, as `ctx.extensionPoints.register` takes them. `noun` is the host's word, such as
- *  `Pull request`. Marks on a line of the diff, keyed the way the shared viewer keys a row, and room
- *  beside the state and checks on the overview, where the owner's own facts stay. */
+/** What a `review-panel` contributor receives. Drawn only in a task, for the task's own change request. */
+export type ReviewPanelProps = SummaryBadgesProps & { taskId: string }
+
+/** The three points, as `ctx.extensionPoints.register` takes them. `noun` is the host's word, such as
+ *  `Pull request`. Marks on a line of the diff, keyed the way the shared viewer keys a row, room
+ *  beside the state and checks on the overview, where the owner's own facts stay, and one view the
+ *  reader can switch the diff for, such as a review guide. */
 export const changeRequestPoints = (noun: string) =>
   [
     { id: 'diff-line', label: `${noun} diff line`, kind: 'annotation', key: [...DIFF_LINE_KEY], max: 4 },
     { id: 'summary-badges', label: `${noun} summary`, kind: 'remote', mode: 'stack', max: SUMMARY_BADGES_MAX },
+    { id: 'review-panel', label: `${noun} review panel`, kind: 'remote', mode: 'stack', max: 1 },
   ] as const
 
 /** A host's qualified point ids, which the host mints from the bare ones above. */
 export const changeRequestPointIds = (pluginId: string) => ({
   diffLine: `${pluginId}:diff-line`,
   summaryBadges: `${pluginId}:summary-badges`,
+  reviewPanel: `${pluginId}:review-panel`,
 })

@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { changeRequestPointIds, changeRequestPoints, DIFF_LINE_KEY, SUMMARY_BADGES_MAX } from './points'
 
-// The two points every code host opens. Held here rather than where they are drawn, because an
+// The three points every code host opens. Held here rather than where they are drawn, because an
 // unmatched contribution is silent by design: a point whose name or key drifted produces an empty
 // surface and no error.
 //
@@ -35,5 +35,13 @@ describe('the summary-badges slot', () => {
   it('holds a few contributors, not an unbounded strip', () => {
     expect(SUMMARY_BADGES_MAX).toBeGreaterThan(0)
     expect(SUMMARY_BADGES_MAX).toBeLessThanOrEqual(6)
+  })
+})
+
+describe('the review-panel point', () => {
+  // One contributor, because it takes the diff's place and a reader switches between two views, not five.
+  it("holds one view under each host's own name", () => {
+    expect(changeRequestPointIds('bitbucket').reviewPanel).toBe('bitbucket:review-panel')
+    expect(changeRequestPoints('Pull request')[2]).toMatchObject({ id: 'review-panel', kind: 'remote', max: 1 })
   })
 })

@@ -6,7 +6,7 @@ sources:
   - docs/plugins/remote-points.md
   - docs/plugins/rows-and-annotations.md
   - docs/tui/plugin-losses.md
-checked: 'cba7f787d'
+checked: '6f8862c01'
 ---
 
 An extension point is a place in one plugin's view that another plugin may fill. The owner opens it,
@@ -593,6 +593,26 @@ Badges beside a pull request's state.
 }
 ```
 
+#### `github:review-panel`
+
+A tab beside the diff of a task's pull request, named by your label. Your tree gets `{ owner, repo, number, taskId }`.
+
+```json manifest
+{
+  "client": "./client.js",
+  "contributions": {
+    "extensions": [
+      {
+        "id": "github-review-panel",
+        "point": "github:review-panel",
+        "label": "Acme review notes",
+        "remote": "reviewPanel"
+      }
+    ]
+  }
+}
+```
+
 ### Points `bitbucket` opens
 
 #### `bitbucket:diff-line`
@@ -635,6 +655,26 @@ Badges beside a Bitbucket pull request's state.
 }
 ```
 
+#### `bitbucket:review-panel`
+
+A tab beside the diff of a task's pull request, named by your label. Your tree gets `{ owner, repo, number, taskId }`.
+
+```json manifest
+{
+  "client": "./client.js",
+  "contributions": {
+    "extensions": [
+      {
+        "id": "bitbucket-review-panel",
+        "point": "bitbucket:review-panel",
+        "label": "Acme review notes",
+        "remote": "reviewPanel"
+      }
+    ]
+  }
+}
+```
+
 ### Points `gitlab` opens
 
 #### `gitlab:diff-line`
@@ -671,6 +711,26 @@ Badges beside a merge request's state.
         "point": "gitlab:summary-badges",
         "label": "Acme checks",
         "remote": "summaryBadges"
+      }
+    ]
+  }
+}
+```
+
+#### `gitlab:review-panel`
+
+A tab beside the diff of a task's merge request, named by your label. Your tree gets `{ owner, repo, number, taskId }`.
+
+```json manifest
+{
+  "client": "./client.js",
+  "contributions": {
+    "extensions": [
+      {
+        "id": "gitlab-review-panel",
+        "point": "gitlab:review-panel",
+        "label": "Acme review notes",
+        "remote": "reviewPanel"
       }
     ]
   }

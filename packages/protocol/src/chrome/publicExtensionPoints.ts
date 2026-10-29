@@ -52,6 +52,14 @@ const DETAIL = {
   note: "drawn by the host above the owner's detail view, outside its tree",
 } as const
 
+const REVIEW_PANEL = {
+  kind: 'remote',
+  mode: 'stack',
+  max: 1,
+  props: '{ owner, repo, number, taskId }',
+  note: 'a tab named by your label, beside the diff; only in a task, for its own change request',
+} as const
+
 export const PUBLIC_EXTENSION_POINTS: readonly PublicExtensionPoint[] = [
   {
     id: 'core:link-preview',
@@ -183,10 +191,13 @@ export const PUBLIC_EXTENSION_POINTS: readonly PublicExtensionPoint[] = [
   },
   { id: 'github:diff-line', kind: 'annotation', key: ['file', 'line', 'side'], max: 4 },
   { id: 'github:summary-badges', kind: 'remote', mode: 'stack', max: 4, props: '{ owner, repo, number }' },
+  { id: 'github:review-panel', ...REVIEW_PANEL },
   { id: 'bitbucket:diff-line', kind: 'annotation', key: ['file', 'line', 'side'], max: 4 },
   { id: 'bitbucket:summary-badges', kind: 'remote', mode: 'stack', max: 4, props: '{ owner, repo, number }' },
+  { id: 'bitbucket:review-panel', ...REVIEW_PANEL },
   { id: 'gitlab:diff-line', kind: 'annotation', key: ['file', 'line', 'side'], max: 4 },
   { id: 'gitlab:summary-badges', kind: 'remote', mode: 'stack', max: 4, props: '{ owner, repo, number }' },
+  { id: 'gitlab:review-panel', ...REVIEW_PANEL },
   {
     id: 'preview:toolbar-actions',
     kind: 'remote',

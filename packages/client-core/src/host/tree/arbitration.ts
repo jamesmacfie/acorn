@@ -125,3 +125,8 @@ export function withSlotChoice(raw: string | undefined, slot: string, choice: st
  */
 export const slotFills = (pointId: string, key?: string): boolean =>
   extensionDeliveries(pointId).some((entry) => matchesKey(entry.matches, key))
+
+/** The label of the first contributor offering to fill this slot, for an owner that names a control
+ *  after what fills it. In a `stack` point that holds one, it is the contributor that draws. */
+export const slotLabel = (pointId: string, key?: string): string | undefined =>
+  extensionDeliveries(pointId).find((entry) => matchesKey(entry.matches, key))?.label

@@ -114,7 +114,7 @@ task's, both from the shared views (`plugins/gitlab/src/client/`). A job's log i
 the server's own form for the branch. The importer lists every server's projects by address, with
 **Clone** and **Link folder**.
 
-The plugin opens `gitlab:diff-line` and `gitlab:summary-badges`, with the key shape every code host
+The plugin opens `gitlab:diff-line`, `gitlab:summary-badges`, and `gitlab:review-panel`, with the key shape every code host
 uses, and registers the data sources `merge-requests`, `review-comments`, `pipeline-jobs` with
 **Retry job**, and `local-branches` with the relation to a branch's merge request.
 

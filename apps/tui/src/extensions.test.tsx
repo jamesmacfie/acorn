@@ -16,6 +16,7 @@ afterEach(() => {
   delete process.env.ACORN_FIXTURE_BADGE
   delete process.env.ACORN_FIXTURE_DIFF_MARK
   delete process.env.ACORN_FIXTURE_PLUGIN_CHORD
+  delete process.env.ACORN_FIXTURE_REVIEW_PANEL
   fixtureBadgePresses.length = 0
 })
 
@@ -105,6 +106,22 @@ describe('a contribution inside somebody else’s surface', () => {
       await screen.until('#42', 45)
       await screen.press('d', { ctrl: true, meta: true, shift: true })
       expect(fixtureBadgePresses).toContain('chord')
+    } finally {
+      screen.done()
+    }
+  }, 180_000)
+
+  // The panel is a tab of the strip, so h and l reach it, beside the diff column at this width.
+  it('draws a review panel as a tab beside the diff, reached with l', async () => {
+    process.env.ACORN_FIXTURE_REVIEW_PANEL = '1'
+    const screen = await renderFixture({ pane: 'pr', width: 160, height: 40 })
+    try {
+      expect(await screen.until('Fixture guide', 45)).toContain('src/login.ts')
+      expect(await screen.reach('[Details]')).toBe(true)
+      for (let step = 0; step < 6; step += 1) await screen.press('l')
+      const frame = await screen.until('fixture guide for task-1', 45)
+      expect(frame).toContain('[Fixture guide]')
+      expect(frame).toContain('src/login.ts')
     } finally {
       screen.done()
     }
