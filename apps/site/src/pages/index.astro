@@ -23,7 +23,7 @@ import type { SnapshotId } from '../snapshots'
 
 export const meta = {
   description:
-    'Run Claude Code and Codex in tasks, each on its own branch and worktree, and answer them from the desktop app, the terminal, the browser, or your phone.',
+    'Run Claude Code and Codex on several pieces of work at once, each on its own branch and worktree, and answer them from your desk, your browser, or your phone.',
   sources: [
     'docs/features.md',
     'docs/workspaces-and-tasks.md',
@@ -80,19 +80,19 @@ const lanes = [
 const steps = [
   {
     title: 'Open a task',
-    text: 'Give it a title. acorn names a branch after it and makes the worktree when something needs the files.',
+    text: 'Give it a title, and acorn names a branch after it and sets up a worktree.',
     href: '/docs/using/tasks-and-worktrees/',
     link: 'Tasks and worktrees',
   },
   {
     title: 'Run agents in it',
-    text: 'Start Claude Code and Codex in the task, and answer their permission requests as they come.',
+    text: 'Start Claude Code or Codex in it. Answer them there when they ask a question or want permission.',
     href: '/docs/agents/agent-sessions/',
     link: 'Agent sessions',
   },
   {
     title: 'Review and ship',
-    text: 'Merge the pull request from the task. Archiving it stops its agents and removes the worktree, mess and all.',
+    text: 'Merge the pull request, then archive the task. That stops its agents and deletes the worktree, mess and all.',
     href: '/docs/using/archive-and-restore/',
     link: 'Archive and restore',
   },
@@ -105,7 +105,7 @@ const tour: { id: string; label: string; snapshot: SnapshotId; text: string; hre
     id: 'tasks',
     label: 'Tasks',
     snapshot: 'palette',
-    text: 'Start a task from a pull request, a Linear issue, a Rollbar error, or the New task dialog. Press ⌘K for the command palette over it.',
+    text: 'Start a task from a pull request, a Linear issue, a Rollbar error, or from scratch. ⌘K opens the command palette.',
     href: '/features/tasks/',
     link: 'More about tasks',
   },
@@ -113,7 +113,7 @@ const tour: { id: string; label: string; snapshot: SnapshotId; text: string; hre
     id: 'agents',
     label: 'Agents',
     snapshot: 'context',
-    text: "Claude Code and Codex run as managed sessions in the task's worktree. The Context pane is where you choose what the task tells them.",
+    text: "Claude Code and Codex run in the task's worktree. Each new agent starts with the pull request, the linked issues, and your notes, and the Context pane is where you pick what goes in.",
     href: '/features/agents/',
     link: 'More about agents',
   },
@@ -121,7 +121,7 @@ const tour: { id: string; label: string; snapshot: SnapshotId; text: string; hre
     id: 'review',
     label: 'Review',
     snapshot: 'review',
-    text: 'The pull request pane has the checks, the review threads, and the diff, unified or split. Merge from the same pane.',
+    text: 'The pull request pane shows the checks, the review comments, and the diff, unified or split. You merge from there too.',
     href: '/features/review/',
     link: 'More about review',
   },
@@ -129,7 +129,7 @@ const tour: { id: string; label: string; snapshot: SnapshotId; text: string; hre
     id: 'task-tools',
     label: 'Task tools',
     snapshot: 'database',
-    text: 'An editor with ripgrep search, a PostgreSQL client, an HTTP client, Docker, and a browser preview, each a pane of the task.',
+    text: 'A code editor, a PostgreSQL client, an HTTP client, Docker, and a browser preview, each one a pane in the task.',
     href: '/features/task-tools/',
     link: 'More about task tools',
   },
@@ -137,7 +137,7 @@ const tour: { id: string; label: string; snapshot: SnapshotId; text: string; hre
     id: 'automation',
     label: 'Workflows',
     snapshot: 'workflow',
-    text: 'Workflows run agent, terminal, and check steps as a graph, with gates where a person decides. Run one on a schedule or from a script.',
+    text: 'A workflow chains agent runs, terminal commands, and checks, and can stop to wait for your approval. Run one on a schedule or from a script.',
     href: '/features/automation/',
     link: 'More about automation',
   },
@@ -195,35 +195,35 @@ const faq = [
   {
     question: 'Do I need an API key?',
     answer:
-      'Not for agents. acorn runs Claude Code and Codex, and each signs in with its own login. An API key is optional, for features such as SQL generation.',
+      'Not for agents. Claude Code and Codex sign in the way they always do. A key is optional, for extras such as writing SQL from a description.',
     href: '/docs/agents/model-providers-and-generating-text/',
     link: 'Model providers and generating text',
   },
   {
     question: 'Does my code leave my machine?',
     answer:
-      'Your code stays on the machine that runs the Node. acorn talks to the services you connect, such as GitHub, and your agents talk to their own providers. Telemetry is off by default.',
+      'Your code stays on the machine where your agents run. acorn talks to the services you connect, such as GitHub, and your agents talk to their own providers. Telemetry is off by default.',
     href: '/docs/security/telemetry-and-privacy/',
     link: 'Telemetry and privacy',
   },
   {
     question: 'Does the phone app need an account?',
     answer:
-      "Yes. A phone reaches your Node through a relay, so you sign in and turn on remote access first. Nothing else needs an account, and acorn contacts the account service only once you sign in.",
+      "Yes. Your phone reaches your computer through a relay server, so you sign in and turn on remote access first. Nothing else needs an account, and acorn doesn't contact the account service until you sign in.",
     href: '/docs/built-in-plugins/account/',
     link: 'Account',
   },
   {
     question: 'Which platforms?',
     answer:
-      "The desktop app runs on macOS and Windows. The terminal client and the standalone Node run wherever Node.js runs, Linux included. The phone app runs in a phone's browser.",
+      "The desktop app runs on macOS and Windows. The terminal app and the server Node run anywhere Node.js does, Linux included. The phone app runs in your phone's browser.",
     href: '/docs/start/install/',
     link: 'Install',
   },
   {
     question: 'How is it different from a terminal multiplexer or an IDE?',
     answer:
-      'A task owns its branch, worktree, terminals, agent sessions, and pull request, and they all sit in one window. Archiving the task stops what runs in it and removes its worktree.',
+      'A task keeps its branch, worktree, terminals, agents, and pull request together in one window. Archive the task, and everything running in it stops and its worktree is deleted.',
     href: '/docs/start/concepts/',
     link: 'Concepts',
   },
@@ -242,7 +242,10 @@ const nut = art.slice(4).join('\n')
 <Marketing title="A workspace for working with coding agents" meta={meta}>
   <SoftwareApplication slot="head" release={release} />
   <Hero slot="hero" title="Let your agents go nuts." highlight="go nuts." split>
-    <p>Run Claude Code and Codex in tasks, each on its own branch and worktree.</p>
+    <p>
+      Run Claude Code and Codex on several pieces of work at once, each on its own branch and worktree, so they don't
+      trip over each other.
+    </p>
     <Fragment slot="actions">
       <a class="button" data-variant="primary" data-size="lg" href="/download/">{getAcorn}</a>
       <a class="button" data-size="lg" href="/docs/">Read the docs</a>
@@ -261,7 +264,8 @@ const nut = art.slice(4).join('\n')
     <header class="chapter-head">
       <h2 id="loop">Every mess gets its own branch.</h2>
       <p class="lede">
-        The usual task gets its own branch and worktree, so agents on different tasks work in different checkouts.
+        In acorn, each piece of work is a task, like a bug fix or a new feature. A task's agents work in their own
+        copy of the repo, so several tasks can run at once without touching each other's files.
       </p>
     </header>
     <figure class="lanes">
@@ -301,7 +305,7 @@ const nut = art.slice(4).join('\n')
   <section class="section chapter" aria-labelledby="window">
     <header class="chapter-head">
       <h2 id="window">You can close a few windows now.</h2>
-      <p class="lede">The pull request, the terminals, and the other tools a task needs open as panes inside it.</p>
+      <p class="lede">A task's pull request, terminals, and other tools open as panes in the same window.</p>
     </header>
     <Tour tabs={tour}>
       {tour.map((tab) => <Snapshot slot={tab.id} id={tab.snapshot} />)}
@@ -312,8 +316,8 @@ const nut = art.slice(4).join('\n')
     <header class="chapter-head">
       <h2 id="plugins">Take it apart.</h2>
       <p class="lede">
-        Every pane in that window comes from a plugin, and so do the terminal drawer and most of the icons on its rails.
-        A plugin you install uses the same seams, and draws in both clients.{' '}
+        Every pane in that window is a plugin, and so are the terminal and most of the icons down its sides. Plugins you
+        write or install are built the same way, and work in both the desktop app and the terminal app.{' '}
         <a href="/features/plugins/">More about plugins</a>
       </p>
     </header>
@@ -322,7 +326,7 @@ const nut = art.slice(4).join('\n')
       <Snapshot
         id="hero"
         instance="plugins"
-        caption="The task from the top of the page, with what plugins draw outlined: the Git and Agent panes, the Terminal drawer, five sources on the left rail, and every pane's button on the right."
+        caption="The task from the top of the page, with every part a plugin draws outlined: the Git and Agent panes, the terminal, five icons down the left side, and every pane's button on the right."
       />
     </div>
 
@@ -349,12 +353,12 @@ const nut = art.slice(4).join('\n')
       <div class="build-text">
         <h3>Or ask an agent for one.</h3>
         <p>
-          Tell an agent in any task what you're missing, such as a pane that lists the task's TODO comments. It reads
-          your Node's plugin reference, writes the plugin, and installs nothing until you approve it.
+          Tell an agent what you're missing, like a pane that lists the task's TODO comments. It reads acorn's plugin
+          docs, writes the plugin, and installs nothing until you approve it.
         </p>
         <p>
-          A plugin can add panes, rail sources, commands, agent tools, workflow steps, and themes. An installed one runs
-          in a sandbox, with only the permissions you accept.
+          A plugin can add panes, sidebar lists, commands, agent tools, workflow steps, and themes. One you install runs
+          in a sandbox, with only the permissions you grant it.
         </p>
         <ul class="actions">
           <li><a href="/docs/build-plugins/start/have-your-agent-build-it/">Have your agent build it</a></li>
@@ -389,8 +393,8 @@ const nut = art.slice(4).join('\n')
         </div>
         <h3>In the browser</h3>
         <p>
-          Open the Linear issue, and the panel opens on its task: the agents, what they wait on, and a box to message
-          them. The browser never sees the Node's token.
+          Open a Linear issue, and the extension's side panel shows its task: the agents, what they're waiting on, and a
+          box to message them. Your browser never holds the key to acorn.
         </p>
         <a href="/features/browser/">More about the browser extension</a>
       </div>
@@ -429,8 +433,8 @@ const nut = art.slice(4).join('\n')
         </div>
         <h3>On your phone</h3>
         <p>
-          Turn on remote access, then pair the phone by matching three words on a device that's already paired. Needs
-          you lists every agent that's waiting on you.
+          Turn on remote access, then pair your phone by matching three words with a device you've already paired. Its
+          Needs you list shows every agent that's waiting on you.
         </p>
         <a href="/docs/built-in-plugins/account/#turn-on-remote-access">Turn on remote access</a>
       </div>
@@ -441,8 +445,8 @@ const nut = art.slice(4).join('\n')
     <header class="chapter-head">
       <h2 id="nodes">Put the agents on a bigger machine.</h2>
       <p class="lede">
-        The desktop app runs a Node on your computer. Run another on a server, and its agents keep working while your
-        laptop sleeps.
+        Your agents run inside a Node, a background service the desktop app starts on your computer. Run a Node on a
+        server too, and its agents keep working while your laptop sleeps.
       </p>
     </header>
     <div class="nodes">
@@ -458,13 +462,13 @@ const nut = art.slice(4).join('\n')
           <div>
             <dt>Pair from any client</dt>
             <dd>
-              Check that the six identity words match, then enter the code. The client pins the Node's certificate from
-              then on.
+              Check that the six words match on both screens, then enter the code. From then on, your app trusts that
+              Node and nothing pretending to be it.
             </dd>
           </div>
           <div>
             <dt>Every Node in one place</dt>
-            <dd>Fleet home shows each Node you've paired, its tasks, and what waits on you there.</dd>
+            <dd>Fleet home lists every Node you've paired, its tasks, and the agents waiting on you there.</dd>
           </div>
         </dl>
         <a href="/features/nodes/">More about Nodes</a>
