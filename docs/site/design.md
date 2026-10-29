@@ -74,6 +74,25 @@ shows a callout's or a badge's tone in its border beside a word that names it, a
 or hovered row with an accent rule. A primary button is the accent, with `--bg` as its ink, which the
 palette pairs at 5.3:1 by day and 9.9:1 by night.
 
+## Type sizes
+
+Each kind of text on a marketing page has one size, so two things that do the same job never differ:
+
+| Size | What it sets |
+| --- | --- |
+| `--site-fs-hero`, `--site-fs-display` | The hero's headline, and a chapter's or the closing band's heading. |
+| `--site-fs-h2`, `--fs-xl` | A section's heading, and a step's, a card's, or a list's heading. |
+| `--site-fs-lede` | The paragraph under a display heading, the hero's included. |
+| `--site-fs-body` | Paragraphs, and the tour's tabs. |
+| `--fs-lg` | Secondary words in Inter: a card's text and the plugin wall's names. |
+| `--fs-md` | Mono controls and links: the header, buttons, segmented switches, and the footer's links. Mono runs wider than Inter, so it sits a pixel under `--fs-lg`. |
+| `--fs` | Labels: a footer column's name, a frame's bar and caption. |
+
+Mono runs wide, and its space is as wide as a letter, so headings pull in. Every heading takes
+`--site-track-heading` and `--site-words-heading`, and a display heading takes the stronger
+`--site-track-display` and `--site-words-display`. A lede in Inter takes `--site-track-lede`. A
+frame's title is semibold in sentence case, as a snapshot's is, not the app's tracked capitals.
+
 ## The mark
 
 `apps/site/src/components/Mark.astro` draws the wordmark: the ASCII acorn from the app's empty states,

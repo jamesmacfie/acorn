@@ -1,8 +1,7 @@
 ---
 // The landing page, one idea a screen: what a task is, the panes it opens, the plugins they're made of,
-// answering agents from the browser and the phone, Nodes on other machines, and what acorn keeps from its
-// agents. Every claim links to the page that owns it. Every picture is a capture of acorn, or a drawing
-// made from the site fixture's facts.
+// answering agents from the browser and the phone, and Nodes on other machines. Every claim links to the
+// page that owns it. Every picture is a capture of acorn, or a drawing made from the site fixture's facts.
 import Badge from '../components/Badge.astro'
 import Hero from '../components/Hero.astro'
 import InstallBlock from '../components/InstallBlock.astro'
@@ -100,7 +99,7 @@ const steps = [
 ]
 
 // One tab per feature group, in features.ts's order, leaving out what the chapters below cover: plugins,
-// the browser, Nodes, and security.
+// the browser, and Nodes.
 const tour: { id: string; label: string; snapshot: SnapshotId; text: string; href: string; link: string }[] = [
   {
     id: 'tasks',
@@ -185,55 +184,6 @@ Identity      helmet amber finch hedge forge bell
 Pairing code  ruBm8AwlUnz0hOUn4sLDwg   (valid 10 minutes)
 
 On the other machine, open Settings → Nodes, add a node, and check that the identity words match.`
-
-// Who can reach what on a Node (docs/security/the-trust-model): the tiles a Node holds, and each caller's
-// reach into them. The agent is the one working in the first task.
-const tiles = [
-  { id: 'webhooks', name: 'Retry failed webhooks', detail: 'Its worktree, terminals, and agents' },
-  { id: 'vat', name: 'Add VAT to EU invoices', detail: 'Its worktree, terminals, and agents' },
-  { id: 'query', name: 'Speed up the overdue invoices query', detail: 'Its worktree, terminals, and agents' },
-  { id: 'keys', name: 'Stored keys', detail: 'Your GitHub token and API keys' },
-  { id: 'admin', name: 'Devices and plugins', detail: 'Pairing, installs, and the audit log' },
-] as const
-type Reach = 'yes' | 'no' | 'write'
-const REACH: Record<Reach, { words: string; icon: string }> = {
-  yes: { words: 'Reaches', icon: 'check' },
-  no: { words: 'Out of reach', icon: 'lock' },
-  write: { words: 'Write-only', icon: 'key-round' },
-}
-const callers: {
-  id: string
-  label: string
-  text: string
-  href: string
-  link: string
-  reach: Record<(typeof tiles)[number]['id'], Reach>
-}[] = [
-  {
-    id: 'reach-you',
-    label: 'You',
-    text: 'A paired device has full owner access to its Node. The Node encrypts stored keys and never sends one back, even to you.',
-    href: '/docs/security/the-trust-model/',
-    link: 'The trust model',
-    reach: { webhooks: 'yes', vat: 'yes', query: 'yes', keys: 'write', admin: 'yes' },
-  },
-  {
-    id: 'reach-agent',
-    label: 'An agent',
-    text: 'Its token names one task, so the Node refuses its calls to any other, and it starts with none of your keys in its environment. Its shell still runs as you.',
-    href: '/docs/security/what-acorn-doesnt-protect-against/',
-    link: "What acorn doesn't protect against",
-    reach: { webhooks: 'yes', vat: 'no', query: 'no', keys: 'no', admin: 'no' },
-  },
-  {
-    id: 'reach-relay',
-    label: 'The relay',
-    text: "With remote access on, a phone's traffic goes through a relay that forwards bytes it can't read. Neither the relay nor the account service can approve a new device.",
-    href: '/docs/built-in-plugins/account/#turn-on-remote-access',
-    link: 'Remote access',
-    reach: { webhooks: 'no', vat: 'no', query: 'no', keys: 'no', admin: 'no' },
-  },
-]
 
 const faq = [
   {
@@ -522,36 +472,6 @@ const nut = art.slice(4).join('\n')
     </div>
   </section>
 
-  <section class="section chapter band" aria-labelledby="trust">
-    <header class="chapter-head">
-      <h2 id="trust">The agents don't get your keys.</h2>
-      <p class="lede">
-        Your code stays on the machine that runs the Node. Pick who's asking to see what each one can reach there.
-      </p>
-    </header>
-    <Tour tabs={callers} label="Who's asking">
-      {
-        callers.map((caller) => (
-          <figure slot={caller.id} class="reach">
-            <figcaption class="reach-head">What {caller.label.toLowerCase()} can reach on a Node</figcaption>
-            <ul>
-              {tiles.map((tile) => (
-                <li data-reach={caller.reach[tile.id]}>
-                  <span class="reach-name">{tile.name}</span>
-                  <span class="reach-detail">{tile.detail}</span>
-                  <span class="reach-state">
-                    <span class="reach-icon" aria-hidden="true" set:html={lucideIcon(REACH[caller.reach[tile.id]].icon)} />
-                    {REACH[caller.reach[tile.id]].words}
-                  </span>
-                </li>
-              ))}
-            </ul>
-          </figure>
-        ))
-      }
-    </Tour>
-  </section>
-
   <section class="section faq" aria-labelledby="questions">
     <div class="faq-head">
       <h2 id="questions">Questions</h2>
@@ -620,8 +540,8 @@ const nut = art.slice(4).join('\n')
     max-inline-size: 18ch;
     font-size: var(--site-fs-display);
     font-weight: var(--fw-bold);
-    /* Mono at display size reads loose, as the hero's headline does. */
-    letter-spacing: -0.04em;
+    letter-spacing: var(--site-track-display);
+    word-spacing: var(--site-words-display);
     line-height: 1.02;
     overflow-wrap: break-word;
     min-inline-size: 0;
@@ -921,7 +841,7 @@ const nut = art.slice(4).join('\n')
      a short last row just stops. */
   .wall {
     display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(min(10rem, 50%), 1fr));
+    grid-template-columns: repeat(auto-fill, minmax(min(11.5rem, 50%), 1fr));
     max-inline-size: none;
     margin: 0;
     padding: 0;
@@ -935,7 +855,7 @@ const nut = art.slice(4).join('\n')
     align-items: center;
     gap: var(--space-5);
     padding: var(--space-6) var(--space-7);
-    font-size: var(--fs);
+    font-size: var(--fs-lg);
     line-height: var(--lh-tight);
     border-inline-end: var(--divider);
     border-block-end: var(--divider);
@@ -1137,109 +1057,6 @@ const nut = art.slice(4).join('\n')
     }
   }
 
-  /* ── Reach ──
-     A Node drawn as what it holds, for whoever the tabs pick: each task, the stored keys, and the devices
-     and plugins. What the caller reaches is drawn solid in the accent, what it can't is dashed and
-     locked. The words say which, so the lines only repeat them. */
-  .reach {
-    display: grid;
-    gap: var(--space-8);
-    margin: 0;
-    padding: var(--space-9);
-    font-family: var(--font-mono);
-    background: var(--bg);
-    border: var(--surface-border);
-    border-radius: var(--site-radius-window);
-  }
-  .reach-head {
-    font-size: var(--fs-sm);
-    font-weight: var(--fw-bold);
-  }
-  .reach ul {
-    display: grid;
-    grid-template-columns: repeat(6, minmax(0, 1fr));
-    gap: var(--space-6);
-    max-inline-size: none;
-    margin: 0;
-    padding: 0;
-    list-style: none;
-  }
-  .reach li {
-    display: grid;
-    grid-column: span 2;
-    grid-template-rows: auto auto 1fr;
-    gap: var(--space-3);
-    min-block-size: 9rem;
-    padding: var(--space-9);
-    font-size: var(--fs);
-    line-height: var(--lh);
-    border: var(--bw-strong) dashed var(--border-strong);
-    border-radius: var(--radius-lg);
-  }
-  .reach li:nth-child(n + 4) {
-    grid-column: span 3;
-    min-block-size: 7rem;
-  }
-  .reach li[data-reach='yes'] {
-    background: var(--bg-subtle);
-    border-style: solid;
-    border-color: var(--accent);
-  }
-  .reach li[data-reach='write'] {
-    border-style: solid;
-    border-color: var(--accent);
-  }
-  .reach-name {
-    font-size: var(--fs-lg);
-    font-weight: var(--fw-bold);
-  }
-  .reach-state {
-    display: flex;
-    align-items: center;
-    align-self: end;
-    gap: var(--space-3);
-    font-weight: var(--fw-semibold);
-  }
-  .reach-icon {
-    display: block;
-    flex: none;
-    inline-size: 1rem;
-    block-size: 1rem;
-  }
-  [data-reach='yes'] .reach-icon,
-  [data-reach='write'] .reach-icon {
-    color: var(--accent);
-  }
-  .reach-icon :global(svg) {
-    display: block;
-    inline-size: 100%;
-    block-size: 100%;
-  }
-  @media (max-width: 47.99rem) {
-    .reach {
-      padding: var(--space-7);
-    }
-    .reach ul {
-      grid-template-columns: minmax(0, 1fr);
-    }
-    .reach li,
-    .reach li:nth-child(n + 4) {
-      grid-column: auto;
-      min-block-size: 0;
-    }
-  }
-  /* A newly picked caller's Node fades in, so the change reads as one picture changing. */
-  @media (prefers-reduced-motion: no-preference) {
-    :global(.tour-panel:has(> .tour-picture > .reach)) {
-      transition: opacity var(--dur-med) var(--ease-out);
-    }
-    @starting-style {
-      :global(.tour-panel:has(> .tour-picture > .reach)) {
-        opacity: 0;
-      }
-    }
-  }
-
   /* ── Questions ── */
   .faq {
     align-items: start;
@@ -1268,6 +1085,8 @@ const nut = art.slice(4).join('\n')
     padding-block: var(--space-9);
     font-family: var(--font-mono);
     font-weight: var(--fw-semibold);
+    letter-spacing: var(--site-track-heading);
+    word-spacing: var(--site-words-heading);
     cursor: pointer;
     list-style: none;
   }
@@ -1335,7 +1154,7 @@ const nut = art.slice(4).join('\n')
     padding: 0;
     list-style: none;
     font-family: var(--font-mono);
-    font-size: var(--fs-sm);
+    font-size: var(--fs-md);
   }
   /* The acorn from the header, at the size of a sign. It tips its cap to whoever reaches for the main
      button. */
