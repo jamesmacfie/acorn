@@ -130,6 +130,23 @@ The terminal client opens the file in the **Editor** pane instead, at the line, 
 deleted line. Its diff column beside the tabs isn't a keyboard stop, so a line shown there couldn't be
 reached.
 
+### Asking about the line
+
+`bridge.ui.revealChangeRequestLine(path, line, side, { ask: { note } })` also opens the inline agent
+card on the line once its rows load. `note` is optional text for the agent, at most 2,048 characters,
+and goes first in the card's context
+([shared review views](./change-request-ui.md#build-a-model)). The card is the diff's ordinary line
+conversation, so after the reader sends from it, it stays on that line in the **Diff** tab.
+
+`ask` travels in the place, through the pane intent and the code host's `requestFileScroll`, to
+`DiffPane`, which calls `inlineChat.open(row, ask)`. The broker refuses an `ask` without a line, or a
+note that isn't text or is over the limit, with `bad_request`. The note goes to the agent with the
+reader's next question, and the reader doesn't see it in the card, so asking follows `openTask`'s rule:
+it works only from a click or key handler, at most once a second, and is refused with `denied`
+otherwise. It needs no scope of its own, because the reader still sends from the card. A line no
+segment covers lands on the file's header and opens nothing. The terminal client ignores `ask` and opens the line in the editor, so a caller doesn't need to
+know which host it's in.
+
 ## Browser features a frame lacks
 
 The iframe is sandboxed `allow-scripts allow-same-origin`, without `allow-modals` or `allow-popups`:

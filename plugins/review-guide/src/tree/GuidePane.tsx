@@ -152,9 +152,9 @@ export function GuidePane(props: { taskId?: string; bridge: AcornBridge; layout:
                 layout={props.layout}
                 label={profileLabel(stored().profileId)}
                 onSession={(id) => void props.bridge.ui.openDestination('session', id)}
-                onReveal={(path, line, side) =>
+                onReveal={(path, line, side, ask) =>
                   void props.bridge.ui
-                    .revealChangeRequestLine(path, line, side)
+                    .revealChangeRequestLine(path, line, side, ask && { ask })
                     .catch((error: unknown) => setFailure(message(error)))
                 }
                 onRetry={() => void send('generate')}

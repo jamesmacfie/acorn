@@ -91,9 +91,10 @@ export function ChangeRequestDiff(props: {
         Object.fromEntries(files.map((file) => [file.path, file.patchKey])),
       )
   })
-  const [openInline, setOpenInline] = createSignal<InlineOrigin | null>(null)
+  // The line whose card the reader opened, and the note it was opened with, which goes to the agent.
+  const [openInline, setOpenInline] = createSignal<{ origin: InlineOrigin; note?: string } | null>(null)
   createEffect(() => {
-    const opened = openInline()
+    const opened = openInline()?.origin
     if (opened && topology()?.files.find((file) => file.path === opened.path)?.patchKey !== opened.patchKey)
       setOpenInline(null)
   })
@@ -130,9 +131,20 @@ export function ChangeRequestDiff(props: {
       if (topology()?.files.find((file) => file.path === origin.path)?.patchKey !== origin.patchKey) return []
       return [{ path: origin.path, side: origin.side, line: origin.line }]
     })
-    const opened = openInline()
+    const opened = openInline()?.origin
     return opened ? [...visible, { path: opened.path, side: opened.side, line: opened.line }] : visible
   })
+
+  // The note the card was opened with goes first, so the agent reads the line as the reader saw it,
+  // and the reader's own question stays short. A plugin wrote it, not the reader, and the label says
+  // so, so the agent weighs it as context rather than as the reader's words.
+  const lineContext = async (origin: InlineOrigin, row: CodeRow): Promise<string> => {
+    const opened = openInline()
+    const code = await loadDiffLineContext(diffSource, row)
+    return opened?.note && sameLine(opened.origin, origin)
+      ? `The reader asked from a plugin's note on this line. The plugin wrote it, not the reader:\n${opened.note}\n\n${code}`
+      : code
+  }
 
   const diffSource: DiffSource = {
     ...source,
@@ -146,7 +158,10 @@ export function ChangeRequestDiff(props: {
       ? {
           inlineChat: {
             anchors: inlineAnchors,
-            open: (row: CodeRow) => setOpenInline(inlineOrigin(row)),
+            open: (row: CodeRow, ask?: { note?: string }) => {
+              const origin = inlineOrigin(row)
+              setOpenInline(origin && { origin, ...(ask?.note ? { note: ask.note } : {}) })
+            },
             render: (row: CodeRow) => {
               // Memoised: read directly, every session update would rebuild the card and blur its textarea.
               const shown = createMemo(
@@ -161,7 +176,8 @@ export function ChangeRequestDiff(props: {
                         sameLine(session.origin, origin) &&
                         !session.archivedAt,
                     )
-                  return exists || (openInline() && sameLine(openInline()!, origin)) ? origin : null
+                  const opened = openInline()?.origin
+                  return exists || (opened && sameLine(opened, origin)) ? origin : null
                 },
                 null,
                 { equals: (a, b) => a === b || (!!a && !!b && sameLine(a, b)) },
@@ -173,7 +189,7 @@ export function ChangeRequestDiff(props: {
                     return (
                       <Card
                         origin={origin}
-                        loadContext={() => loadDiffLineContext(diffSource, row)}
+                        loadContext={() => lineContext(origin, row)}
                         onClose={() => setOpenInline(null)}
                       />
                     )

@@ -89,11 +89,12 @@ export type DiffSource = {
    * segments load; `render` draws one line's, inside its segment so the height is measured.
    */
   lineExtra?: { anchors: () => readonly DiffLineAnchor[]; render: (row: CodeRow) => JSX.Element }
-  /** A task-owned agent conversation anchored to a diff line. */
+  /** A task-owned agent conversation anchored to a diff line. `open` takes the `ask` a revealed place
+   *  carried, whose `note` the conversation starts from. */
   inlineChat?: {
     anchors: () => readonly DiffLineAnchor[]
     render: (row: CodeRow) => JSX.Element
-    open: (row: CodeRow) => void
+    open: (row: CodeRow, ask?: { note?: string }) => void
   }
   /**
    * A click on a code line, for a source with a modifier-key affordance of its own. Unified mode

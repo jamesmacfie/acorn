@@ -34,8 +34,9 @@ import { guidePath, openQuestions, OVERVIEW, stepPage, wrapUpDone, type PathNote
 const PAGE_BYTES = 256 * 1024
 
 type Side = 'old' | 'new'
-/** Show a line, or a file's first line, in the change request's diff. */
-export type Reveal = (path: string, line?: number, side?: Side) => void
+/** Show a line, or a file's first line, in the change request's diff. `ask` also opens the agent card
+ *  on the line, with `note` as context for the agent. */
+export type Reveal = (path: string, line?: number, side?: Side, ask?: { note?: string }) => void
 
 const TONES: Record<
   GuideNote['tone'],
@@ -406,7 +407,7 @@ function Later(props: { label: string; children: JSX.Element }) {
 }
 
 /** A hunk under a link to it in the change request's diff, named by its path and first line, with
- *  each note under the line it's on. ✦ on a line shows that line in the change request's diff. Beside
+ *  each note under the line it's on. ✦ on a line asks about it in the change request's diff. Beside
  *  the diff it draws only the noted lines, and nothing under the link for a hunk with no notes. */
 function Hunk(props: {
   item: DiffItem
@@ -429,7 +430,7 @@ function Hunk(props: {
             patch={props.item.patch}
             noteContext={narrow() ? 0 : undefined}
             onActivate={(place: { side: Side; line: number }) =>
-              props.onReveal(props.item.path, place.line, place.side)
+              props.onReveal(props.item.path, place.line, place.side, {})
             }
           >
             <Index each={props.notes}>
@@ -445,6 +446,10 @@ function Hunk(props: {
 function Note(props: { note: PathNote; author: string; state: NoteState; onReveal: Reveal }) {
   const key = () => props.note.key
   const reveal = () => props.onReveal(props.note.path, props.note.line, props.note.side)
+  const ask = () =>
+    props.onReveal(props.note.path, props.note.line, props.note.side, {
+      note: `${props.note.title}\n\n${props.note.body}`,
+    })
   return (
     <DiffNote
       side={props.note.side}
@@ -458,8 +463,7 @@ function Note(props: { note: PathNote; author: string; state: NoteState; onRevea
     >
       <Markdown text={props.note.body} />
       <Inline wrap>
-        {/* Shows the line, where the change request's own ✦ asks about it. */}
-        <Button size="sm" variant="ghost" onPress={reveal}>
+        <Button size="sm" variant="ghost" onPress={ask}>
           Ask a follow-up
         </Button>
         <Button size="sm" variant="ghost" onPress={reveal}>

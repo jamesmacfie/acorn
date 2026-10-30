@@ -141,8 +141,17 @@ export type PluginBridgeUiRequest =
   | { id: number; kind: 'ui'; op: 'openTask'; taskId: string }
   // Show a file, and a line on one side of it, in the diff of the frame's task's primary change
   // request. The host picks the pane from the task, so the frame never names another plugin's pane.
-  // Granted by `core.changeRequests:reveal`.
-  | { id: number; kind: 'ui'; op: 'revealChangeRequestLine'; path: string; line?: number; side?: 'old' | 'new' }
+  // Granted by `core.changeRequests:reveal`. `ask` also opens the agent card on that line, with `note`
+  // as context for the agent. The reader still sends from the card, so it needs no scope of its own.
+  | {
+      id: number
+      kind: 'ui'
+      op: 'revealChangeRequestLine'
+      path: string
+      line?: number
+      side?: 'old' | 'new'
+      ask?: { note?: string }
+    }
   // Hand an `https` URL to the host, which runs the same content-link ladder every shell surface
   // runs: in-app when a recogniser claims it, the owner's browser otherwise. The frame passes a URL
   // and learns nothing back, because the host is the side that knows which surface this port belongs
@@ -180,6 +189,9 @@ export const MAX_DOCUMENT_BYTES = 2 * 1024 * 1024
  * number, because they are the two halves of one conversation and neither is a payload: an input names
  * what to open and a result names what came back. Anything with bytes in it belongs on a route. */
 export const MAX_OVERLAY_INPUT_BYTES = 64 * 1024
+
+/** The longest note a `revealChangeRequestLine` ask may carry to the agent card, in characters. */
+export const MAX_ASK_NOTE_CHARS = 2048
 
 // A webview controller can address only the surface whose binding owns its port. There is no surface,
 // plugin or node identifier in the request for plugin code to forge.

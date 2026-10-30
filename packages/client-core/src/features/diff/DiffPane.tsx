@@ -673,7 +673,8 @@ export function DiffPane(props: {
 
   // Take the reader to the place a file-scroll asked for, once the diff can show it: the file's header
   // once the scroller and topology exist, and a line once its segment has loaded. A line no segment
-  // covers, such as one outside every hunk or one from an older patch, lands on the file's header.
+  // covers, such as one outside every hunk or one from an older patch, lands on the file's header. A
+  // place with `ask` also opens the agent card on its line, and only when the line was found.
   createEffect(() => {
     const place = wanted()
     if (!place || !items().length || !scrollEl()) return
@@ -692,9 +693,10 @@ export function DiffPane(props: {
     if (!rows) return void untrack(() => layout.scrollToIndex(index))
     const row = rows.findIndex((r) => isCodeRow(r) && (side === 'old' ? r.oldNo : r.newNo) === place.line)
     setWanted(undefined)
-    untrack(() =>
-      revealMatch({ path: place.path, patchKey: file.patchKey!, ordinal, row: Math.max(row, 0), start: 0, end: 0 }),
-    )
+    untrack(() => {
+      revealMatch({ path: place.path, patchKey: file.patchKey!, ordinal, row: Math.max(row, 0), start: 0, end: 0 })
+      if (place.ask && row >= 0) source().inlineChat?.open(rows[row] as CodeRow, place.ask)
+    })
   })
 
   // Scroll to the selected file once its header exists, which is as soon as the topology does: its

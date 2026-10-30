@@ -281,13 +281,14 @@ export function attach(
             ...(subresourceId === undefined ? {} : { subresourceId }),
           })),
         openTask: async (taskId) => void (await request({ kind: 'ui', op: 'openTask', taskId })),
-        revealChangeRequestLine: async (path, line, side) =>
+        revealChangeRequestLine: async (path, line, side, options) =>
           void (await request({
             kind: 'ui',
             op: 'revealChangeRequestLine',
             path,
             ...(line === undefined ? {} : { line }),
             ...(side === undefined ? {} : { side }),
+            ...(options?.ask === undefined ? {} : { ask: options.ask }),
           })),
         openUrl: async (url) => void (await request({ kind: 'ui', op: 'openUrl', url })),
         done: async () => void (await request({ kind: 'ui', op: 'importer.done' })),

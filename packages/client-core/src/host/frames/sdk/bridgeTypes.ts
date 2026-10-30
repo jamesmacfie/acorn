@@ -92,9 +92,16 @@ export type AcornBridge = {
      * know one. `side` is `new` by default, and `old` for a deleted line. The host opens the code
      * host's pane for it. A line the diff doesn't show lands on the file's header. Needs the
      * `core.changeRequests:reveal` scope, and rejects with `not_found` when the task has no change
-     * request.
+     * request. Pass `ask` with a line to also open the agent card on it, with `note`, at most 2,048
+     * characters, as context for the agent. The reader still sends from the card. Asking works only
+     * from a click or key handler, at most once a second.
      */
-    revealChangeRequestLine(path: string, line?: number, side?: 'old' | 'new'): Promise<void>
+    revealChangeRequestLine(
+      path: string,
+      line?: number,
+      side?: 'old' | 'new',
+      options?: { ask?: { note?: string } },
+    ): Promise<void>
     /**
      * Hand an `https` URL to the host. It resolves in-app when something recognises it, such as another
      * provider's reference panel or a task pane, and opens the owner's browser otherwise. Anything but

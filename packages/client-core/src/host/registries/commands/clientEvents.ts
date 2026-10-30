@@ -18,8 +18,9 @@ import { createLogger } from '../../../infra/telemetry/logger'
 const log = createLogger('client-event')
 
 /** A place in a diff: a file, and a line on one side of it when the caller knows one. `side` is
- *  `new` when it's missing. */
-export type DiffPlace = { path: string; line?: number; side?: 'old' | 'new' }
+ *  `new` when it's missing. `ask` opens the agent card on the line, with `note` as context for the
+ *  agent. */
+export type DiffPlace = { path: string; line?: number; side?: 'old' | 'new'; ask?: { note?: string } }
 
 export type PaneIntent =
   | { kind: 'notes:open'; slug: string; scope: NoteScope }

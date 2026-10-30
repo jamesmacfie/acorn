@@ -8,7 +8,7 @@ sources:
   - plugins/review-guide/src/tree/GuidePath.tsx
   - docs/first-party-plugins/review-guide/pane.md
   - plugins/review-guide/src/server/workflowStep.ts
-checked: '000004794'
+checked: '7d0df9c88'
 ---
 
 import { Steps } from '@astrojs/starlight/components'
@@ -87,9 +87,12 @@ closely** for a judgment call, or **Risk** for a likely bug, then a title and a 
 none.
 
 Above each hunk is a link with its file and first line, such as `src/billing/invoice.ts:42`. Click it,
-a note's **Show in diff** or **Ask a follow-up**, or ✦ beside any line to open the pull request's diff
-at that line, where you can see the code around it and comment. Hunks the harness left out are a last
-step, **Not covered by the guide**.
+or a note's **Show in diff**, to open the pull request's diff at that line, where you can see the code
+around it and comment. Hunks the harness left out are a last step, **Not covered by the guide**.
+
+To ask about a line, click a note's **Ask a follow-up**, or ✦ beside any line. The pull request's diff
+opens the agent card on that line. From a note, the agent also gets the note's text, so your question
+can be short. The conversation stays on that line in the **Diff** tab.
 
 acorn checks the harness's answer against the diff before it shows it. Every hunk appears exactly once:
 a hunk the harness left out goes to **Not covered by the guide**, a hunk it put in two steps stays in
@@ -111,7 +114,8 @@ want one.
 
 It reads the task's pull request from its code host plugin, and the change from the task's worktree with
 git. It has no network access of its own, runs no other programs, and reads no secrets. It may open the
-task's pull request diff at a line, which is what a hunk's link and ✦ do. The guide is
+task's pull request diff at a line, and open the agent card there, which is what a hunk's link and ✦
+do. The card waits for you to send a question. The guide is
 kept on the Node until the task is deleted.
 
 The **Guide** tab sits beside the diff, so you can read a step and its code in the diff side by side.

@@ -26,7 +26,7 @@ It ships as a bundled loaded package, so it reaches the Node only through its ma
   person from, so the step uses the owner's saved harness choice.
 
 It asks for no network, no processes, and no secrets. Its tree has one frame scope,
-`core.changeRequests:reveal`, for the hunk links.
+`core.changeRequests:reveal`, for the hunk links and for opening the agent card on a line.
 
 ## What it spends
 

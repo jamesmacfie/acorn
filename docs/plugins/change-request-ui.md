@@ -78,7 +78,10 @@ to read its `pr-synced` frame. GitLab's and Bitbucket's buttons use it.
 `ChangeRequestDiff` takes a `DiffSource` without its threads, inline chat, or line opener, and adds
 those. It maps `old` and `new` to the viewer's `LEFT` and `RIGHT`, opens an added line in the
 `editor` pane, and anchors agent conversations to a line through the agents plugin's
-`agents.inlineDiff` capability, which the host passes in.
+`agents.inlineDiff` capability, which the host passes in. A card opened with a note, from a frame's
+`ask` ([asking about the line](./frames.md#asking-about-the-line)), puts it first in the card's
+context, under a line that says a plugin wrote it, not the reader, then the code around the line. The
+card itself doesn't change, so the reader sees only their own question.
 
 `ChangeRequestList` draws the Open and Closed tabs, the filter, and one row per change request. The
 host owns the reads, the search past the loaded pages, each row's checks, and the row menu.

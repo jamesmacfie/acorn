@@ -219,7 +219,7 @@ describe('revealChangeRequestLine', () => {
 
   it("sends the place to the pane the bound task's change request names", () => {
     tasks.set('task-1', { id: 'task-1', changeRequest: { pane: 'mr' } })
-    const place = { path: 'src/a.ts', line: 4, side: 'new' as const }
+    const place = { path: 'src/a.ts', line: 4, side: 'new' as const, ask: { note: 'Why a cap?' } }
     expect(build({ binding: binding({ taskId: 'task-1' }) }).revealChangeRequestLine(place)).toBe(true)
     expect(openPane).toHaveBeenCalledWith('task-1', 'mr', { kind: 'change-request:reveal', place })
   })

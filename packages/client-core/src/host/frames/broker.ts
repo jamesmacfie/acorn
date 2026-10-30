@@ -19,6 +19,7 @@ import type {
   PluginFrameContext,
 } from '@acorn/protocol/plugin/bridge.ts'
 import {
+  MAX_ASK_NOTE_CHARS,
   MAX_DOCUMENT_BYTES,
   MAX_OVERLAY_INPUT_BYTES,
   MAX_PLUGIN_BYTES,
@@ -96,7 +97,12 @@ export type FrameServices = {
   openTask(taskId: string): (() => void) | undefined
   // Show a place in the diff of the bound task's primary change request. False when the frame has no
   // task, or its task has no change request.
-  revealChangeRequestLine(place: { path: string; line?: number; side?: 'old' | 'new' }): boolean
+  revealChangeRequestLine(place: {
+    path: string
+    line?: number
+    side?: 'old' | 'new'
+    ask?: { note?: string }
+  }): boolean
   // Resolve an https URL somewhere: in-app if a content-link recogniser claims it, the owner's browser
   // otherwise. Returns nothing on purpose; see the `openUrl` case below for why the frame is told neither
   // the outcome nor when it happened.
@@ -560,7 +566,7 @@ export function createFrameBridge(input: {
         if (!binding.api.includes('core.changeRequests:reveal')) {
           return void post(denied(id, 'revealChangeRequestLine needs the core.changeRequests:reveal scope'))
         }
-        const { path, line, side } = data
+        const { path, line, side, ask } = data
         if (
           typeof path !== 'string' ||
           !path ||
@@ -576,10 +582,39 @@ export function createFrameBridge(input: {
             ),
           )
         }
+        const note = (ask as { note?: unknown } | undefined)?.note
+        if (
+          ask !== undefined &&
+          (line === undefined ||
+            typeof ask !== 'object' ||
+            ask === null ||
+            (note !== undefined && (typeof note !== 'string' || note.length > MAX_ASK_NOTE_CHARS)))
+        ) {
+          return void post(
+            failed(
+              id,
+              'bad_request',
+              `revealChangeRequestLine can ask only about a line, with a note of at most ${MAX_ASK_NOTE_CHARS} characters`,
+            ),
+          )
+        }
+        // The note reaches the agent with the reader's next question, so asking is held to the
+        // person's-act rule and budget `openTask` uses. Background code can still show a line.
+        if (ask !== undefined) {
+          if (!services.frameHasFocus()) {
+            return void post(denied(id, 'revealChangeRequestLine asks only from a click or key handler'))
+          }
+          const now = Date.now()
+          if (now - lastNavigationAt < NAVIGATION_MIN_GAP_MS) {
+            return void post(denied(id, 'revealChangeRequestLine asks at most once a second'))
+          }
+          lastNavigationAt = now
+        }
         const place = {
           path,
           ...(line === undefined ? {} : { line: line as number }),
           ...(side === undefined ? {} : { side: side as 'old' | 'new' }),
+          ...(ask === undefined ? {} : { ask: note === undefined ? {} : { note: note as string } }),
         }
         if (!services.revealChangeRequestLine(place)) {
           return void post(failed(id, 'not_found', "this surface's task has no change request"))

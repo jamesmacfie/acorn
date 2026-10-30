@@ -280,15 +280,15 @@ describe('GuidePane', () => {
     pane.dispose()
   })
 
-  it("shows a line in the change request's diff from ✦, Show in diff, and Ask a follow-up", async () => {
+  it('asks about a line from ✦ with no note, from Ask a follow-up with the note, and shows one from Show in diff', async () => {
     const pane = await mount(stored('ready', { pages: ['overview'], notes: [] }))
     await pane.press('StackedDiff', 'a.ts', 'onActivate', { side: 'old', line: 1 })
     await pane.press('Button', 'Show in diff')
     await pane.press('Button', 'Ask a follow-up')
     expect(pane.revealed).toEqual([
-      ['a.ts', 1, 'old'],
-      ['a.ts', 1, 'new'],
-      ['a.ts', 1, 'new'],
+      ['a.ts', 1, 'old', { ask: {} }],
+      ['a.ts', 1, 'new', undefined],
+      ['a.ts', 1, 'new', { ask: { note: 'This may overflow.\n\nCheck **the cap**.' } }],
     ])
     pane.dispose()
   })
@@ -349,11 +349,11 @@ describe('GuidePane', () => {
     it("shows a step's first hunk in the diff when the step opens", async () => {
       const pane = await mount(stored('ready', { pages: ['overview'], notes: [] }), 'narrow')
       await pane.press('Button', 'Mark reviewed & continue')
-      expect(pane.revealed).toEqual([['a.test.ts', 1, 'new']])
+      expect(pane.revealed).toEqual([['a.test.ts', 1, 'new', undefined]])
       await pane.press('Button', 'Tests')
-      expect(pane.revealed.at(-1)).toEqual(['a.test.ts', 1, 'new'])
+      expect(pane.revealed.at(-1)).toEqual(['a.test.ts', 1, 'new', undefined])
       await pane.press('Button', 'Core')
-      expect(pane.revealed.at(-1)).toEqual(['a.ts', 1, 'new'])
+      expect(pane.revealed.at(-1)).toEqual(['a.ts', 1, 'new', undefined])
       pane.dispose()
     })
   })
