@@ -3,6 +3,7 @@ import { children, createEffect, For, on, onCleanup, Show, type JSX } from 'soli
 import Icon from '../content/Icon'
 import type { Tone } from '../../tokens/tokens'
 import { createCollection } from '../../keys/collection'
+import { publishTabStrip } from '../../keys/tabStrips'
 import { revealActiveTab, trackTabOverflow } from './tabScroll'
 
 export type TabDef = {
@@ -63,6 +64,16 @@ export function Tabs(props: {
     const attachCollection = collection.containerProps.ref as (element: HTMLElement) => void
     attachCollection(element)
   }
+
+  onCleanup(
+    publishTabStrip({
+      label: () => props.ariaLabel,
+      tabs,
+      active: () => props.active,
+      select: (id) => props.onChange(id),
+      shown: () => !!stripRef?.isConnected && stripRef.getClientRects().length > 0,
+    }),
+  )
 
   createEffect(() => {
     const active = props.active

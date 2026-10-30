@@ -10,6 +10,7 @@ import type { CommandExecutionContext } from '../registries/commands/commands'
 import { registerNavigationCommands } from '../registries/commands/navigationCommands'
 import { createRouterNavigation } from './routerNavigation'
 import { registerDesktopSourceOpeners } from './sourceOpeners'
+import { registerTabStripCommands } from './tabStripCommands'
 import { createCommandPaletteView } from './paletteView'
 import { Alert } from '../../kit/components/primitives'
 import { PaletteSurface } from './PaletteSurface'
@@ -78,6 +79,8 @@ export default function CommandPalette() {
   })
   // Open <label> for every source the rail can draw, each with a shortcut the person can set.
   registerDesktopSourceOpeners(() => context().workspaceId)
+  // Show <tab> tab for every tab strip on screen.
+  registerTabStripCommands()
 
   // Back to a frame further up, as Escape would get there one step at a time.
   const popTo = (depth: number) => {
