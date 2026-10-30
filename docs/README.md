@@ -488,6 +488,15 @@ Each plugin landing page above has topic pages in a folder of the same name:
   [keeping the machine awake](./future/node-tray/07-keep-awake.md), and [acceptance on real
   machines](./future/node-tray/08-acceptance.md).
 
+## Review guide v2 proposal
+
+- [Review guide v2](./future/review-guide/README.md), a path through the change with notes on lines,
+  with phases for [steps and line notes in the answer](./future/review-guide/01-steps-and-line-notes.md),
+  [notes on diff rows](./future/review-guide/02-notes-on-diff-rows.md), [the review
+  path](./future/review-guide/03-the-review-path.md), [asking from the
+  guide](./future/review-guide/04-ask-from-the-guide.md), and [notes in the Diff
+  tab](./future/review-guide/05-notes-in-the-diff.md).
+
 ## OpenCode harness proposal
 
 - [OpenCode as a contributed harness](./future/opencode.md), postponed.
