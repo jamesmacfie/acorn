@@ -64,6 +64,7 @@ export {
   DiffLine,
   FileHead,
   StackedDiff,
+  DiffNote,
   NonCodeRow,
   SplitCell,
   EmptyState,

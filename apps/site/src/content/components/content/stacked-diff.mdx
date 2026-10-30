@@ -4,10 +4,10 @@ description: One file's patch, drawn as a unified diff.
 sources:
   - packages/client-core/src/kit/diff/DiffRows.tsx
   - docs/ui-design/every-node.md
-checked: afced2661
+checked: '622edc342'
 ---
 
-Use `StackedDiff` to show one file's change from its patch text. It draws the file's header, each hunk, and each line.
+Use `StackedDiff` to show one file's change from its patch text. It draws the file's header, each hunk, and each line. Put `DiffNote` children in it to pin notes under lines, and set `onActivate` to hear the ✦ button on any line, which sends `{ side, line }`. In the terminal, ✦ is Enter on the line.
 
 <Specimen id="stacked-diff" />
 
@@ -20,6 +20,7 @@ Use `StackedDiff` to show one file's change from its patch text. It draws the fi
 ## Related
 
 - [`FileHead`](/docs/components/content/file-head/), for the header line alone.
+- [`DiffNote`](/docs/components/content/diff-note/), for a note under one of its lines.
 - [`CodeBlock`](/docs/components/content/code-block/), for code that isn't a change.
 
 ## Mistakes

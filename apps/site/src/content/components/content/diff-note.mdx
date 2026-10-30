@@ -1,0 +1,28 @@
+---
+title: DiffNote
+description: A note pinned under one line of a StackedDiff.
+sources:
+  - packages/client-core/src/kit/diff/diffNotes.ts
+  - packages/client-core/src/kit/diff/DiffRows.tsx
+  - docs/ui-design/every-node.md
+checked: '622edc342'
+---
+
+Use `DiffNote` as a child of a `StackedDiff` to pin a note under one of its lines. `side` and `line` name the line, `tone` and `label` say what kind of note it is, and `author` and `title` fill its header. Its children are the body and your own buttons. A reader can fold the note to its header.
+
+<Specimen id="diff-note" />
+
+{/* facts */}
+
+## Example
+
+<SpecimenCode id="diff-note" />
+
+## Related
+
+- [`StackedDiff`](/docs/components/content/stacked-diff/), the diff a note sits in. Its `onActivate` hears the ✦ button on any line.
+
+## Mistakes
+
+- Putting a `DiffNote` anywhere but directly in a `StackedDiff`. Outside one it isn't drawn.
+- Naming a line the patch doesn't have. The note draws after the last line, with its line number in the header, so check the line first.

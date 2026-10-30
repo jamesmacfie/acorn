@@ -1,8 +1,8 @@
 import { createEffect, createSignal, For, Match, on, onCleanup, Show, Switch } from 'solid-js'
 import {
   Alert,
-  Badge,
   Button,
+  DiffNote,
   EmptyState,
   Fold,
   Inline,
@@ -36,6 +36,10 @@ const message = (error: unknown) =>
   error instanceof Error && error.message ? error.message : 'Something went wrong. Try again.'
 
 const plural = (count: number, one: string, many: string) => `${count} ${count === 1 ? one : many}`
+
+type Side = 'old' | 'new'
+/** Show a line, or a file's first line, in the change request's diff. */
+type Reveal = (path: string, line?: number, side?: Side) => void
 
 const TONES: Record<GuideNote['tone'], { label: string; tone: 'neutral' | 'warn' | 'danger' }> = {
   explain: { label: 'Explains', tone: 'neutral' },
@@ -165,12 +169,11 @@ export function GuidePane(props: { taskId?: string; bridge: AcornBridge }) {
                 stored={stored()}
                 label={profileLabel(stored().profileId)}
                 onSession={(id) => void props.bridge.ui.openDestination('session', id)}
-                onReveal={(item) => {
-                  const start = hunkStart(item.patch)
-                  props.bridge.ui
-                    .revealChangeRequestLine(item.path, start?.line, start?.side)
+                onReveal={(path, line, side) =>
+                  void props.bridge.ui
+                    .revealChangeRequestLine(path, line, side)
                     .catch((error: unknown) => setFailure(message(error)))
-                }}
+                }
                 onRetry={() => void send('generate')}
               />
             )}
@@ -185,7 +188,7 @@ function StoredGuideView(props: {
   stored: StoredGuide
   label: string
   onSession: (sessionId: string) => void
-  onReveal: (item: DiffItem) => void
+  onReveal: Reveal
   onRetry: () => void
 }) {
   const session = () =>
@@ -227,7 +230,7 @@ function StoredGuideView(props: {
               {session()}
             </Stack>
             <For each={coverageNotes(guide())}>{(note) => <Alert tone="warn">{note}</Alert>}</For>
-            <GuideSteps guide={guide()} onReveal={props.onReveal} />
+            <GuideSteps guide={guide()} author={props.label} onReveal={props.onReveal} />
           </Stack>
         )}
       </Match>
@@ -235,7 +238,7 @@ function StoredGuideView(props: {
   )
 }
 
-function GuideSteps(props: { guide: Guide; onReveal: (item: DiffItem) => void }) {
+function GuideSteps(props: { guide: Guide; author: string; onReveal: Reveal }) {
   const blocks = () => [
     ...props.guide.steps,
     ...(props.guide.uncovered.length
@@ -282,6 +285,7 @@ function GuideSteps(props: { guide: Guide; onReveal: (item: DiffItem) => void })
                   <Hunk
                     item={item}
                     notes={block.notes.filter((note) => note.hunk === item.id)}
+                    author={props.author}
                     onReveal={props.onReveal}
                   />
                 )}
@@ -295,33 +299,44 @@ function GuideSteps(props: { guide: Guide; onReveal: (item: DiffItem) => void })
 }
 
 /** A hunk under a link to it in the change request's diff, named by its path and first line, with
- *  its notes after it. */
-function Hunk(props: { item: DiffItem; notes: GuideNote[]; onReveal: (item: DiffItem) => void }) {
+ *  each note under the line it's on. ✦ on a line shows that line in the change request's diff. */
+function Hunk(props: { item: DiffItem; notes: GuideNote[]; author: string; onReveal: Reveal }) {
   const start = () => hunkStart(props.item.patch)
   const label = () => (start()?.side === 'new' ? `${props.item.path}:${start()!.line}` : props.item.path)
   return (
     <Stack gap="row">
-      <Link onPress={() => props.onReveal(props.item)}>{label()}</Link>
+      <Link onPress={() => props.onReveal(props.item.path, start()?.line, start()?.side)}>{label()}</Link>
       <Show when={props.item.patch} fallback={<Text>{props.item.note}</Text>}>
-        <StackedDiff path={props.item.path} patch={props.item.patch} />
+        <StackedDiff
+          path={props.item.path}
+          patch={props.item.patch}
+          onActivate={(place: { side: Side; line: number }) => props.onReveal(props.item.path, place.line, place.side)}
+        >
+          <For each={props.notes}>
+            {(note) => (
+              <DiffNote
+                side={note.side}
+                line={note.line}
+                tone={TONES[note.tone].tone}
+                label={TONES[note.tone].label}
+                author={props.author}
+                title={note.title}
+              >
+                <Markdown text={note.body} />
+                <Inline>
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    onPress={() => props.onReveal(props.item.path, note.line, note.side)}
+                  >
+                    Show in diff
+                  </Button>
+                </Inline>
+              </DiffNote>
+            )}
+          </For>
+        </StackedDiff>
       </Show>
-      <For each={props.notes}>{(note) => <Note note={note} />}</For>
-    </Stack>
-  )
-}
-
-function Note(props: { note: GuideNote }) {
-  const tone = () => TONES[props.note.tone]
-  return (
-    <Stack gap="inline">
-      <Inline wrap>
-        <Badge size="xs" tone={tone().tone}>
-          {tone().label}
-        </Badge>
-        <Text emphasis="strong">{props.note.title}</Text>
-        <Text tone="muted">{`${props.note.side === 'old' ? 'Deleted line' : 'Line'} ${props.note.line}`}</Text>
-      </Inline>
-      <Markdown text={props.note.body} />
     </Stack>
   )
 }

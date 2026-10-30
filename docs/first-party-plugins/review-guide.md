@@ -167,11 +167,13 @@ A status change sends `plugin:review-guide:changed`, and the pane reads the view
 **Guide** is a task pane drawn as a remote tree, so the desktop and the terminal client draw the same
 one. Its header has the harness picker and **Generate guide**, **Regenerate**, or **Stop**. Each step
 is a fold with its goal, its "why", and each hunk in `StackedDiff`, under a link named by its path and
-first line, such as `src/billing/invoice.ts:42`. Under each hunk, its notes draw as a plain list: the
-tone, the title, the line, and the body as Markdown. A hunk with no new side, such as a deleted file's, starts on its
-old side, and its link shows only the path. Pressing a link opens the task's change request diff at that
-line ([showing a line in the change request](../plugins/frames.md#showing-a-line-in-the-change-request)).
-In the terminal client it opens the file in the editor instead.
+first line, such as `src/billing/invoice.ts:42`. Each note is a `DiffNote` under the line it's on, in
+the inline agent card's shape: the harness's name, the tone's word, the title, the body as Markdown,
+and **Show in diff**. A note folds to its header. A hunk with no new side, such as a deleted file's,
+starts on its old side, and its link shows only the path. Pressing a link or **Show in diff**, or ✦ on
+any line, opens the task's change request diff at that line
+([showing a line in the change request](../plugins/frames.md#showing-a-line-in-the-change-request)).
+In the terminal client it opens the file in the editor instead, and ✦ is Enter on the line.
 
 A tree batch is capped at 1 MiB, so the first draw opens steps only until their hunk text reaches
 256 KiB, and the rest open on demand. While a guide generates, the pane links to the session's

@@ -1,0 +1,12 @@
+{"columns":70,"rows":10,"lines":[
+[{"text":"src/login.ts","attrs":["bold"]},{"text":"                                                     "},{"text":"+1","fg":"ok"},{"text":" "},{"text":"−1","fg":"danger"}],
+[{"text":"@@ -1,3 +1,3 @@","fg":"muted"}],
+[{"text":"   1    1 ","fg":"muted"},{"text":" import { session } from \"./session\""}],
+[{"text":"   2      ","fg":"muted"},{"text":"-const next = \"/\"","fg":"danger"}],
+[{"text":"        2 ","fg":"muted"},{"text":"+const next = params.get(\"next\") ?? \"/\"","fg":"ok"}],
+[{"text":"          "},{"text":"▾ ✦ Risk","fg":"danger"},{"text":"  An open redirect"}],
+[{"text":"          The query string sets next, so any site can send a reader he"}],
+[{"text":"          [Show in diff]"}],
+[{"text":"   3    3 ","fg":"muted"},{"text":" redirect(next)"}],
+[]
+]}

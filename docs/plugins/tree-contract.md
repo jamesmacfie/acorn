@@ -108,7 +108,8 @@ retired slot's result can't reach another slot that reused its id.
 
 The host validates every message:
 
-- `type` must be a node this build knows and can draw on this host. Anything else is omitted.
+- `type` must be a node this build knows and can draw on this host. Anything else is omitted. A
+  `DiffNote` outside a `StackedDiff` is omitted the same way, because only its diff can place it.
 - A prop value is a handler id or plain JSON, limited to 16 levels, 10,000 values, and 1 MiB of
   characters. `class`, `className`, `style`, `classList`, and nested host handles such as `item` and
   `drag` are refused. A role prop carrying a raw color is refused. A failing prop is dropped, and the

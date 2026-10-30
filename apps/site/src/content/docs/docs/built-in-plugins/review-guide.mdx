@@ -6,7 +6,7 @@ sources:
   - plugins/review-guide/acorn-plugin.config.mjs
   - plugins/review-guide/src/tree/GuidePane.tsx
   - plugins/review-guide/src/server/workflowStep.ts
-checked: 'b87f55c94'
+checked: '622edc342'
 ---
 
 import { Steps } from '@astrojs/starlight/components'
@@ -64,11 +64,12 @@ kind = "review-guide:generate"
 - One step per part of the change, in reading order. Each finishes the sentence "After this step you'll
   know", says why the change exists, and shows its hunks. A binary file, a rename, or a mode change
   shows its path and what changed.
-- Under a hunk, any notes the harness pinned to its lines. Each has a tone, **Explains** for context,
-  **Look closely** for a judgment call, or **Risk** for a likely bug, then a title, its line, and a
-  short body. Most hunks have none.
-- Above each hunk, a link with its file and first line, such as `src/billing/invoice.ts:42`. Click it to
-  open the pull request's diff at that line, where you can see the code around it and comment.
+- Under a line, any note the harness pinned to it. Each has a tone, **Explains** for context,
+  **Look closely** for a judgment call, or **Risk** for a likely bug, then a title and a short body.
+  Click the arrow on a note to fold it to its title. Most hunks have none.
+- Above each hunk, a link with its file and first line, such as `src/billing/invoice.ts:42`. Click it,
+  a note's **Show in diff**, or ✦ beside any line to open the pull request's diff at that line, where
+  you can see the code around it and comment.
 - **Not covered by the guide**, last, with any hunk the harness left out.
 
 acorn checks the harness's answer against the diff before it shows it. Every hunk appears exactly once:
@@ -91,15 +92,16 @@ want one.
 
 It reads the task's pull request from its code host plugin, and the change from the task's worktree with
 git. It has no network access of its own, runs no other programs, and reads no secrets. It may open the
-task's pull request diff at a line, which is what a hunk's link does. The guide is
+task's pull request diff at a line, which is what a hunk's link and ✦ do. The guide is
 kept on the Node until the task is deleted.
 
 The **Guide** tab sits beside the diff, so you can read a step and its code in the diff side by side.
 
 ## In the terminal
 
-The terminal client draws the same pane and the same tab. A hunk's link opens the file in the **Editor**
-pane at that line, rather than in the diff.
+The terminal client draws the same pane and the same tab. A note is one line with its tone and title,
+then its body, and Enter on that line folds it. A hunk's link, or Enter on a line of the diff, opens the
+file in the **Editor** pane at that line, rather than in the diff.
 
 ## Limits
 

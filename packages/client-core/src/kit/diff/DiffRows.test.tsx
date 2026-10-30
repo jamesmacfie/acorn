@@ -1,7 +1,8 @@
 import { render } from 'solid-js/web'
 import type { JSX } from 'solid-js'
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { DiffLine, NonCodeRow, SplitCell } from './DiffRows'
+import { DiffLine, NonCodeRow, SplitCell, StackedDiff } from './DiffRows'
+import { DiffNote } from './diffNotes'
 import type { CodeRow } from './diffModel'
 
 const insert: CodeRow = {
@@ -31,6 +32,69 @@ function mount(component: () => JSX.Element) {
   cleanups.push(() => host.remove())
   return host
 }
+
+describe('a StackedDiff with notes', () => {
+  const patch = '@@ -3,3 +3,3 @@\n keep\n-old\n+new\n tail'
+  /** The code rows and notes in drawing order, a note as `note:<title>`. */
+  const drawn = (host: HTMLElement) =>
+    [...host.querySelectorAll('.diff-row:not(.diff-file-row):not(.diff-hunk), .diff-note')].map((element) =>
+      element.classList.contains('diff-note')
+        ? `note:${element.querySelector('.diff-note-title')?.textContent}`
+        : element.querySelector('.diff-code')?.textContent,
+    )
+
+  it('draws each note under its row, and a note on a missing line after the last', () => {
+    const host = mount(() => (
+      <StackedDiff path="a.ts" patch={patch}>
+        <DiffNote side="new" line={99} title="Nowhere" />
+        <DiffNote side="new" line={4} tone="danger" label="Risk" author="Claude Code" title="Added">
+          <span>added body</span>
+        </DiffNote>
+        <DiffNote side="old" line={4} title="Deleted" />
+      </StackedDiff>
+    ))
+    expect(drawn(host)).toEqual(['keep', 'old', 'note:Deleted', 'new', 'note:Added', 'tail', 'note:Nowhere'])
+    const risk = host.querySelectorAll('.diff-note')[1]!
+    expect(risk.querySelector('.diff-note-head')!.textContent).toBe('✦Claude CodeRisk▾')
+    expect(risk.textContent).toContain('added body')
+    expect(host.querySelectorAll('.diff-noted')).toHaveLength(2)
+    expect(host.querySelector('.diff-noted[data-tone="danger"] .diff-code')!.textContent).toBe('new')
+    expect(host.querySelectorAll('.diff-note')[2]!.textContent).toContain('Line 99')
+  })
+
+  it('folds a note to its header, with the title beside it', () => {
+    const host = mount(() => (
+      <StackedDiff path="a.ts" patch={patch}>
+        <DiffNote side="new" line={4} title="Added">
+          <span>added body</span>
+        </DiffNote>
+      </StackedDiff>
+    ))
+    host.querySelector<HTMLButtonElement>('.diff-note-fold')!.click()
+    const note = host.querySelector('.diff-note')!
+    expect(note.textContent).not.toContain('added body')
+    expect(note.querySelector('.diff-note-title')).toBeNull()
+    expect(note.querySelector('.diff-note-peek')!.textContent).toBe('Added')
+    host.querySelector<HTMLButtonElement>('.diff-note-fold')!.click()
+    expect(note.textContent).toContain('added body')
+  })
+
+  it('sends the side and line of the ✦ pressed, and shows no ✦ without onActivate', () => {
+    const activate = vi.fn()
+    const host = mount(() => <StackedDiff path="a.ts" patch={patch} onActivate={activate} />)
+    const asks = host.querySelectorAll<HTMLButtonElement>('.diff-ask-btn')
+    expect(asks).toHaveLength(4)
+    asks[0]!.click()
+    asks[1]!.click()
+    asks[2]!.click()
+    expect(activate.mock.calls).toEqual([
+      [{ side: 'new', line: 3 }],
+      [{ side: 'old', line: 4 }],
+      [{ side: 'new', line: 4 }],
+    ])
+    expect(mount(() => <StackedDiff path="a.ts" patch={patch} />).querySelector('.diff-ask-btn')).toBeNull()
+  })
+})
 
 describe('diff line editor navigation', () => {
   it('opens an agent chat on either side without triggering a row action', () => {

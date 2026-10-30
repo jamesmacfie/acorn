@@ -86,6 +86,7 @@ import { Rows } from '../../kit/components/layout/Rows'
 import { Only } from '../../kit/components/layout/Only'
 import { Fallback } from '../../kit/components/content/Fallback'
 import { Rectangle } from '../../kit/components/content/Rectangle'
+import { DiffNote } from '../../kit/diff/diffNotes'
 
 // The nine loaders, and why each one is not a component.
 //
@@ -195,6 +196,7 @@ export const KIT_COMPONENTS: KitTable = {
   Rectangle,
   Only,
   Fallback,
+  DiffNote,
   Timeline: load(() => import('../../kit/components/content/Timeline').then((m) => ({ default: m.Timeline }))),
   Markdown: load(() => import('../../kit/components/content/Markdown.tsx')),
   DiffPane: load(() => import('../../features/diff/DiffPane').then((m) => ({ default: m.DiffPane }))),

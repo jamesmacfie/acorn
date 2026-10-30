@@ -32,6 +32,41 @@
    than the column count, since there is no virtual window here to make that unstable. */
 .diff-stacked .diff-rows { position: static; min-width: max-content; }
 .diff-stacked .diff-row { position: static; transform: none; }
+/* A tree's note under a StackedDiff row (kit/diff/diffNotes.ts): the inline agent card's box, at the
+   card inset and one scrollport wide, as .diff-thread is below, so a long code line neither stretches
+   it nor scrolls it away. The noted row's stripe sits on the sticky chrome, which would paint over a
+   stripe on the row itself. */
+.diff-note {
+  position: sticky;
+  left: var(--diff-card-inset);
+  width: calc(100cqw - var(--diff-card-inset) - var(--pane-pad));
+  margin: 6px var(--pane-pad) 6px var(--diff-card-inset);
+  font-family: var(--font-ui);
+  line-height: var(--lh);
+  white-space: normal;
+}
+.diff-note[data-tone='warn'] { border-color: color-mix(in srgb, var(--warn) 50%, var(--border)); }
+.diff-note[data-tone='danger'] { border-color: color-mix(in srgb, var(--danger) 50%, var(--border)); }
+.diff-note-head { display: flex; align-items: center; gap: var(--space-4); min-width: 0; }
+.diff-note-mark { flex: none; color: var(--text-muted); }
+.diff-note-author { flex: none; color: var(--text-muted); }
+.diff-note-peek { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--text-muted); }
+.diff-note-fold { flex: none; padding: 0 var(--space-2); font: inherit; color: var(--text-faint); background: none; border: none; cursor: pointer; }
+.diff-note-fold:hover { color: var(--text); }
+.diff-note-title { margin-top: var(--space-3); font-weight: 600; }
+.diff-note-body { display: flex; flex-direction: column; gap: var(--space-3); margin-top: var(--space-2); }
+/* `::after`, so it paints over the gutters, which are positioned and filled with the row's color. */
+.diff-noted > .diff-line-chrome::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 0;
+  width: var(--stripe-w);
+  background: var(--diff-note-stripe, var(--text-muted));
+}
+.diff-noted[data-tone='warn'] { --diff-note-stripe: var(--warn); }
+.diff-noted[data-tone='danger'] { --diff-note-stripe: var(--danger); }
 /* One virtual item: a file header, a segment of up to 64 rows, or a slice of an expanded gap. The
    item is positioned; the rows inside it are in normal flow, so a segment is as tall as its rows and
    any thread or note among them (docs/diff-rendering/geometry.md § Row geometry). */

@@ -101,6 +101,8 @@ export { default as ModelBackendPicker } from '@acorn/client-core/features/setti
 // ── Diff rows ─────────────────────────────────────────────────────────────────────────────────
 // The components of the diff toolkit; its model, virtualizer and find pass are on ./ui/diff.
 export { DiffLine, FileHead, NonCodeRow, SplitCell, StackedDiff } from '@acorn/client-core/kit/diff/DiffRows.tsx'
+// A note pinned under one line of a StackedDiff, written as its child.
+export { DiffNote } from '@acorn/client-core/kit/diff'
 // The whole viewer as one component: virtualized unified and split lists, find, sticky file header,
 // per-file collapse, gap expansion, and the comment layer. Driven by a `DiffSource` from ./ui/diff.
 // A plugin reaching for the row components directly is building a simpler surface than this one.

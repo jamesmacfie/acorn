@@ -127,6 +127,7 @@ acorn-plugin-sdk/remote: value CopyButton
 acorn-plugin-sdk/remote: value DescriptionList
 acorn-plugin-sdk/remote: value DetailColumn
 acorn-plugin-sdk/remote: value DiffLine
+acorn-plugin-sdk/remote: value DiffNote
 acorn-plugin-sdk/remote: value DiffPane
 acorn-plugin-sdk/remote: value DocumentTabs
 acorn-plugin-sdk/remote: value EmptyState

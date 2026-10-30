@@ -35,7 +35,7 @@ const COMPONENT_GROUPS = {
   content: [
     'Text', 'Link', 'Heading', 'Badge', 'Chip', 'StatusDot', 'Facts', 'DescriptionList', 'Meter', 'CodeBlock',
     'Log', 'Markdown', 'EmptyState', 'Alert', 'Spinner', 'Kbd', 'UserAvatar', 'Artwork', 'Icon', 'DiffPane', 'DiffLine',
-    'FileHead', 'StackedDiff', 'NonCodeRow', 'SplitCell',
+    'FileHead', 'StackedDiff', 'DiffNote', 'NonCodeRow', 'SplitCell',
   ],
   collections: [
     'Rows', 'Row', 'TreeRow', 'RowActions', 'ChipRow', 'Table', 'TableHead', 'TableRow', 'TableCell', 'Grid',

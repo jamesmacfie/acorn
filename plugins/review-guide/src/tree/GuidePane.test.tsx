@@ -20,6 +20,17 @@ const inserted = (ops: TreeMutation[]): TreeNode[] => {
   return out
 }
 
+/** The node a node was last inserted under, or null for a root. */
+const parentOf = (ops: TreeMutation[], id: string): string | null => {
+  let parent: string | null = null
+  const walk = (node: TreeNode, under: string | null): void => {
+    if (node.id === id) parent = under
+    node.children.forEach((child) => walk(child, node.id))
+  }
+  for (const op of ops) if (op.op === 'insert') walk(op.node, op.parent)
+  return parent
+}
+
 const item = (id: string, patch = '@@ -1 +1 @@\n-a\n+b'): DiffItem => ({
   id,
   path: id.split('#')[0]!,
@@ -111,7 +122,7 @@ const mount = async (answer: GuideView) => {
   })
   await settle()
   await settle()
-  return { nodes: inserted(ops), root, revealed, dispose: () => root.dispose() }
+  return { nodes: inserted(ops), ops, root, revealed, dispose: () => root.dispose() }
 }
 
 describe('GuidePane', () => {
@@ -137,26 +148,43 @@ describe('GuidePane', () => {
     dispose()
   })
 
-  it("draws a step's goal, and each note under its hunk", async () => {
-    const { nodes, dispose } = await mount(view(stored('ready')))
+  it("draws a step's goal, and each note as a DiffNote in its hunk's diff", async () => {
+    const { nodes, ops, dispose } = await mount(view(stored('ready')))
     const text = (node: TreeNode): string =>
       typeof node.props.value === 'string' ? node.props.value : node.children.map(text).join('')
-    const drawn = nodes
-      .filter((node) => ['StackedDiff', 'Badge', 'Markdown'].includes(node.type) || node.type === 'Text')
-      .map((node) => (node.type === 'StackedDiff' ? `diff ${node.props.path}` : (node.props.text ?? text(node))))
-    const core = drawn.slice(drawn.indexOf("After this step you'll know how a is bumped."), drawn.indexOf('To check.'))
-    expect(core).toEqual([
+    expect(nodes.filter((node) => node.type === 'Text').map(text)).toContain(
       "After this step you'll know how a is bumped.",
-      'Because.',
-      'diff a.ts',
-      'Risk',
-      'This may overflow.',
-      'Line 1',
-      'Check **the cap**.',
-    ])
+    )
+    const note = nodes.find((node) => node.type === 'DiffNote')!
+    expect(note.props).toMatchObject({
+      side: 'new',
+      line: 1,
+      tone: 'danger',
+      label: 'Risk',
+      author: 'Claude Code',
+      title: 'This may overflow.',
+    })
+    const parent = nodes.find((node) => node.id === parentOf(ops, note.id))!
+    expect(parent.type).toBe('StackedDiff')
+    expect(parent.props.path).toBe('a.ts')
+    const inNote = nodes.filter((node) => parentOf(ops, node.id) === note.id)
+    expect(inNote.find((node) => node.type === 'Markdown')?.props.text).toBe('Check **the cap**.')
     expect(JSON.stringify(nodes)).toContain(
       "Dropped 2 notes that didn't match a line of the change or went past the limit.",
     )
+    dispose()
+  })
+
+  it("shows a line in the change request's diff from ✦ and from a note's Show in diff", async () => {
+    const { nodes, root, revealed, dispose } = await mount(view(stored('ready')))
+    const diff = nodes.find((node) => node.type === 'StackedDiff' && node.props.path === 'a.ts')!
+    root.dispatch((diff.props.onActivate as { $handler: number }).$handler, { side: 'old', line: 1 })
+    const show = nodes.find((node) => node.type === 'Button' && JSON.stringify(node).includes('Show in diff'))!
+    root.dispatch((show.props.onPress as { $handler: number }).$handler, undefined)
+    expect(revealed).toEqual([
+      ['a.ts', 1, 'old'],
+      ['a.ts', 1, 'new'],
+    ])
     dispose()
   })
 

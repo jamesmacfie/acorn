@@ -3,7 +3,7 @@
 // review rows in github" split would be a redesign of the component, and the changes pane already
 // renders NonCodeRow today. What each surface actually varies is passed in as props (composers,
 // resolve/reply callbacks, gap expansion), so nothing here reaches back into a plugin.
-import { createEffect, createMemo, createSignal, For, Match, on, Show, Switch } from 'solid-js'
+import { createEffect, createMemo, createSignal, For, Match, on, Show, Switch, type JSX } from 'solid-js'
 import CopyButton from '../components/inputs/CopyButton'
 import { fileStatusMeta } from '../lib/rendering/displayMeta'
 import MentionTextarea from '../components/inputs/MentionTextarea'
@@ -24,8 +24,16 @@ import {
   type ThreadRowT,
 } from './diffModel'
 import { markTokens, type FindHighlight } from './find'
+import {
+  createPinnedNotes,
+  DiffNotesProvider,
+  linePlace,
+  placeNotes,
+  type DiffLinePlace,
+  type PinnedNote,
+} from './diffNotes'
 import { persistDraft } from '../lib/state/draftState'
-import { Button } from '../components/primitives'
+import { Badge, Button } from '../components/primitives'
 import SanitizedHtml from '../components/content/SanitizedHtml'
 
 export type LineComposerController = {
@@ -243,8 +251,17 @@ export function DiffLine(props: {
  *
  * `lineNumbers={false}` blanks both number columns, for hunks whose numbers count from the top of an
  * excerpt rather than the file.
+ *
+ * `DiffNote` children draw under the row they name (./diffNotes.ts). `onActivate` gives every line the
+ * ✦ button, which sends the line's place.
  */
-export function StackedDiff(props: { path: string; patch: string; lineNumbers?: boolean }) {
+export function StackedDiff(props: {
+  path: string
+  patch: string
+  lineNumbers?: boolean
+  onActivate?: (place: DiffLinePlace) => void
+  children?: JSX.Element
+}) {
   const rows = createMemo(() => {
     const file = {
       path: props.path,
@@ -255,11 +272,9 @@ export function StackedDiff(props: { path: string; patch: string; lineNumbers?: 
       viewed: false,
       patch: props.patch,
     }
-    return buildDiffRows(file, plainTokenize).flatMap<HunkRow | CodeRow>((row) => {
-      if (row.kind === 'hunk') return [row]
-      if (!isCodeRow(row)) return []
-      return [props.lineNumbers === false ? { ...row, oldNo: null, newNo: null } : row]
-    })
+    return buildDiffRows(file, plainTokenize).filter(
+      (row): row is HunkRow | CodeRow => row.kind === 'hunk' || isCodeRow(row),
+    )
   })
   const head = createMemo(() => ({
     path: props.path,
@@ -267,34 +282,105 @@ export function StackedDiff(props: { path: string; patch: string; lineNumbers?: 
     additions: rows().filter((row) => row.kind === 'insert').length,
     deletions: rows().filter((row) => row.kind === 'delete').length,
   }))
+  const { notes, pin } = createPinnedNotes<JSX.Element>()
+  const placed = createMemo(() => placeNotes(rows(), notes()))
+  const ask = (row: CodeRow) => {
+    const place = linePlace(row)
+    if (place) props.onActivate?.(place)
+  }
   return (
-    <div class="diff diff-stacked">
-      <div class="diff-rows">
-        <div class="diff-row diff-file-row">
-          <FileHead file={head()} />
+    <DiffNotesProvider value={pin}>
+      <div class="diff diff-stacked">
+        <div class="diff-rows">
+          <div class="diff-row diff-file-row">
+            <FileHead file={head()} />
+          </div>
+          <For each={rows()}>
+            {(row, index) => (
+              <Show
+                when={isCodeRow(row) ? row : null}
+                fallback={
+                  <div class="diff-row diff-hunk">
+                    <span class="diff-hunk-text">{(row as HunkRow).text}</span>
+                  </div>
+                }
+              >
+                {(code) => {
+                  const here = () => placed().under.get(index()) ?? []
+                  return (
+                    <>
+                      <div
+                        class="diff-row"
+                        classList={{
+                          'diff-add': code().kind === 'insert',
+                          'diff-del': code().kind === 'delete',
+                          'diff-noted': here().length > 0,
+                        }}
+                        data-tone={here()[0]?.props.tone}
+                      >
+                        <DiffLine
+                          r={props.lineNumbers === false ? { ...code(), oldNo: null, newNo: null } : code()}
+                          canAdd={false}
+                          addComment={async () => {}}
+                          onMutated={() => {}}
+                          askAgent={props.onActivate ? ask : undefined}
+                        />
+                      </div>
+                      <For each={here()}>{(note) => <NoteCard note={note} />}</For>
+                    </>
+                  )
+                }}
+              </Show>
+            )}
+          </For>
+          <For each={placed().unplaced}>{(note) => <NoteCard note={note} unplaced />}</For>
         </div>
-        <For each={rows()}>
-          {(row) => (
-            <Show
-              when={isCodeRow(row) ? row : null}
-              fallback={
-                <div class="diff-row diff-hunk">
-                  <span class="diff-hunk-text">{(row as HunkRow).text}</span>
-                </div>
-              }
-            >
-              {(code) => (
-                <div
-                  class="diff-row"
-                  classList={{ 'diff-add': code().kind === 'insert', 'diff-del': code().kind === 'delete' }}
-                >
-                  <DiffLine r={code()} canAdd={false} addComment={async () => {}} onMutated={() => {}} />
-                </div>
-              )}
-            </Show>
-          )}
-        </For>
+        {props.children}
       </div>
+    </DiffNotesProvider>
+  )
+}
+
+/** A note in the inline agent card's shape: ✦, the author, the tone's word, then the title and the
+ *  tree's own body and buttons. Folds to its header. */
+function NoteCard(props: { note: PinnedNote<JSX.Element>; unplaced?: boolean }) {
+  const note = () => props.note.props
+  const folded = () => props.note.folded()
+  return (
+    <div class="ui-card diff-note" data-pad="sm" data-tone={note().tone ?? 'neutral'}>
+      <div class="diff-note-head">
+        <span class="diff-note-mark" aria-hidden="true">
+          ✦
+        </span>
+        <Show when={note().author}>{(author) => <span class="diff-note-author">{author()}</span>}</Show>
+        <Show when={note().label}>
+          {(label) => (
+            <Badge size="xs" tone={note().tone ?? 'neutral'}>
+              {label()}
+            </Badge>
+          )}
+        </Show>
+        <Show when={props.unplaced}>
+          <span class="diff-note-author">{`${note().side === 'old' ? 'Deleted line' : 'Line'} ${note().line}`}</span>
+        </Show>
+        <span class="diff-note-peek">{folded() ? note().title : ''}</span>
+        <button
+          type="button"
+          class="diff-note-fold"
+          aria-expanded={!folded()}
+          aria-label={folded() ? 'Open note' : 'Fold note'}
+          data-tip={folded() ? 'Open note' : 'Fold note'}
+          onClick={() => props.note.setFolded(!folded())}
+        >
+          {folded() ? '▸' : '▾'}
+        </button>
+      </div>
+      <Show when={!folded()}>
+        <Show when={note().title}>
+          <div class="diff-note-title">{note().title}</div>
+        </Show>
+        <div class="diff-note-body">{note().children}</div>
+      </Show>
     </div>
   )
 }

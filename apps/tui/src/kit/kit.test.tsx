@@ -64,6 +64,7 @@ import {
   Spinner,
   SplitCell,
   StackedDiff,
+  DiffNote,
   StatusDot,
   Table,
   TableCell,
@@ -933,6 +934,25 @@ const CASES: Case[] = [
     },
   },
   {
+    node: 'DiffNote',
+    draws: 'reduced: one header line under its row, at the code column, then its children',
+    render: () => (
+      <StackedDiff path="src/a.ts" patch={'@@ -3,2 +3,2 @@\n keep\n-old\n+new'}>
+        <DiffNote side="new" line={4} tone="danger" label="Risk" title="Retries forever">
+          <Text>why it matters</Text>
+        </DiffNote>
+      </StackedDiff>
+    ),
+    size: { width: 50, height: 8 },
+    check: (frame) => {
+      const row = rowOf(frame, '+new')
+      const header = frame.lines[row + 1]!
+      expect(header).toContain('▾ ✦ Risk  Retries forever')
+      expect(header.indexOf('▾')).toBe(frame.lines[row]!.indexOf('+new'))
+      expect(frame.lines[row + 2]).toContain('why it matters')
+    },
+  },
+  {
     node: 'NonCodeRow',
     draws: 'reduced: a dim line saying what is not being shown',
     render: () => (
@@ -1557,6 +1577,44 @@ const BEHAVIOURS: Behaviour[] = [
     drive: async (screen, pressed) => {
       await screen.press('RETURN')
       expect(pressed).toEqual(['copied text'])
+    },
+  },
+  {
+    node: 'StackedDiff',
+    does: 'presses a line on Enter where it was given onActivate, sending its side and number',
+    render: (record) => (
+      <StackedDiff
+        path="a.ts"
+        patch={'@@ -3,2 +3,2 @@\n keep\n-old\n+new'}
+        onActivate={(place) => record(`${place.side}:${place.line}`)}
+      />
+    ),
+    size: { height: 8 },
+    drive: async (screen, pressed) => {
+      lit(screen, '   3    3')
+      await screen.press('RETURN')
+      await screen.press('ARROW_DOWN')
+      await screen.press('RETURN')
+      expect(pressed).toEqual(['new:3', 'old:4'])
+    },
+  },
+  {
+    node: 'DiffNote',
+    does: 'folds to its header line on Enter, and opens again',
+    render: () => (
+      <StackedDiff path="a.ts" patch={'@@ -3,2 +3,2 @@\n keep\n-old\n+new'}>
+        <DiffNote side="new" line={4} label="Risk" title="Retries forever">
+          <Text>why it matters</Text>
+        </DiffNote>
+      </StackedDiff>
+    ),
+    size: { height: 9 },
+    drive: async (screen) => {
+      lit(screen, '▾ ✦ Risk')
+      const folded = await screen.press('RETURN')
+      expect(folded.text).toContain('▸ ✦ Risk  Retries forever')
+      expect(folded.text).not.toContain('why it matters')
+      expect((await folded.press('RETURN')).text).toContain('why it matters')
     },
   },
   {

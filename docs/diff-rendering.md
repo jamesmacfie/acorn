@@ -15,7 +15,9 @@ The viewer comes in three layers, and `tools/arch/boundaries.test.ts` enforces t
   index and its measure scheduler, and the find marks. It takes props and draws DOM, with no
   application state, so a plugin can use a piece of it for a simpler view. `StackedDiff` is the
   simplest: one file's patch, read-only, in normal flow, for a patch shown inside something else,
-  such as an agent's step.
+  such as an agent's step. A tree can pin a note under one of its lines with a `DiffNote` child,
+  drawn in the inline agent card's shape, and can hear the ✦ button on any line through
+  `onActivate` (`kit/diff/diffNotes.ts`).
 - `packages/client-core/src/features/diff/` is the viewer: `DiffPane` and the parts only it uses. This
   layer reads preferences, registers a command and a keybinding, and keeps session scroll state, none
   of which `kit/` can do.

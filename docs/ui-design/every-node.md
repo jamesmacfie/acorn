@@ -139,7 +139,8 @@ paint containment would clip a card's focus ring.
 | `DiffPane` | none | Reduced: unified only, `+`/`-` in colour, annotations as indented lines under their row. Windowed, so a long patch draws the rows around the viewport and not all of them |
 | `DiffLine` | none | Reduced: one line, `+`/`-`/space in the gutter, no intra-line highlight |
 | `FileHead` | none | Reduced: the path in bold with `+n −m` right-aligned |
-| `StackedDiff` | none | Reduced: the `FileHead` line, then each hunk header and `DiffLine` below it |
+| `StackedDiff` | conditional | Reduced: the `FileHead` line, then each hunk header and `DiffLine` below it, with each `DiffNote` child under its row. With `onActivate`, each numbered line is a stop, and Enter sends its side and line, because a cell has no hover to show ✦ on |
+| `DiffNote` | stop | Reduced: under its row at the code column, one header line `▾ ✦ Label  Title` that folds the note on Enter, then its children. A folded note is its header line only. Outside a `StackedDiff` it's left out |
 | `NonCodeRow` | none | Reduced: a grey line saying what is not being shown, such as `binary file` |
 | `SplitCell` | none | Absent: side-by-side needs 160 cells, so a terminal diff is unified |
 | `EmptyState` | none | Centred grey text |

@@ -167,6 +167,11 @@ export const NODE_SUPPORT = {
     tui: 'reduced',
     loss: 'no intra-line word highlight, and the header has no copy control',
   },
+  DiffNote: {
+    dom: 'full',
+    tui: 'reduced',
+    loss: 'one header line with no author, and the fold is the line itself',
+  },
   NonCodeRow: {
     dom: 'full',
     tui: 'reduced',

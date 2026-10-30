@@ -336,6 +336,53 @@ describe('a tree becomes the host’s own components', () => {
     expect(host.querySelector('.ui-badge')).not.toBeNull()
   })
 
+  it('omits a DiffNote outside a StackedDiff, as it omits a node it has never heard of', async () => {
+    const h = harness()
+    h.mount()
+    h.apply([
+      {
+        op: 'insert',
+        parent: null,
+        index: 0,
+        node: node('n1', 'Card', {}, [
+          node('n2', 'DiffNote', { side: 'new', line: 1, title: 'stray' }, [node('n3', '#text', { value: 'body' })]),
+          node('n4', 'Badge', {}, [node('n5', '#text', { value: 'known' })]),
+        ]),
+      },
+    ])
+    await frame()
+    expect(host.textContent).toBe('known')
+  })
+
+  it('draws a DiffNote under its StackedDiff line and sends the ✦ line back', async () => {
+    const h = harness()
+    h.mount()
+    h.apply([
+      {
+        op: 'insert',
+        parent: null,
+        index: 0,
+        node: node(
+          'n1',
+          'StackedDiff',
+          { path: 'a.ts', patch: '@@ -1,2 +1,2 @@\n keep\n-old\n+new', onActivate: { $handler: 3 } },
+          [
+            node('n2', 'DiffNote', { side: 'old', line: 2, tone: 'warn', label: 'Look closely', title: 'Gone' }, [
+              node('n3', '#text', { value: 'why it went' }),
+            ]),
+          ],
+        ),
+      },
+    ])
+    expect(await settled(() => !!host.querySelector('.diff-note'))).toBe(true)
+    const noted = host.querySelector('.diff-noted')!
+    expect(noted.textContent).toContain('old')
+    expect(noted.nextElementSibling).toBe(host.querySelector('.diff-note'))
+    expect(host.querySelector('.diff-note')!.textContent).toContain('why it went')
+    noted.querySelector<HTMLButtonElement>('.diff-ask-btn')!.click()
+    expect(h.sent).toEqual([{ handler: 3, event: 'onActivate', payload: { side: 'old', line: 2 } }])
+  })
+
   it('drops a class or a style before it reaches an element', async () => {
     const h = harness()
     h.mount()

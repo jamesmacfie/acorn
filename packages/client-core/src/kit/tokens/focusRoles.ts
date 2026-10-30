@@ -90,7 +90,10 @@ export const NODE_FOCUS = {
   DiffPane: 'none',
   DiffLine: 'none',
   FileHead: 'none',
-  StackedDiff: 'none',
+  // A stop per line when given `onActivate`, which is the ✦ button on the DOM and the line itself in
+  // cells. A note's header folds it, so a note is a stop of its own.
+  StackedDiff: 'conditional',
+  DiffNote: 'stop',
   NonCodeRow: 'none',
   SplitCell: 'none',
   EmptyState: 'none',

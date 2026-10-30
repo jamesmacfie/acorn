@@ -621,6 +621,7 @@ ui/tree: CopyButton
 ui/tree: DescriptionList
 ui/tree: DetailColumn
 ui/tree: DiffLine
+ui/tree: DiffNote
 ui/tree: DiffPane
 ui/tree: DocumentTabs
 ui/tree: EmptyState
@@ -724,6 +725,7 @@ ui: CopyButton
 ui: DescriptionList
 ui: DetailColumn
 ui: DiffLine
+ui: DiffNote
 ui: DiffPane
 ui: DocumentTabs
 ui: EmptyState

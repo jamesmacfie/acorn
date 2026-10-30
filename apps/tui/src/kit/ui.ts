@@ -64,6 +64,7 @@ export {
   Spinner,
   SplitCell,
   StackedDiff,
+  DiffNote,
   StatusDot,
   Table,
   TableCell,

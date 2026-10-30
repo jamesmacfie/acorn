@@ -77,6 +77,7 @@ export const KIT_NODES = [
   'DiffLine',
   'FileHead',
   'StackedDiff',
+  'DiffNote',
   'NonCodeRow',
   'SplitCell',
   'EmptyState',

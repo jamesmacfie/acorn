@@ -1,0 +1,84 @@
+{
+  "meta": {
+    "title": "DiffNote",
+    "caption": "A Risk note pinned under the line it describes, with its body and a button.",
+    "terminal": {
+      "columns": 70,
+      "rows": 10
+    },
+    "width": 560
+  },
+  "batches": [
+    [
+      {
+        "op": "insert",
+        "parent": null,
+        "index": 0,
+        "node": {
+          "id": "n1",
+          "type": "StackedDiff",
+          "props": {
+            "path": "src/login.ts",
+            "patch": "@@ -1,3 +1,3 @@\n import { session } from \"./session\"\n-const next = \"/\"\n+const next = params.get(\"next\") ?? \"/\"\n redirect(next)\n"
+          },
+          "children": [
+            {
+              "id": "n2",
+              "type": "DiffNote",
+              "props": {
+                "side": "new",
+                "line": 2,
+                "tone": "danger",
+                "label": "Risk",
+                "author": "Claude Code",
+                "title": "An open redirect"
+              },
+              "children": [
+                {
+                  "id": "n3",
+                  "type": "Text",
+                  "props": {},
+                  "children": [
+                    {
+                      "id": "n4",
+                      "type": "#text",
+                      "props": {
+                        "value": "The query string sets next, so any site can send a reader here and on to itself."
+                      },
+                      "children": []
+                    }
+                  ]
+                },
+                {
+                  "id": "n5",
+                  "type": "Inline",
+                  "props": {},
+                  "children": [
+                    {
+                      "id": "n6",
+                      "type": "Button",
+                      "props": {
+                        "size": "sm",
+                        "variant": "ghost"
+                      },
+                      "children": [
+                        {
+                          "id": "n7",
+                          "type": "#text",
+                          "props": {
+                            "value": "Show in diff"
+                          },
+                          "children": []
+                        }
+                      ]
+                    }
+                  ]
+                }
+              ]
+            }
+          ]
+        }
+      }
+    ]
+  ]
+}
