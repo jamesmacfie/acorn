@@ -91,6 +91,7 @@
       "agents:session",
       "bitbucket:diff-line",
       "bitbucket:summary-badges",
+      "bitbucket:review-panel",
       "context:section",
       "docker:stats-beside",
       "docker:container",
@@ -99,8 +100,10 @@
       "editor:line",
       "github:diff-line",
       "github:summary-badges",
+      "github:review-panel",
       "gitlab:diff-line",
       "gitlab:summary-badges",
+      "gitlab:review-panel",
       "git:diff-line",
       "git:push-actions",
       "preview:toolbar-actions",
@@ -205,7 +208,8 @@
       ],
       "extensionPoints": [
         "bitbucket:diff-line",
-        "bitbucket:summary-badges"
+        "bitbucket:summary-badges",
+        "bitbucket:review-panel"
       ],
       "extensions": [
         "bitbucket.push-actions"
@@ -319,7 +323,8 @@
       ],
       "extensionPoints": [
         "github:diff-line",
-        "github:summary-badges"
+        "github:summary-badges",
+        "github:review-panel"
       ],
       "extensions": [
         "github.push-actions"
@@ -350,7 +355,8 @@
       ],
       "extensionPoints": [
         "gitlab:diff-line",
-        "gitlab:summary-badges"
+        "gitlab:summary-badges",
+        "gitlab:review-panel"
       ],
       "extensions": [
         "gitlab.push-actions"
