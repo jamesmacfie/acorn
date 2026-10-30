@@ -15,10 +15,11 @@ export default {
     // `head:changed` marks a guide stale. The pane reads the guide again on its own `changed`.
     events: ['head:changed', 'plugin:review-guide:changed'],
     // `tasks` reads the change request and the worktree, `git` diffs it, and `prefs` keeps the
-    // harness the person picked. No network, no processes, and no secrets: the turn runs in the
-    // Agents plugin, and git runs through core.
+    // harness the person picked. `identity` names the node's owner, whose pick the workflow step uses.
+    // No network, no processes, and no secrets: the turn runs in the Agents plugin, and git runs
+    // through core.
     node: {
-      core: ['tasks', 'git', 'prefs'],
+      core: ['tasks', 'git', 'prefs', 'identity'],
       capabilities: ['agents.sessionExecute', 'agents.profiles'],
       secrets: false,
       exec: false,

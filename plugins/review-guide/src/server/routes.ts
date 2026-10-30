@@ -4,10 +4,15 @@ import { GuideError, type Guides } from './guides'
 const failure = (status: number, code: string, message: string) =>
   Response.json({ error: { code, message, requestId: '', retryable: status >= 500 } }, { status })
 
-/** `GET /guide?taskId=`, `POST /guide/generate`, and `POST /guide/stop`. Each answers the pane's view. */
+/** `GET /guide?taskId=`, `POST /guide/generate`, and `POST /guide/stop`. Each answers the pane's view.
+ *  `GET /profiles` answers the workflow step's harness choices. */
 export function createGuideFetch(guides: Guides): PluginFetchHandler {
   return async (request, context) => {
     const url = new URL(request.url)
+    if (request.method === 'GET' && url.pathname === '/profiles') {
+      const profiles = await guides.profiles()
+      return Response.json({ options: profiles.map((profile) => ({ value: profile.id, label: profile.label })) })
+    }
     const body = request.method === 'POST' ? ((await request.json().catch(() => ({}))) as Record<string, unknown>) : {}
     const taskId = request.method === 'GET' ? url.searchParams.get('taskId') : body.taskId
     if (typeof taskId !== 'string' || !taskId) return failure(400, 'bad_request', 'Name a task.')

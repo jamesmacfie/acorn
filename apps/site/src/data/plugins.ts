@@ -242,6 +242,7 @@ export const PLUGINS = {
       'node.core:tasks': "Reads the task's pull request and finds its worktree.",
       'node.core:git': "Reads the change from the task's worktree with git.",
       'node.core:prefs': 'Remembers the harness you picked.',
+      'node.core:identity': "Finds whose harness choice a workflow's review guide step uses.",
       'node.capabilities:agents.sessionExecute':
         'Runs the turn that writes the guide, in an agent session of the task, with read-only tools.',
       'node.capabilities:agents.profiles': 'Lists the harnesses you can pick from.',

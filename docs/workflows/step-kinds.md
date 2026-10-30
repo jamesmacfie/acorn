@@ -78,6 +78,7 @@ after workflows does.
 | `terminal:run-target` | [terminal.md](../terminal.md) | Starts a declared run target and reports its URL. |
 | `database:query` | [database.md](../database.md) | A saved query or inline SQL, capped and read-only. |
 | `database:generate` | [database.md](../database.md) | A model writes the SQL, then the same read runs it. |
+| `review-guide:generate` | [review-guide.md](../first-party-plugins/review-guide.md#in-a-workflow) | Writes the task's review guide and waits until it's ready. |
 
 Each lives with the code that already knows how to do the thing safely, which is the rule for
 admitting a kind at all. The command kind sits beside the process broker's environment allowlist, the

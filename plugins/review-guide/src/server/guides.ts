@@ -1,5 +1,5 @@
 import { and, desc, eq, ne } from 'drizzle-orm'
-import type { CoreServices, PluginDatabase } from '@acorn/plugin-api/node'
+import type { CoreServices, HeadlessResult, PluginDatabase } from '@acorn/plugin-api/node'
 import type { AgentProfiles, AgentSessionExecute } from '@acorn/plugin-agents/contract/sessionExecute.ts'
 import type { AgentProfile, Guide, GuideView, StoredGuide } from '../shared/guide'
 import { reviewGuides } from '../node/schema'
@@ -32,7 +32,20 @@ export type GuideDeps = {
 // The person's harness choice, in this plugin's own prefs namespace.
 const PROFILE_KEY = 'profile'
 
-type Running = { controller: AbortController; headSha: string | null; stale: boolean }
+/** How a generation ended, for a caller that waits on it. `guide` is null when it failed or stopped. */
+export type FinishedGuide = {
+  guide: Guide | null
+  error: string | null
+  costUsd: number | null
+  usage?: HeadlessResult['capture']['usage']
+}
+
+type Running = {
+  controller: AbortController
+  headSha: string | null
+  stale: boolean
+  finished: Promise<FinishedGuide>
+}
 
 // The saved choice while the harness is still installed. Otherwise the first, which is the Agents
 // plugin's default.
@@ -91,10 +104,14 @@ export function createGuides(deps: GuideDeps) {
     }
   }
 
-  /** Read the change, store a `generating` row, and start the turn. Answers once the turn has started. */
-  async function generate(userId: string, taskId: string, profileId: string | undefined): Promise<GuideView> {
-    if (running.has(taskId)) return view(userId, taskId)
-    const job: Running = { controller: new AbortController(), headSha: null, stale: false }
+  /** Read the change, store a `generating` row, and start the turn. Answers once the turn has started,
+   *  with the job already running for the task if there is one. `remember` saves `profileId` as the
+   *  person's choice. */
+  async function start(userId: string, taskId: string, profileId: string | undefined, remember: boolean) {
+    const existing = running.get(taskId)
+    if (existing) return existing
+    const finished = Promise.withResolvers<FinishedGuide>()
+    const job: Running = { controller: new AbortController(), headSha: null, stale: false, finished: finished.promise }
     running.set(taskId, job)
     try {
       const execute = deps.execute()
@@ -104,7 +121,7 @@ export function createGuides(deps: GuideDeps) {
       if (!chosen || !profiles.some((profile) => profile.id === chosen)) {
         throw new GuideError('Pick a harness that can run a guide.', 400)
       }
-      if (profileId) await deps.prefs.write(userId, PROFILE_KEY, profileId)
+      if (remember && profileId) await deps.prefs.write(userId, PROFILE_KEY, profileId)
       const detail = await deps.tasks.changeRequestDetail(taskId)
       if (!detail) throw new GuideError("This task has no change request, or its code host didn't answer.", 409)
       if (!detail.baseRef) {
@@ -130,13 +147,40 @@ export function createGuides(deps: GuideDeps) {
         createdAt: now,
         updatedAt: now,
       })
-      void runTurn(execute, job, taskId, chosen, change)
+      finished.resolve(runTurn(execute, job, taskId, chosen, change))
     } catch (error) {
       running.delete(taskId)
+      // A caller that joined this job while it was starting fails with the same sentence.
+      finished.resolve({ guide: null, error: error instanceof Error ? error.message : String(error), costUsd: null })
       throw error
     }
     deps.changed(taskId)
+    return job
+  }
+
+  /** The pane's generate. The harness it names becomes the person's choice. */
+  async function generate(userId: string, taskId: string, profileId: string | undefined): Promise<GuideView> {
+    await start(userId, taskId, profileId, true)
     return view(userId, taskId)
+  }
+
+  /** The workflow step's generate. Joins the task's running guide if there is one, and waits for it to
+   *  finish. `signal` stops it, the way the pane's Stop does. */
+  async function generateAndWait(
+    userId: string,
+    taskId: string,
+    profileId: string | undefined,
+    signal: AbortSignal,
+  ): Promise<FinishedGuide> {
+    const job = await start(userId, taskId, profileId, false)
+    const abort = () => job.controller.abort()
+    signal.addEventListener('abort', abort, { once: true })
+    if (signal.aborted) abort()
+    try {
+      return await job.finished
+    } finally {
+      signal.removeEventListener('abort', abort)
+    }
   }
 
   async function runTurn(
@@ -145,9 +189,11 @@ export function createGuides(deps: GuideDeps) {
     taskId: string,
     profileId: string,
     change: Change,
-  ) {
+  ): Promise<FinishedGuide> {
     let sessionId: string | null = null
     let outcome: Partial<typeof reviewGuides.$inferInsert>
+    let guide: Guide | null = null
+    let cost: Pick<FinishedGuide, 'costUsd' | 'usage'> = { costUsd: null }
     try {
       const result = await execute({
         taskId,
@@ -166,13 +212,14 @@ export function createGuides(deps: GuideDeps) {
         },
       })
       sessionId = result?.agentSessionId ?? sessionId
+      if (result)
+        cost = { costUsd: result.capture.costUsd, ...(result.capture.usage ? { usage: result.capture.usage } : {}) }
+      if (result?.status === 'ok' && result.capture.structuredOutput)
+        guide = checkCoverage(result.capture.structuredOutput as GuideAnswer, change.items)
       outcome = !result
         ? { status: 'failed', error: "This harness can't run a guide." }
-        : result.status === 'ok' && result.capture.structuredOutput
-          ? {
-              status: job.stale ? 'stale' : 'ready',
-              guide: JSON.stringify(checkCoverage(result.capture.structuredOutput as GuideAnswer, change.items)),
-            }
+        : guide
+          ? { status: job.stale ? 'stale' : 'ready', guide: JSON.stringify(guide) }
           : {
               status: 'failed',
               error:
@@ -189,6 +236,7 @@ export function createGuides(deps: GuideDeps) {
       running.delete(taskId)
       deps.changed(taskId)
     }
+    return { guide, error: outcome.error ?? null, ...cost }
   }
 
   function stop(taskId: string): void {
@@ -215,7 +263,7 @@ export function createGuides(deps: GuideDeps) {
       .where(eq(reviewGuides.status, 'generating'))
   }
 
-  return { view, generate, stop, markStale, failInterrupted }
+  return { view, generate, generateAndWait, profiles: listProfiles, stop, markStale, failInterrupted }
 }
 
 export type Guides = ReturnType<typeof createGuides>

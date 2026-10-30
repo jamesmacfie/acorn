@@ -12,6 +12,7 @@ sources:
   - plugins/terminal/src/server/workflowSteps.ts
   - plugins/database/src/server/workflowSteps.ts
   - plugins/http/src/server/workflowStep.ts
+  - plugins/review-guide/src/server/workflowStep.ts
 checked: '5773c873c'
 ---
 
@@ -42,6 +43,7 @@ The **Add step** menu groups them as below. In a file, `kind` names one. A step 
 | **Run a query** | `database:query` | Runs a saved query or SQL against the task's database, read-only. |
 | **Generate and run a query** | `database:generate` | Has a model write the SQL from your words, then runs it the same way. |
 | **Call an HTTP endpoint** | `http:request` | Sends one request through the project's variables and hands on the response. |
+| **Generate a review guide** | `review-guide:generate` | Has a harness write the task's review guide, and waits until it's ready in the **Guide** tab. |
 
 A kind from a plugin, such as `terminal:command`, is named with the plugin's ID, and takes its settings
 under `[steps.with]`. Its step can't run while that plugin is off.

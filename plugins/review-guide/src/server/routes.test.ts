@@ -4,6 +4,7 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { makeTestPluginDb, type TestPluginDb } from '@acorn/plugin-api/testkit'
+import type { StepHandlerContext } from '@acorn/plugin-workflows/contract/extensions.ts'
 import type {
   AgentSessionExecuteRequest,
   AgentSessionExecuteResult,
@@ -11,6 +12,7 @@ import type {
 import type { GuideView } from '../shared/guide'
 import { createGuides, type GuideDeps, type Guides } from './guides'
 import { createGuideFetch } from './routes'
+import { guideStepHandler } from './workflowStep'
 
 // A worktree whose branch adds one file and changes another against origin/main.
 function makeWorktree(): { dir: string; commit(): string } {
@@ -228,5 +230,83 @@ describe('review guide routes', () => {
     expect((await call('GET', '/guide?taskId=task-1', undefined, 'task-9')).status).toBe(404)
     expect((await call('POST', '/guide/generate', { taskId: 'task-1' }, 'task-9')).status).toBe(404)
     expect((await call('GET', '/guide?taskId=task-1', undefined, 'task-1')).status).toBe(200)
+  })
+
+  describe('the review-guide:generate step', () => {
+    const step = (taskId: string, withTable: Record<string, unknown> = {}, signal = new AbortController().signal) =>
+      guideStepHandler(
+        guides,
+        () => 'alice',
+      )({
+        run: { id: 'run-1', taskId },
+        def: { name: 'guide', kind: 'review-guide:generate', with: withTable },
+        signal,
+        emit: () => {},
+      } as unknown as StepHandlerContext)
+    const started = () => vi.waitFor(() => expect(turns.length).toBeGreaterThan(0))
+
+    it('lists the harnesses as select options', async () => {
+      const response = await fetch(new Request('http://plugin/profiles'), {
+        userId: 'alice',
+        principal: { kind: 'device', userId: 'alice' },
+      } as Parameters<typeof fetch>[1])
+      expect(await response.json()).toEqual({
+        options: [
+          { value: 'claude-code', label: 'Claude Code' },
+          { value: 'codex', label: 'Codex' },
+        ],
+      })
+    })
+
+    it('generates the guide the pane shows, and hands on its text and cost', async () => {
+      const outcome = step('task-1', { profileId: 'codex' })
+      await started()
+      expect(turns[0]!.request).toMatchObject({ profileId: 'codex', tools: { maxRisk: 'read' } })
+      const result = okResult(ANSWER)
+      result.capture = { ...result.capture, costUsd: 0.42, usage: { inputTokens: 10, outputTokens: 5 } }
+      turns[0]!.finish(result)
+      expect(await outcome).toEqual({
+        status: 'done',
+        result: { result: 'Bumps a.\n\n- The bump' },
+        costUsd: 0.42,
+        usage: { inputTokens: 10, outputTokens: 5 },
+      })
+      expect((await call('GET', '/guide?taskId=task-1')).body.guide).toMatchObject({
+        status: 'ready',
+        profileId: 'codex',
+      })
+      // The pane's pick is the person's choice. A workflow's isn't.
+      expect(prefs.has('profile')).toBe(false)
+    })
+
+    it('waits for a guide that is already generating instead of starting another', async () => {
+      await call('POST', '/guide/generate', { taskId: 'task-1' })
+      const outcome = step('task-1')
+      await Promise.resolve()
+      expect(turns).toHaveLength(1)
+      turns[0]!.finish(okResult(ANSWER))
+      expect(await outcome).toMatchObject({ status: 'done', result: { result: 'Bumps a.\n\n- The bump' } })
+      expect(turns).toHaveLength(1)
+    })
+
+    it('fails with the sentence the pane shows', async () => {
+      expect(await step('task-2')).toEqual({
+        status: 'failed',
+        error: "This task has no change request, or its code host didn't answer.",
+      })
+      const outcome = step('task-1')
+      await started()
+      turns[0]!.finish({ ...okResult(null), status: 'error', stderrTail: 'The harness crashed.' })
+      expect(await outcome).toMatchObject({ status: 'failed', error: 'The harness crashed.' })
+    })
+
+    it('stops the turn when the step is stopped', async () => {
+      const controller = new AbortController()
+      const outcome = step('task-1', {}, controller.signal)
+      await started()
+      controller.abort()
+      expect(await outcome).toMatchObject({ status: 'failed', error: 'You stopped the guide.' })
+      expect((await call('GET', '/guide?taskId=task-1')).body.guide?.status).toBe('failed')
+    })
   })
 })

@@ -5,6 +5,7 @@ sources:
   - docs/first-party-plugins/review-guide.md
   - plugins/review-guide/acorn-plugin.config.mjs
   - plugins/review-guide/src/tree/GuidePane.tsx
+  - plugins/review-guide/src/server/workflowStep.ts
 checked: '574139413'
 ---
 
@@ -36,6 +37,25 @@ why its change exists, then shows its hunks.
 
 The harness runs one turn in an agent session of the task, so a guide spends that harness's usage. The
 turn can read the worktree but can't change it. **Stop** ends the turn.
+
+## Write a guide from a workflow
+
+Add a **Generate a review guide** step, `review-guide:generate`, to a workflow you start, such as one
+that reviews a pull request. When the run reaches the step, it writes the task's guide the same way the
+pane does and waits until it's done, so the guide is ready in the **Guide** tab when you open the pull
+request.
+
+```toml
+[[steps]]
+name = "guide"
+kind = "review-guide:generate"
+```
+
+- **Harness** is optional. Leave it empty to use the harness you picked in the pane.
+- If a guide is already being written for the task, the step waits for that one.
+- A later step can read the summary and the section titles as `${steps.guide.output}`.
+- The turn's cost counts toward the run's `max_cost_usd`.
+- When the guide fails, or you stop the run, the step fails with the same message the pane shows.
 
 ## What a guide shows
 

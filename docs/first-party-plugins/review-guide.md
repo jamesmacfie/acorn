@@ -20,6 +20,8 @@ It ships as a bundled loaded package, so it reaches the Node only through its ma
   fetched copy of the branch.
 - The profiles the person may pick from, through `agents.profiles`. With no saved choice it uses the
   first, which is the Agents plugin's default.
+- The Node's bound owner, through `identity`, for the workflow step. A run has no request to take a
+  person from, so the step uses the owner's saved harness choice.
 
 It asks for no network, no processes, and no secrets. Its tree has one frame scope,
 `core.changeRequests:reveal`, for the hunk links.
@@ -36,8 +38,37 @@ shows only its `@@` header, and the prompt tells the harness to read the files i
 match a JSON schema: a summary, and sections with a title, a "why" in Markdown, a kind (`core` or
 `supporting`), and hunk IDs in reading order. The prompt and the schema are in `src/server/prompt.ts`.
 
-Generating is something the person starts. A new commit marks a guide stale and doesn't regenerate it.
-A retry on the same commits with the same harness reuses its session.
+Generating is something the person starts, from the pane or from a workflow they start that reaches
+the step below. A new commit marks a guide stale and doesn't regenerate it. A retry on the same commits
+with the same harness reuses its session.
+
+## In a workflow
+
+The `review-guide:generate` step kind runs the pane's generation for the run's task and waits until
+the guide is ready, failed, or stopped
+([contributed step kinds](../workflows/step-kinds.md#the-kinds-other-plugins-contribute)). The guide is
+stored the same way, so it's in the **Guide** tab, and the coverage check and staleness apply unchanged.
+A workflow that reviews a pull request can add it so the guide is ready when the person opens the pull
+request:
+
+```toml
+[[steps]]
+name = "guide"
+kind = "review-guide:generate"
+
+[steps.with]
+profileId = "codex"
+```
+
+- `profileId` is optional. Its choices come from `GET /v1/p/review-guide/profiles`. Empty means the
+  Node owner's saved choice, then the first profile, as in the pane. The step doesn't save its pick.
+- If a guide is already generating for the task, the step waits for that one instead of starting
+  another.
+- `${steps.<name>.output}` is the guide's summary, then one `- ` line per section title.
+- Stopping the step, such as cancelling the run, stops the turn the way **Stop** does.
+- The turn's cost and token usage go into the step, so the run's `max_cost_usd` counts them.
+- With no change request, no target branch, an empty diff, or a failed or stopped turn, the step fails
+  with the sentence the pane shows.
 
 ## The coverage check
 
@@ -74,7 +105,7 @@ One generation runs per task at a time. A second request while one runs gets the
 
 ## Routes
 
-Each answers the pane's whole view: whether the task has a change request, the profiles, the chosen
+The three guide routes each answer the pane's whole view: whether the task has a change request, the profiles, the chosen
 profile, and the newest guide. A task-scoped caller is held to its own task.
 
 | Route | What it does |
@@ -82,6 +113,7 @@ profile, and the newest guide. A task-scoped caller is held to its own task.
 | `GET /v1/p/review-guide/guide?taskId=` | Reads the view |
 | `POST /v1/p/review-guide/guide/generate` | `{ taskId, profileId? }`. Saves the profile, reads the change, and starts the turn |
 | `POST /v1/p/review-guide/guide/stop` | `{ taskId }`. Aborts the running turn |
+| `GET /v1/p/review-guide/profiles` | `{ options: [{ value, label }] }`, the workflow step's harness choices. Not a view |
 
 A status change sends `plugin:review-guide:changed`, and the pane reads the view again.
 
