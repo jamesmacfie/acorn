@@ -18,11 +18,10 @@ export const describeGuideStep: StepKindDescription = {
       hint: 'Empty uses the harness you picked in the Guide pane.',
     },
   ],
-  output: { description: "The guide's summary and its section titles, in reading order." },
+  output: { description: "The guide's summary and its step titles, in reading order." },
 }
 
-const guideText = (guide: Guide) =>
-  [guide.summary, '', ...guide.sections.map((section) => `- ${section.title}`)].join('\n')
+const guideText = (guide: Guide) => [guide.summary, '', ...guide.steps.map((step) => `- ${step.title}`)].join('\n')
 
 /** `owner` is the node's bound owner. A run has no request to take a user from, and the harness
  *  choice is that person's pref. */

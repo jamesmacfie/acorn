@@ -1,6 +1,79 @@
 # Phase 1: steps and line notes in the answer
 
-Date: October 30, 2026. Status: not started. Needs nothing.
+Date: October 30, 2026. Status: done. Needs nothing.
+
+## Completion note
+
+Landed October 30, 2026.
+
+### What landed
+
+- The answer has `steps`, each with `goal` and `notes`. `GUIDE_SCHEMA`, `GuideAnswer`, the stored
+  `Guide`, the pane, and the workflow step's description all say steps.
+- `checkNotes` in `plugins/review-guide/src/server/notes.ts` runs right after `checkCoverage` in
+  `runTurn`. `misplacedNotes` sits on `Guide`, and the pane shows a line for it.
+- `src/shared/hunk.ts` holds the one row parser, `hunkRows`, beside `hunkStart`, which moved there
+  from the pane. The Node's note check and the pane both import it.
+- A stored guide with `sections` reads as steps with an empty goal and no notes, through `readGuide` in
+  `guides.ts`. A route test inserts one and reads it.
+- The pane shows each goal as "After this step you'll know …", and draws notes under their hunk as a
+  plain list: a tone badge, the title, `Line N` or `Deleted line N`, and the body as Markdown.
+- The plugin doc, the site's review guide page, and the plugin's sentence in
+  `apps/site/src/data/plugins.ts` describe steps and notes.
+
+### Decisions
+
+- `text` must match the whole line, after trimming trailing whitespace on both sides. The measurement
+  below gave no reason to accept fragments.
+- No ceiling on the step count. Guides came back with 3 to 11 steps for 3 to 31 hunks, so the
+  prompt is enough for now.
+- The old side holds deleted rows only. A note on an unchanged row must say `new`, as the field
+  table says. A note that says `old` on an unchanged row is dropped.
+- The schema sets no `maxLength` or `maxItems`. A breach would fail the whole answer, so the note
+  check enforces the caps instead.
+- `checkCoverage` passes each step's other fields through untouched, and counts the notes of a step it
+  drops in `misplacedNotes`. `checkNotes` adds its own drops to that count, so the pane's one line
+  covers both checks.
+- Notes past a cap count as dropped, so the pane's line says "didn't match a line of the change or
+  went past the limit".
+
+### Deviations
+
+- The first measurement showed that both harnesses repeat "After this step you'll know" in `goal`.
+  The prompt now asks for only the finishing words, and `checkCoverage` strips the opening words if
+  they still come back. That way every reader of a goal gets the fragment, phase 3 included.
+- The live check ran Claude Code (`claude -p --json-schema`) and Codex (`codex exec --output-schema`)
+  headless and read-only, with `guideTurn`'s exact prompt and `GUIDE_SCHEMA`, and then ran both checks
+  on each answer. It didn't run in `pnpm dev:agent`, because that needs a task with a real pull request
+  attached. The pane's drawing is covered by `GuidePane.test.tsx`, not by a screenshot.
+
+### Measurement
+
+There were six runs on three real changes: `6be0a88cd` (7 hunks), `07e3ba770` (3 hunks), and this
+phase's own plugin diff (31 hunks).
+
+| Change | Harness | Steps | Notes | Kept | Moved | Dropped |
+| --- | --- | --- | --- | --- | --- | --- |
+| `6be0a88cd` | Claude Code | 5 | 8 | 8 | 0 | 0 |
+| `6be0a88cd` | Codex | 5 | 2 | 2 | 0 | 0 |
+| `07e3ba770` | Claude Code | 3 | 3 | 3 | 0 | 0 |
+| `07e3ba770` | Codex | 3 | 1 | 1 | 0 | 0 |
+| This phase | Claude Code | 10 | 8 | 8 | 0 | 0 |
+| This phase | Codex | 11 | 2 | 2 | 0 | 0 |
+
+Every hunk was covered once in every run. Claude Code leaves about four times as many notes as Codex.
+Most of them are **Look closely**, and they read as real review points rather than narration.
+
+### For later phases
+
+- A note's `line` is always a real row on its side after the check, so phase 2 can place a note by
+  `hunk`, `side`, and `line` alone. Use `hunkRows` to find the row, rather than a second parser.
+- A step's `goal` is a fragment with no opening words, and it's empty on an older guide. Hide the goal
+  line when it's empty.
+- `Guide.steps[].notes` is in reading order, so phase 3's wrap-up can list them in that order.
+- Notes don't carry an ID. Phases 3 to 5 need a stable key for progress or for marks. The mockup builds
+  one from `hunk`, `side`, and `line`, but the check allows two notes on one row, so add the note's
+  position on its row when the key must be unique.
 
 ## Goal
 

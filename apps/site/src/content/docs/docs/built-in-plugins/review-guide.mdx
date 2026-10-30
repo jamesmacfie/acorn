@@ -1,6 +1,6 @@
 ---
 title: Review guide
-description: Have the agent harness you pick arrange a task's pull request into sections in reading order, with every hunk shown exactly once.
+description: Have the agent harness you pick arrange a task's pull request into steps in reading order, with every hunk shown exactly once and notes on the lines that need them.
 sources:
   - docs/first-party-plugins/review-guide.md
   - plugins/review-guide/acorn-plugin.config.mjs
@@ -14,9 +14,10 @@ import Checkpoint from '../../../../components/Checkpoint.astro'
 import PluginFacts from '../../../../components/PluginFacts.astro'
 
 The Review guide plugin walks you through a task's pull request. The agent harness you pick, such as
-Claude Code or Codex, reads the change in the task's worktree and arranges its hunks into sections in the
-order you'd read them. Core changes come first, and tests, docs, and wiring come after. Each section says
-why its change exists, then shows its hunks.
+Claude Code or Codex, reads the change in the task's worktree and arranges its hunks into steps in the
+order you'd read them, starting where the data or the request comes in. Core changes come first, and
+tests, docs, and wiring come after. Each step says what you'll know after it and why its change exists,
+then shows its hunks with a few short notes on the lines worth a closer look.
 
 <PluginFacts id="review-guide">
   <Fragment slot="adds">The **Guide** pane on a task, a **Guide** tab in a task's pull request or merge request view, and the **Open review guide** command.</Fragment>
@@ -31,7 +32,7 @@ why its change exists, then shows its hunks.
 
 2. Pick a harness at the top of the guide, and click **Generate guide**.
 
-   <Checkpoint>The guide says the harness is writing it, with a link to its session. When it finishes, the guide shows a summary and the sections.</Checkpoint>
+   <Checkpoint>The guide says the harness is writing it, with a link to its session. When it finishes, the guide shows a summary and the steps.</Checkpoint>
 
 </Steps>
 
@@ -53,23 +54,32 @@ kind = "review-guide:generate"
 
 - **Harness** is optional. Leave it empty to use the harness you picked in the pane.
 - If a guide is already being written for the task, the step waits for that one.
-- A later step can read the summary and the section titles as `${steps.guide.output}`.
+- A later step can read the summary and the step titles as `${steps.guide.output}`.
 - The turn's cost counts toward the run's `max_cost_usd`.
 - When the guide fails, or you stop the run, the step fails with the same message the pane shows.
 
 ## What a guide shows
 
 - A summary of the whole change, and which harness wrote it for which commit.
-- One section per part of the change, in reading order. Each says why the change exists and shows its
-  hunks. A binary file, a rename, or a mode change shows its path and what changed.
+- One step per part of the change, in reading order. Each finishes the sentence "After this step you'll
+  know", says why the change exists, and shows its hunks. A binary file, a rename, or a mode change
+  shows its path and what changed.
+- Under a hunk, any notes the harness pinned to its lines. Each has a tone, **Explains** for context,
+  **Look closely** for a judgment call, or **Risk** for a likely bug, then a title, its line, and a
+  short body. Most hunks have none.
 - Above each hunk, a link with its file and first line, such as `src/billing/invoice.ts:42`. Click it to
   open the pull request's diff at that line, where you can see the code around it and comment.
 - **Not covered by the guide**, last, with any hunk the harness left out.
 
 acorn checks the harness's answer against the diff before it shows it. Every hunk appears exactly once:
-a hunk the harness left out goes to **Not covered by the guide**, a hunk it put in two sections stays in
+a hunk the harness left out goes to **Not covered by the guide**, a hunk it put in two steps stays in
 the first, and an ID that isn't in the change is dropped. The pane says when it moved or dropped
 anything, so a guide can arrange the change but can't hide any of it.
+
+Each note quotes the text of the line it's on, and acorn checks the quote against the diff too. A note
+with the wrong line number moves to the one line that has its text. A note whose text matches no line,
+or more than one, is dropped, and so is any past three on a hunk or 40 in a guide. The pane says how many
+it dropped, so a note never sits on a line it doesn't describe.
 
 ## When the change moves on
 
@@ -84,7 +94,7 @@ git. It has no network access of its own, runs no other programs, and reads no s
 task's pull request diff at a line, which is what a hunk's link does. The guide is
 kept on the Node until the task is deleted.
 
-The **Guide** tab sits beside the diff, so you can read a section and its code in the diff side by side.
+The **Guide** tab sits beside the diff, so you can read a step and its code in the diff side by side.
 
 ## In the terminal
 

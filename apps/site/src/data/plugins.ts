@@ -230,7 +230,7 @@ export const PLUGINS = {
   },
   'review-guide': {
     name: 'Review guide',
-    sentence: "Has the agent harness you pick walk you through a task's pull request, section by section.",
+    sentence: "Has the agent harness you pick walk you through a task's pull request, step by step.",
     icon: 'list-checks',
     ships: 'package',
     worksIn: both,

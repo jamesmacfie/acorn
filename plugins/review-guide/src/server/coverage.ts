@@ -1,19 +1,24 @@
 import type { DiffItem, Guide } from '../shared/guide'
 import type { GuideAnswer } from './prompt'
 
+// A goal finishes this sentence and the pane writes its opening words. Harnesses often repeat them anyway.
+const GOAL_OPENING = /^after this step you['’]ll know\s*/i
+
 /**
  * Hold the harness's answer to the diff, so the guide shows every item exactly once. This is checked
  * here rather than asked for in the prompt, because a reviewer who trusts a guide doesn't look for what
- * it left out. An item in two sections stays in the first, an unknown ID is dropped, and an item in no
- * section goes to `uncovered` in file order. A section left with no items is dropped.
+ * it left out. An item in two steps stays in the first, an unknown ID is dropped, and an item in no
+ * step goes to `uncovered` in file order. A step left with no items is dropped with its notes, and the
+ * notes that survive are still unchecked: `checkNotes` holds them to their lines.
  */
 export function checkCoverage(answer: GuideAnswer, items: DiffItem[]): Guide {
   const byId = new Map(items.map((item) => [item.id, item]))
   const placed = new Set<string>()
   let repeated = 0
   let unknown = 0
-  const sections = answer.sections.flatMap(({ title, why, kind, hunks }) => {
-    const sectionItems = hunks.flatMap((id) => {
+  let misplacedNotes = 0
+  const steps = answer.steps.flatMap(({ hunks, ...step }) => {
+    const stepItems = hunks.flatMap((id) => {
       const item = byId.get(id)
       if (!item) unknown++
       else if (placed.has(id)) repeated++
@@ -23,13 +28,16 @@ export function checkCoverage(answer: GuideAnswer, items: DiffItem[]): Guide {
       }
       return []
     })
-    return sectionItems.length ? [{ title, why, kind, items: sectionItems }] : []
+    if (stepItems.length) return [{ ...step, goal: step.goal.replace(GOAL_OPENING, ''), items: stepItems }]
+    misplacedNotes += step.notes.length
+    return []
   })
   return {
     summary: answer.summary,
-    sections,
+    steps,
     uncovered: items.filter((item) => !placed.has(item.id)),
     repeated,
     unknown,
+    misplacedNotes,
   }
 }

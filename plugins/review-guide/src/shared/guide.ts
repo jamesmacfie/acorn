@@ -13,24 +13,48 @@ export type DiffItem = {
   note: string
 }
 
-type GuideSection = {
+/** A short note the harness pinned to one line of a hunk. */
+export type GuideNote = {
+  /** The ID of a hunk in the note's step. */
+  hunk: string
+  /** `new` for an added or unchanged line, `old` for a deleted one. */
+  side: 'old' | 'new'
+  /** The line's number on `side`. */
+  line: number
+  /** The line's text without its `+`, `-`, or space marker. The note check holds the note to it. */
+  text: string
+  /** The pane labels them Explains, Look closely, and Risk. */
+  tone: 'explain' | 'attention' | 'risk'
   title: string
+  /** Markdown. */
+  body: string
+}
+
+type GuideStep = {
+  title: string
+  /** Finishes "After this step you'll know". Empty on a guide stored before steps had goals. */
+  goal: string
   /** Markdown. */
   why: string
   kind: 'core' | 'supporting'
   items: DiffItem[]
+  /** Notes on lines of `items`, in reading order. */
+  notes: GuideNote[]
 }
 
-/** A guide after the coverage check: every item of the diff appears exactly once. */
+/** A guide after the coverage and note checks: every item of the diff appears exactly once, and every
+ *  note sits on the line it quotes. */
 export type Guide = {
   summary: string
-  sections: GuideSection[]
+  steps: GuideStep[]
   /** Items the harness left out, in file order. The pane draws them last as "Not covered by the guide". */
   uncovered: DiffItem[]
-  /** Items the harness put in more than one section. Each stays in the first. */
+  /** Items the harness put in more than one step. Each stays in the first. */
   repeated: number
   /** IDs in the answer that name no item of the diff. Dropped. */
   unknown: number
+  /** Notes the checks dropped: off their step's hunks, quoting no line, or past a cap. */
+  misplacedNotes: number
 }
 
 export type StoredGuide = {

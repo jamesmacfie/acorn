@@ -9,6 +9,7 @@ import type {
   AgentSessionExecuteRequest,
   AgentSessionExecuteResult,
 } from '@acorn/plugin-agents/contract/sessionExecute.ts'
+import { reviewGuides } from '../node/schema'
 import type { GuideView } from '../shared/guide'
 import { createGuides, type GuideDeps, type Guides } from './guides'
 import { createGuideFetch } from './routes'
@@ -61,11 +62,36 @@ const git: GuideDeps['git'] = {
   },
 }
 
+const note = (line: number, text: string) => ({
+  hunk: 'app.ts#1',
+  side: 'new',
+  line,
+  text,
+  tone: 'attention',
+  title: 'Callers read a.',
+  body: 'Check them.',
+})
+
 const ANSWER = {
   summary: 'Bumps a.',
-  sections: [
-    { title: 'The bump', why: 'Because.', kind: 'core', hunks: ['app.ts#1'] },
-    { title: 'Its test', why: 'To check it.', kind: 'supporting', hunks: ['nope.ts#1'] },
+  steps: [
+    {
+      title: 'The bump',
+      goal: 'what a is now.',
+      why: 'Because.',
+      kind: 'core',
+      hunks: ['app.ts#1'],
+      // The first is misnumbered and moves to line 1. The second quotes no line and is dropped.
+      notes: [note(7, 'export const a = 2'), note(1, 'export const a = 3')],
+    },
+    {
+      title: 'Its test',
+      goal: 'that a is read.',
+      why: 'To check it.',
+      kind: 'supporting',
+      hunks: ['nope.ts#1'],
+      notes: [],
+    },
   ],
 }
 
@@ -189,10 +215,42 @@ describe('review guide routes', () => {
     const view = await settled()
     expect(view.profileId).toBe('codex')
     expect(view.guide).toMatchObject({ status: 'ready', sessionId: 'session-1' })
-    expect(view.guide?.guide).toMatchObject({ summary: 'Bumps a.', repeated: 0, unknown: 1 })
-    expect(view.guide?.guide?.sections.map((section) => section.title)).toEqual(['The bump'])
+    expect(view.guide?.guide).toMatchObject({ summary: 'Bumps a.', repeated: 0, unknown: 1, misplacedNotes: 1 })
+    expect(view.guide?.guide?.steps).toMatchObject([
+      { title: 'The bump', goal: 'what a is now.', notes: [{ line: 1, text: 'export const a = 2' }] },
+    ])
+    expect(view.guide?.guide?.steps[0]!.notes).toHaveLength(1)
     expect(view.guide?.guide?.uncovered.map((item) => item.id)).toEqual(['app.test.ts#1'])
     expect(changed).toHaveBeenCalledWith('task-1')
+  })
+
+  it('reads a guide stored with sections as steps with no goals or notes', async () => {
+    const guide = {
+      summary: 'Old.',
+      sections: [{ title: 'Core', why: 'Because.', kind: 'core', items: [] }],
+      uncovered: [],
+      repeated: 0,
+      unknown: 0,
+    }
+    await pluginDb.db.insert(reviewGuides).values({
+      taskId: 'task-1',
+      baseSha: 'b',
+      headSha: 'h',
+      baseRef: 'main',
+      profileId: 'codex',
+      status: 'ready',
+      guide: JSON.stringify(guide),
+      createdAt: 1,
+      updatedAt: 1,
+    })
+    expect((await call('GET', '/guide?taskId=task-1')).body.guide?.guide).toEqual({
+      summary: 'Old.',
+      steps: [{ title: 'Core', goal: '', why: 'Because.', kind: 'core', items: [], notes: [] }],
+      uncovered: [],
+      repeated: 0,
+      unknown: 0,
+      misplacedNotes: 0,
+    })
   })
 
   it('marks a guide stale when HEAD moves, and leaves it when it does not', async () => {

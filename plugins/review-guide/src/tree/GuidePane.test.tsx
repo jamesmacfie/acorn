@@ -4,7 +4,7 @@ import { createRemoteRoot } from '@acorn/plugin-api/testkit/client'
 import type { AcornBridge } from '@acorn/plugin-api/ui/sdk'
 import { solidTree } from '@acorn/plugin-api/ui/tree'
 import type { DiffItem, GuideView } from '../shared/guide'
-import { GuidePane, hunkStart } from './GuidePane'
+import { GuidePane } from './GuidePane'
 
 // The pane driven through `solidTree` into a remote root, with the mutations it emits as the evidence.
 
@@ -48,13 +48,38 @@ const stored = (status: 'ready' | 'generating', big = ''): GuideView['guide'] =>
     status === 'ready'
       ? {
           summary: 'Bumps a.',
-          sections: [
-            { title: 'Core', why: 'Because.', kind: 'core', items: [item('a.ts#1', `@@ -1 +1 @@\n+${big}`)] },
-            { title: 'Tests', why: 'To check.', kind: 'supporting', items: [item('a.test.ts#1')] },
+          steps: [
+            {
+              title: 'Core',
+              goal: 'how a is bumped.',
+              why: 'Because.',
+              kind: 'core',
+              items: [item('a.ts#1', `@@ -1 +1 @@\n+${big}`)],
+              notes: [
+                {
+                  hunk: 'a.ts#1',
+                  side: 'new',
+                  line: 1,
+                  text: big,
+                  tone: 'risk',
+                  title: 'This may overflow.',
+                  body: 'Check **the cap**.',
+                },
+              ],
+            },
+            {
+              title: 'Tests',
+              goal: '',
+              why: 'To check.',
+              kind: 'supporting',
+              items: [item('a.test.ts#1')],
+              notes: [],
+            },
           ],
           uncovered: [item('b.ts#1')],
           repeated: 0,
           unknown: 0,
+          misplacedNotes: 2,
         }
       : null,
 })
@@ -90,7 +115,7 @@ const mount = async (answer: GuideView) => {
 }
 
 describe('GuidePane', () => {
-  it('draws each section in order, then the hunks the guide left out', async () => {
+  it('draws each step in order, then the hunks the guide left out', async () => {
     const { nodes, dispose } = await mount(view(stored('ready')))
     expect(nodes.filter((node) => node.type === 'Fold').map((node) => node.props.label)).toEqual([
       'Core',
@@ -106,9 +131,32 @@ describe('GuidePane', () => {
     dispose()
   })
 
-  it('leaves later sections closed when the first is large', async () => {
+  it('leaves later steps closed when the first is large', async () => {
     const { nodes, dispose } = await mount(view(stored('ready', 'x'.repeat(300 * 1024))))
     expect(nodes.filter((node) => node.type === 'StackedDiff').map((node) => node.props.path)).toEqual(['a.ts'])
+    dispose()
+  })
+
+  it("draws a step's goal, and each note under its hunk", async () => {
+    const { nodes, dispose } = await mount(view(stored('ready')))
+    const text = (node: TreeNode): string =>
+      typeof node.props.value === 'string' ? node.props.value : node.children.map(text).join('')
+    const drawn = nodes
+      .filter((node) => ['StackedDiff', 'Badge', 'Markdown'].includes(node.type) || node.type === 'Text')
+      .map((node) => (node.type === 'StackedDiff' ? `diff ${node.props.path}` : (node.props.text ?? text(node))))
+    const core = drawn.slice(drawn.indexOf("After this step you'll know how a is bumped."), drawn.indexOf('To check.'))
+    expect(core).toEqual([
+      "After this step you'll know how a is bumped.",
+      'Because.',
+      'diff a.ts',
+      'Risk',
+      'This may overflow.',
+      'Line 1',
+      'Check **the cap**.',
+    ])
+    expect(JSON.stringify(nodes)).toContain(
+      "Dropped 2 notes that didn't match a line of the change or went past the limit.",
+    )
     dispose()
   })
 
@@ -127,20 +175,5 @@ describe('GuidePane', () => {
     expect(JSON.stringify(nodes)).toContain('Claude Code is writing the guide')
     expect(JSON.stringify(nodes)).toContain('Stop')
     dispose()
-  })
-})
-
-describe('hunkStart', () => {
-  it('starts a hunk at its first new-side line', () => {
-    expect(hunkStart('@@ -10,4 +12,6 @@ function a() {\n x')).toEqual({ line: 12, side: 'new' })
-    expect(hunkStart('@@ -1 +1 @@\n-a\n+b')).toEqual({ line: 1, side: 'new' })
-  })
-
-  it('starts a hunk with no new side at its first old-side line', () => {
-    expect(hunkStart('@@ -1,3 +0,0 @@\n-a\n-b\n-c')).toEqual({ line: 1, side: 'old' })
-  })
-
-  it('has no start for an item without hunk text', () => {
-    expect(hunkStart('')).toBeNull()
   })
 })

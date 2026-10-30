@@ -5,6 +5,7 @@ import type { AgentProfile, Guide, GuideView, StoredGuide } from '../shared/guid
 import { reviewGuides } from '../node/schema'
 import { ChangeError, readChange, type Change } from './change'
 import { checkCoverage } from './coverage'
+import { checkNotes } from './notes'
 import { GUIDE_SCHEMA, guideTurn, type GuideAnswer } from './prompt'
 
 /** A request the pane can't act on, with the sentence it shows and the status the route answers. */
@@ -52,6 +53,18 @@ type Running = {
 const pickProfile = (profiles: AgentProfile[], saved: string | null) =>
   profiles.find((profile) => profile.id === saved)?.id ?? profiles[0]?.id ?? null
 
+// A guide stored before steps had goals and notes. Each one cost harness usage, so it still reads.
+type GuideWithSections = Omit<Guide, 'steps' | 'misplacedNotes'> & {
+  sections: Omit<Guide['steps'][number], 'goal' | 'notes'>[]
+}
+
+function readGuide(json: string): Guide {
+  const stored = JSON.parse(json) as Guide | GuideWithSections
+  if (!('sections' in stored)) return stored
+  const { sections, ...rest } = stored
+  return { ...rest, steps: sections.map((section) => ({ ...section, goal: '', notes: [] })), misplacedNotes: 0 }
+}
+
 export function createGuides(deps: GuideDeps) {
   const db = deps.db
   // One generation per task. Set before the first await, so a second request can't slip in beside it.
@@ -92,7 +105,7 @@ export function createGuides(deps: GuideDeps) {
           headSha: row.headSha,
           sessionId: row.sessionId,
           error: row.error,
-          guide: row.guide ? (JSON.parse(row.guide) as Guide) : null,
+          guide: row.guide ? readGuide(row.guide) : null,
           updatedAt: row.updatedAt,
         }
       : null
@@ -215,7 +228,7 @@ export function createGuides(deps: GuideDeps) {
       if (result)
         cost = { costUsd: result.capture.costUsd, ...(result.capture.usage ? { usage: result.capture.usage } : {}) }
       if (result?.status === 'ok' && result.capture.structuredOutput)
-        guide = checkCoverage(result.capture.structuredOutput as GuideAnswer, change.items)
+        guide = checkNotes(checkCoverage(result.capture.structuredOutput as GuideAnswer, change.items))
       outcome = !result
         ? { status: 'failed', error: "This harness can't run a guide." }
         : guide

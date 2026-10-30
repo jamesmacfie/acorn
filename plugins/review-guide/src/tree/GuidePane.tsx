@@ -1,6 +1,7 @@
 import { createEffect, createSignal, For, Match, on, onCleanup, Show, Switch } from 'solid-js'
 import {
   Alert,
+  Badge,
   Button,
   EmptyState,
   Fold,
@@ -15,11 +16,19 @@ import {
   ToolbarSpacer,
 } from '@acorn/plugin-api/ui/tree'
 import type { AcornBridge } from '@acorn/plugin-api/ui/sdk'
-import { CHANGED_CHANNEL, type DiffItem, type Guide, type GuideView, type StoredGuide } from '../shared/guide'
+import {
+  CHANGED_CHANNEL,
+  type DiffItem,
+  type Guide,
+  type GuideNote,
+  type GuideView,
+  type StoredGuide,
+} from '../shared/guide'
+import { hunkStart } from '../shared/hunk'
 
 const API = '/v1/p/review-guide/guide'
 
-// The host refuses a tree batch over 1 MiB, so the first draw opens sections only until their hunk text
+// The host refuses a tree batch over 1 MiB, so the first draw opens steps only until their hunk text
 // reaches this much. The rest open on demand.
 const FIRST_DRAW_BYTES = 256 * 1024
 
@@ -28,28 +37,28 @@ const message = (error: unknown) =>
 
 const plural = (count: number, one: string, many: string) => `${count} ${count === 1 ? one : many}`
 
-/** Where a hunk starts: its first new-side line, or its first old-side line when it has no new side,
- *  as in a deleted file. Null for an item with no hunk text. */
-export function hunkStart(patch: string): { line: number; side: 'old' | 'new' } | null {
-  const header = /^@@ -(\d+)(?:,\d+)? \+(\d+)(?:,(\d+))? @@/.exec(patch)
-  if (!header) return null
-  return header[3] === '0' || header[2] === '0'
-    ? { line: Number(header[1]), side: 'old' }
-    : { line: Number(header[2]), side: 'new' }
+const TONES: Record<GuideNote['tone'], { label: string; tone: 'neutral' | 'warn' | 'danger' }> = {
+  explain: { label: 'Explains', tone: 'neutral' },
+  attention: { label: 'Look closely', tone: 'warn' },
+  risk: { label: 'Risk', tone: 'danger' },
 }
 
-/** What the coverage check changed, as sentences. Empty when the harness placed every hunk once. */
+/** What the coverage and note checks changed, as sentences. Empty when the harness placed every hunk
+ *  once and every note on its line. */
 function coverageNotes(guide: Guide): string[] {
   return [
     ...(guide.uncovered.length
       ? [`${plural(guide.uncovered.length, "hunk wasn't", "hunks weren't")} covered by the guide. They're last.`]
       : []),
     ...(guide.repeated
-      ? [
-          `The guide put ${plural(guide.repeated, 'hunk', 'hunks')} in more than one section. Each is shown in its first.`,
-        ]
+      ? [`The guide put ${plural(guide.repeated, 'hunk', 'hunks')} in more than one step. Each is shown in its first.`]
       : []),
     ...(guide.unknown ? [`The guide named ${plural(guide.unknown, 'hunk', 'hunks')} that aren't in the change.`] : []),
+    ...(guide.misplacedNotes
+      ? [
+          `Dropped ${plural(guide.misplacedNotes, 'note', 'notes')} that didn't match a line of the change or went past the limit.`,
+        ]
+      : []),
   ]
 }
 
@@ -218,7 +227,7 @@ function StoredGuideView(props: {
               {session()}
             </Stack>
             <For each={coverageNotes(guide())}>{(note) => <Alert tone="warn">{note}</Alert>}</For>
-            <GuideSections guide={guide()} onReveal={props.onReveal} />
+            <GuideSteps guide={guide()} onReveal={props.onReveal} />
           </Stack>
         )}
       </Match>
@@ -226,14 +235,14 @@ function StoredGuideView(props: {
   )
 }
 
-function GuideSections(props: { guide: Guide; onReveal: (item: DiffItem) => void }) {
+function GuideSteps(props: { guide: Guide; onReveal: (item: DiffItem) => void }) {
   const blocks = () => [
-    ...props.guide.sections,
+    ...props.guide.steps,
     ...(props.guide.uncovered.length
-      ? [{ title: 'Not covered by the guide', why: '', items: props.guide.uncovered }]
+      ? [{ title: 'Not covered by the guide', goal: '', why: '', items: props.guide.uncovered, notes: [] }]
       : []),
   ]
-  // Which sections are open, by index. Seeded so the first draw stays under the batch limit.
+  // Which steps are open, by index. Seeded so the first draw stays under the batch limit.
   const [open, setOpen] = createSignal(
     blocks().reduce<{ bytes: number; open: Set<number> }>(
       (state, block, index) => {
@@ -262,10 +271,21 @@ function GuideSections(props: { guide: Guide; onReveal: (item: DiffItem) => void
         >
           <Show when={open().has(index())}>
             <Stack>
+              <Show when={block.goal}>
+                <Text emphasis="strong">{`After this step you'll know ${block.goal}`}</Text>
+              </Show>
               <Show when={block.why}>
                 <Markdown text={block.why} />
               </Show>
-              <For each={block.items}>{(item) => <Hunk item={item} onReveal={props.onReveal} />}</For>
+              <For each={block.items}>
+                {(item) => (
+                  <Hunk
+                    item={item}
+                    notes={block.notes.filter((note) => note.hunk === item.id)}
+                    onReveal={props.onReveal}
+                  />
+                )}
+              </For>
             </Stack>
           </Show>
         </Fold>
@@ -274,8 +294,9 @@ function GuideSections(props: { guide: Guide; onReveal: (item: DiffItem) => void
   )
 }
 
-/** A hunk under a link to it in the change request's diff, named by its path and first line. */
-function Hunk(props: { item: DiffItem; onReveal: (item: DiffItem) => void }) {
+/** A hunk under a link to it in the change request's diff, named by its path and first line, with
+ *  its notes after it. */
+function Hunk(props: { item: DiffItem; notes: GuideNote[]; onReveal: (item: DiffItem) => void }) {
   const start = () => hunkStart(props.item.patch)
   const label = () => (start()?.side === 'new' ? `${props.item.path}:${start()!.line}` : props.item.path)
   return (
@@ -284,6 +305,23 @@ function Hunk(props: { item: DiffItem; onReveal: (item: DiffItem) => void }) {
       <Show when={props.item.patch} fallback={<Text>{props.item.note}</Text>}>
         <StackedDiff path={props.item.path} patch={props.item.patch} />
       </Show>
+      <For each={props.notes}>{(note) => <Note note={note} />}</For>
+    </Stack>
+  )
+}
+
+function Note(props: { note: GuideNote }) {
+  const tone = () => TONES[props.note.tone]
+  return (
+    <Stack gap="inline">
+      <Inline wrap>
+        <Badge size="xs" tone={tone().tone}>
+          {tone().label}
+        </Badge>
+        <Text emphasis="strong">{props.note.title}</Text>
+        <Text tone="muted">{`${props.note.side === 'old' ? 'Deleted line' : 'Line'} ${props.note.line}`}</Text>
+      </Inline>
+      <Markdown text={props.note.body} />
     </Stack>
   )
 }
