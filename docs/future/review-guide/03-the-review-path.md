@@ -1,6 +1,86 @@
 # Phase 3: the review path
 
-Date: October 30, 2026. Status: not started. Needs phase 2.
+Date: October 30, 2026. Status: done. Needs phase 2.
+
+## Completion note
+
+Landed October 30, 2026.
+
+### What landed
+
+- `src/shared/path.ts` builds the path from a guide with `guidePath`: each step's minutes (one per 40
+  changed lines, at least one), its added and removed lines, and a key for each note. The hunks the
+  guide left out are a last step, **Not covered by the guide**, with no kind. The tree draws from it,
+  and the progress route checks a mark against it.
+- `review_guides.progress` is a nullable JSON column, `0001_clever_boom_boom.sql`. It holds
+  `GuideProgress`: `pages` (`overview`, `step-<n>`) and `notes` (note keys).
+  `POST /v1/p/review-guide/guide/progress` takes `{ taskId, page?, note?, done }` with exactly one of
+  `page` or `note`. It writes in one synchronous transaction, so two marks sent together can't
+  overwrite each other, then sends `plugin:review-guide:changed` and answers the view. An unknown page
+  or note is a 400, and a task with no guide is a 409.
+- The tree mounts twice: `pane` draws `GuidePane` wide and `panel` draws it narrow. The three
+  `review-panel` extensions point at `panel`. `GuidePane.tsx` keeps the shell (loading, toolbar,
+  states) and `GuidePath.tsx` holds the rail, the stepper, the three pages, and the hunks and notes.
+- The wide layout is a `ListDetail` with the rail as its list. The narrow one is the progress line, a
+  row of numbered `xs` buttons, then the page. Beside the diff, a hunk with notes draws through
+  `StackedDiff noteContext={0}`, a hunk with none is its link alone, and opening a step calls
+  `revealChangeRequestLine` with its first hunk.
+- Two additive kit changes, on both hosts. `StackedDiff` takes `noteContext`, the code rows kept on
+  each side of a noted row, with hunk headers dropped (`keptRows` in `kit/diff/diffNotes.ts`).
+  `DiffNote` takes `open` and `onOpenChange` in `Fold`'s controlled mode, so the guide's **Got it** can
+  fold a note.
+- Docs: the plugin page's storage and routes sections, and the pane moved to its own page,
+  `docs/first-party-plugins/review-guide/pane.md`, because the plugin page passed 200 lines.
+  `every-node.md` rows for `StackedDiff` and `DiffNote`, and the site's `StackedDiff`, `DiffNote`, and
+  review guide pages.
+
+### Decisions
+
+- No keys. A loaded plugin's keybinding must include a modifier and can run only a host action verb,
+  and none of those reaches a tree, so `j`, `k`, and `n` can't work. The pane doc says so.
+- **Leave your review** is a sentence pointing at **Details**, not a button. The tree has no verb to
+  select that tab.
+- The guide opens on the first page that isn't done, so closing and reopening, or switching between
+  the pane and the column, keeps the reader's place. Each surface keeps its own open page after that.
+- The wrap-up has no stored state. It counts as done once every step is reviewed and every Look
+  closely and Risk note is checked. With that, the progress line counts the overview, the steps, and
+  the wrap-up, as "2 of 5 done" does.
+- A note's key is `hunk:side:line`, with `:2` appended for a second note on the same row, as phase 1's
+  note asked.
+- **Got it** folds an Explains note for this view only. It isn't progress.
+- **Mark checked** doesn't fold a note. It turns into **✓ Checked** and toggles back.
+- The 256 KiB rule stays for one huge step: within a page, hunks past 256 KiB of text wait behind a
+  closed `Fold` that draws them when opened. Pages no longer need it otherwise.
+- Lists over the guide use `Index`, not `For`, so a progress mark, which replaces the view object,
+  doesn't redraw every hunk or reset a note's fold.
+
+### Deviations
+
+- `DiffNote` gained `open` and `onOpenChange`. The phase doc didn't name a kit change, but **Got it**
+  can't fold a note without one, because phase 2 kept the fold inside the kit.
+- The rail's "~5 min" is the whole guide's minutes, not the minutes left.
+- Live check, desktop: done in `pnpm dev:agent` on the `site-snapshots` fixture, with the site's fake
+  GitHub, a hand-added change request link, and a guide seeded through the plugin's own parser and
+  checks (project memory `walk-review-guide-live-in-dev-agent`). The narrow column, the wide rail,
+  marking steps, checking a note in the wrap-up, and progress showing in the other surface all worked.
+  The check found two drawing faults, now fixed: `Text` on pages truncated instead of wrapping, and
+  a note's button row overflowed the narrow column. The second fix was built but not looked at again.
+- Live check, terminal: not done. In `pnpm dev:tui:agent` the guide built into the data root and its
+  trust prompt was accepted, but the Node never started the plugin after two restarts. The terminal
+  drawing of `noteContext` is covered by `kit.test.tsx`.
+- Staging for `pnpm dev:agent` fails on the mobile startup budget on this branch: styles are
+  129,053 B of 128,000 B. This phase adds no CSS, so the growth came earlier, likely phase 2's note
+  card. The check ran with `--prepared` around it.
+- The site's component pages all cite `every-node.md`, so the stale check lists them. Only the
+  `StackedDiff` and `DiffNote` rows changed, and only those two pages and the review guide page were
+  updated and marked.
+
+### For later phases
+
+- Phase 4 replaces **Ask a follow-up**'s handler in `Note` (`GuidePath.tsx`). It reveals the line for
+  now, the same as **Show in diff**.
+- Phase 5 can use `guidePath` for each note's step number and key.
+- The terminal client's live check is still owed for phases 2 and 3.
 
 ## Goal
 

@@ -57,6 +57,17 @@ export type Guide = {
   misplacedNotes: number
 }
 
+/** How far the reader got through a guide. Kept on the guide's row, so a new guide starts with none. */
+export type GuideProgress = {
+  /** `overview` and `step-<n>` for each page marked reviewed, as `stepPage` names them. */
+  pages: string[]
+  /** The keys of the notes marked checked, as `guidePath` gives them. */
+  notes: string[]
+}
+
+/** `POST /guide/progress`'s body, less the task: one page or one note marked done or not done. */
+export type ProgressMark = ({ page: string } | { note: string }) & { done: boolean }
+
 export type StoredGuide = {
   status: 'generating' | 'ready' | 'failed' | 'stale'
   profileId: string
@@ -66,12 +77,13 @@ export type StoredGuide = {
   sessionId: string | null
   error: string | null
   guide: Guide | null
+  progress: GuideProgress
   updatedAt: number
 }
 
 export type AgentProfile = { id: string; label: string }
 
-/** `GET /guide?taskId=`, and the answer to the two POSTs. */
+/** `GET /guide?taskId=`, and the answer to each POST. */
 export type GuideView = {
   /** False when the task has no primary change request. The pane shows an empty state. */
   hasChangeRequest: boolean

@@ -1599,6 +1599,21 @@ const BEHAVIOURS: Behaviour[] = [
     },
   },
   {
+    node: 'StackedDiff',
+    does: 'keeps only the noted rows with noteContext, and no hunk header',
+    render: () => (
+      <StackedDiff path="src/a.ts" patch={'@@ -1,4 +1,4 @@\n one\n two\n-old\n+new\n tail'} noteContext={0}>
+        <DiffNote side="new" line={3} label="Risk" title="Retries forever" />
+      </StackedDiff>
+    ),
+    size: { height: 8 },
+    drive: async (screen) => {
+      expect(screen.text).toContain('+new')
+      expect(screen.text).toContain('Retries forever')
+      for (const hidden of ['two', '-old', '@@']) expect(screen.text).not.toContain(hidden)
+    },
+  },
+  {
     node: 'DiffNote',
     does: 'folds to its header line on Enter, and opens again',
     render: () => (

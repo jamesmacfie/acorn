@@ -1,7 +1,8 @@
 import { and, desc, eq, ne } from 'drizzle-orm'
 import type { CoreServices, HeadlessResult, PluginDatabase } from '@acorn/plugin-api/node'
 import type { AgentProfiles, AgentSessionExecute } from '@acorn/plugin-agents/contract/sessionExecute.ts'
-import type { AgentProfile, Guide, GuideView, StoredGuide } from '../shared/guide'
+import type { AgentProfile, Guide, GuideProgress, GuideView, ProgressMark, StoredGuide } from '../shared/guide'
+import { guidePath, OVERVIEW, stepPage } from '../shared/path'
 import { reviewGuides } from '../node/schema'
 import { ChangeError, readChange, type Change } from './change'
 import { checkCoverage } from './coverage'
@@ -58,6 +59,9 @@ type GuideWithSections = Omit<Guide, 'steps' | 'misplacedNotes'> & {
   sections: Omit<Guide['steps'][number], 'goal' | 'notes'>[]
 }
 
+const NO_PROGRESS: GuideProgress = { pages: [], notes: [] }
+const readProgress = (json: string | null): GuideProgress => (json ? (JSON.parse(json) as GuideProgress) : NO_PROGRESS)
+
 function readGuide(json: string): Guide {
   const stored = JSON.parse(json) as Guide | GuideWithSections
   if (!('sections' in stored)) return stored
@@ -106,6 +110,7 @@ export function createGuides(deps: GuideDeps) {
           sessionId: row.sessionId,
           error: row.error,
           guide: row.guide ? readGuide(row.guide) : null,
+          progress: readProgress(row.progress),
           updatedAt: row.updatedAt,
         }
       : null
@@ -252,6 +257,32 @@ export function createGuides(deps: GuideDeps) {
     return { guide, error: outcome.error ?? null, ...cost }
   }
 
+  /** Mark a page reviewed or a note checked on the task's guide, or undo it. In one transaction, so two
+   *  marks sent together can't overwrite each other. */
+  async function markProgress(userId: string, taskId: string, mark: ProgressMark): Promise<GuideView> {
+    db.transaction((tx) => {
+      const row = tx.select().from(reviewGuides).where(eq(reviewGuides.taskId, taskId)).get()
+      if (!row?.guide) throw new GuideError("There's no guide to mark yet.", 409)
+      const path = guidePath(readGuide(row.guide))
+      const field = 'page' in mark ? 'pages' : 'notes'
+      const key = 'page' in mark ? mark.page : mark.note
+      const known =
+        field === 'pages'
+          ? key === OVERVIEW || path.some((step) => stepPage(step.number) === key)
+          : path.some((step) => step.notes.some((note) => note.key === key))
+      if (!known) throw new GuideError(`The guide has no ${field === 'pages' ? 'page' : 'note'} "${key}".`, 400)
+      const progress = readProgress(row.progress)
+      const rest = progress[field].filter((entry) => entry !== key)
+      const next = { ...progress, [field]: mark.done ? [...rest, key] : rest }
+      tx.update(reviewGuides)
+        .set({ progress: JSON.stringify(next) })
+        .where(eq(reviewGuides.taskId, taskId))
+        .run()
+    })
+    deps.changed(taskId)
+    return view(userId, taskId)
+  }
+
   function stop(taskId: string): void {
     running.get(taskId)?.controller.abort()
   }
@@ -276,7 +307,7 @@ export function createGuides(deps: GuideDeps) {
       .where(eq(reviewGuides.status, 'generating'))
   }
 
-  return { view, generate, generateAndWait, profiles: listProfiles, stop, markStale, failInterrupted }
+  return { view, generate, generateAndWait, markProgress, profiles: listProfiles, stop, markStale, failInterrupted }
 }
 
 export type Guides = ReturnType<typeof createGuides>

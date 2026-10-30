@@ -290,6 +290,51 @@ describe('review guide routes', () => {
     expect((await call('GET', '/guide?taskId=task-1', undefined, 'task-1')).status).toBe(200)
   })
 
+  describe('progress', () => {
+    const ready = async () => {
+      await call('POST', '/guide/generate', { taskId: 'task-1' })
+      turns.at(-1)!.finish(okResult(ANSWER))
+      return settled()
+    }
+
+    it('stores a reviewed page and a checked note, answers the view, and says the guide changed', async () => {
+      expect((await ready()).guide?.progress).toEqual({ pages: [], notes: [] })
+      changed.mockClear()
+      await call('POST', '/guide/progress', { taskId: 'task-1', page: 'step-1', done: true })
+      const { status, body } = await call('POST', '/guide/progress', {
+        taskId: 'task-1',
+        note: 'app.ts#1:new:1',
+        done: true,
+      })
+      expect(status).toBe(200)
+      expect(body.guide?.progress).toEqual({ pages: ['step-1'], notes: ['app.ts#1:new:1'] })
+      expect(changed).toHaveBeenCalledTimes(2)
+      await call('POST', '/guide/progress', { taskId: 'task-1', page: 'step-1', done: false })
+      expect((await call('GET', '/guide?taskId=task-1')).body.guide?.progress.pages).toEqual([])
+    })
+
+    it("refuses a page or note the guide doesn't have, and another task's caller", async () => {
+      await ready()
+      expect((await call('POST', '/guide/progress', { taskId: 'task-1', page: 'step-9', done: true })).status).toBe(400)
+      expect(
+        (await call('POST', '/guide/progress', { taskId: 'task-1', note: 'app.ts#1:new:7', done: true })).status,
+      ).toBe(400)
+      expect((await call('POST', '/guide/progress', { taskId: 'task-1', done: true })).status).toBe(400)
+      expect(
+        (await call('POST', '/guide/progress', { taskId: 'task-1', page: 'overview', done: true }, 'task-9')).status,
+      ).toBe(404)
+      expect((await call('POST', '/guide/progress', { taskId: 'task-2', page: 'overview', done: true })).status).toBe(
+        409,
+      )
+    })
+
+    it('starts a regenerated guide with no progress', async () => {
+      await ready()
+      await call('POST', '/guide/progress', { taskId: 'task-1', page: 'overview', done: true })
+      expect((await ready()).guide?.progress).toEqual({ pages: [], notes: [] })
+    })
+  })
+
   describe('the review-guide:generate step', () => {
     const step = (taskId: string, withTable: Record<string, unknown> = {}, signal = new AbortController().signal) =>
       guideStepHandler(

@@ -1,51 +1,24 @@
-import { createEffect, createSignal, For, Match, on, onCleanup, Show, Switch } from 'solid-js'
+import { createEffect, createSignal, Match, on, onCleanup, Show, Switch } from 'solid-js'
 import {
   Alert,
   Button,
-  DiffNote,
   EmptyState,
-  Fold,
   Inline,
   Link,
-  Markdown,
   Select,
   Stack,
-  StackedDiff,
   Text,
   Toolbar,
   ToolbarSpacer,
 } from '@acorn/plugin-api/ui/tree'
 import type { AcornBridge } from '@acorn/plugin-api/ui/sdk'
-import {
-  CHANGED_CHANNEL,
-  type DiffItem,
-  type Guide,
-  type GuideNote,
-  type GuideView,
-  type StoredGuide,
-} from '../shared/guide'
-import { hunkStart } from '../shared/hunk'
+import { CHANGED_CHANNEL, type Guide, type GuideView, type ProgressMark, type StoredGuide } from '../shared/guide'
+import { GuidePath, plural, type Reveal } from './GuidePath'
 
 const API = '/v1/p/review-guide/guide'
 
-// The host refuses a tree batch over 1 MiB, so the first draw opens steps only until their hunk text
-// reaches this much. The rest open on demand.
-const FIRST_DRAW_BYTES = 256 * 1024
-
 const message = (error: unknown) =>
   error instanceof Error && error.message ? error.message : 'Something went wrong. Try again.'
-
-const plural = (count: number, one: string, many: string) => `${count} ${count === 1 ? one : many}`
-
-type Side = 'old' | 'new'
-/** Show a line, or a file's first line, in the change request's diff. */
-type Reveal = (path: string, line?: number, side?: Side) => void
-
-const TONES: Record<GuideNote['tone'], { label: string; tone: 'neutral' | 'warn' | 'danger' }> = {
-  explain: { label: 'Explains', tone: 'neutral' },
-  attention: { label: 'Look closely', tone: 'warn' },
-  risk: { label: 'Risk', tone: 'danger' },
-}
 
 /** What the coverage and note checks changed, as sentences. Empty when the harness placed every hunk
  *  once and every note on its line. */
@@ -66,8 +39,9 @@ function coverageNotes(guide: Guide): string[] {
   ]
 }
 
-/** The task pane. The host mounts it with the pane's task. */
-export function GuidePane(props: { taskId?: string; bridge: AcornBridge }) {
+/** The Guide pane draws it `wide`, and the column beside the change request's diff draws it `narrow`.
+ *  The host mounts it with the task. */
+export function GuidePane(props: { taskId?: string; bridge: AcornBridge; layout: 'wide' | 'narrow' }) {
   const [view, setView] = createSignal<GuideView | null>(null)
   const [picked, setPicked] = createSignal<string | null>(null)
   const [failure, setFailure] = createSignal('')
@@ -108,6 +82,14 @@ export function GuidePane(props: { taskId?: string; bridge: AcornBridge }) {
       setFailure(message(error))
     } finally {
       setSending(false)
+    }
+  }
+
+  const mark = async (progress: ProgressMark) => {
+    try {
+      setView(await props.bridge.api.post<GuideView>(`${API}/progress`, { taskId: props.taskId, ...progress }))
+    } catch (error) {
+      setFailure(message(error))
     }
   }
 
@@ -167,6 +149,7 @@ export function GuidePane(props: { taskId?: string; bridge: AcornBridge }) {
             {(stored) => (
               <StoredGuideView
                 stored={stored()}
+                layout={props.layout}
                 label={profileLabel(stored().profileId)}
                 onSession={(id) => void props.bridge.ui.openDestination('session', id)}
                 onReveal={(path, line, side) =>
@@ -175,6 +158,7 @@ export function GuidePane(props: { taskId?: string; bridge: AcornBridge }) {
                     .catch((error: unknown) => setFailure(message(error)))
                 }
                 onRetry={() => void send('generate')}
+                onMark={(progress) => void mark(progress)}
               />
             )}
           </Match>
@@ -186,10 +170,12 @@ export function GuidePane(props: { taskId?: string; bridge: AcornBridge }) {
 
 function StoredGuideView(props: {
   stored: StoredGuide
+  layout: 'wide' | 'narrow'
   label: string
   onSession: (sessionId: string) => void
   onReveal: Reveal
   onRetry: () => void
+  onMark: (progress: ProgressMark) => void
 }) {
   const session = () =>
     props.stored.sessionId ? (
@@ -222,121 +208,26 @@ function StoredGuideView(props: {
             <Show when={props.stored.status === 'stale'}>
               <Alert tone="warn">The change has new commits since this guide. Regenerate to cover them.</Alert>
             </Show>
-            <Stack>
-              <Markdown text={guide().summary} />
-              <Text tone="muted">
-                {`Written by ${props.label} for ${props.stored.headSha.slice(0, 7)} against ${props.stored.baseRef}.`}
-              </Text>
-              {session()}
-            </Stack>
-            <For each={coverageNotes(guide())}>{(note) => <Alert tone="warn">{note}</Alert>}</For>
-            <GuideSteps guide={guide()} author={props.label} onReveal={props.onReveal} />
+            <GuidePath
+              guide={guide()}
+              progress={props.stored.progress}
+              layout={props.layout}
+              author={props.label}
+              credit={
+                <>
+                  <Text tone="muted" wrap>
+                    {`Written by ${props.label} for ${props.stored.headSha.slice(0, 7)} against ${props.stored.baseRef}.`}
+                  </Text>
+                  {session()}
+                </>
+              }
+              coverage={coverageNotes(guide())}
+              onReveal={props.onReveal}
+              onMark={props.onMark}
+            />
           </Stack>
         )}
       </Match>
     </Switch>
-  )
-}
-
-function GuideSteps(props: { guide: Guide; author: string; onReveal: Reveal }) {
-  const blocks = () => [
-    ...props.guide.steps,
-    ...(props.guide.uncovered.length
-      ? [{ title: 'Not covered by the guide', goal: '', why: '', items: props.guide.uncovered, notes: [] }]
-      : []),
-  ]
-  // Which steps are open, by index. Seeded so the first draw stays under the batch limit.
-  const [open, setOpen] = createSignal(
-    blocks().reduce<{ bytes: number; open: Set<number> }>(
-      (state, block, index) => {
-        state.bytes += block.items.reduce((total, item) => total + item.patch.length, 0)
-        if (index === 0 || state.bytes <= FIRST_DRAW_BYTES) state.open.add(index)
-        return state
-      },
-      { bytes: 0, open: new Set() },
-    ).open,
-  )
-  const toggle = (index: number, next: boolean) =>
-    setOpen((current) => {
-      const copy = new Set(current)
-      if (next) copy.add(index)
-      else copy.delete(index)
-      return copy
-    })
-  return (
-    <For each={blocks()}>
-      {(block, index) => (
-        <Fold
-          label={block.title}
-          count={block.items.length}
-          open={open().has(index())}
-          onOpenChange={(next: boolean) => toggle(index(), next)}
-        >
-          <Show when={open().has(index())}>
-            <Stack>
-              <Show when={block.goal}>
-                <Text emphasis="strong">{`After this step you'll know ${block.goal}`}</Text>
-              </Show>
-              <Show when={block.why}>
-                <Markdown text={block.why} />
-              </Show>
-              <For each={block.items}>
-                {(item) => (
-                  <Hunk
-                    item={item}
-                    notes={block.notes.filter((note) => note.hunk === item.id)}
-                    author={props.author}
-                    onReveal={props.onReveal}
-                  />
-                )}
-              </For>
-            </Stack>
-          </Show>
-        </Fold>
-      )}
-    </For>
-  )
-}
-
-/** A hunk under a link to it in the change request's diff, named by its path and first line, with
- *  each note under the line it's on. ✦ on a line shows that line in the change request's diff. */
-function Hunk(props: { item: DiffItem; notes: GuideNote[]; author: string; onReveal: Reveal }) {
-  const start = () => hunkStart(props.item.patch)
-  const label = () => (start()?.side === 'new' ? `${props.item.path}:${start()!.line}` : props.item.path)
-  return (
-    <Stack gap="row">
-      <Link onPress={() => props.onReveal(props.item.path, start()?.line, start()?.side)}>{label()}</Link>
-      <Show when={props.item.patch} fallback={<Text>{props.item.note}</Text>}>
-        <StackedDiff
-          path={props.item.path}
-          patch={props.item.patch}
-          onActivate={(place: { side: Side; line: number }) => props.onReveal(props.item.path, place.line, place.side)}
-        >
-          <For each={props.notes}>
-            {(note) => (
-              <DiffNote
-                side={note.side}
-                line={note.line}
-                tone={TONES[note.tone].tone}
-                label={TONES[note.tone].label}
-                author={props.author}
-                title={note.title}
-              >
-                <Markdown text={note.body} />
-                <Inline>
-                  <Button
-                    size="sm"
-                    variant="ghost"
-                    onPress={() => props.onReveal(props.item.path, note.line, note.side)}
-                  >
-                    Show in diff
-                  </Button>
-                </Inline>
-              </DiffNote>
-            )}
-          </For>
-        </StackedDiff>
-      </Show>
-    </Stack>
   )
 }

@@ -5,8 +5,10 @@ sources:
   - docs/first-party-plugins/review-guide.md
   - plugins/review-guide/acorn-plugin.config.mjs
   - plugins/review-guide/src/tree/GuidePane.tsx
+  - plugins/review-guide/src/tree/GuidePath.tsx
+  - docs/first-party-plugins/review-guide/pane.md
   - plugins/review-guide/src/server/workflowStep.ts
-checked: '622edc342'
+checked: '000004794'
 ---
 
 import { Steps } from '@astrojs/starlight/components'
@@ -32,7 +34,7 @@ then shows its hunks with a few short notes on the lines worth a closer look.
 
 2. Pick a harness at the top of the guide, and click **Generate guide**.
 
-   <Checkpoint>The guide says the harness is writing it, with a link to its session. When it finishes, the guide shows a summary and the steps.</Checkpoint>
+   <Checkpoint>The guide says the harness is writing it, with a link to its session. When it finishes, the guide opens on its overview.</Checkpoint>
 
 </Steps>
 
@@ -58,19 +60,36 @@ kind = "review-guide:generate"
 - The turn's cost counts toward the run's `max_cost_usd`.
 - When the guide fails, or you stop the run, the step fails with the same message the pane shows.
 
-## What a guide shows
+## Walk the path
 
-- A summary of the whole change, and which harness wrote it for which commit.
-- One step per part of the change, in reading order. Each finishes the sentence "After this step you'll
-  know", says why the change exists, and shows its hunks. A binary file, a rename, or a mode change
-  shows its path and what changed.
-- Under a line, any note the harness pinned to it. Each has a tone, **Explains** for context,
-  **Look closely** for a judgment call, or **Risk** for a likely bug, then a title and a short body.
-  Click the arrow on a note to fold it to its title. Most hunks have none.
-- Above each hunk, a link with its file and first line, such as `src/billing/invoice.ts:42`. Click it,
-  a note's **Show in diff**, or ✦ beside any line to open the pull request's diff at that line, where
-  you can see the code around it and comment.
-- **Not covered by the guide**, last, with any hunk the harness left out.
+A guide is a path: an overview, one page per step, and a wrap-up. In the **Guide** pane a rail on the
+left lists every page with your progress. Each step's row shows its kind, its hunks, a rough number of
+minutes, and a dot for each note in its tone, so you can see where the risk is before you start. In
+the **Guide** tab beside the diff, numbered buttons along the top take its place.
+
+- **The overview** has a summary of the whole change, which harness wrote it for which commit, the
+  counts, what you'll know by the end, and a card for each step. Click **Start the path**.
+- **Each step** finishes the sentence "After this step you'll know", says why the change exists, and
+  shows its hunks. Click **Mark reviewed & continue** when you're done with it, or **Back** to go back.
+  A binary file, a rename, or a mode change shows its path and what changed.
+- **The wrap-up** lists every **Look closely** and **Risk** note as a checkbox, with a link to its step.
+  Check each one once you've made up your mind, then leave your review in the pull request's
+  **Details**. The guide never approves or comments for you.
+
+The guide remembers which steps you marked and which notes you checked, so it opens where you
+stopped, and the pane and the tab beside the diff show the same progress. **Regenerate** starts a new
+guide with no progress. In the tab beside the diff, a step shows only its noted lines, and opening it
+scrolls the diff next to it to the step's first hunk.
+
+Under a line is any note the harness pinned to it. Each has a tone, **Explains** for context, **Look
+closely** for a judgment call, or **Risk** for a likely bug, then a title and a short body. Click
+**Mark checked** on a note you've settled, or **Got it** to fold an Explains note. Most hunks have
+none.
+
+Above each hunk is a link with its file and first line, such as `src/billing/invoice.ts:42`. Click it,
+a note's **Show in diff** or **Ask a follow-up**, or ✦ beside any line to open the pull request's diff
+at that line, where you can see the code around it and comment. Hunks the harness left out are a last
+step, **Not covered by the guide**.
 
 acorn checks the harness's answer against the diff before it shows it. Every hunk appears exactly once:
 a hunk the harness left out goes to **Not covered by the guide**, a hunk it put in two steps stays in

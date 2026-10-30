@@ -1,5 +1,5 @@
 import { render } from 'solid-js/web'
-import type { JSX } from 'solid-js'
+import { createSignal, type JSX } from 'solid-js'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { DiffLine, NonCodeRow, SplitCell, StackedDiff } from './DiffRows'
 import { DiffNote } from './diffNotes'
@@ -77,6 +77,37 @@ describe('a StackedDiff with notes', () => {
     expect(note.querySelector('.diff-note-peek')!.textContent).toBe('Added')
     host.querySelector<HTMLButtonElement>('.diff-note-fold')!.click()
     expect(note.textContent).toContain('added body')
+  })
+
+  it('hands the fold to the caller with onOpenChange', () => {
+    const [open, setOpen] = createSignal(true)
+    const changes: boolean[] = []
+    const host = mount(() => (
+      <StackedDiff path="a.ts" patch={patch}>
+        <DiffNote side="new" line={4} title="Added" open={open()} onOpenChange={(next) => changes.push(next)}>
+          <span>added body</span>
+        </DiffNote>
+      </StackedDiff>
+    ))
+    host.querySelector<HTMLButtonElement>('.diff-note-fold')!.click()
+    expect(changes).toEqual([false])
+    expect(host.textContent).toContain('added body')
+    setOpen(false)
+    expect(host.textContent).not.toContain('added body')
+  })
+
+  it('keeps only the noted rows and the rows around them with noteContext', () => {
+    const long = '@@ -1,5 +1,5 @@\n one\n two\n-three\n+THREE\n four\n five'
+    const notedDiff = (context: number) =>
+      mount(() => (
+        <StackedDiff path="a.ts" patch={long} noteContext={context}>
+          <DiffNote side="new" line={3} title="Here" />
+        </StackedDiff>
+      ))
+    expect(drawn(notedDiff(0))).toEqual(['THREE', 'note:Here'])
+    const around = notedDiff(1)
+    expect(drawn(around)).toEqual(['three', 'THREE', 'note:Here', 'four'])
+    expect(around.querySelector('.diff-hunk')).toBeNull()
   })
 
   it('sends the side and line of the ✦ pressed, and shows no ✦ without onActivate', () => {

@@ -27,6 +27,7 @@ import { markTokens, type FindHighlight } from './find'
 import {
   createPinnedNotes,
   DiffNotesProvider,
+  keptRows,
   linePlace,
   placeNotes,
   type DiffLinePlace,
@@ -253,13 +254,15 @@ export function DiffLine(props: {
  * excerpt rather than the file.
  *
  * `DiffNote` children draw under the row they name (./diffNotes.ts). `onActivate` gives every line the
- * ✦ button, which sends the line's place.
+ * ✦ button, which sends the line's place. `noteContext` keeps only the noted rows and that many rows
+ * around each, for a diff whose full text is shown somewhere else.
  */
 export function StackedDiff(props: {
   path: string
   patch: string
   lineNumbers?: boolean
   onActivate?: (place: DiffLinePlace) => void
+  noteContext?: number
   children?: JSX.Element
 }) {
   const rows = createMemo(() => {
@@ -284,6 +287,7 @@ export function StackedDiff(props: {
   }))
   const { notes, pin } = createPinnedNotes<JSX.Element>()
   const placed = createMemo(() => placeNotes(rows(), notes()))
+  const kept = createMemo(() => keptRows(rows(), placed().under.keys(), props.noteContext))
   const ask = (row: CodeRow) => {
     const place = linePlace(row)
     if (place) props.onActivate?.(place)
@@ -297,39 +301,41 @@ export function StackedDiff(props: {
           </div>
           <For each={rows()}>
             {(row, index) => (
-              <Show
-                when={isCodeRow(row) ? row : null}
-                fallback={
-                  <div class="diff-row diff-hunk">
-                    <span class="diff-hunk-text">{(row as HunkRow).text}</span>
-                  </div>
-                }
-              >
-                {(code) => {
-                  const here = () => placed().under.get(index()) ?? []
-                  return (
-                    <>
-                      <div
-                        class="diff-row"
-                        classList={{
-                          'diff-add': code().kind === 'insert',
-                          'diff-del': code().kind === 'delete',
-                          'diff-noted': here().length > 0,
-                        }}
-                        data-tone={here()[0]?.props.tone}
-                      >
-                        <DiffLine
-                          r={props.lineNumbers === false ? { ...code(), oldNo: null, newNo: null } : code()}
-                          canAdd={false}
-                          addComment={async () => {}}
-                          onMutated={() => {}}
-                          askAgent={props.onActivate ? ask : undefined}
-                        />
-                      </div>
-                      <For each={here()}>{(note) => <NoteCard note={note} />}</For>
-                    </>
-                  )
-                }}
+              <Show when={kept()?.has(index()) ?? true}>
+                <Show
+                  when={isCodeRow(row) ? row : null}
+                  fallback={
+                    <div class="diff-row diff-hunk">
+                      <span class="diff-hunk-text">{(row as HunkRow).text}</span>
+                    </div>
+                  }
+                >
+                  {(code) => {
+                    const here = () => placed().under.get(index()) ?? []
+                    return (
+                      <>
+                        <div
+                          class="diff-row"
+                          classList={{
+                            'diff-add': code().kind === 'insert',
+                            'diff-del': code().kind === 'delete',
+                            'diff-noted': here().length > 0,
+                          }}
+                          data-tone={here()[0]?.props.tone}
+                        >
+                          <DiffLine
+                            r={props.lineNumbers === false ? { ...code(), oldNo: null, newNo: null } : code()}
+                            canAdd={false}
+                            addComment={async () => {}}
+                            onMutated={() => {}}
+                            askAgent={props.onActivate ? ask : undefined}
+                          />
+                        </div>
+                        <For each={here()}>{(note) => <NoteCard note={note} />}</For>
+                      </>
+                    )
+                  }}
+                </Show>
               </Show>
             )}
           </For>

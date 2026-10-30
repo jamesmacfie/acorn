@@ -472,7 +472,8 @@ Each plugin landing page above has topic pages in a folder of the same name:
   plugins](./extensibility/runtime.md), [UI and cooperation](./extensibility/ui-and-cooperation.md).
 - [first-party-plugins.md](./first-party-plugins.md): [Plugins to
   copy](./first-party-plugins/examples.md), [The review guide
-  plugin](./first-party-plugins/review-guide.md), [First-party plugins in the
+  plugin](./first-party-plugins/review-guide.md), [The review guide's
+  pane](./first-party-plugins/review-guide/pane.md), [First-party plugins in the
   terminal](./first-party-plugins/terminal.md).
 
 ## Mobile web app proposal

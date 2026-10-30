@@ -15,6 +15,7 @@ import { annotationsFor } from '@acorn/client-core/host/annotations/annotations.
 import {
   createPinnedNotes,
   DiffNotesProvider,
+  keptRows,
   linePlace,
   placeNotes,
   type DiffLinePlace,
@@ -94,12 +95,14 @@ export function NonCodeRow(props: { row: Exclude<DiffRowT, CodeRow> }) {
 
 /** reduced: the file header and unified rows, with each `DiffNote` child under its row at the code
  *  column. A cell has no hover to show ✦ on, so with `onActivate` each numbered line is a stop instead,
- *  and pressing it sends the line's place. */
+ *  and pressing it sends the line's place. `noteContext` keeps only the noted rows and that many rows
+ *  around each, as on the DOM. */
 export function StackedDiff(props: {
   path: string
   patch: string
   lineNumbers?: boolean
   onActivate?: (place: DiffLinePlace) => void
+  noteContext?: number
   children?: JSX.Element
 }) {
   const rows = createMemo(() => {
@@ -123,24 +126,27 @@ export function StackedDiff(props: {
   })
   const { notes, pin } = createPinnedNotes<JSX.Element>()
   const placed = createMemo(() => placeNotes(rows(), notes()))
+  const kept = createMemo(() => keptRows(rows(), placed().under.keys(), props.noteContext))
   return (
     <DiffNotesProvider value={pin}>
       <box flexDirection="column" flexShrink={0}>
         <FileHead file={head()} />
         <For each={rows()}>
-          {(row, index) =>
-            isCodeRow(row) ? (
-              <>
-                <StackedLine
-                  r={props.lineNumbers === false ? { ...row, oldNo: null, newNo: null } : row}
-                  onActivate={props.onActivate}
-                />
-                <For each={placed().under.get(index()) ?? []}>{(note) => <NoteLines note={note} />}</For>
-              </>
-            ) : (
-              <NonCodeRow row={row as Exclude<DiffRowT, CodeRow>} />
-            )
-          }
+          {(row, index) => (
+            <Show when={kept()?.has(index()) ?? true}>
+              {isCodeRow(row) ? (
+                <>
+                  <StackedLine
+                    r={props.lineNumbers === false ? { ...row, oldNo: null, newNo: null } : row}
+                    onActivate={props.onActivate}
+                  />
+                  <For each={placed().under.get(index()) ?? []}>{(note) => <NoteLines note={note} />}</For>
+                </>
+              ) : (
+                <NonCodeRow row={row as Exclude<DiffRowT, CodeRow>} />
+              )}
+            </Show>
+          )}
         </For>
         <For each={placed().unplaced}>{(note) => <NoteLines note={note} unplaced />}</For>
         {props.children}

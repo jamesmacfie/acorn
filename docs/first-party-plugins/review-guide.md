@@ -133,7 +133,12 @@ hunk's rows and line numbers with `hunkRows` and `hunkStart` in `src/shared/hunk
 ## Storage
 
 One table, `review_guides`, in the plugin's own database, keyed by task, base commit, and head commit.
-A row holds the profile, the status, the checked guide as JSON, the error, the session ID, and its times.
+A row holds the profile, the status, the checked guide as JSON, the error, the session ID, the
+reader's progress, and its times. `progress` is JSON, `GuideProgress` in `src/shared/guide.ts`: the
+pages marked reviewed, as `overview` and `step-<n>`, and the keys of the notes marked checked. A note's
+key is its hunk ID, side, and line, such as `src/billing/invoice.ts#2:new:42`, with `:2` added for a
+second note on the same row. Progress is null until the reader marks something. It lives on the
+guide's row, so a regenerated guide starts with none, and a stale guide keeps its progress.
 A guide stored before steps had goals and notes holds `sections` instead of `steps`. It reads as steps
 with an empty goal and no notes, so a guide the person already paid for still shows.
 A task keeps one guide: generating a new one removes the guide for any earlier commits. The rows of a
@@ -150,39 +155,28 @@ One generation runs per task at a time. A second request while one runs gets the
 
 ## Routes
 
-The three guide routes each answer the pane's whole view: whether the task has a change request, the profiles, the chosen
-profile, and the newest guide. A task-scoped caller is held to its own task.
+The four guide routes each answer the pane's whole view: whether the task has a change request, the
+profiles, the chosen profile, and the newest guide with its progress. A task-scoped caller is held to
+its own task.
 
 | Route | What it does |
 | --- | --- |
 | `GET /v1/p/review-guide/guide?taskId=` | Reads the view |
 | `POST /v1/p/review-guide/guide/generate` | `{ taskId, profileId? }`. Saves the profile, reads the change, and starts the turn |
 | `POST /v1/p/review-guide/guide/stop` | `{ taskId }`. Aborts the running turn |
+| `POST /v1/p/review-guide/guide/progress` | `{ taskId, page?, note?, done }`, with one of `page` or `note`. Marks a page reviewed or a note checked, or undoes it. A page or note the guide doesn't have is a 400, and a task with no guide is a 409 |
 | `GET /v1/p/review-guide/profiles` | `{ options: [{ value, label }] }`, the workflow step's harness choices. Not a view |
 
-A status change sends `plugin:review-guide:changed`, and the pane reads the view again.
+A status change or a progress mark sends `plugin:review-guide:changed`, and every surface showing
+the guide reads the view again. That's how a step marked in the pane shows as done beside the diff.
 
 ## The pane
 
 **Guide** is a task pane drawn as a remote tree, so the desktop and the terminal client draw the same
-one. Its header has the harness picker and **Generate guide**, **Regenerate**, or **Stop**. Each step
-is a fold with its goal, its "why", and each hunk in `StackedDiff`, under a link named by its path and
-first line, such as `src/billing/invoice.ts:42`. Each note is a `DiffNote` under the line it's on, in
-the inline agent card's shape: the harness's name, the tone's word, the title, the body as Markdown,
-and **Show in diff**. A note folds to its header. A hunk with no new side, such as a deleted file's,
-starts on its old side, and its link shows only the path. Pressing a link or **Show in diff**, or ✦ on
-any line, opens the task's change request diff at that line
-([showing a line in the change request](../plugins/frames.md#showing-a-line-in-the-change-request)).
-In the terminal client it opens the file in the editor instead, and ✦ is Enter on the line.
-
-A tree batch is capped at 1 MiB, so the first draw opens steps only until their hunk text reaches
-256 KiB, and the rest open on demand. While a guide generates, the pane links to the session's
-transcript through its `session` destination.
-
-The same tree fills the `review-panel` point on GitHub, GitLab, and Bitbucket, so a task's change
-request view has a **Guide** tab beside the diff
-([shared review views](../plugins/change-request-ui.md#extension-points)). The pane stays for a task
-with no change request view open.
+one. It reads as a path: an overview, one page per step, and a wrap-up, with progress saved on the
+guide's row. The Guide pane draws it wide, with a rail, and the column beside the change request's
+diff draws it narrow, with a stepper and only the noted lines. See
+[the review guide's pane](./review-guide/pane.md).
 
 ## Limits
 

@@ -1,0 +1,1 @@
+ALTER TABLE `review_guides` ADD `progress` text;

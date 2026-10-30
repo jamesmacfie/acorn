@@ -8,6 +8,13 @@
       "when": 1793313429299,
       "tag": "0000_loud_blindfold",
       "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "6",
+      "when": 1793350723239,
+      "tag": "0001_clever_boom_boom",
+      "breakpoints": true
     }
   ]
 }

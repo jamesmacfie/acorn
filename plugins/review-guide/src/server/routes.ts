@@ -4,7 +4,8 @@ import { GuideError, type Guides } from './guides'
 const failure = (status: number, code: string, message: string) =>
   Response.json({ error: { code, message, requestId: '', retryable: status >= 500 } }, { status })
 
-/** `GET /guide?taskId=`, `POST /guide/generate`, and `POST /guide/stop`. Each answers the pane's view.
+/** `GET /guide?taskId=`, `POST /guide/generate`, `POST /guide/stop`, and `POST /guide/progress`. Each
+ *  answers the pane's view.
  *  `GET /profiles` answers the workflow step's harness choices. */
 export function createGuideFetch(guides: Guides): PluginFetchHandler {
   return async (request, context) => {
@@ -30,6 +31,13 @@ export function createGuideFetch(guides: Guides): PluginFetchHandler {
         case 'POST /guide/stop':
           guides.stop(taskId)
           return Response.json(await guides.view(context.userId, taskId))
+        case 'POST /guide/progress': {
+          const { page, note, done } = body
+          const named = typeof page === 'string' ? { page } : typeof note === 'string' ? { note } : null
+          if (!named || (page !== undefined && note !== undefined) || typeof done !== 'boolean')
+            return failure(400, 'bad_request', 'Name one page or one note, and say whether it is done.')
+          return Response.json(await guides.markProgress(context.userId, taskId, { ...named, done }))
+        }
         default:
           return failure(404, 'not_found', 'Not found.')
       }

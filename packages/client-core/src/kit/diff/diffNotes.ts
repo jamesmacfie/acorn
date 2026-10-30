@@ -4,7 +4,7 @@
 // that draws nothing where it stands: it hands its props to the `StackedDiff` above it, which draws
 // it under the row it names. Outside a `StackedDiff` there is nobody to hand them to, so the note is
 // omitted, as a node the host doesn't know is.
-import { createContext, createSignal, onCleanup, useContext, type Accessor, type Setter } from 'solid-js'
+import { createContext, createSignal, onCleanup, useContext, type Accessor } from 'solid-js'
 import type { CodeRow, HunkRow } from './diffModel'
 
 /** One line of a diff, named the way a review names it: deleted rows on the old side, everything
@@ -19,6 +19,10 @@ export type DiffNoteProps<Children = unknown> = DiffLinePlace & {
   author?: string
   /** One line, and all a folded note shows. */
   title?: string
+  /** Controlled mode, as `Fold`'s: with `onOpenChange` the caller owns the fold, and `open` defaults
+   *  to true. Without it the note keeps its own fold and starts open. */
+  open?: boolean
+  onOpenChange?: (open: boolean) => void
   /** The body and the plugin's own buttons. */
   children?: Children
 }
@@ -28,7 +32,7 @@ export type DiffNoteProps<Children = unknown> = DiffLinePlace & {
 export type PinnedNote<Children = unknown> = {
   props: DiffNoteProps<Children>
   folded: Accessor<boolean>
-  setFolded: Setter<boolean>
+  setFolded: (folded: boolean) => void
 }
 
 const DiffNotesContext = createContext<(note: PinnedNote) => () => void>()
@@ -48,7 +52,9 @@ export const DiffNotesProvider = DiffNotesContext.Provider
 /** The kit node. It draws nothing itself; see the top of this file. */
 export function DiffNote(props: DiffNoteProps) {
   const pin = useContext(DiffNotesContext)
-  const [folded, setFolded] = createSignal(false)
+  const [local, setLocal] = createSignal(false)
+  const folded = () => (props.onOpenChange ? props.open === false : local())
+  const setFolded = (next: boolean) => (props.onOpenChange ? props.onOpenChange(!next) : setLocal(next))
   if (pin) onCleanup(pin({ props, folded, setFolded }))
   return null
 }
@@ -56,6 +62,23 @@ export function DiffNote(props: DiffNoteProps) {
 export const linePlace = (row: CodeRow): DiffLinePlace | null => {
   const line = row.kind === 'delete' ? row.oldNo : row.newNo
   return line == null ? null : { side: row.kind === 'delete' ? 'old' : 'new', line }
+}
+
+/** With `context`, the indices of the rows a `StackedDiff` keeps: each noted row and `context` code
+ *  rows either side of it, with no hunk headers. Undefined keeps every row. */
+export function keptRows(
+  rows: readonly (HunkRow | CodeRow)[],
+  noted: Iterable<number>,
+  context: number | undefined,
+): Set<number> | undefined {
+  if (context === undefined) return undefined
+  const code = rows.flatMap((row, index) => (row.kind === 'hunk' ? [] : [index]))
+  const kept = new Set<number>()
+  for (const index of noted) {
+    const at = code.indexOf(index)
+    for (const near of code.slice(Math.max(0, at - context), at + context + 1)) kept.add(near)
+  }
+  return kept
 }
 
 /** Which row each note sits under, by index into `rows`: the first code row at its side and line.

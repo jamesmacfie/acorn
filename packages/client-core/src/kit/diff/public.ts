@@ -7,6 +7,7 @@ export {
   createPinnedNotes,
   DiffNote,
   DiffNotesProvider,
+  keptRows,
   linePlace,
   placeNotes,
   type DiffLinePlace,

@@ -17,6 +17,8 @@ export const reviewGuides = sqliteTable(
     // The checked guide as JSON (shared/guide.ts `Guide`). Null until a turn answers.
     guide: text('guide'),
     error: text('error'),
+    // How far the reader got, as JSON (shared/guide.ts `GuideProgress`). Null until they mark something.
+    progress: text('progress'),
     // The managed agent session the turn runs in, once it has one.
     sessionId: text('session_id'),
     createdAt: integer('created_at').notNull(),
