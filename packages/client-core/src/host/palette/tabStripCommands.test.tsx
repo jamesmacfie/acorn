@@ -40,6 +40,8 @@ it('offers a palette row for each tab on screen except the open one, and picks t
 
     await executeCommand(conversation.id)
     expect(active()).toBe('conversation')
+    // Focus goes with it, so the palette does not hand it back to the tab that was open.
+    expect(document.activeElement?.textContent).toContain('Conversation')
 
     // A strip that is mounted but not drawn offers nothing.
     rects.mockReturnValue([] as unknown as DOMRectList)

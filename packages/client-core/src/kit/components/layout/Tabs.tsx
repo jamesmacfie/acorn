@@ -70,7 +70,12 @@ export function Tabs(props: {
       label: () => props.ariaLabel,
       tabs,
       active: () => props.active,
-      select: (id) => props.onChange(id),
+      // Focus follows, as it does for a click: otherwise the palette hands focus back to the tab
+      // that was open, which keeps its focus ring and the arrow keys.
+      select: (id) => {
+        props.onChange(id)
+        stripRef?.querySelector<HTMLElement>(`[data-collection-key="${CSS.escape(id)}"]`)?.focus()
+      },
       shown: () => !!stripRef?.isConnected && stripRef.getClientRects().length > 0,
     }),
   )

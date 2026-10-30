@@ -75,11 +75,14 @@ export function createOverlayFocus(close: () => void): OverlayFocus {
     release: () => {
       if (activeClose === close) activeClose = null
       // Return focus to wherever it was before we grabbed it, so Esc / backdrop / re-toggle dismissal
-      // doesn't strand keyboard focus on <body>. Skip if that element is gone: a pick that navigated
-      // or opened a file unmounted it, and that action's own focus target wins.
+      // doesn't strand keyboard focus on <body>. Skip if that element is gone, or if the pick moved
+      // focus somewhere else: a tab the palette switched to, a file it opened. That action's own focus
+      // target wins.
       const prev = prevFocus
       prevFocus = null
-      if (prev?.isConnected && prev !== document.activeElement) prev.focus()
+      const current = document.activeElement
+      const unclaimed = !current || current === document.body || current === inputRef || !current.isConnected
+      if (prev?.isConnected && prev !== current && unclaimed) prev.focus()
     },
     setInputRef: (el) => {
       inputRef = el
