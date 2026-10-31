@@ -170,6 +170,18 @@ its own task.
 A status change or a progress mark sends `plugin:review-guide:changed`, and every surface showing
 the guide reads the view again. That's how a step marked in the pane shows as done beside the diff.
 
+## In the Diff tab
+
+The manifest fills `github:diff-line`, `gitlab:diff-line`, and `bitbucket:diff-line` from
+`POST /v1/p/review-guide/marks`, so a reviewer who never opens the guide still sees its notes
+([marks from other plugins](../diff-rendering/review.md#marks-from-other-plugins)). For each task the
+keys name, the route reads the newest guide once. It answers only for a `ready` guide whose head commit
+is the change request's head, from `tasks.changeRequestDetail`, because a guide on an unpushed commit
+would put notes on the wrong lines. Each note on an asked row becomes a mark with the note's title and
+the `sparkles` icon: `info` for Explains, `warn` for Look closely, and `danger` for Risk. A task-scoped
+caller asking about another task gets a 404. A mark has no action. Every `changed` frame refreshes the
+plugin's descriptors, so the marks follow a new or stale guide.
+
 ## The pane
 
 **Guide** is a task pane drawn as a remote tree, so the desktop and the terminal client draw the same

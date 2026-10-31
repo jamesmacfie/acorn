@@ -33,6 +33,18 @@ describe('a diff row as an annotation key', () => {
     })
   })
 
+  // The code hosts declare `task` after the row's three, and their diff adds it to every row.
+  it('adds the fields that hold for the whole diff, and the row keeps its own', () => {
+    const key = annotationKey(row(), { task: 'task-1', line: 7 })
+    expect(key).toEqual({ file: 'src/auth.ts', line: 42, side: 'new', task: 'task-1' })
+    expect(annotationKeyOf([...DIFF_ANNOTATION_FIELDS, 'task'], key).split('\u0000')).toEqual([
+      'src/auth.ts',
+      '42',
+      'new',
+      'task-1',
+    ])
+  })
+
   it('looks up under the same string the owner’s declared field order mints', () => {
     const key = annotationKey(row())
     const lookup = annotationKeyOf([...DIFF_ANNOTATION_FIELDS], key)

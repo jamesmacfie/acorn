@@ -8,7 +8,7 @@ sources:
   - plugins/review-guide/src/tree/GuidePath.tsx
   - docs/first-party-plugins/review-guide/pane.md
   - plugins/review-guide/src/server/workflowStep.ts
-checked: '7d0df9c88'
+checked: 'daba447b3'
 ---
 
 import { Steps } from '@astrojs/starlight/components'
@@ -22,7 +22,7 @@ tests, docs, and wiring come after. Each step says what you'll know after it and
 then shows its hunks with a few short notes on the lines worth a closer look.
 
 <PluginFacts id="review-guide">
-  <Fragment slot="adds">The **Guide** pane on a task, a **Guide** tab in a task's pull request or merge request view, and the **Open review guide** command.</Fragment>
+  <Fragment slot="adds">The **Guide** pane on a task, a **Guide** tab in a task's pull request or merge request view, its notes under their lines in the **Diff** tab, and the **Open review guide** command.</Fragment>
   <Fragment slot="needs">A task with a pull request on GitHub, a merge request on GitLab, or a pull request on Bitbucket, and Claude Code or Codex installed.</Fragment>
 </PluginFacts>
 
@@ -104,6 +104,13 @@ with the wrong line number moves to the one line that has its text. A note whose
 or more than one, is dropped, and so is any past three on a hunk or 40 in a guide. The pane says how many
 it dropped, so a note never sits on a line it doesn't describe.
 
+## In the Diff tab
+
+You don't have to open the guide to see what it flagged. Each note's title also shows under its line in
+the pull request's own **Diff** tab, with ✦ and the plugin's name, colored by its tone. The marks only
+show while the guide is up to date and its commit is the pull request's latest, so they never sit on
+lines that moved. A mark doesn't open its step. To ask about the line, click ✦ beside it, as on any line.
+
 ## When the change moves on
 
 A new commit on the task marks the guide out of date, and the pane says the change has new commits.
@@ -132,4 +139,4 @@ file in the **Editor** pane at that line, rather than in the diff.
 - A change larger than 16 MB can't have a guide.
 - The guide covers the worktree's latest commit, which can be ahead of the pull request when a commit
   hasn't been pushed. A hunk's link then lands on its file's header when the pull request's diff doesn't
-  have the line.
+  have the line, and the **Diff** tab shows none of its notes until you push.

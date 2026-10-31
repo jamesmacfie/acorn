@@ -6,8 +6,9 @@
 // Its own module, with no Solid in it, so a client entry and a bare-Node test can both reach it.
 
 // The fields the shared viewer mints per row, in the order it mints them (`annotationKey` in
-// client-core). A key declared in any other order looks up under a string nothing ever wrote.
-export const DIFF_LINE_KEY = ['file', 'line', 'side'] as const
+// client-core), then the task `ChangeRequestDiff` adds to every row: `''` on a diff browsed outside a
+// task. A key declared in any other order looks up under a string nothing ever wrote.
+export const DIFF_LINE_KEY = ['file', 'line', 'side', 'task'] as const
 
 /** How many contributors fit on the overview before the host draws a disclosure. */
 export const SUMMARY_BADGES_MAX = 4
@@ -20,7 +21,7 @@ export type SummaryBadgesProps = { owner: string; repo: string; number: string }
 export type ReviewPanelProps = SummaryBadgesProps & { taskId: string }
 
 /** The three points, as `ctx.extensionPoints.register` takes them. `noun` is the host's word, such as
- *  `Pull request`. Marks on a line of the diff, keyed the way the shared viewer keys a row, room
+ *  `Pull request`. Marks on a line of the diff, keyed the way the shared viewer keys a row plus its task, room
  *  beside the state and checks on the overview, where the owner's own facts stay, and a tab of its own
  *  beside the diff, such as a review guide. */
 export const changeRequestPoints = (noun: string) =>

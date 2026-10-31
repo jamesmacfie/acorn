@@ -21,7 +21,8 @@ Every GitHub surface is a host layout filled with kit components; the plugin shi
 | The importer | A titled card on the Projects page of setting rows, one per repository, with **Clone** and **Link folder** beside it. A repository that already has a project says "Added as" that project and keeps both buttons. In onboarding the wizard is the frame. |
 
 Three places let another plugin in. `github:diff-line` takes marks on a line of a pull request's diff,
-keyed by file, line and side, the same shape the Changes tab opens over the working tree.
+keyed by file, line, side, and task: the Changes tab's shape over the working tree, plus the task whose
+pull request is open.
 `github:summary-badges` is a `stack` slot on the overview, so github's own facts stay and up to four
 contributors are added beside them ([plugins.md](../plugins.md) § Cooperative extension points).
 `github:review-panel` is one tree, drawn as a tab beside a task's diff

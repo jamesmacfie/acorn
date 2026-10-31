@@ -209,12 +209,14 @@ export function ChangeRequestDiff(props: {
   // What another plugin knows about a line of this diff — coverage, a lint result — drawn under the
   // row it belongs to. The host fetches, batches and stamps; this only names the point
   // (docs/plugins/cooperative-extension-points.md § Cooperative extension points, the `annotation` kind).
+  // Each key names the task, so a mark answered for one task's diff never draws on another's. A diff
+  // browsed outside a task asks with an empty one.
   // A sibling of the pane rather than a wrapper: DiffPane is a fragment that fills its container, and
   // the warning stays above it whichever file is on screen.
   return (
     <>
       <Show when={props.warning()}>{(message) => <Alert tone="warn">{message()}</Alert>}</Show>
-      <DiffPane source={diffSource} annotations={props.annotations} />
+      <DiffPane source={diffSource} annotations={props.annotations} annotationKeyFields={{ task: taskId ?? '' }} />
     </>
   )
 }

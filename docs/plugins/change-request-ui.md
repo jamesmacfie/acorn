@@ -91,7 +91,10 @@ host owns the reads, the search past the loaded pages, each row's checks, and th
 Each code host opens its own `diff-line`, `summary-badges`, and `review-panel` points, so GitHub's are
 `github:diff-line`, `github:summary-badges`, and `github:review-panel`, and GitLab's and Bitbucket's
 start `gitlab:` and `bitbucket:`. Register all three with `changeRequestPoints(noun)`. `DIFF_LINE_KEY`
-is the `diff-line` key, `file`, `line`, and `side`. A `summary-badges` contributor gets
+is the `diff-line` key, `file`, `line`, `side`, and `task`. `ChangeRequestDiff` adds the task it's drawn
+in to every row's key, or `''` without one, so a contributor's marks for one task's diff never draw on
+another's ([marks from other plugins](../diff-rendering/review.md#marks-from-other-plugins)). A
+`summary-badges` contributor gets
 `{ owner, repo, number }`, where `owner` is the repository's namespace.
 
 `review-panel` holds one tree, which `ChangeRequestView` draws as a tab named by the contributor's

@@ -6,6 +6,7 @@ import { guidePath, OVERVIEW, stepPage } from '../shared/path'
 import { reviewGuides } from '../node/schema'
 import { ChangeError, readChange, type Change } from './change'
 import { checkCoverage } from './coverage'
+import { noteMarks, type DiffLineKey, type DiffLineMark } from './marks'
 import { checkNotes } from './notes'
 import { GUIDE_SCHEMA, guideTurn, type GuideAnswer } from './prompt'
 
@@ -87,20 +88,15 @@ export function createGuides(deps: GuideDeps) {
       .set({ ...patch, updatedAt: Date.now() })
       .where(where(change, taskId))
 
-  async function view(userId: string, taskId: string): Promise<GuideView> {
-    const [requests, profiles, saved, rows] = await Promise.all([
-      deps.tasks.changeRequests(taskId),
-      listProfiles(),
-      deps.prefs.read(userId, PROFILE_KEY),
-      db
-        .select()
-        .from(reviewGuides)
-        .where(eq(reviewGuides.taskId, taskId))
-        .orderBy(desc(reviewGuides.updatedAt))
-        .limit(1),
-    ])
-    const row = rows[0]
-    const guide: StoredGuide | null = row
+  /** The task's newest guide, whatever its status. */
+  async function newest(taskId: string): Promise<StoredGuide | null> {
+    const [row] = await db
+      .select()
+      .from(reviewGuides)
+      .where(eq(reviewGuides.taskId, taskId))
+      .orderBy(desc(reviewGuides.updatedAt))
+      .limit(1)
+    return row
       ? {
           status: row.status,
           profileId: row.profileId,
@@ -114,6 +110,15 @@ export function createGuides(deps: GuideDeps) {
           updatedAt: row.updatedAt,
         }
       : null
+  }
+
+  async function view(userId: string, taskId: string): Promise<GuideView> {
+    const [requests, profiles, saved, guide] = await Promise.all([
+      deps.tasks.changeRequests(taskId),
+      listProfiles(),
+      deps.prefs.read(userId, PROFILE_KEY),
+      newest(taskId),
+    ])
     return {
       hasChangeRequest: requests.some((request) => request.role === 'primary'),
       profiles,
@@ -283,6 +288,16 @@ export function createGuides(deps: GuideDeps) {
     return view(userId, taskId)
   }
 
+  /** The marks a ready guide puts under the change request's diff rows. None when the guide was made
+   *  on a commit the change request doesn't have yet, because its lines may not be the diff's. */
+  async function marks(taskId: string, keys: DiffLineKey[]): Promise<DiffLineMark[]> {
+    const stored = await newest(taskId)
+    if (stored?.status !== 'ready' || !stored.guide) return []
+    const detail = await deps.tasks.changeRequestDetail(taskId)
+    if (!detail?.headSha || detail.headSha !== stored.headSha) return []
+    return noteMarks(stored.guide, keys)
+  }
+
   function stop(taskId: string): void {
     running.get(taskId)?.controller.abort()
   }
@@ -307,7 +322,17 @@ export function createGuides(deps: GuideDeps) {
       .where(eq(reviewGuides.status, 'generating'))
   }
 
-  return { view, generate, generateAndWait, markProgress, profiles: listProfiles, stop, markStale, failInterrupted }
+  return {
+    view,
+    generate,
+    generateAndWait,
+    markProgress,
+    marks,
+    profiles: listProfiles,
+    stop,
+    markStale,
+    failInterrupted,
+  }
 }
 
 export type Guides = ReturnType<typeof createGuides>

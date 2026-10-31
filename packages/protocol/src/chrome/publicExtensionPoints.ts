@@ -52,6 +52,13 @@ const DETAIL = {
   note: "drawn by the host above the owner's detail view, outside its tree",
 } as const
 
+const CHANGE_REQUEST_DIFF_LINE = {
+  kind: 'annotation',
+  key: ['file', 'line', 'side', 'task'],
+  max: 4,
+  note: '`task` is the task whose change request diff is open, or "" on a diff browsed outside a task; answer each mark with the key you were asked about',
+} as const
+
 const REVIEW_PANEL = {
   kind: 'remote',
   mode: 'stack',
@@ -189,13 +196,13 @@ export const PUBLIC_EXTENSION_POINTS: readonly PublicExtensionPoint[] = [
     note: 'asked about the cursor line of a saved file; `line` is one-based and `revision` is the SHA-256 of the file on disk',
     terminal: 'never asked, because the terminal edits in `$EDITOR`',
   },
-  { id: 'github:diff-line', kind: 'annotation', key: ['file', 'line', 'side'], max: 4 },
+  { id: 'github:diff-line', ...CHANGE_REQUEST_DIFF_LINE },
   { id: 'github:summary-badges', kind: 'remote', mode: 'stack', max: 4, props: '{ owner, repo, number }' },
   { id: 'github:review-panel', ...REVIEW_PANEL },
-  { id: 'bitbucket:diff-line', kind: 'annotation', key: ['file', 'line', 'side'], max: 4 },
+  { id: 'bitbucket:diff-line', ...CHANGE_REQUEST_DIFF_LINE },
   { id: 'bitbucket:summary-badges', kind: 'remote', mode: 'stack', max: 4, props: '{ owner, repo, number }' },
   { id: 'bitbucket:review-panel', ...REVIEW_PANEL },
-  { id: 'gitlab:diff-line', kind: 'annotation', key: ['file', 'line', 'side'], max: 4 },
+  { id: 'gitlab:diff-line', ...CHANGE_REQUEST_DIFF_LINE },
   { id: 'gitlab:summary-badges', kind: 'remote', mode: 'stack', max: 4, props: '{ owner, repo, number }' },
   { id: 'gitlab:review-panel', ...REVIEW_PANEL },
   {

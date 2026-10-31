@@ -225,14 +225,15 @@ export function AnnotationMarks(props: { point: string; itemKey: PluginAnnotatio
  *  Unmarked lines keep the single-text renderable from `DiffLine`. */
 const GUTTER_CELLS = 10
 
-export function AnnotatedDiffLine(props: { r: CodeRow; point?: string }) {
-  const marks = () => (props.point ? annotationsFor(props.point, annotationKey(props.r)).length : 0)
+export function AnnotatedDiffLine(props: { r: CodeRow; point?: string; keyFields?: PluginAnnotationKey }) {
+  const key = () => annotationKey(props.r, props.keyFields)
+  const marks = () => (props.point ? annotationsFor(props.point, key()).length : 0)
   return (
     <Show when={props.point && marks()} fallback={<DiffLine r={props.r} />}>
       <box flexDirection="column" flexShrink={0}>
         <DiffLine r={props.r} />
         <box flexDirection="row" paddingLeft={GUTTER_CELLS} flexShrink={0} overflow="hidden">
-          <AnnotationMarks point={props.point!} itemKey={annotationKey(props.r)} />
+          <AnnotationMarks point={props.point!} itemKey={key()} />
         </box>
       </box>
     </Show>

@@ -9,6 +9,7 @@ import {
   type DiffSegmentPayload,
   type DiffSegmentRequest,
 } from '@acorn/diff-document/document'
+import type { PluginAnnotationKey } from '@acorn/protocol/extensionPoints.ts'
 import { annotationKey } from '@acorn/client-core/host/annotations/annotationKey.ts'
 import { requestAnnotations } from '@acorn/client-core/host/annotations/annotations.ts'
 import { Line, runStyle } from '../cells'
@@ -50,7 +51,12 @@ type TuiDiffSource = {
  *  window; spacers preserve its total height and let `ScrollViewport` own keys, wheel, and offset.
  *  Annotation rows add one visual line that the topology does not count. A variable-height row kind
  *  would require cumulative row offsets (docs/diff-rendering/document.md § The document). */
-export function DiffPane(props: { source: TuiDiffSource; annotations?: string }) {
+export function DiffPane(props: {
+  source: TuiDiffSource
+  annotations?: string
+  /** Fields added to every row's annotation key, as the desktop's `DiffPane` takes them. */
+  annotationKeyFields?: PluginAnnotationKey
+}) {
   // Every file header and segment at its first line. Bounded by segments, not rows: the whole of what
   // the window is found in. A header is block `-1`.
   const blocks = createMemo(() => {
@@ -153,7 +159,9 @@ export function DiffPane(props: { source: TuiDiffSource; annotations?: string })
   // `requestAnnotations` compares the key set, so a render that moves nothing re-asks nothing
   // (client-core/host/annotations).
   const keys = createMemo(() =>
-    window().rows.flatMap((entry) => (entry.code && isCode(entry.code) ? [annotationKey(entry.code)] : [])),
+    window().rows.flatMap((entry) =>
+      entry.code && isCode(entry.code) ? [annotationKey(entry.code, props.annotationKeyFields)] : [],
+    ),
   )
   createEffect(() => {
     const point = props.annotations
@@ -202,7 +210,11 @@ export function DiffPane(props: { source: TuiDiffSource; annotations?: string })
               >
                 {(row) => (
                   <Show when={isCode(row())} fallback={<NonCodeRow row={row() as Exclude<DiffRowT, CodeRow>} />}>
-                    <AnnotatedDiffLine r={row() as CodeRow} point={props.annotations} />
+                    <AnnotatedDiffLine
+                      r={row() as CodeRow}
+                      point={props.annotations}
+                      keyFields={props.annotationKeyFields}
+                    />
                   </Show>
                 )}
               </Show>

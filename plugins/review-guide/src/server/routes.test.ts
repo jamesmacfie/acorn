@@ -111,8 +111,11 @@ describe('review guide routes', () => {
   let turns: { request: AgentSessionExecuteRequest; finish(result: AgentSessionExecuteResult): void }[]
   let changed: ReturnType<typeof vi.fn<(taskId: string) => void>>
   const prefs = new Map<string, string>()
+  // The change request's head commit, as its code host reports it.
+  let pullHead: string | null = null
 
   beforeEach(() => {
+    pullHead = null
     repo = makeWorktree()
     pluginDb = makeTestPluginDb('review-guide')
     turns = []
@@ -137,7 +140,9 @@ describe('review guide routes', () => {
               ]
             : [],
         changeRequestDetail: async (taskId) =>
-          taskId === 'task-1' ? { number: 7, title: 'Bump', body: null, changedFiles: [], baseRef: 'main' } : null,
+          taskId === 'task-1'
+            ? { number: 7, title: 'Bump', body: null, changedFiles: [], baseRef: 'main', headSha: pullHead }
+            : null,
       },
       git,
       prefs: {
@@ -332,6 +337,79 @@ describe('review guide routes', () => {
       await ready()
       await call('POST', '/guide/progress', { taskId: 'task-1', page: 'overview', done: true })
       expect((await ready()).guide?.progress).toEqual({ pages: [], notes: [] })
+    })
+  })
+
+  describe('marks in the diff', () => {
+    const key = (line: number, task = 'task-1') => ({ file: 'app.ts', line, side: 'new', task })
+    const marks = async (keys: object[], callerTask?: string) => {
+      const response = await fetch(
+        new Request('http://plugin/marks', { method: 'POST', body: JSON.stringify({ keys }) }),
+        {
+          userId: 'alice',
+          principal: callerTask
+            ? { kind: 'internal', userId: 'alice', scope: 'task', taskId: callerTask }
+            : { kind: 'device', userId: 'alice' },
+        } as Parameters<typeof fetch>[1],
+      )
+      return { status: response.status, items: ((await response.json()) as { items?: unknown[] }).items }
+    }
+    // A guide whose one note has `tone`, on the change request's head unless the code host says otherwise.
+    const ready = async (tone = 'attention') => {
+      await call('POST', '/guide/generate', { taskId: 'task-1' })
+      const answer = {
+        ...ANSWER,
+        steps: [{ ...ANSWER.steps[0]!, notes: [{ ...note(1, 'export const a = 2'), tone }] }],
+      }
+      turns.at(-1)!.finish(okResult(answer))
+      const view = await settled()
+      pullHead = view.guide!.headSha
+      return view
+    }
+
+    it('answers each note on an asked row with its title, under the key it was asked about', async () => {
+      await ready()
+      expect(await marks([key(1), key(2)])).toEqual({
+        status: 200,
+        items: [{ key: key(1), severity: 'warn', text: 'Callers read a.', icon: 'sparkles' }],
+      })
+    })
+
+    it('colors a mark by its note’s tone', async () => {
+      for (const [tone, severity] of [
+        ['explain', 'info'],
+        ['attention', 'warn'],
+        ['risk', 'danger'],
+      ]) {
+        await ready(tone)
+        expect((await marks([key(1)])).items).toMatchObject([{ severity }])
+      }
+    })
+
+    it('answers nothing for a guide that is generating or stale, or another task', async () => {
+      await call('POST', '/guide/generate', { taskId: 'task-1' })
+      expect((await marks([key(1)])).items).toEqual([])
+      turns[0]!.finish(okResult(ANSWER))
+      pullHead = (await settled()).guide!.headSha
+      expect((await marks([key(1)])).items).toHaveLength(1)
+      expect((await marks([key(1, 'task-2')])).items).toEqual([])
+      expect((await marks([key(1, '')])).items).toEqual([])
+      await guides.markStale('task-1', repo.commit())
+      expect((await marks([key(1)])).items).toEqual([])
+    })
+
+    it("answers nothing while the guide's commit isn't the change request's head", async () => {
+      await ready()
+      pullHead = 'a-pushed-commit'
+      expect((await marks([key(1)])).items).toEqual([])
+      pullHead = null
+      expect((await marks([key(1)])).items).toEqual([])
+    })
+
+    it("refuses a task's own caller asking about another task", async () => {
+      await ready()
+      expect((await marks([key(1)], 'task-9')).status).toBe(404)
+      expect((await marks([key(1)], 'task-1')).items).toHaveLength(1)
     })
   })
 

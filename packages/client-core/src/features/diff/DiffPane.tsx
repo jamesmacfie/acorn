@@ -18,6 +18,7 @@ import { DiffCanvas } from './DiffCanvas'
 import { FileHead, type LineComposerController, type ThreadCollapseController } from '../../kit/diff/DiffRows'
 import { AnnotationMarks } from '../../host/annotations/AnnotationMarks'
 import { annotationKey } from '../../host/annotations/annotationKey'
+import type { PluginAnnotationKey } from '@acorn/protocol/extensionPoints.ts'
 import { annotationsFor, requestAnnotations } from '../../host/annotations/annotations'
 import { DiffToolbar } from './DiffToolbar'
 import { createDiffFindController } from './findController'
@@ -97,6 +98,9 @@ export function DiffPane(props: {
    * its own point.
    */
   annotations?: string
+  /** Fields added to every row's annotation key, after `{ file, line, side }`, such as the code hosts'
+   *  `{ task }`. The owner declares them in its point's key. */
+  annotationKeyFields?: PluginAnnotationKey
 }) {
   // First, so its cleanup runs after every other one here and its final reading sees them done.
   const health = createDiffHealth()
@@ -262,12 +266,13 @@ export function DiffPane(props: {
         ),
       ),
   )
+  const rowKey = (row: CodeRow) => annotationKey(row, props.annotationKeyFields)
   const lineExtraPrint = (row: CodeRow): string | null => {
     const side = row.kind === 'delete' ? 'old' : 'new'
     const line = side === 'old' ? row.oldNo : row.newNo
     const own = line != null && extraLines().has(lineKey(row.path, side, line))
     const point = props.annotations
-    const marks = point ? annotationsFor(point, annotationKey(row)).length : 0
+    const marks = point ? annotationsFor(point, rowKey(row)).length : 0
     return own || marks ? `${own ? 1 : 0}.${marks}` : null
   }
   const hasLineExtra = (row: CodeRow) => lineExtraPrint(row) != null
@@ -277,7 +282,7 @@ export function DiffPane(props: {
     return [
       source().lineExtra?.render(row),
       chat ? <div class="diff-inline-chat">{chat}</div> : null,
-      point ? <AnnotationMarks point={point} itemKey={annotationKey(row)} /> : null,
+      point ? <AnnotationMarks point={point} itemKey={rowKey(row)} /> : null,
     ]
   }
 
@@ -440,7 +445,7 @@ export function DiffPane(props: {
     for (const vi of layout.range()) {
       const item = all[vi.index]
       if (item?.kind !== 'segment' && item?.kind !== 'overlay') continue
-      for (const row of itemRows(item) ?? []) if (isCodeRow(row)) keys.push(annotationKey(row))
+      for (const row of itemRows(item) ?? []) if (isCodeRow(row)) keys.push(rowKey(row))
     }
     requestAnnotations(point, keys)
   })

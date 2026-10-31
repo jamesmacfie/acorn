@@ -45,7 +45,8 @@ function installBadge(shape: string): Disposable {
 }
 
 /** A mark on the first inserted line of the fixture pull request's patch, keyed the way the shared
- *  viewer keys a row (`{ file, line, side }`, client-core/host/annotations/annotationKey.ts). */
+ *  viewer keys a row (`{ file, line, side }`, client-core/host/annotations/annotationKey.ts) plus the
+ *  task, which it answers from the key it was asked about. */
 function installDiffMark(): Disposable {
   return extensionRegistry.register({
     id: 'fixture:diff-mark',
@@ -55,7 +56,10 @@ function installDiffMark(): Disposable {
     order: 10,
     carrier: 'items',
     fetch: async () => [],
-    marks: async () => [{ key: { file: 'src/login.ts', line: 2, side: 'new' }, text: 'uncovered', severity: 'warn' }],
+    marks: async (keys) =>
+      keys
+        .filter((key) => key.file === 'src/login.ts' && key.line === 2 && key.side === 'new')
+        .map((key) => ({ key, text: 'uncovered', severity: 'warn' })),
   })
 }
 

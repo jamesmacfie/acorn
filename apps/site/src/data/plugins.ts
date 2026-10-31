@@ -238,7 +238,8 @@ export const PLUGINS = {
     reasons: {
       'api:core.changeRequests:reveal': "Opens the pull request's diff at a hunk's first line when you press its link.",
       'events:head:changed': 'Marks a guide out of date when the task gets a new commit.',
-      'events:plugin:review-guide:changed': 'Redraws the pane when a guide starts, finishes, or goes out of date.',
+      'events:plugin:review-guide:changed':
+        'Redraws the pane, and its notes in the Diff tab, when a guide starts, finishes, or goes out of date.',
       'node.core:tasks': "Reads the task's pull request and finds its worktree.",
       'node.core:git': "Reads the change from the task's worktree with git.",
       'node.core:prefs': 'Remembers the harness you picked.',

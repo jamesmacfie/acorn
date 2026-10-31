@@ -13,6 +13,8 @@ import { largeDiffFiles, largeDiffSource, type LargeDiffFile } from '../../testk
 import { installDiffLayout } from './layout.helper'
 import { residentKey, segmentCacheFor } from './segmentCache'
 import type { DiffSource } from './source'
+import { extensionPointRegistry, extensionRegistry } from '../../host/registries/extensionPoints/extensionPoints'
+import { clearAnnotations } from '../../host/annotations/annotations'
 
 // The viewer against the generated fixture, with the source playing the node's part in-process
 // (testkit/largeDiff.ts). What is counted is what the viewer asks the source for, because that is
@@ -59,13 +61,15 @@ afterEach(() => {
 
 const newClient = () => new QueryClient({ defaultOptions: { queries: { retry: false, enabled: false } } })
 
-const mount = (source: DiffSource, client = newClient()) => {
+type PaneProps = Omit<Parameters<typeof DiffPane>[0], 'source'>
+
+const mount = (source: DiffSource, client = newClient(), paneProps: PaneProps = {}) => {
   const host = document.createElement('div')
   document.body.append(host)
   const dispose = render(
     () => (
       <QueryClientProvider client={client}>
-        <DiffPane source={source} />
+        <DiffPane source={source} {...paneProps} />
       </QueryClientProvider>
     ),
     host,
@@ -223,6 +227,49 @@ describe('a segmented diff', () => {
     ])
     expect(await opened('reveal-only', { line })).toEqual([])
     expect(await opened('ask-missing', { line: 9_999_999, ask: {} })).toEqual([])
+  }, 30_000)
+
+  // A contributor answers marks for the task it read, whatever it was asked. The key's fixed `task`
+  // is what keeps that answer off another task's diff of the same file.
+  it("draws a mark answered for one task only on that task's diff", async () => {
+    const files = [...largeDiffFiles('small', 1)].slice(0, 1)
+    const point = 'github:diff-line'
+    cleanups.push(
+      extensionPointRegistry.register({
+        id: point,
+        ownerId: 'github',
+        label: 'Pull request diff line',
+        kind: 'annotation',
+        key: ['file', 'line', 'side', 'task'],
+        max: 4,
+      }).dispose,
+      extensionRegistry.register({
+        id: 'plugin:guide:marks',
+        pluginId: 'guide',
+        point,
+        label: 'Guide',
+        order: 10,
+        carrier: 'items',
+        fetch: async () => [],
+        marks: async (keys) =>
+          keys.map((key) => ({ key: { ...key, task: 'task-1' }, severity: 'warn' as const, text: 'Look here' })),
+      }).dispose,
+      () => clearAnnotations(point),
+    )
+    const marks = async (task: string) => {
+      const host = mount(largeDiffSource(files, { scope: `marks-${task}` }), newClient(), {
+        annotations: point,
+        annotationKeyFields: { task },
+      })
+      await vi.waitFor(() => expect(host.querySelector('.diff-row .diff-code')).not.toBeNull(), { timeout: 5_000 })
+      await settle()
+      const count = host.querySelectorAll('.annotation-mark').length
+      host.unmount()
+      return count
+    }
+
+    expect(await marks('task-2')).toBe(0)
+    expect(await marks('task-1')).toBeGreaterThan(0)
   }, 30_000)
 
   it('keeps unchanged segments across a revision and reloads only the file that moved', async () => {

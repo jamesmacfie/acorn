@@ -9,12 +9,13 @@ import { changeRequestPointIds, changeRequestPoints, DIFF_LINE_KEY, SUMMARY_BADG
 // lives beside the viewer in client-core, and the pairing is held from the other end too, in
 // client-core's `annotationKey` tests.
 describe('the diff-line annotation point', () => {
-  it("is keyed by the three fields the viewer mints, in the viewer's order", () => {
-    expect(DIFF_LINE_KEY).toEqual(['file', 'line', 'side'])
+  // `task` comes from `ChangeRequestDiff`, which hands it to the viewer for every row.
+  it("is keyed by the three fields the viewer mints, in the viewer's order, then the task", () => {
+    expect(DIFF_LINE_KEY).toEqual(['file', 'line', 'side', 'task'])
     expect(changeRequestPoints('Pull request')[0]).toMatchObject({
       id: 'diff-line',
       kind: 'annotation',
-      key: ['file', 'line', 'side'],
+      key: ['file', 'line', 'side', 'task'],
     })
   })
 

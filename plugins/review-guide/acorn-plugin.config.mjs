@@ -38,14 +38,12 @@ export default {
       // the Agent pane.
       destinations: [{ id: 'session', label: 'Agent session', targetKind: 'managed-agent' }],
     }],
-    // The guide's narrow layout, beside the diff in each code host's change request view. It reads
-    // only the `taskId` the host mounts it with.
-    extensions: ['github', 'gitlab', 'bitbucket'].map((host) => ({
-      id: `${host}-review-panel`,
-      point: `${host}:review-panel`,
-      label: 'Guide',
-      remote: 'panel',
-    })),
+    // Per code host: the guide's narrow layout beside the change request's diff, which reads only the
+    // `taskId` the host mounts it with, and the guide's notes as marks under the diff's rows.
+    extensions: ['github', 'gitlab', 'bitbucket'].flatMap((host) => [
+      { id: `${host}-review-panel`, point: `${host}:review-panel`, label: 'Guide', remote: 'panel' },
+      { id: `${host}-diff-line`, point: `${host}:diff-line`, label: 'Guide notes', items: '/v1/p/review-guide/marks' },
+    ]),
     commands: [{
       id: 'open',
       kind: 'action',

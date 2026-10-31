@@ -1,6 +1,64 @@
 # Phase 5: notes in the Diff tab
 
-Date: October 30, 2026. Status: not started. Needs phase 1.
+Date: October 30, 2026. Status: done. Needs phase 1.
+
+## Completion note
+
+Landed October 31, 2026.
+
+### What landed
+
+- The code hosts' `diff-line` key is `['file', 'line', 'side', 'task']` (`DIFF_LINE_KEY`). The public
+  point list the authoring guide reads says the same, with a note that `task` is `''` outside a task.
+  `git:diff-line` is unchanged.
+- `annotationKey(row, fixed?)` adds the fixed fields to the row's own three, and the row's fields win.
+  Both hosts' `DiffPane` take `annotationKeyFields` and use it for every key they ask about and look
+  up. `ChangeRequestDiff` passes `{ task: taskId ?? '' }`, which covers the browse surface.
+- The guide's manifest adds `<host>-diff-line` for GitHub, GitLab, and Bitbucket, each with
+  `items: '/v1/p/review-guide/marks'`.
+- `POST /marks` keeps only well-formed keys with a non-empty task, refuses a task-scoped caller with a
+  404 when any key names another task, and asks `guides.marks` once per task in the batch.
+  `guides.marks` reads the newest guide once, answers nothing unless it's `ready` and its head is
+  `changeRequestDetail().headSha`, then calls `noteMarks` in `src/server/marks.ts`. Each mark echoes
+  the asked key, uses the note's title, the `sparkles` icon, and `info`, `warn`, or `danger` by tone.
+- `guides.newest` holds the newest-row read that `view` used to do inline. `view` and `marks` share it.
+- The terminal fixture's `github:diff-line` mark answers with the key it was asked about, because a
+  static three-field key no longer matches.
+- Docs: `docs/diff-rendering/review.md`, `docs/plugins/change-request-ui.md`, `docs/github-integration/surfaces.md`,
+  and a short **In the Diff tab** section in the plugin page. The site's review guide page has an
+  **In the Diff tab** section, a line in its facts and limits, and a new reason wording for the
+  `changed` event. The pages the stale check listed are marked.
+
+### Decisions
+
+- The task goes in the key, not in a scope beside it. The published surface snapshot names no key
+  field, and the key keeps isolation in the host instead of trusting each contributor.
+- No new invalidation. Every `plugin:review-guide:changed` frame already bumps the plugin's
+  descriptor revision, which is part of an annotation request's identity, and the guide already sends
+  it on start, finish, stale, and progress. The live check confirmed marks follow it without a reload.
+- Explains notes show, as `info`. On the seeded fixture guide the marks were one line each and didn't
+  crowd the diff. If a real guide proves noisy, dropping `explain` in `noteMarks` is one line.
+- No setting to hide the marks, as the doc said to start.
+- A batch with keys for several tasks is grouped rather than refused. The host sends one task per
+  batch, so this costs nothing and stays correct if that ever changes.
+
+### Deviations
+
+- The live check didn't push a commit. The fake GitHub reads the pull's head once at start, and the
+  fixture's task sits on `main` in the project folder. Instead it moved the stored guide's head off the
+  pull's head (the unpushed-commit case), then back, then marked the guide stale. Marks went, came back
+  on the `changed` frame, and went again. The route tests cover a real `head:changed`.
+- GitLab and Bitbucket weren't walked live. They pass the same `ChangeRequestDiff` and point shape.
+- The terminal client wasn't walked. Its `DiffPane` takes the same prop, and `extensions.test.tsx`
+  still finds the fixture mark under its line.
+
+### For later phases
+
+- A contributor outside this repository that builds `diff-line` keys from three fields stops matching
+  on the code hosts. Answering with the asked key fixes it.
+- After a push, the marks reappear only on the next descriptor refresh, such as a `changed` frame or a
+  reload. Nothing tells the guide that the pull request's head moved to match it.
+- The Node service graph measured 1,942,974 B of its 1,944,000 B ceiling during the live check.
 
 ## Goal
 

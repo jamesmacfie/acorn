@@ -1,12 +1,14 @@
 import type { PluginFetchHandler } from '@acorn/plugin-api/node'
 import { GuideError, type Guides } from './guides'
+import { diffLineKeys } from './marks'
 
 const failure = (status: number, code: string, message: string) =>
   Response.json({ error: { code, message, requestId: '', retryable: status >= 500 } }, { status })
 
 /** `GET /guide?taskId=`, `POST /guide/generate`, `POST /guide/stop`, and `POST /guide/progress`. Each
  *  answers the pane's view.
- *  `GET /profiles` answers the workflow step's harness choices. */
+ *  `GET /profiles` answers the workflow step's harness choices.
+ *  `POST /marks` answers the code hosts' `diff-line` points with the guide's notes. */
 export function createGuideFetch(guides: Guides): PluginFetchHandler {
   return async (request, context) => {
     const url = new URL(request.url)
@@ -15,10 +17,20 @@ export function createGuideFetch(guides: Guides): PluginFetchHandler {
       return Response.json({ options: profiles.map((profile) => ({ value: profile.id, label: profile.label })) })
     }
     const body = request.method === 'POST' ? ((await request.json().catch(() => ({}))) as Record<string, unknown>) : {}
+    const { principal } = context
+    if (request.method === 'POST' && url.pathname === '/marks') {
+      const keys = diffLineKeys(body.keys)
+      // A task's agent can call this too. Its credential names one task, so hold it to that task.
+      if (principal.scope === 'task' && keys.some((key) => key.task !== principal.taskId))
+        return failure(404, 'not_found', 'Not found.')
+      // The host asks about one diff at a time, so a batch names one task, and its guide is read once.
+      const byTask = Map.groupBy(keys, (key) => key.task)
+      const marks = await Promise.all([...byTask].map(([taskId, taskKeys]) => guides.marks(taskId, taskKeys)))
+      return Response.json({ items: marks.flat() })
+    }
     const taskId = request.method === 'GET' ? url.searchParams.get('taskId') : body.taskId
     if (typeof taskId !== 'string' || !taskId) return failure(400, 'bad_request', 'Name a task.')
     // A task's agent can call these routes too. Its credential names one task, so hold it to that task.
-    const { principal } = context
     if (principal.scope === 'task' && taskId !== principal.taskId) return failure(404, 'not_found', 'Not found.')
     try {
       switch (`${request.method} ${url.pathname}`) {

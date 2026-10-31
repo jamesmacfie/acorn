@@ -65,10 +65,16 @@ back to comparing text. A failed send keeps its draft.
 A diff pane can name an `annotation` extension point, and the host draws every contributor's marks
 under the code row they name ([plugins](../plugins.md) § Cooperative extension points). The points
 are `git:diff-line` over the working tree, `github:diff-line` and `bitbucket:diff-line` over a pull
-request, and `gitlab:diff-line` over a merge request. All are keyed `{ file, line, side }` with the fields in the
-same order, and all hand the point's name to `DiffPane`, so a contributor that answers one can answer
-the others. `side` is the row's own kind, not
-the view mode: a mark on line 42 of the new file means the new side in split or unified mode.
+request, and `gitlab:diff-line` over a merge request. All are keyed `{ file, line, side }` with the
+fields in the same order, and all hand the point's name to `DiffPane`. `side` is the row's own kind,
+not the view mode: a mark on line 42 of the new file means the new side in split or unified mode.
+
+The three code hosts add `task` after those fields, `{ file, line, side, task }`. `DiffPane` takes
+`annotationKeyFields`, fields it adds to every row's key, and `ChangeRequestDiff` passes
+`{ task: taskId }`, or `{ task: '' }` on a diff browsed outside a task. The host builds the lookup from
+the declared fields, so a mark answered for one task's diff never draws on another task's diff of the
+same file and line. A contributor that answers each mark with the key it was asked about serves all
+four points with the same code.
 
 Marks follow the source's own `lineExtra`, because the source's annotation is the one the person
 using the pane wrote. They draw inside the segment, so a mark arriving for a row on screen grows the
