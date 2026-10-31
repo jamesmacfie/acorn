@@ -195,7 +195,13 @@ export type PluginAnnotationMark = {
   /** Longer content the owner may show on demand, such as in a tooltip. Kept only for a point that
    *  sets `acceptsDetail`, so a batch of thousands of diff-line marks never carries it. */
   detail?: AnnotationDetail
+  /** Marks a note the reader can reply to, where the owner can draw one: `text` is its title and a
+   *  markdown `detail` its body. `author` names who wrote it, such as a harness, and `label` is the
+   *  word for its severity, such as `Risk`. Kept only beside a markdown `detail`. */
+  note?: AnnotationNote
 }
+
+export type AnnotationNote = { author: string; label: string }
 
 /** The content shape language hover uses. Markdown is untrusted and is drawn only through the host's
  *  sanitizer. */

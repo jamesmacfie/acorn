@@ -4,10 +4,12 @@ description: One file's patch, drawn as a unified diff.
 sources:
   - packages/client-core/src/kit/diff/DiffRows.tsx
   - docs/ui-design/every-node.md
-checked: '000004794'
+checked: '6b445c7a4'
 ---
 
 Use `StackedDiff` to show one file's change from its patch text. It draws the file's header, each hunk, and each line. Put `DiffNote` children in it to pin notes under lines, and set `onActivate` to hear the ✦ button on any line, which sends `{ side, line }`. In the terminal, ✦ is Enter on the line. Set `noteContext` to draw only the noted lines and that many lines around each, for a column beside a diff that already shows the whole file.
+
+Set `conversations` when the patch is part of the task's pull request and your plugin has the `core.changeRequests:reveal` scope. Each line then holds the agent card from the pull request's **Diff** tab, with the same conversation. A note is the card's first message, with a reply box under it, and ✦ opens an empty card in place instead of sending `onActivate`. The terminal has no agent card, so it draws notes and sends `onActivate` as before.
 
 <Specimen id="stacked-diff" />
 

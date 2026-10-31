@@ -134,7 +134,15 @@ export function createGuides(deps: GuideDeps) {
       profiles,
       profileId: pickProfile(profiles, saved),
       guide,
+      matchesChangeRequest: await matchesChangeRequest(taskId, guide),
     }
+  }
+
+  /** A guide made on a commit the change request doesn't have yet may not have the diff's lines. */
+  async function matchesChangeRequest(taskId: string, stored: StoredGuide | null): Promise<boolean> {
+    if (stored?.status !== 'ready' || !stored.guide) return false
+    const detail = await deps.tasks.changeRequestDetail(taskId)
+    return !!detail?.headSha && detail.headSha === stored.headSha
   }
 
   /** Read the change, store a `generating` row, and start the turn. Answers once the turn has started,
@@ -302,14 +310,12 @@ export function createGuides(deps: GuideDeps) {
     return view(userId, taskId)
   }
 
-  /** The marks a ready guide puts under the change request's diff rows. None when the guide was made
-   *  on a commit the change request doesn't have yet, because its lines may not be the diff's. */
+  /** The marks a ready guide on the change request's head puts under that diff's rows. */
   async function marks(taskId: string, keys: DiffLineKey[]): Promise<DiffLineMark[]> {
     const stored = await newest(taskId)
-    if (stored?.status !== 'ready' || !stored.guide) return []
-    const detail = await deps.tasks.changeRequestDetail(taskId)
-    if (!detail?.headSha || detail.headSha !== stored.headSha) return []
-    return noteMarks(stored.guide, keys)
+    if (!stored?.guide || !(await matchesChangeRequest(taskId, stored))) return []
+    const author = (await listProfiles()).find((profile) => profile.id === stored.profileId)?.label ?? stored.profileId
+    return noteMarks(stored.guide, keys, author)
   }
 
   function stop(taskId: string): void {

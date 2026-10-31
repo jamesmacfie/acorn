@@ -19,19 +19,10 @@ attempt, the guide built into the session's data root and its trust prompt was a
 never started the plugin after two restarts. Find out why, then walk the path, the notes, and the Diff
 tab's marks.
 
-## Show the note in the agent card
+## Land on the revealed line from the wide pane
 
-**Ask a follow-up** sends the note's title and body to the agent as context, under a label saying a
-plugin wrote it. The agent card doesn't show that note, so the reader can't see everything that goes to
-the agent. Asking needs the reader's own click or key press, at most once a second, which keeps
-background code from slipping text in. The fix belongs in the agents plugin's `InlineDiffCard`: take the
-note as a prop and draw it above the composer, labelled with the plugin that sent it.
-
-## Land on the asked line from the wide pane
-
-From the wide Guide pane, a reveal into the pull request pane stops short of its line when cards or
-review threads sit above it, so the agent card opens below the screen. A plain hunk link lands at the
-same place, so the cause is `DiffPane`'s reveal, not asking. The reveal should hold the line in place
+From the wide Guide pane, a hunk link or **Show in diff** into the pull request pane stops short of its
+line when cards or review threads sit above it. The cause is `DiffPane`'s reveal. The reveal should hold the line in place
 while the blocks above it are measured, the way scroll restoration does. From the column beside the
 diff, the line lands on screen.
 
@@ -45,12 +36,14 @@ host reports a new head for the task's change request.
 ## Decide on posting a note to the code host
 
 Whether a note can become a review comment on the code host was an open question on October 30, 2026.
-A note can already become a line conversation through **Ask a follow-up**, so this can be decided now.
+A note is already the opening message of its line's conversation, in the guide and in the **Diff** tab,
+so this can be decided now.
 The guide itself never posts, approves, or requests changes.
 
 ## Later ideas
 
-- Jump from a Diff tab mark to its step. Marks hold no actions, so this is a host change of its own.
+- Jump from a note's card in the Diff tab to its step. The card is the agents plugin's, so this needs a
+  way for a mark to name a place in its plugin.
 - Share progress between people or devices. Progress belongs to one task's guide on one Node.
 - Regenerate one step, or a guide per commit.
 - Check GitLab and Bitbucket with a fixture. Both were checked by reading the code. They pass the same

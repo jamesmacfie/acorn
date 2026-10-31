@@ -150,7 +150,7 @@ export function requestAnnotations(pointId: string, keys: readonly PluginAnnotat
             return []
           }
           if (point.acceptsDetail) return [mark]
-          const { detail: _detail, ...plain } = mark
+          const { detail: _detail, note: _note, ...plain } = mark
           return [plain]
         })
         const limit = point.acceptedMarks ?? Number.POSITIVE_INFINITY

@@ -7,13 +7,14 @@ and its checks. Read it before you add a code host or change one of those views.
 
 ## What it holds
 
-The package is `packages/change-request-ui/`. It has two entrypoints:
+The package is `packages/change-request-ui/`. It has four entrypoints:
 
 | Entrypoint | What it exports |
 | --- | --- |
 | `@acorn/change-request-ui/model` | The neutral types, the check status vocabulary and roll-up, `reviewDecision`, `inlineReviewThreads`, `filterChangeRequests`, `branchReferenceCandidates`, and the two point declarations. No Solid, so a rail marker or a Node test can read it. |
 | `@acorn/change-request-ui/views` | `createChangeRequestModel`, `ChangeRequestView`, `ChangeRequestOverview`, `changeRequestSections`, `ChangeRequestConversation`, `ChangeRequestDiff`, `ChecksPanel`, `ChangeRequestList`, and `useChangedFiles`. |
 | `@acorn/change-request-ui/railMarker` | `changeRequestRailMarker`, the marks on a change request pane's rail button. Its own entrypoint, because a client entry registers it eagerly, and the views would load every shared view at first paint. |
+| `@acorn/change-request-ui/lines` | `changeRequestLines`, the agent card on a line of a task's change request for a surface that isn't its diff. Its own entrypoint for the same reason. |
 
 The views never fetch from a code host. Each plugin keeps its queries, mutations, routes, and query
 keys, and maps its own records onto the neutral types. The one exception is Linear enrichment of the
@@ -78,10 +79,17 @@ to read its `pr-synced` frame. GitLab's and Bitbucket's buttons use it.
 `ChangeRequestDiff` takes a `DiffSource` without its threads, inline chat, or line opener, and adds
 those. It maps `old` and `new` to the viewer's `LEFT` and `RIGHT`, opens an added line in the
 `editor` pane, and anchors agent conversations to a line through the agents plugin's
-`agents.inlineDiff` capability, which the host passes in. A card opened with a note, from a frame's
-`ask` ([asking about the line](./frames.md#asking-about-the-line)), puts it first in the card's
-context, under a line that says a plugin wrote it, not the reader, then the code around the line. The
-card itself doesn't change, so the reader sees only their own question.
+`agents.inlineDiff` capability, which the host passes in. A row whose `diff-line` mark is a note
+(`note` beside a markdown `detail`, [marks from other plugins](../diff-rendering/review.md#marks-from-other-plugins))
+draws the card in place of that mark, with the note as its opening message and a reply box under it.
+Without the agents plugin, it draws the note on its own.
+
+`changeRequestLines` from `@acorn/change-request-ui/lines` builds the same card for a surface that
+isn't the diff. Each code host provides it as `changeRequestLinesId(<its plugin id>)`, with a function
+that reads the task's change request and its diff's files, so a plugin's tree shows the same
+conversations ([asking about a change request line](./remote-trees.md#asking-about-a-change-request-line)).
+It's its own entrypoint because a client entry provides it eagerly. `lineConversation.tsx` holds what
+both share: the restated origin, the origin a line builds, and when a line shows its card.
 
 `ChangeRequestList` draws the Open and Closed tabs, the filter, and one row per change request. The
 host owns the reads, the search past the loaded pages, each row's checks, and the row menu.

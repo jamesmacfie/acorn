@@ -32,19 +32,23 @@
    than the column count, since there is no virtual window here to make that unstable. */
 .diff-stacked .diff-rows { position: static; min-width: max-content; }
 .diff-stacked .diff-row { position: static; transform: none; }
-/* A tree's note under a StackedDiff row (kit/diff/diffNotes.ts): the inline agent card's box, at the
-   card inset and one scrollport wide, as .diff-thread is below, so a long code line neither stretches
-   it nor scrolls it away. The noted row's stripe sits on the sticky chrome, which would paint over a
-   stripe on the row itself. */
-.diff-note {
+/* What a StackedDiff row draws under itself (kit/diff/diffNotes.ts): its notes, or its agent card. At
+   the card inset and one scrollport wide, as .diff-thread is below, so a long code line neither
+   stretches it nor scrolls it away. The noted row's stripe sits on the sticky chrome, which would paint
+   over a stripe on the row itself. */
+.diff-note-line {
   position: sticky;
   left: var(--diff-card-inset);
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
   width: calc(100cqw - var(--diff-card-inset) - var(--pane-pad));
   margin: 6px var(--pane-pad) 6px var(--diff-card-inset);
   font-family: var(--font-ui);
   line-height: var(--lh);
   white-space: normal;
 }
+.diff-note-line:empty { display: none; }
 .diff-note[data-tone='warn'] { border-color: color-mix(in srgb, var(--warn) 50%, var(--border)); }
 .diff-note[data-tone='danger'] { border-color: color-mix(in srgb, var(--danger) 50%, var(--border)); }
 .diff-note-head { display: flex; align-items: center; gap: var(--space-4); min-width: 0; }

@@ -9,6 +9,7 @@ client: AttentionSourceContribution
 client: BindingCandidate
 client: BindingOrigin
 client: COMMAND_CLOSED
+client: ChangeRequestLines
 client: CheckedDiagnostic
 client: ClientPlugin
 client: ClientScheduleContribution
@@ -69,6 +70,7 @@ client: brandMarkRegistry
 client: bytesOf
 client: cachedTaskScripts
 client: canAddProjectFromFolder
+client: changeRequestLinesId
 client: clearLocal
 client: clientCapability
 client: clientCapabilityId
@@ -526,6 +528,7 @@ ui/diff: CodeRow
 ui/diff: DiffDocumentFile
 ui/diff: DiffDocumentTopology
 ui/diff: DiffLineAnchor
+ui/diff: DiffNoteText
 ui/diff: DiffSearchPage
 ui/diff: DiffSearchRequest
 ui/diff: DiffSegmentPayload
@@ -534,6 +537,7 @@ ui/diff: DiffSnippetAnchor
 ui/diff: DiffSnippetLine
 ui/diff: DiffSnippets
 ui/diff: DiffSource
+ui/diff: PinnedNote
 ui/diff: createDiffSnippets
 ui/diff: diffScopeKey
 ui/diff: documentTopology
@@ -564,6 +568,7 @@ ui/editor: shouldHighlightDocument
 ui/editor: watchEditorTheme
 ui/host: Acorn
 ui/host: AnnotationMarks
+ui/host: DiffNoteCard
 ui/host: Drawer
 ui/host: IconPicker
 ui/host: InlineAnnotationMarks

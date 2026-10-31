@@ -1,5 +1,5 @@
 import { lazy } from 'solid-js'
-import type { ClientPlugin } from '@acorn/plugin-api/client'
+import { changeRequestLinesId, type ClientPlugin } from '@acorn/plugin-api/client'
 import { changeRequestPoints } from '@acorn/change-request-ui/model'
 import { parseMergeRequestRef, samePath } from '../shared/mergeRequestRef'
 import { gitlabBrowsePath, gitlabRouteContributions, taskMergeRequest } from './clientRoutes'
@@ -9,6 +9,7 @@ import { gitlabMergeRequestPromotion } from './mergeRequestTasks'
 import { mrPaneContribution } from './mergeRequest/paneContribution'
 import { mrRailMarkerContribution } from './mergeRequest/railMarker'
 import { GIT_PUSH_ACTIONS_POINT, GitlabPushActions } from './pushActions'
+import { gitlabChangeRequestLines } from './changeRequestLines'
 
 // Two lazy chunks off one module: the source declares its list and detail apart, and a terminal draws
 // them in two panels.
@@ -62,6 +63,8 @@ export const gitlabClientPlugin: ClientPlugin = {
     })
     ctx.integrationFlows.register(gitlabIntegrationFlow)
     ctx.panes.register(mrPaneContribution)
+    // The agent card on a line of a task's change request, for a tree that shows its lines.
+    ctx.capabilities.provide(changeRequestLinesId('gitlab'), gitlabChangeRequestLines)
     ctx.railMarkers.register(mrRailMarkerContribution)
     for (const point of changeRequestPoints('Merge request')) ctx.extensionPoints.register(point)
     ctx.extensions.register({

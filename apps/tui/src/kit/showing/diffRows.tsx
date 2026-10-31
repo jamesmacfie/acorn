@@ -25,6 +25,7 @@ import { stop } from '../../keys/stops'
 import { Line, Run, runStyle } from '../cells'
 import { litControl } from '../roles'
 import { Icon } from './marks'
+import { Markdown } from './documents'
 
 /** reduced: no intra-line word highlight. The gutter is the change, the colour is the direction.
  *
@@ -140,7 +141,7 @@ export function StackedDiff(props: {
                     r={props.lineNumbers === false ? { ...row, oldNo: null, newNo: null } : row}
                     onActivate={props.onActivate}
                   />
-                  <For each={placed().under.get(index()) ?? []}>{(note) => <NoteLines note={note} />}</For>
+                  <For each={placed().under.get(index()) ?? []}>{(note) => <DiffNoteCard note={note} />}</For>
                 </>
               ) : (
                 <NonCodeRow row={row as Exclude<DiffRowT, CodeRow>} />
@@ -148,7 +149,7 @@ export function StackedDiff(props: {
             </Show>
           )}
         </For>
-        <For each={placed().unplaced}>{(note) => <NoteLines note={note} unplaced />}</For>
+        <For each={placed().unplaced}>{(note) => <DiffNoteCard note={note} unplaced />}</For>
         {props.children}
       </box>
     </DiffNotesProvider>
@@ -171,9 +172,10 @@ function StackedLine(props: { r: CodeRow; onActivate?: (place: DiffLinePlace) =>
   )
 }
 
-/** reduced: one header line, `▾ ✦ Label  Title`, that folds the note when pressed, then the tree's
- *  children. A folded note is its header line only. */
-function NoteLines(props: { note: PinnedNote<JSX.Element>; unplaced?: boolean }) {
+/** reduced: one header line, `▾ ✦ Label  Title`, that folds the note when pressed, then the body and
+ *  the tree's children. A folded note is its header line only. The terminal has no agent card, so a
+ *  `StackedDiff` with `conversations` draws its notes like this too. */
+export function DiffNoteCard(props: { note: PinnedNote<JSX.Element>; unplaced?: boolean }) {
   const note = () => props.note.props
   const folded = () => props.note.folded()
   const control = stop({ onPress: () => props.note.setFolded(!folded()) })
@@ -191,6 +193,7 @@ function NoteLines(props: { note: PinnedNote<JSX.Element>; unplaced?: boolean })
       </box>
       <Show when={!folded()}>
         <box flexDirection="column" flexShrink={0}>
+          <Show when={note().body}>{(body) => <Markdown text={body()} />}</Show>
           {note().children}
         </box>
       </Show>

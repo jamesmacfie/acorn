@@ -3,7 +3,10 @@ import type { DiffSource } from './source'
 import type { PlainCodeRow } from '@acorn/diff-document/document'
 
 /** A bounded excerpt from the one segment containing a clicked code line. */
-export async function loadDiffLineContext(source: DiffSource, row: CodeRow): Promise<string> {
+export async function loadDiffLineContext(
+  source: Pick<DiffSource, 'topology' | 'loadSegments'>,
+  row: CodeRow,
+): Promise<string> {
   const file = source.topology()?.files.find((candidate) => candidate.path === row.path)
   if (!file?.patchKey) return row.raw
   const side = row.kind === 'delete' ? 0 : 2

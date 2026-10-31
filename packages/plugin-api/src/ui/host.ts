@@ -8,6 +8,9 @@ export { confirmAction } from '@acorn/client-core/host/registries/shell/willPhas
 export { default as Acorn } from '@acorn/client-core/kit/components/content/Acorn.tsx'
 // A compiled composition over Picker, Icon, and its actions, shared with the task modal.
 export { IconPicker } from '@acorn/client-core/kit/components/inputs'
+// A `DiffNote` as its `StackedDiff` draws it, for a compiled surface that draws a line's notes itself,
+// such as the agent card on a change request line. Not a kit node: a tree pins a `DiffNote` instead.
+export { DiffNoteCard } from '@acorn/client-core/kit/diff/DiffRows.tsx'
 // The typed folder field that stands in for `pickNodeFolder` where it can't browse the Node's disk,
 // such as on a remote Node. A compiled composition over Input and Button, not a kit node.
 export { NodePathForm } from '@acorn/client-core/features/workspaces/NodePathForm.tsx'

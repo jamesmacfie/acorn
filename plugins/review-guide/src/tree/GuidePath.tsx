@@ -25,7 +25,14 @@ import {
   StatusDot,
   Text,
 } from '@acorn/plugin-api/ui/tree'
-import type { DiffItem, Guide, GuideNote, GuideProgress, ProgressMark } from '../shared/guide'
+import {
+  TONE_LABELS,
+  type DiffItem,
+  type Guide,
+  type GuideNote,
+  type GuideProgress,
+  type ProgressMark,
+} from '../shared/guide'
 import { hunkStart } from '../shared/hunk'
 import { guidePath, openQuestions, OVERVIEW, stepPage, wrapUpDone, type PathNote, type PathStep } from '../shared/path'
 
@@ -34,17 +41,16 @@ import { guidePath, openQuestions, OVERVIEW, stepPage, wrapUpDone, type PathNote
 const PAGE_BYTES = 256 * 1024
 
 type Side = 'old' | 'new'
-/** Show a line, or a file's first line, in the change request's diff. `ask` also opens the agent card
- *  on the line, with `note` as context for the agent. */
-export type Reveal = (path: string, line?: number, side?: Side, ask?: { note?: string }) => void
+/** Show a line, or a file's first line, in the change request's diff. */
+export type Reveal = (path: string, line?: number, side?: Side) => void
 
 const TONES: Record<
   GuideNote['tone'],
   { label: string; tone: 'neutral' | 'warn' | 'danger'; dot: 'muted' | 'warn' | 'danger'; counted: string }
 > = {
-  explain: { label: 'Explains', tone: 'neutral', dot: 'muted', counted: 'explained' },
-  attention: { label: 'Look closely', tone: 'warn', dot: 'warn', counted: 'to look at closely' },
-  risk: { label: 'Risk', tone: 'danger', dot: 'danger', counted: 'risk' },
+  explain: { label: TONE_LABELS.explain, tone: 'neutral', dot: 'muted', counted: 'explained' },
+  attention: { label: TONE_LABELS.attention, tone: 'warn', dot: 'warn', counted: 'to look at closely' },
+  risk: { label: TONE_LABELS.risk, tone: 'danger', dot: 'danger', counted: 'risk' },
 }
 
 export const plural = (count: number, one: string, many: string) => `${count} ${count === 1 ? one : many}`
@@ -71,6 +77,8 @@ export function GuidePath(props: {
   credit: JSX.Element
   /** What the coverage and note checks changed, as sentences. */
   coverage: string[]
+  /** Whether the guide's lines are the change request's, so they hold its line conversations. */
+  conversations: boolean
   onReveal: Reveal
   onMark: (mark: ProgressMark) => void
 }) {
@@ -153,6 +161,7 @@ export function GuidePath(props: {
             next={path()[open()]?.title ?? 'Wrap up'}
             layout={props.layout}
             author={props.author}
+            conversations={props.conversations}
             notes={notes}
             onReveal={props.onReveal}
             onBack={() => go(open() - 1)}
@@ -358,6 +367,7 @@ function StepPage(props: {
   next: string
   layout: 'wide' | 'narrow'
   author: string
+  conversations: boolean
   notes: NoteState
   onReveal: Reveal
   onBack: () => void
@@ -390,6 +400,7 @@ function StepPage(props: {
               notes={props.step.notes.filter((note) => note.hunk === item().id)}
               layout={props.layout}
               author={props.author}
+              conversations={props.conversations}
               state={props.notes}
               onReveal={props.onReveal}
             />
@@ -425,13 +436,16 @@ function Later(props: { label: string; children: JSX.Element }) {
 }
 
 /** A hunk under a link to it in the change request's diff, named by its path and first line, with
- *  each note under the line it's on. ✦ on a line asks about it in the change request's diff. Beside
- *  the diff it draws only the noted lines, and nothing under the link for a hunk with no notes. */
+ *  each note under the line it's on. With `conversations`, each line holds the change request's agent
+ *  card for it, with the line's notes as its opening messages, and ✦ opens it in place. The host draws
+ *  the card. Without, or where the host has no card, ✦ shows the line in the change request's diff.
+ *  Beside the diff it draws only the noted lines, and nothing under the link for a hunk with no notes. */
 function Hunk(props: {
   item: DiffItem
   notes: PathNote[]
   layout: 'wide' | 'narrow'
   author: string
+  conversations: boolean
   state: NoteState
   onReveal: Reveal
 }) {
@@ -447,8 +461,9 @@ function Hunk(props: {
             path={props.item.path}
             patch={props.item.patch}
             noteContext={narrow() ? 0 : undefined}
+            conversations={props.conversations}
             onActivate={(place: { side: Side; line: number }) =>
-              props.onReveal(props.item.path, place.line, place.side, {})
+              props.onReveal(props.item.path, place.line, place.side)
             }
           >
             <Index each={props.notes}>
@@ -464,10 +479,6 @@ function Hunk(props: {
 function Note(props: { note: PathNote; author: string; state: NoteState; onReveal: Reveal }) {
   const key = () => props.note.key
   const reveal = () => props.onReveal(props.note.path, props.note.line, props.note.side)
-  const ask = () =>
-    props.onReveal(props.note.path, props.note.line, props.note.side, {
-      note: `${props.note.title}\n\n${props.note.body}`,
-    })
   return (
     <DiffNote
       side={props.note.side}
@@ -476,14 +487,11 @@ function Note(props: { note: PathNote; author: string; state: NoteState; onRevea
       label={TONES[props.note.tone].label}
       author={props.author}
       title={props.note.title}
+      body={props.note.body}
       open={!props.state.folded(key())}
       onOpenChange={(open: boolean) => props.state.onFold(key(), !open)}
     >
-      <Markdown text={props.note.body} />
       <Inline wrap>
-        <Button size="sm" variant="ghost" onPress={ask}>
-          Ask a follow-up
-        </Button>
         <Button size="sm" variant="ghost" onPress={reveal}>
           Show in diff
         </Button>

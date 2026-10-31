@@ -592,47 +592,6 @@ describe('ui verbs', () => {
     ])
   })
 
-  it('passes an ask on a line through, and refuses one without a line or with a note over the limit', async () => {
-    const h = withBridge({ api: ['core.changeRequests:reveal'] })
-    const reveal = (id: number, place: Record<string, unknown>) =>
-      h.send({ id, kind: 'ui', op: 'revealChangeRequestLine', path: 'src/a.ts', ...place })
-    reveal(72, { line: 3, ask: { note: 'Why a cap?' } })
-    reveal(74, { ask: { note: 'No line.' } })
-    reveal(75, { line: 3, ask: { note: 'x'.repeat(2049) } })
-    reveal(76, { line: 3, ask: { note: 7 } })
-    reveal(77, { line: 3, ask: 'note' })
-    await h.settled(6)
-    expect(replyTo(h, 72)).toMatchObject({ ok: true })
-    for (const id of [74, 75, 76, 77])
-      expect(replyTo(h, id)).toMatchObject({ ok: false, error: { code: 'bad_request' } })
-    expect(vi.mocked(h.svc.revealChangeRequestLine).mock.calls).toEqual([
-      [{ path: 'src/a.ts', line: 3, ask: { note: 'Why a cap?' } }],
-    ])
-  })
-
-  it("asks only from the reader's own act, at most once a second, while a plain reveal needs neither", async () => {
-    const unfocused = withBridge(
-      { api: ['core.changeRequests:reveal'] },
-      services({ frameHasFocus: vi.fn(() => false) }),
-    )
-    unfocused.send({ id: 78, kind: 'ui', op: 'revealChangeRequestLine', path: 'src/a.ts', line: 3, ask: {} })
-    unfocused.send({ id: 79, kind: 'ui', op: 'revealChangeRequestLine', path: 'src/a.ts', line: 3 })
-    await unfocused.settled(3)
-    expect(replyTo(unfocused, 78)).toMatchObject({ ok: false, error: { code: PLUGIN_BRIDGE_DENIED } })
-    expect(replyTo(unfocused, 79)).toMatchObject({ ok: true })
-    unfocused.dispose()
-
-    const h = withBridge({ api: ['core.changeRequests:reveal'] })
-    h.send({ id: 80, kind: 'ui', op: 'revealChangeRequestLine', path: 'src/a.ts', line: 3, side: 'old', ask: {} })
-    h.send({ id: 81, kind: 'ui', op: 'revealChangeRequestLine', path: 'src/a.ts', line: 4, ask: {} })
-    await h.settled(3)
-    expect(replyTo(h, 80)).toMatchObject({ ok: true })
-    expect(replyTo(h, 81)).toMatchObject({ ok: false, error: { code: PLUGIN_BRIDGE_DENIED } })
-    expect(vi.mocked(h.svc.revealChangeRequestLine).mock.calls).toEqual([
-      [{ path: 'src/a.ts', line: 3, side: 'old', ask: {} }],
-    ])
-  })
-
   it('answers not_found for a reveal when the task has no change request', async () => {
     const h = withBridge(
       { api: ['core.changeRequests:reveal'] },

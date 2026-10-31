@@ -26,7 +26,15 @@ export type ReviewPanelProps = SummaryBadgesProps & { taskId: string }
  *  beside the diff, such as a review guide. */
 export const changeRequestPoints = (noun: string) =>
   [
-    { id: 'diff-line', label: `${noun} diff line`, kind: 'annotation', key: [...DIFF_LINE_KEY], max: 4 },
+    // Detail, so a mark that's a note can draw as the agent card with its body (ChangeRequestDiff).
+    {
+      id: 'diff-line',
+      label: `${noun} diff line`,
+      kind: 'annotation',
+      key: [...DIFF_LINE_KEY],
+      max: 4,
+      acceptsDetail: true,
+    },
     { id: 'summary-badges', label: `${noun} summary`, kind: 'remote', mode: 'stack', max: SUMMARY_BADGES_MAX },
     { id: 'review-panel', label: `${noun} review panel`, kind: 'remote', mode: 'stack', max: 1 },
   ] as const

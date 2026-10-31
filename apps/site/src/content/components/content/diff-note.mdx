@@ -5,10 +5,10 @@ sources:
   - packages/client-core/src/kit/diff/diffNotes.ts
   - packages/client-core/src/kit/diff/DiffRows.tsx
   - docs/ui-design/every-node.md
-checked: '000004794'
+checked: '6b445c7a4'
 ---
 
-Use `DiffNote` as a child of a `StackedDiff` to pin a note under one of its lines. `side` and `line` name the line, `tone` and `label` say what kind of note it is, and `author` and `title` fill its header. Its children are the body and your own buttons. A reader can fold the note to its header. To fold it from your own button, such as **Got it**, pass `open` and `onOpenChange`, and the note's fold is yours.
+Use `DiffNote` as a child of a `StackedDiff` to pin a note under one of its lines. `side` and `line` name the line, `tone` and `label` say what kind of note it is, and `author` and `title` fill its header. `body` is the note's Markdown, and its children are your own buttons. The note also names your plugin, which acorn fills in. A reader can fold the note to its header. To fold it from your own button, such as **Got it**, pass `open` and `onOpenChange`, and the note's fold is yours.
 
 <Specimen id="diff-note" />
 
@@ -20,7 +20,7 @@ Use `DiffNote` as a child of a `StackedDiff` to pin a note under one of its line
 
 ## Related
 
-- [`StackedDiff`](/docs/components/content/stacked-diff/), the diff a note sits in. Its `onActivate` hears the ✦ button on any line.
+- [`StackedDiff`](/docs/components/content/stacked-diff/), the diff a note sits in. Its `onActivate` hears the ✦ button on any line. With `conversations`, a note opens the agent card on its line, and its body is the card's first message.
 
 ## Mistakes
 

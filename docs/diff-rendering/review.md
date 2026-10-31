@@ -76,6 +76,13 @@ the declared fields, so a mark answered for one task's diff never draws on anoth
 same file and line. A contributor that answers each mark with the key it was asked about serves all
 four points with the same code.
 
+A mark can be a note: `note`, `{ author, label }`, beside a markdown `detail`, on a point that
+accepts detail. The three code hosts' points do. A source with an inline chat gets a row's notes in
+`inlineChat.render(row, notes)` and draws them, and the host leaves them out of the row's marks.
+`ChangeRequestDiff` draws them as the line's agent card, with each note as an opening message the
+reader can reply to, credited to the mark's plugin id ([shared review views](../plugins/change-request-ui.md#build-a-model)). Anywhere
+else a note is an ordinary mark.
+
 Marks follow the source's own `lineExtra`, because the source's annotation is the one the person
 using the pane wrote. They draw inside the segment, so a mark arriving for a row on screen grows the
 segment instead of overlapping the rows below. Rows with neither mount no annotation component or

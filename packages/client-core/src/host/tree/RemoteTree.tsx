@@ -23,6 +23,7 @@ import { watchAppearance } from '../../kit/tokens/appearance'
 import { clientEvents, consumePaneIntent } from '../registries/commands/clientEvents'
 import { TreeHost } from './TreeHost'
 import { fenceScope } from '../markdownFences/fenceViewers'
+import { changeRequestLineCard } from '../../features/diff/changeRequestLines'
 import { recordTreeFailure } from './treeFailures'
 import type { RemoteContribution } from './treeRegistry'
 import {
@@ -336,6 +337,11 @@ export function RemoteTree(componentProps: RemoteTreeProps) {
           componentProps.onFailed?.(reason)
         }}
         {...fenceScope(componentProps.markdownFences, boundScope)}
+        // A tree that may show the task's change request lines may draw their agent card. It sends
+        // nothing until the reader does.
+        {...(bound.taskId && bound.api.includes('core.changeRequests:reveal')
+          ? { lineCards: () => changeRequestLineCard(bound.taskId!) }
+          : {})}
       />
     </div>
   )

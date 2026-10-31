@@ -92,9 +92,16 @@ strips it everywhere else, so a batch of thousands of diff-line marks never carr
 16 KiB of UTF-8, or a detail of the wrong shape, is dropped and the rest of the mark kept. Detail is
 untrusted: the owner draws it only through `richTooltipDom`, which sanitizes Markdown and writes the
 "From <plugin>" credit. An editor gets it from `@acorn/plugin-api/ui/editor`. Any other owner draws
-`InlineAnnotationMarks` from `@acorn/plugin-api/ui/host`, which calls it. Two points accept detail:
-`editor:line` ([line annotations](../editor/line-annotations.md)) and
-[`agents:session`](#session-annotations).
+`InlineAnnotationMarks` from `@acorn/plugin-api/ui/host`, which calls it. Points that accept detail
+are `editor:line` ([line annotations](../editor/line-annotations.md)),
+[`agents:session`](#session-annotations), and the code hosts' `diff-line` points.
+
+With a markdown `detail`, a mark may also carry `note`, `{ "author": "…", "label": "…" }`, to say it's a
+note the reader can reply to: `text` is its title, `detail` its body, `author` who wrote it, and `label`
+the word for its severity, such as `Risk`. The host keeps `note` only beside a markdown `detail`. A code
+host's diff draws such a mark as the line's agent card
+([marks from other plugins](../diff-rendering/review.md#marks-from-other-plugins)), and every other
+owner draws it as a mark.
 
 A compiled plugin contributes marks with a `marks(keys, signal)` function instead of a route:
 

@@ -26,7 +26,7 @@ It ships as a bundled loaded package, so it reaches the Node only through its ma
   person from, so the step uses the owner's saved harness choice.
 
 It asks for no network, no processes, and no secrets. Its tree has one frame scope,
-`core.changeRequests:reveal`, for the hunk links and for opening the agent card on a line.
+`core.changeRequests:reveal`, for the hunk links and for the agent card on its lines.
 
 ## What it spends
 
@@ -156,8 +156,9 @@ One generation runs per task at a time. A second request while one runs gets the
 ## Routes
 
 The four guide routes each answer the pane's whole view: whether the task has a change request, the
-profiles, the chosen profile, and the newest guide with its progress. A task-scoped caller is held to
-its own task.
+profiles, the chosen profile, the newest guide with its progress, and `matchesChangeRequest`: whether
+the guide is ready on the change request's head commit, from `tasks.changeRequestDetail`, so its lines
+are the change request's. A task-scoped caller is held to its own task.
 
 | Route | What it does |
 | --- | --- |
@@ -176,25 +177,24 @@ the guide reads the view again. That's how a step marked in the pane shows as do
 The manifest fills `github:diff-line`, `gitlab:diff-line`, and `bitbucket:diff-line` from
 `POST /v1/p/review-guide/marks`, so a reviewer who never opens the guide still sees its notes
 ([marks from other plugins](../diff-rendering/review.md#marks-from-other-plugins)). For each task the
-keys name, the route reads the newest guide once. It answers only for a `ready` guide whose head commit
-is the change request's head, from `tasks.changeRequestDetail`, because a guide on an unpushed commit
-would put notes on the wrong lines. Each note on an asked row becomes a mark with the note's title and
-the `sparkles` icon: `info` for Explains, `warn` for Look closely, and `danger` for Risk. A task-scoped
-caller asking about another task gets a 404. A mark has no action. Every `changed` frame refreshes the
-plugin's descriptors, so the marks follow a new or stale guide.
+keys name, the route reads the newest guide once. It answers only while `matchesChangeRequest` holds,
+because a guide on an unpushed commit would put notes on the wrong lines. Each note on an asked row is
+a mark that's a note: its title, the `sparkles` icon, its body as markdown `detail`, and `note` with the
+harness's label and the tone's word (`TONE_LABELS`). Its severity is `info`, `warn`, or `danger`. The
+diff draws it as the line's agent card, the same conversation the guide shows on that line, and the
+terminal client as a one-line mark. A task-scoped caller asking about another task gets a 404. Every
+`changed` frame refreshes the plugin's descriptors, so the marks follow a new or stale guide.
 
 ## The pane
 
-**Guide** is a task pane drawn as a remote tree, so the desktop and the terminal client draw the same
-one. It reads as a path: an overview, one page per step, and a wrap-up, with progress saved on the
-guide's row. The Guide pane draws it wide, with a rail, and the column beside the change request's
-diff draws it narrow, with a stepper and only the noted lines. See
-[the review guide's pane](./review-guide/pane.md).
+**Guide** is a task pane drawn as a remote tree: a path of an overview, one page per step, and a
+wrap-up, wide in its pane and narrow beside the change request's diff. A reader asks about a line in
+place ([the review guide's pane](./review-guide/pane.md)).
 
 ## Limits
 
 - Only the primary change request has a guide, because only it has a checkout.
 - A diff larger than core's git output cap, 16 MiB, fails with a message instead of a partial guide.
 - The guide covers the worktree's HEAD, which can differ from the change request's head when a commit
-  hasn't been pushed. A hunk link whose line the change request's diff doesn't have lands on the
-  file's header.
+  hasn't been pushed. Its lines then hold no conversations, and a hunk link whose line the change
+  request's diff doesn't have lands on the file's header.

@@ -9,7 +9,7 @@ sources:
   - plugins/review-guide/src/tree/GenerateModal.tsx
   - docs/first-party-plugins/review-guide/pane.md
   - plugins/review-guide/src/server/workflowStep.ts
-checked: 'dd8ac15e6'
+checked: '6b445c7a4'
 ---
 
 import { Steps } from '@astrojs/starlight/components'
@@ -94,9 +94,11 @@ Above each hunk is a link with its file and first line, such as `src/billing/inv
 or a note's **Show in diff**, to open the pull request's diff at that line, where you can see the code
 around it and comment. Hunks the harness left out are a last step, **Not covered by the guide**.
 
-To ask about a line, click a note's **Ask a follow-up**, or ✦ beside any line. The pull request's diff
-opens the agent card on that line. From a note, the agent also gets the note's text, so your question
-can be short. The conversation stays on that line in the **Diff** tab.
+To ask about a note, type in the reply box under it. The note is the first message of the line's
+conversation with an agent, so the agent gets the note's text with your first question, and your
+question can be short. To ask about any other line, click ✦ beside it. The agent card opens right there,
+in the guide. It's the same conversation as on that line in the pull request's **Diff** tab, so you can
+carry on in either place. Nothing goes to the agent until you send.
 
 acorn checks the harness's answer against the diff before it shows it. Every hunk appears exactly once:
 a hunk the harness left out goes to **Not covered by the guide**, a hunk it put in two steps stays in
@@ -110,10 +112,12 @@ it dropped, so a note never sits on a line it doesn't describe.
 
 ## In the Diff tab
 
-You don't have to open the guide to see what it flagged. Each note's title also shows under its line in
-the pull request's own **Diff** tab, with ✦ and the plugin's name, colored by its tone. The marks only
-show while the guide is up to date and its commit is the pull request's latest, so they never sit on
-lines that moved. A mark doesn't open its step. To ask about the line, click ✦ beside it, as on any line.
+You don't have to open the guide to see what it flagged. Each note also shows under its line in the
+pull request's own **Diff** tab, as the same agent card with the note's title and body and a reply box
+under it. A reply there is the conversation the guide shows on that line. The notes only show while the
+guide is up to date and its commit is the pull request's latest, so they never sit on lines that moved.
+Until then, the guide's notes have no reply box, and ✦ opens the line in the pull request's diff. A note
+in the Diff tab doesn't open its step.
 
 ## When the change moves on
 
@@ -125,17 +129,18 @@ want one.
 
 It reads the task's pull request from its code host plugin, and the change from the task's worktree with
 git. It has no network access of its own, runs no other programs, and reads no secrets. It may open the
-task's pull request diff at a line, and open the agent card there, which is what a hunk's link and ✦
-do. The card waits for you to send a question. The guide is
+task's pull request diff at a line, which is what a hunk's link does, and show the agent card on the
+pull request's lines in the guide. The card waits for you to send a question. The guide is
 kept on the Node until the task is deleted.
 
 The **Guide** tab sits beside the diff, so you can read a step and its code in the diff side by side.
 
 ## In the terminal
 
-The terminal client draws the same pane and the same tab. A note is one line with its tone and title,
-then its body, and Enter on that line folds it. A hunk's link, or Enter on a line of the diff, opens the
-file in the **Editor** pane at that line, rather than in the diff.
+The terminal client draws the same pane and the same tab, with no agent card. A note is one line with
+its tone and title, then its body, and Enter on that line folds it. A hunk's link, or Enter on a line of
+the diff, opens the file in the **Editor** pane at that line, rather than in the diff. To ask about a
+line there, use the Agent pane.
 
 ## Limits
 

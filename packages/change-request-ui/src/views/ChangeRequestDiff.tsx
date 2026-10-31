@@ -1,60 +1,55 @@
-import { createEffect, createMemo, createSignal, Show, type Component } from 'solid-js'
+import { createEffect, createMemo, createSignal, For, mapArray, Show, type JSX } from 'solid-js'
 import { openPane } from '@acorn/plugin-api/client'
 import { Alert, DiffPane } from '@acorn/plugin-api/ui'
-import { loadDiffLineContext, type CodeRow, type DiffLineAnchor, type DiffSource } from '@acorn/plugin-api/ui/diff'
+import { DiffNoteCard } from '@acorn/plugin-api/ui/host'
+import {
+  loadDiffLineContext,
+  type CodeRow,
+  type DiffLineAnchor,
+  type DiffSource,
+  type PinnedNote,
+} from '@acorn/plugin-api/ui/diff'
 import type { Thread } from '../model/types'
+import { LineConversation, lineOrigin, sameLine, type InlineDiffSurface, type InlineOrigin } from './lineConversation'
 
 // A change request's diff: the shared diff shell (client-core's DiffPane, docs/diff-rendering.md)
 // filled in by the host. The host answers the shell's questions, which document, where its segments
 // come from, and what a comment does. This adds what every code host does the same way: the threads
 // in the shell's vocabulary, the warning that the host's file limit cut the list short, opening a line
-// in the editor, and the agent conversation anchored to a line.
+// in the editor, and the agent conversation anchored to a line, which a mark that's a note opens with.
 //
 // The document is the host's, cut into segments with no patch text in it. The viewer asks for the
 // segments it is near. Binary and too-large files have no patch; the shell renders a "No diff" row.
 
-/**
- * Where an agent conversation on a diff line came from. The same shape as the agents plugin's
- * `InlineDiffOrigin`, restated because a shared library can't import a plugin. The host passes the
- * agents plugin's capability, and assigning it here is what checks the two still agree.
- */
-type InlineOrigin = {
-  kind: 'inline-diff'
-  source: 'changes' | 'pull-request'
-  taskId: string
-  path: string
-  side: 'old' | 'new'
-  line: number
-  patchKey: string
-  quote: string
-  scope?: 'staged' | 'unstaged'
-  pull?: { owner: string; repo: string; number: string }
-}
+const TONE = { info: 'neutral', warn: 'warn', danger: 'danger' } as const
 
-/** The part of the agents plugin's inline diff surface this view uses. */
-export type InlineDiffSurface = {
-  prime: (taskId: string) => void
-  /** A session can also be a side question, which isn't about a diff line. */
-  sessionsForTask: (
-    taskId: string,
-  ) => readonly { origin?: InlineOrigin | { kind: 'btw' } | null; archivedAt?: number | null }[]
-  reportPatches: (
-    scope: { taskId: string; source: 'pull-request'; pull: { owner: string; repo: string; number: string } },
-    patches: Record<string, string | null>,
-  ) => void
-  Card: Component<{ origin: InlineOrigin; loadContext: () => Promise<string>; onClose?: () => void }>
+/** A mark that's a note, as the line's card draws it: the mark's text as the title, its detail as the
+ *  body. Its fold is this view's. */
+function markNote(
+  row: CodeRow,
+  mark: {
+    pluginId: string
+    severity: keyof typeof TONE
+    text: string
+    note?: { author: string; label: string }
+    detail?: { value: string }
+  },
+): PinnedNote<JSX.Element> {
+  const [folded, setFolded] = createSignal(false)
+  return {
+    props: {
+      side: row.kind === 'delete' ? 'old' : 'new',
+      line: (row.kind === 'delete' ? row.oldNo : row.newNo) ?? 0,
+      tone: TONE[mark.severity],
+      title: mark.text,
+      from: mark.pluginId,
+      ...(mark.note ? { author: mark.note.author, label: mark.note.label } : {}),
+      ...(mark.detail ? { body: mark.detail.value } : {}),
+    },
+    folded,
+    setFolded,
+  }
 }
-
-const sameLine = (left: InlineOrigin, right: InlineOrigin): boolean =>
-  left.taskId === right.taskId &&
-  left.source === right.source &&
-  left.path === right.path &&
-  left.side === right.side &&
-  left.line === right.line &&
-  left.patchKey === right.patchKey &&
-  left.pull?.owner === right.pull?.owner &&
-  left.pull?.repo === right.pull?.repo &&
-  left.pull?.number === right.pull?.number
 
 export type ChangeRequestDiffSource = Omit<DiffSource, 'threads' | 'inlineChat' | 'openLine'> & {
   /** Threads already verified against this diff's revision (`inlineReviewThreads`). */
@@ -91,10 +86,10 @@ export function ChangeRequestDiff(props: {
         Object.fromEntries(files.map((file) => [file.path, file.patchKey])),
       )
   })
-  // The line whose card the reader opened, and the note it was opened with, which goes to the agent.
-  const [openInline, setOpenInline] = createSignal<{ origin: InlineOrigin; note?: string } | null>(null)
+  // The line whose card the reader opened with ✦.
+  const [openInline, setOpenInline] = createSignal<InlineOrigin | null>(null)
   createEffect(() => {
-    const opened = openInline()?.origin
+    const opened = openInline()
     if (opened && topology()?.files.find((file) => file.path === opened.path)?.patchKey !== opened.patchKey)
       setOpenInline(null)
   })
@@ -103,17 +98,17 @@ export function ChangeRequestDiff(props: {
     const patchKey = topology()?.files.find((file) => file.path === row.path)?.patchKey
     const line = row.kind === 'delete' ? row.oldNo : row.newNo
     if (!patchKey || line == null) return null
-    return {
-      kind: 'inline-diff',
-      source: 'pull-request',
-      taskId,
+    return lineOrigin(taskId, pull, patchKey, {
       path: row.path,
       side: row.kind === 'delete' ? 'old' : 'new',
       line,
-      patchKey,
-      quote: row.raw.slice(0, 2_000),
-      pull,
-    }
+      quote: row.raw,
+    })
+  }
+  const opened = (row: CodeRow): boolean => {
+    const open = openInline()
+    const origin = inlineOrigin(row)
+    return !!open && !!origin && sameLine(open, origin)
   }
   const inlineAnchors = createMemo<DiffLineAnchor[]>(() => {
     if (!taskId) return []
@@ -131,20 +126,9 @@ export function ChangeRequestDiff(props: {
       if (topology()?.files.find((file) => file.path === origin.path)?.patchKey !== origin.patchKey) return []
       return [{ path: origin.path, side: origin.side, line: origin.line }]
     })
-    const opened = openInline()?.origin
+    const opened = openInline()
     return opened ? [...visible, { path: opened.path, side: opened.side, line: opened.line }] : visible
   })
-
-  // The note the card was opened with goes first, so the agent reads the line as the reader saw it,
-  // and the reader's own question stays short. A plugin wrote it, not the reader, and the label says
-  // so, so the agent weighs it as context rather than as the reader's words.
-  const lineContext = async (origin: InlineOrigin, row: CodeRow): Promise<string> => {
-    const opened = openInline()
-    const code = await loadDiffLineContext(diffSource, row)
-    return opened?.note && sameLine(opened.origin, origin)
-      ? `The reader asked from a plugin's note on this line. The plugin wrote it, not the reader:\n${opened.note}\n\n${code}`
-      : code
-  }
 
   const diffSource: DiffSource = {
     ...source,
@@ -158,43 +142,20 @@ export function ChangeRequestDiff(props: {
       ? {
           inlineChat: {
             anchors: inlineAnchors,
-            open: (row: CodeRow, ask?: { note?: string }) => {
-              const origin = inlineOrigin(row)
-              setOpenInline(origin && { origin, ...(ask?.note ? { note: ask.note } : {}) })
-            },
-            render: (row: CodeRow) => {
-              // Memoised: read directly, every session update would rebuild the card and blur its textarea.
-              const shown = createMemo(
-                () => {
-                  const origin = inlineOrigin(row)
-                  if (!origin || !inline()?.Card) return null
-                  const exists = inline()
-                    ?.sessionsForTask(taskId)
-                    .some(
-                      (session) =>
-                        session.origin?.kind === 'inline-diff' &&
-                        sameLine(session.origin, origin) &&
-                        !session.archivedAt,
-                    )
-                  const opened = openInline()?.origin
-                  return exists || (opened && sameLine(opened, origin)) ? origin : null
-                },
-                null,
-                { equals: (a, b) => a === b || (!!a && !!b && sameLine(a, b)) },
-              )
+            open: (row: CodeRow) => setOpenInline(inlineOrigin(row)),
+            render: (row, marks) => {
+              const notes = createMemo(mapArray(marks, (mark) => markNote(row, mark)))
+              const fallback = <For each={notes()}>{(note) => <DiffNoteCard note={note} />}</For>
               return (
-                <Show when={shown()} keyed>
-                  {(origin) => {
-                    const Card = inline()!.Card
-                    return (
-                      <Card
-                        origin={origin}
-                        loadContext={() => lineContext(origin, row)}
-                        onClose={() => setOpenInline(null)}
-                      />
-                    )
-                  }}
-                </Show>
+                <LineConversation
+                  inline={inline()}
+                  origin={inlineOrigin(row)}
+                  notes={notes()}
+                  open={opened(row)}
+                  onClose={() => setOpenInline(null)}
+                  loadContext={() => loadDiffLineContext(diffSource, row)}
+                  fallback={fallback}
+                />
               )
             },
           },

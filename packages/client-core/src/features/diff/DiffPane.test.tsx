@@ -199,36 +199,6 @@ describe('a segmented diff', () => {
     expect(drawn).toContain(String(line))
   }, 30_000)
 
-  it('opens the inline chat on the row a held place asks about, once its segment loads', async () => {
-    const files = [...largeDiffFiles('small', 1)]
-    // Not the first file, so scrolling away from the top says the diff took the place.
-    const file = largeDiffSource(files)
-      .topology()!
-      .files.slice(1)
-      .find((candidate) => candidate.segments.length > 3 && candidate.segments[2]!.lines[2] > 0)!
-    const line = file.segments[2]!.lines[3]
-    // Where the chat opened for a place, after the diff has scrolled to it.
-    const opened = async (scope: string, place: { line?: number; ask?: { note?: string } }) => {
-      const open = vi.fn()
-      requestFileScroll({ routeKey: scope, path: file.path, ...place })
-      const host = mount({
-        ...largeDiffSource(files, { scope }),
-        inlineChat: { anchors: () => [], render: () => null, open },
-      })
-      await vi.waitFor(() => expect(host.querySelector<HTMLElement>('.diff')?.scrollTop).toBeGreaterThan(0), {
-        timeout: 5_000,
-      })
-      await settle()
-      return open.mock.calls.map(([row, ask]) => [row.path, row.newNo, ask])
-    }
-
-    expect(await opened('ask-line', { line, ask: { note: 'Why a cap?' } })).toEqual([
-      [file.path, line, { note: 'Why a cap?' }],
-    ])
-    expect(await opened('reveal-only', { line })).toEqual([])
-    expect(await opened('ask-missing', { line: 9_999_999, ask: {} })).toEqual([])
-  }, 30_000)
-
   // A contributor answers marks for the task it read, whatever it was asked. The key's fixed `task`
   // is what keeps that answer off another task's diff of the same file.
   it("draws a mark answered for one task only on that task's diff", async () => {

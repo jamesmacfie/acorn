@@ -8,6 +8,7 @@ import type {
 } from '@acorn/diff-document/document'
 import type { CodeRow, DiffThread } from '../../kit/diff/diffModel'
 import type { DiffViewScope } from './viewState'
+import type { StampedMark } from '../../host/annotations/annotations'
 
 /** Which column a comment is anchored to. The renderer's own vocabulary, matching buildRenderableRows. */
 export type CommentSide = 'LEFT' | 'RIGHT'
@@ -89,12 +90,13 @@ export type DiffSource = {
    * segments load; `render` draws one line's, inside its segment so the height is measured.
    */
   lineExtra?: { anchors: () => readonly DiffLineAnchor[]; render: (row: CodeRow) => JSX.Element }
-  /** A task-owned agent conversation anchored to a diff line. `open` takes the `ask` a revealed place
-   *  carried, whose `note` the conversation starts from. */
+  /** A task-owned agent conversation anchored to a diff line. `render` gets the line's marks that are
+   *  notes (`PluginAnnotationMark.note`), which the conversation draws as its opening messages in place
+   *  of the marks. */
   inlineChat?: {
     anchors: () => readonly DiffLineAnchor[]
-    render: (row: CodeRow) => JSX.Element
-    open: (row: CodeRow, ask?: { note?: string }) => void
+    render: (row: CodeRow, notes: () => readonly StampedMark[]) => JSX.Element
+    open: (row: CodeRow) => void
   }
   /**
    * A click on a code line, for a source with a modifier-key affordance of its own. Unified mode

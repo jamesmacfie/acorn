@@ -13,8 +13,12 @@ import './annotations.css'
 //
 // The plugin id is drawn, not merely recorded, for the reason the row groups draw theirs: a person
 // reading "not covered by any test" on their diff is entitled to know which package said so.
-export function AnnotationMarks(props: { point: string; itemKey: PluginAnnotationKey }) {
-  const marks = () => annotationsFor(props.point, props.itemKey)
+//
+// A mark that's a note is the one an owner may draw as its own agent card instead. The reply box is the
+// owner's, and nothing goes to the agent until the reader sends.
+/** `omitNotes` leaves out the marks that are notes, for an owner that draws those as cards. */
+export function AnnotationMarks(props: { point: string; itemKey: PluginAnnotationKey; omitNotes?: boolean }) {
+  const marks = () => annotationsFor(props.point, props.itemKey).filter((mark) => !(props.omitNotes && mark.note))
   return (
     <Show when={marks().length}>
       <div class="annotation-marks">

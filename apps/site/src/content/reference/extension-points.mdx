@@ -6,7 +6,7 @@ sources:
   - docs/plugins/remote-points.md
   - docs/plugins/rows-and-annotations.md
   - docs/tui/plugin-losses.md
-checked: '6f8862c01'
+checked: '6b445c7a4'
 ---
 
 An extension point is a place in one plugin's view that another plugin may fill. The owner opens it,
@@ -555,7 +555,7 @@ Text after a line in Editor, with a tooltip.
 
 #### `github:diff-line`
 
-Marks on lines of a pull request's diff.
+Marks on lines of a pull request's diff. A mark with a Markdown `detail` and `note: { author, label }` draws as the line's agent card instead, with the mark's text and detail as its first message and a reply box under it.
 
 ```json manifest
 {
@@ -617,7 +617,7 @@ A tab beside the diff of a task's pull request, named by your label. Your tree g
 
 #### `bitbucket:diff-line`
 
-Marks on lines of a Bitbucket pull request's diff.
+Marks on lines of a Bitbucket pull request's diff. A mark with a Markdown `detail` and `note: { author, label }` draws as the line's agent card instead, with the mark's text and detail as its first message and a reply box under it.
 
 ```json manifest
 {
@@ -679,7 +679,7 @@ A tab beside the diff of a task's pull request, named by your label. Your tree g
 
 #### `gitlab:diff-line`
 
-Marks on lines of a merge request's diff.
+Marks on lines of a merge request's diff. A mark with a Markdown `detail` and `note: { author, label }` draws as the line's agent card instead, with the mark's text and detail as its first message and a reply box under it.
 
 ```json manifest
 {

@@ -28,6 +28,20 @@ describe('sanitizeAnnotationMark', () => {
       })
   })
 
+  it('keeps a note only beside a markdown detail, with both of its words', () => {
+    const detail = { kind: 'markdown', value: 'Check **the cap**.' } as const
+    const note = { author: 'Claude Code', label: 'Risk' }
+    expect(sanitizeAnnotationMark({ ...mark, detail, note }, 'node-a')).toEqual({ ...mark, detail, note })
+    expect(sanitizeAnnotationMark({ ...mark, note }, 'node-a')).toEqual(mark)
+    expect(
+      sanitizeAnnotationMark({ ...mark, detail: { kind: 'plaintext', value: 'x' }, note }, 'node-a'),
+    ).not.toHaveProperty('note')
+    expect(sanitizeAnnotationMark({ ...mark, detail, note: { author: 'Claude Code' } }, 'node-a')).toEqual({
+      ...mark,
+      detail,
+    })
+  })
+
   it('keeps a busy flag only when it is true', () => {
     expect(sanitizeAnnotationMark({ ...mark, busy: true }, 'node-a')).toEqual({ ...mark, busy: true })
     expect(sanitizeAnnotationMark({ ...mark, busy: 'yes' }, 'node-a')).toEqual(mark)

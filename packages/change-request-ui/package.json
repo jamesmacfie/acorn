@@ -8,7 +8,8 @@
   "exports": {
     "./model": "./src/model/public.ts",
     "./views": "./src/views/public.ts",
-    "./railMarker": "./src/views/railMarker.ts"
+    "./railMarker": "./src/views/railMarker.ts",
+    "./lines": "./src/views/lineConversation.tsx"
   },
   "scripts": {
     "lint": "tsc --noEmit",

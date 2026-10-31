@@ -4,7 +4,7 @@
 // that draws nothing where it stands: it hands its props to the `StackedDiff` above it, which draws
 // it under the row it names. Outside a `StackedDiff` there is nobody to hand them to, so the note is
 // omitted, as a node the host doesn't know is.
-import { createContext, createSignal, onCleanup, useContext, type Accessor } from 'solid-js'
+import { createContext, createSignal, onCleanup, useContext, type Accessor, type JSX } from 'solid-js'
 import type { CodeRow, HunkRow } from './diffModel'
 
 /** One line of a diff, named the way a review names it: deleted rows on the old side, everything
@@ -15,17 +15,26 @@ export type DiffNoteProps<Children = unknown> = DiffLinePlace & {
   tone?: 'neutral' | 'warn' | 'danger'
   /** The tone's word in the header, such as "Risk". */
   label?: string
-  /** Who wrote the note, such as "Claude Code". */
+  /** Who wrote the note, such as "Claude Code", as the plugin says. */
   author?: string
+  /** The plugin that pinned the note. The host sets it, never the plugin, so a reader and an agent
+   *  know whose words they are. */
+  from?: string
   /** One line, and all a folded note shows. */
   title?: string
+  /** Markdown, drawn under the title. Text rather than children, so the host can hand the note to an
+   *  agent as the opening message of the line's conversation. */
+  body?: string
   /** Controlled mode, as `Fold`'s: with `onOpenChange` the caller owns the fold, and `open` defaults
    *  to true. Without it the note keeps its own fold and starts open. */
   open?: boolean
   onOpenChange?: (open: boolean) => void
-  /** The body and the plugin's own buttons. */
+  /** The plugin's own buttons, under the body. */
   children?: Children
 }
+
+/** What a note says, without its fold or buttons: what a line conversation stores and sends. */
+export type DiffNoteText = Pick<DiffNoteProps, 'tone' | 'label' | 'author' | 'from' | 'title' | 'body'>
 
 /** A note as its `StackedDiff` holds it. The fold lives with the note's node, so it survives the
  *  note moving to another row. */
@@ -57,6 +66,21 @@ export function DiffNote(props: DiffNoteProps) {
   const setFolded = (next: boolean) => (props.onOpenChange ? props.onOpenChange(!next) : setLocal(next))
   if (pin) onCleanup(pin({ props, folded, setFolded }))
   return null
+}
+
+/** A line of a task's change request, as a tree's `StackedDiff` hands it to the host's agent card for
+ *  that request (`changeRequestLineCard`). One card per line holds the line's conversation, and its
+ *  notes are the conversation's opening messages. */
+export type ChangeRequestLineProps = DiffLinePlace & {
+  path: string
+  /** The line's code, which the conversation quotes. */
+  quote: string
+  notes: readonly PinnedNote<JSX.Element>[]
+  /** Open on a line with no note and no conversation yet, as ✦ does. */
+  open: boolean
+  onClose: () => void
+  /** Drawn instead of a card, such as for a file the change request doesn't have. */
+  fallback: JSX.Element
 }
 
 export const linePlace = (row: CodeRow): DiffLinePlace | null => {

@@ -6,7 +6,15 @@ export { Artwork, Badge, Chip, ChipRow, Icon, Kbd, Spinner, StatusDot, UserAvata
 export { DescriptionList, Facts, Meter } from './showing/facts'
 export { CodeBlock, Lines, Log, Markdown } from './showing/documents'
 export { Grid, Table, TableCell, TableHead, TableRow } from './showing/tables'
-export { AnnotationMarks, DiffLine, FileHead, NonCodeRow, SplitCell, StackedDiff } from './showing/diffRows'
+export {
+  AnnotationMarks,
+  DiffLine,
+  DiffNoteCard,
+  FileHead,
+  NonCodeRow,
+  SplitCell,
+  StackedDiff,
+} from './showing/diffRows'
 export { DiffNote } from '@acorn/client-core/kit/diff'
 export { DiffPane } from './showing/diffPane'
 export { Alert, EmptyState } from './showing/feedback'

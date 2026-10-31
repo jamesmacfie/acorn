@@ -3,7 +3,20 @@
 // review rows in github" split would be a redesign of the component, and the changes pane already
 // renders NonCodeRow today. What each surface actually varies is passed in as props (composers,
 // resolve/reply callbacks, gap expansion), so nothing here reaches back into a plugin.
-import { createEffect, createMemo, createSignal, For, Match, on, Show, Switch, type JSX } from 'solid-js'
+import {
+  createEffect,
+  createMemo,
+  createSignal,
+  For,
+  lazy,
+  Match,
+  on,
+  Show,
+  Switch,
+  type Component,
+  type JSX,
+} from 'solid-js'
+import { Dynamic } from 'solid-js/web'
 import CopyButton from '../components/inputs/CopyButton'
 import { fileStatusMeta } from '../lib/rendering/displayMeta'
 import MentionTextarea from '../components/inputs/MentionTextarea'
@@ -30,12 +43,16 @@ import {
   keptRows,
   linePlace,
   placeNotes,
+  type ChangeRequestLineProps,
   type DiffLinePlace,
   type PinnedNote,
 } from './diffNotes'
 import { persistDraft } from '../lib/state/draftState'
 import { Badge, Button } from '../components/primitives'
 import SanitizedHtml from '../components/content/SanitizedHtml'
+
+// Lazy: the diff rows load with the compiled roster, and only a note with a body needs Markdown.
+const Markdown = lazy(() => import('../components/content/Markdown'))
 
 export type LineComposerController = {
   isOpen: () => boolean
@@ -256,6 +273,10 @@ export function DiffLine(props: {
  * `DiffNote` children draw under the row they name (./diffNotes.ts). `onActivate` gives every line the
  * ✦ button, which sends the line's place. `noteContext` keeps only the noted rows and that many rows
  * around each, for a diff whose full text is shown somewhere else.
+ *
+ * `lineCards` is the host's, never a tree's. For a tree that set `conversations`, it's the agent card
+ * of the task's change request (`ChangeRequestLineProps`). Each line then draws its card, with its
+ * notes as the opening messages, and ✦ opens the card in place instead of calling `onActivate`.
  */
 export function StackedDiff(props: {
   path: string
@@ -263,6 +284,10 @@ export function StackedDiff(props: {
   lineNumbers?: boolean
   onActivate?: (place: DiffLinePlace) => void
   noteContext?: number
+  /** Says the patch is part of the task's change request, so the host draws the request's agent card
+   *  on its lines. Only a tree with the `core.changeRequests:reveal` scope gets one. */
+  conversations?: boolean
+  lineCards?: () => Component<ChangeRequestLineProps> | undefined
   children?: JSX.Element
 }) {
   const rows = createMemo(() => {
@@ -288,9 +313,14 @@ export function StackedDiff(props: {
   const { notes, pin } = createPinnedNotes<JSX.Element>()
   const placed = createMemo(() => placeNotes(rows(), notes()))
   const kept = createMemo(() => keptRows(rows(), placed().under.keys(), props.noteContext))
+  // Read once: it subscribes to the change request's diff for as long as this diff is drawn.
+  const LineCard = props.lineCards?.()
+  // The line whose card ✦ opened, by row index.
+  const [asked, setAsked] = createSignal<number | null>(null)
   const ask = (row: CodeRow) => {
     const place = linePlace(row)
-    if (place) props.onActivate?.(place)
+    if (LineCard) setAsked(rows().indexOf(row))
+    else if (place) props.onActivate?.(place)
   }
   return (
     <DiffNotesProvider value={pin}>
@@ -328,10 +358,28 @@ export function StackedDiff(props: {
                             canAdd={false}
                             addComment={async () => {}}
                             onMutated={() => {}}
-                            askAgent={props.onActivate ? ask : undefined}
+                            askAgent={LineCard || props.onActivate ? ask : undefined}
                           />
                         </div>
-                        <For each={here()}>{(note) => <NoteCard note={note} />}</For>
+                        <div class="diff-note-line">
+                          <Show
+                            when={LineCard && linePlace(code())}
+                            fallback={<For each={here()}>{(note) => <DiffNoteCard note={note} />}</For>}
+                          >
+                            {(place) => (
+                              <Dynamic
+                                component={LineCard!}
+                                path={props.path}
+                                {...place()}
+                                quote={code().raw}
+                                notes={here()}
+                                open={asked() === index()}
+                                onClose={() => setAsked(null)}
+                                fallback={<For each={here()}>{(note) => <DiffNoteCard note={note} />}</For>}
+                              />
+                            )}
+                          </Show>
+                        </div>
                       </>
                     )
                   }}
@@ -339,7 +387,9 @@ export function StackedDiff(props: {
               </Show>
             )}
           </For>
-          <For each={placed().unplaced}>{(note) => <NoteCard note={note} unplaced />}</For>
+          <div class="diff-note-line">
+            <For each={placed().unplaced}>{(note) => <DiffNoteCard note={note} unplaced />}</For>
+          </div>
         </div>
         {props.children}
       </div>
@@ -347,9 +397,9 @@ export function StackedDiff(props: {
   )
 }
 
-/** A note in the inline agent card's shape: ✦, the author, the tone's word, then the title and the
- *  tree's own body and buttons. Folds to its header. */
-function NoteCard(props: { note: PinnedNote<JSX.Element>; unplaced?: boolean }) {
+/** A note in the inline agent card's shape: ✦, the author, the tone's word, then the title, the body,
+ *  and the note's own buttons. Folds to its header. The agent card draws a line's notes with it too. */
+export function DiffNoteCard(props: { note: PinnedNote<JSX.Element>; unplaced?: boolean }) {
   const note = () => props.note.props
   const folded = () => props.note.folded()
   return (
@@ -359,6 +409,7 @@ function NoteCard(props: { note: PinnedNote<JSX.Element>; unplaced?: boolean }) 
           ✦
         </span>
         <Show when={note().author}>{(author) => <span class="diff-note-author">{author()}</span>}</Show>
+        <Show when={note().from}>{(from) => <span class="diff-note-author">{`from ${from()}`}</span>}</Show>
         <Show when={note().label}>
           {(label) => (
             <Badge size="xs" tone={note().tone ?? 'neutral'}>
@@ -385,7 +436,10 @@ function NoteCard(props: { note: PinnedNote<JSX.Element>; unplaced?: boolean }) 
         <Show when={note().title}>
           <div class="diff-note-title">{note().title}</div>
         </Show>
-        <div class="diff-note-body">{note().children}</div>
+        <div class="diff-note-body">
+          <Show when={note().body}>{(body) => <Markdown text={body()} />}</Show>
+          {note().children}
+        </div>
       </Show>
     </div>
   )

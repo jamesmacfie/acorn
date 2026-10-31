@@ -1,5 +1,5 @@
 import { lazy } from 'solid-js'
-import type { ClientPlugin } from '@acorn/plugin-api/client'
+import { changeRequestLinesId, type ClientPlugin } from '@acorn/plugin-api/client'
 import { changeRequestPoints } from '@acorn/change-request-ui/model'
 import { parsePullRequestRef, sameRepository } from '../shared/pullRequestRef'
 import { bitbucketBrowsePath, bitbucketRouteContributions, taskPullRequest } from './clientRoutes'
@@ -8,6 +8,7 @@ import { bitbucketPullRequestPromotion } from './pullRequestTasks'
 import { prPaneContribution } from './pullRequest/paneContribution'
 import { prRailMarkerContribution } from './pullRequest/railMarker'
 import { BitbucketPushActions, GIT_PUSH_ACTIONS_POINT } from './pushActions'
+import { bitbucketChangeRequestLines } from './changeRequestLines'
 
 // Two lazy chunks off one module: the source declares its list and detail apart, and a terminal draws
 // them in two panels.
@@ -62,6 +63,8 @@ export const bitbucketClientPlugin: ClientPlugin = {
       component: BitbucketImporter,
     })
     ctx.panes.register(prPaneContribution)
+    // The agent card on a line of a task's change request, for a tree that shows its lines.
+    ctx.capabilities.provide(changeRequestLinesId('bitbucket'), bitbucketChangeRequestLines)
     ctx.railMarkers.register(prRailMarkerContribution)
     for (const point of changeRequestPoints('Pull request')) ctx.extensionPoints.register(point)
     ctx.extensions.register({

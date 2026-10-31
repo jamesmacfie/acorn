@@ -1,5 +1,5 @@
 import { lazy } from 'solid-js'
-import type { ClientPlugin } from '@acorn/plugin-api/client'
+import { changeRequestLinesId, type ClientPlugin } from '@acorn/plugin-api/client'
 import { pullRefMatchesTask } from '../shared/pullRef'
 import { changeRequestPoints } from '@acorn/change-request-ui/model'
 import { prFiltersSlice } from './pullList/filterStore'
@@ -11,6 +11,7 @@ import { githubIntegrationFlow } from './integrationFlow'
 import { githubBrowsePath, githubRouteContributions } from './clientRoutes'
 import { GIT_PUSH_ACTIONS_POINT, GithubPushActions } from './pushActions'
 import { githubPullPromotion } from './pullTasks'
+import { githubChangeRequestLines } from './changeRequestLines'
 
 // Two lazy chunks off one module, because the source declares its list and its detail separately and
 // a terminal shell draws them in two different panels. Both resolve the same
@@ -77,6 +78,8 @@ export const githubClientPlugin: ClientPlugin = {
     })
     ctx.integrationFlows.register(githubIntegrationFlow)
     ctx.panes.register(prPaneContribution)
+    // The agent card on a line of a task's change request, for a tree that shows its lines.
+    ctx.capabilities.provide(changeRequestLinesId('github'), githubChangeRequestLines)
     // CI, review, conflicts, and draft or merged state, in the corners of that pane's button.
     ctx.railMarkers.register(prRailMarkerContribution)
     // The two places another plugin may come into a pull request

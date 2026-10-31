@@ -172,9 +172,10 @@ export function GuidePane(props: { taskId?: string; bridge: AcornBridge; layout:
               failure={failureAlert()}
               padded={padded}
               onSession={(id) => void props.bridge.ui.openDestination('session', id)}
-              onReveal={(path, line, side, ask) =>
+              conversations={view()!.matchesChangeRequest}
+              onReveal={(path, line, side) =>
                 void props.bridge.ui
-                  .revealChangeRequestLine(path, line, side, ask && { ask })
+                  .revealChangeRequestLine(path, line, side)
                   .catch((error: unknown) => setFailure(errorMessage(error)))
               }
               onRetry={() => setAsking(true)}
@@ -216,6 +217,8 @@ function StoredGuideView(props: {
   /** Wraps a state other than a ready guide, under the failure. */
   padded: (children: JSX.Element) => JSX.Element
   onSession: (sessionId: string) => void
+  /** Whether the guide's lines hold the change request's agent conversations. */
+  conversations: boolean
   onReveal: Reveal
   onRetry: () => void
   onMark: (progress: ProgressMark) => void
@@ -274,6 +277,7 @@ function StoredGuideView(props: {
               </>
             }
             coverage={coverageNotes(guide())}
+            conversations={props.conversations}
             onReveal={props.onReveal}
             onMark={props.onMark}
           />

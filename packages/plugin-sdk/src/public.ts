@@ -100,15 +100,8 @@ export type AcornBridge = {
     /** Show a file in the diff of this surface's task's primary change request, at a line when you
      * know one. `side` is `new` by default, and `old` for a deleted line. A line the diff doesn't show
      * lands on the file's header. Needs the `core.changeRequests:reveal` scope, and rejects with
-     * `not_found` when the task has no change request. Pass `ask` with a line to also open the agent
-     * card on it, with `note`, at most 2,048 characters, as context for the agent. Asking works only
-     * from a click or key handler, at most once a second. */
-    revealChangeRequestLine(
-      path: string,
-      line?: number,
-      side?: 'old' | 'new',
-      options?: { ask?: { note?: string } },
-    ): Promise<void>
+     * `not_found` when the task has no change request. */
+    revealChangeRequestLine(path: string, line?: number, side?: 'old' | 'new'): Promise<void>
     /** Hand an `https` URL to the host. Anything else is refused, and resolving says only that the host
      * accepted it: where it lands is the host's business, because the frame does not know which surface
      * it is. */

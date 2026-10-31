@@ -23,6 +23,7 @@
     "./features/dashboards/views/host.ts": "./src/features/dashboards/views/host.ts",
     "./features/diff": "./src/features/diff/public.ts",
     "./features/diff/DiffPane.tsx": "./src/features/diff/DiffPane.tsx",
+    "./features/diff/changeRequestLines.ts": "./src/features/diff/changeRequestLines.ts",
     "./features/diff/lineContext.ts": "./src/features/diff/lineContext.ts",
     "./features/editor": "./src/features/editor/public.ts",
     "./features/editor/documentCustody.ts": "./src/features/editor/documentCustody.ts",

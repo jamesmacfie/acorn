@@ -130,6 +130,7 @@ const view = (guide: StoredGuide): GuideView => ({
   profiles: [{ id: 'claude-code', label: 'Claude Code' }],
   profileId: 'claude-code',
   guide,
+  matchesChangeRequest: guide.status === 'ready',
 })
 
 const mount = async (guide: StoredGuide, layout: 'wide' | 'narrow' = 'wide') => {
@@ -341,34 +342,46 @@ describe('GuidePane', () => {
     pane.dispose()
   })
 
-  it('draws each note as a DiffNote under its line, with its buttons', async () => {
+  it('draws each note as a DiffNote under its line, with its body and buttons', async () => {
     const pane = await mount(stored('ready', { pages: ['overview'], notes: [] }))
     const risk = pane.nodes().find((node) => node.type === 'DiffNote' && node.props.title === 'This may overflow.')!
-    expect(risk.props).toMatchObject({ side: 'new', line: 1, tone: 'danger', label: 'Risk', author: 'Claude Code' })
-    expect(pane.parentOf(risk.id)).toMatchObject({ type: 'StackedDiff', props: { path: 'a.ts' } })
+    expect(risk.props).toMatchObject({
+      side: 'new',
+      line: 1,
+      tone: 'danger',
+      label: 'Risk',
+      author: 'Claude Code',
+      body: 'Check **the cap**.',
+    })
+    // The host draws the change request's agent card on its lines, with the note as its opening message.
+    expect(pane.parentOf(risk.id)).toMatchObject({ type: 'StackedDiff', props: { path: 'a.ts', conversations: true } })
     const buttons = (diffNote: TreeNode) =>
       pane
         .nodes()
         .filter((node) => node.type === 'Button' && JSON.stringify(diffNote).includes(`"${node.id}"`))
         .map(text)
-    expect(buttons(risk)).toEqual(['Ask a follow-up', 'Show in diff', 'Mark checked'])
+    expect(buttons(risk)).toEqual(['Show in diff', 'Mark checked'])
     const explain = pane.nodes().find((node) => node.type === 'DiffNote' && node.props.title === 'Why b.')!
-    expect(buttons(explain)).toEqual(['Ask a follow-up', 'Show in diff', 'Got it'])
+    expect(buttons(explain)).toEqual(['Show in diff', 'Got it'])
     await pane.press('Button', 'Got it')
     expect(pane.nodes().find((node) => node.id === explain.id)!.props.open).toBe(false)
     pane.dispose()
   })
 
-  it('asks about a line from ✦ with no note, from Ask a follow-up with the note, and shows one from Show in diff', async () => {
+  it("shows a line in the change request's diff from Show in diff, and from ✦ where the host has no card", async () => {
     const pane = await mount(stored('ready', { pages: ['overview'], notes: [] }))
     await pane.press('StackedDiff', 'a.ts', 'onActivate', { side: 'old', line: 1 })
     await pane.press('Button', 'Show in diff')
-    await pane.press('Button', 'Ask a follow-up')
     expect(pane.revealed).toEqual([
-      ['a.ts', 1, 'old', { ask: {} }],
-      ['a.ts', 1, 'new', undefined],
-      ['a.ts', 1, 'new', { ask: { note: 'This may overflow.\n\nCheck **the cap**.' } }],
+      ['a.ts', 1, 'old'],
+      ['a.ts', 1, 'new'],
     ])
+    pane.dispose()
+  })
+
+  it("doesn't hold conversations on a guide the change request's head has moved past", async () => {
+    const pane = await mount(stored('stale', { pages: ['overview'], notes: [] }))
+    expect(pane.diffs().map((diff) => diff.props.conversations)).toEqual([false, false])
     pane.dispose()
   })
 
@@ -429,11 +442,11 @@ describe('GuidePane', () => {
     it("shows a step's first hunk in the diff when the step opens", async () => {
       const pane = await mount(stored('ready', { pages: ['overview'], notes: [] }), 'narrow')
       await pane.press('Button', 'Mark reviewed & continue')
-      expect(pane.revealed).toEqual([['a.test.ts', 1, 'new', undefined]])
+      expect(pane.revealed).toEqual([['a.test.ts', 1, 'new']])
       await pane.press('Button', 'Tests')
-      expect(pane.revealed.at(-1)).toEqual(['a.test.ts', 1, 'new', undefined])
+      expect(pane.revealed.at(-1)).toEqual(['a.test.ts', 1, 'new'])
       await pane.press('Button', 'Core')
-      expect(pane.revealed.at(-1)).toEqual(['a.ts', 1, 'new', undefined])
+      expect(pane.revealed.at(-1)).toEqual(['a.ts', 1, 'new'])
       pane.dispose()
     })
   })

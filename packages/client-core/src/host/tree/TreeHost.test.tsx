@@ -1,9 +1,11 @@
+import { createEffect } from 'solid-js'
 import { render } from 'solid-js/web'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { TreeMutation } from '@acorn/protocol/tree/messages.ts'
 import { TREE_LIMITS } from '@acorn/protocol/tree/messages.ts'
 import type { KitEvent } from '@acorn/protocol/tree/nodes.ts'
 import { TreeHost, type TreeTransport } from './TreeHost'
+import type { ChangeRequestLineProps } from '../../kit/diff/diffNotes'
 import { mintSlotRef, NestedChromeSlot, WithNestedChromeSlots } from '../plugins/NestedChromeSlot'
 import {
   extensionPointRegistry,
@@ -55,7 +57,7 @@ const harness = () => {
     fail: (message: string) => {
       for (const listener of failed) listener(message)
     },
-    mount: (extra: { markdownFences?: { taskId?: string } } = {}) => {
+    mount: (extra: Pick<Parameters<typeof TreeHost>[0], 'markdownFences' | 'lineCards'> = {}) => {
       dispose = render(
         () => (
           <TreeHost
@@ -377,10 +379,49 @@ describe('a tree becomes the host’s own components', () => {
     expect(await settled(() => !!host.querySelector('.diff-note'))).toBe(true)
     const noted = host.querySelector('.diff-noted')!
     expect(noted.textContent).toContain('old')
-    expect(noted.nextElementSibling).toBe(host.querySelector('.diff-note'))
+    expect(noted.nextElementSibling!.querySelector('.diff-note')).toBe(host.querySelector('.diff-note'))
     expect(host.querySelector('.diff-note')!.textContent).toContain('why it went')
     noted.querySelector<HTMLButtonElement>('.diff-ask-btn')!.click()
     expect(h.sent).toEqual([{ handler: 3, event: 'onActivate', payload: { side: 'old', line: 2 } }])
+  })
+
+  // The card is the change request's line conversation (features/diff/changeRequestLines.ts), stood in
+  // for here: what matters is what the host hands it, and that only a tree that asked gets it.
+  it("draws the host's line card on a StackedDiff that sets conversations, with its notes, and opens it from ✦", async () => {
+    const drawn: { line: number; notes: string[]; open: boolean }[] = []
+    const lineCards = () => (props: ChangeRequestLineProps) => {
+      createEffect(() =>
+        drawn.push({ line: props.line, notes: props.notes.map((note) => note.props.title ?? ''), open: props.open }),
+      )
+      return <div class="line-card">{props.notes.length || props.open ? 'card' : props.fallback}</div>
+    }
+    const diff = (conversations: boolean) =>
+      node(
+        'n1',
+        'StackedDiff',
+        { path: 'a.ts', patch: '@@ -1,2 +1,2 @@\n keep\n-old\n+new', conversations, onActivate: { $handler: 3 } },
+        [node('n2', 'DiffNote', { side: 'old', line: 2, title: 'Gone', body: 'It **went**.', from: 'core' })],
+      )
+    const h = harness()
+    h.mount({ lineCards })
+    h.apply([{ op: 'insert', parent: null, index: 0, node: diff(true) }])
+    expect(await settled(() => host.querySelectorAll('.line-card').length === 3)).toBe(true)
+    expect(drawn.filter((card) => card.notes.length)).toEqual([{ line: 2, notes: ['Gone'], open: false }])
+    drawn.length = 0
+    host.querySelector<HTMLButtonElement>('.diff-row:not(.diff-noted) .diff-ask-btn')!.click()
+    expect(drawn.filter((card) => card.open)).toEqual([{ line: 1, notes: [], open: true }])
+    expect(h.sent).toEqual([])
+    dispose?.()
+
+    // A tree that didn't ask draws plain notes, with the body, and ✦ goes back to it.
+    const plain = harness()
+    plain.mount({ lineCards })
+    plain.apply([{ op: 'insert', parent: null, index: 0, node: diff(false) }])
+    expect(await settled(() => !!host.querySelector('.diff-note'))).toBe(true)
+    expect(host.querySelector('.line-card')).toBeNull()
+    expect(host.querySelector('.diff-note-body strong')?.textContent).toBe('went')
+    // Whose note it is comes from the host, whatever the tree says.
+    expect(host.querySelector('.diff-note')!.textContent).toContain('from stranger')
   })
 
   it('drops a class or a style before it reaches an element', async () => {

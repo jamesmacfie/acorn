@@ -1,9 +1,22 @@
-import { createEffect, createMemo, createResource, createSignal, Index, onCleanup, Show } from 'solid-js'
+import {
+  createEffect,
+  createMemo,
+  createResource,
+  createSignal,
+  For,
+  Index,
+  on,
+  onCleanup,
+  Show,
+  untrack,
+  type JSX,
+} from 'solid-js'
 import { createQuery, useQueryClient } from '@tanstack/solid-query'
 import { Alert, Button, Card, Inline, SegmentedControl, Select, Stack, Text, Textarea } from '@acorn/plugin-api/ui'
-import { ModelPickerPopover } from '@acorn/plugin-api/ui/host'
+import type { DiffNoteText, PinnedNote } from '@acorn/plugin-api/ui/diff'
+import { DiffNoteCard, ModelPickerPopover } from '@acorn/plugin-api/ui/host'
 import type { AgentNormalizedEvent, AgentProviderDescriptor } from '../../contract/wire.ts'
-import { sameInlineLine, type InlineDiffOrigin } from '../../contract/inlineDiff.ts'
+import { sameInlineLine, type InlineDiffNote, type InlineDiffOrigin } from '../../contract/inlineDiff.ts'
 import { providerStartable } from '../../contract/newSessionChoices.ts'
 import { defaultAgentSessionDefaults } from '../../shared/sessionDefaults.ts'
 import { agentSessionDefaultsOptions, writeAgentSessionDefaults } from '../settings/sessionDefaultsClient.ts'
@@ -15,7 +28,34 @@ import { openManagedSession } from '../sessions/managedSelection.ts'
 import AgentEventCard from '../sessions/AgentEventCard.tsx'
 import RuntimeStateIcon from '../sessions/RuntimeStateIcon.tsx'
 
-type Props = { origin: InlineDiffOrigin; loadContext: () => Promise<string>; onClose?: () => void }
+type Props = {
+  origin: InlineDiffOrigin
+  loadContext: () => Promise<string>
+  onClose?: () => void
+  notes?: readonly PinnedNote<JSX.Element>[]
+}
+
+/** What a note says, in the lengths a stored origin allows. */
+const noteText = (note: DiffNoteText): InlineDiffNote => ({
+  ...(note.tone ? { tone: note.tone } : {}),
+  ...(note.label ? { label: note.label.slice(0, 64) } : {}),
+  ...(note.author ? { author: note.author.slice(0, 64) } : {}),
+  ...(note.from ? { from: note.from.slice(0, 128) } : {}),
+  ...(note.title ? { title: note.title.slice(0, 200) } : {}),
+  ...(note.body ? { body: note.body.slice(0, 2000) } : {}),
+})
+
+/** The notes as the agent reads them, above the line's code. The reader sees them in the card. Whose
+ *  they are comes from `from`, which the host set, not from the plugin's own `author`. */
+function notesForAgent(notes: readonly InlineDiffNote[]): string {
+  if (!notes.length) return ''
+  const written = notes.map((note) =>
+    [`${note.label ? `${note.label}: ` : ''}${note.title ?? ''}`, note.body ?? ''].join('\n').trim(),
+  )
+  const plugin = notes[0]!.from ? `the ${notes[0]!.from} plugin` : 'a plugin'
+  const author = notes[0]!.author ? `, which names ${notes[0]!.author} as the author` : ''
+  return `The reader is replying to ${notes.length === 1 ? 'this note' : 'these notes'} on the line, from ${plugin}${author}. The reader didn't write ${notes.length === 1 ? 'it' : 'them'}:\n${written.join('\n\n')}\n\n`
+}
 
 // The thread's "chats only" view, drawn by the thread's own cards: messages, and the agent's questions
 // so they can be answered here. The reader's turn is cut back to the question they typed: the line
@@ -74,6 +114,25 @@ export default function InlineDiffCard(props: Props) {
     () => (session() ? undefined : 'new'),
     () => managedAgentApi.providers(),
   )
+  // The conversation's opening messages: the notes it was drawn with, or those it started with.
+  const storedNotes = createMemo(
+    on(
+      () => session()?.id,
+      () => {
+        const origin = untrack(session)?.origin
+        return (origin?.kind === 'inline-diff' ? (origin.notes ?? []) : []).map((note): PinnedNote<JSX.Element> => {
+          const [folded, setFolded] = createSignal(false)
+          return { props: { ...note, side: props.origin.side, line: props.origin.line }, folded, setFolded }
+        })
+      },
+    ),
+  )
+  const opening = () => (props.notes?.length ? props.notes : storedNotes())
+  // What the conversation keeps and the agent reads: as many as a stored origin holds.
+  const openingText = () =>
+    opening()
+      .slice(0, 4)
+      .map((note) => noteText(note.props))
   const snapshot = createMemo(() => (session() ? managedAgentStore.snapshotFor(session()!.id) : undefined))
   const requestsById = createMemo(
     () => new Map((snapshot()?.requests ?? []).map((request) => [request.providerRequestId, request])),
@@ -151,7 +210,8 @@ export default function InlineDiffCard(props: Props) {
         if (modelOption() && model()) values[modelOption()!.id] = model()
         const readonly = readonlyProfile()
         if (access() === 'read-only' && readonly) values[readonly.optionId] = readonly.value
-        const origin = { ...props.origin, access: access() }
+        const notes = openingText()
+        const origin = { ...props.origin, access: access(), ...(notes.length ? { notes } : {}) }
         target = await managedAgentStore.startInlineSession(
           props.origin.taskId,
           chosen,
@@ -174,8 +234,9 @@ export default function InlineDiffCard(props: Props) {
           target.origin?.kind === 'inline-diff' && target.origin.access === 'read-only'
             ? 'Please answer without changing files or running write commands.\n\n'
             : ''
+        const notes = firstTurn ? notesForAgent(openingText()) : ''
         prompt = firstTurn
-          ? `Question about ${props.origin.path}:${props.origin.line} (${props.origin.side} side, patch ${props.origin.patchKey}):\n\n${context}\n\n${instruction}Question:\n${question}`
+          ? `Question about ${props.origin.path}:${props.origin.line} (${props.origin.side} side, patch ${props.origin.patchKey}):\n\n${notes}${context}\n\n${instruction}Question:\n${question}`
           : `${instruction}${question}`
         setPendingAttempt({ ...attempt, prompt })
       }
@@ -209,7 +270,7 @@ export default function InlineDiffCard(props: Props) {
             </Text>
             <Show when={session()}>{(current) => <Text emphasis="muted">{current().runtimeState}</Text>}</Show>
           </Inline>
-          <Show when={props.onClose && !session()}>
+          <Show when={props.onClose && !session() && !opening().length}>
             <Button size="sm" onPress={() => props.onClose?.()}>
               Close
             </Button>
@@ -223,6 +284,7 @@ export default function InlineDiffCard(props: Props) {
           </Show>
         </Inline>
         <Show when={!collapsed()}>
+          <For each={opening()}>{(note) => <DiffNoteCard note={note} />}</For>
           {/* Index, not For: every snapshot rebuilds the items, and For would remount each card on it. */}
           <Index each={conversation()}>
             {(item) => (
@@ -255,7 +317,7 @@ export default function InlineDiffCard(props: Props) {
             value={draft()}
             onInput={setDraft}
             onCommit={() => void submit()}
-            placeholder="Ask about this change…"
+            placeholder={opening().length ? 'Ask a follow-up…' : 'Ask about this change…'}
           />
           <Inline gap="inline" spread>
             <Show when={!session()}>

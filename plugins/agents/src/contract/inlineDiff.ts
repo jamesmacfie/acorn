@@ -12,6 +12,20 @@ export type InlineDiffOrigin = {
   access?: 'read-only' | 'full'
   scope?: 'staged' | 'unstaged'
   pull?: { owner: string; repo: string; number: string }
+  /** The notes pinned to the line when the conversation started, such as a review guide's. They're
+   *  its opening messages, and they went to the agent with the reader's first question. */
+  notes?: InlineDiffNote[]
+}
+
+/** A note on a diff line, as the conversation keeps it: `DiffNoteText` from `@acorn/plugin-api/ui/diff`. */
+export type InlineDiffNote = {
+  tone?: 'neutral' | 'warn' | 'danger'
+  label?: string
+  author?: string
+  /** The plugin that pinned it, as the host verified. */
+  from?: string
+  title?: string
+  body?: string
 }
 
 export const sameInlineLine = (left: InlineDiffOrigin, right: InlineDiffOrigin): boolean =>

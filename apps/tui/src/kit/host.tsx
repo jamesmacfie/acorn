@@ -368,6 +368,8 @@ function FenceView(props: { viewer: FenceViewer; scope: FenceScope }) {
 
 /** Keep the host API pointed at the diff renderer that owns annotation placement. */
 export { AnnotationMarks } from './showing'
+// The note a `DiffNote` pins, for a compiled surface drawing a line's notes itself.
+export { DiffNoteCard } from './showing'
 
 const MARK_TONE = { info: 'muted', warn: 'warn', danger: 'danger' } as const
 

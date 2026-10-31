@@ -1,5 +1,6 @@
 import { clientCapabilityId } from '@acorn/plugin-api/client'
-import type { Component } from 'solid-js'
+import type { Component, JSX } from 'solid-js'
+import type { PinnedNote } from '@acorn/plugin-api/ui/diff'
 import type { AgentSession } from './wire.ts'
 import type { InlineDiffOrigin } from './inlineDiff.ts'
 
@@ -11,7 +12,13 @@ export type InlineDiffChatSurface = {
     patches: Record<string, string | null>,
   ) => void
   isStale: (origin: InlineDiffOrigin) => boolean | null
-  Card: Component<{ origin: InlineDiffOrigin; loadContext: () => Promise<string>; onClose?: () => void }>
+  /** `notes` are the line's notes, its opening messages. A conversation started with them keeps them. */
+  Card: Component<{
+    origin: InlineDiffOrigin
+    loadContext: () => Promise<string>
+    onClose?: () => void
+    notes?: readonly PinnedNote<JSX.Element>[]
+  }>
 }
 
 export const AGENTS_INLINE_DIFF = clientCapabilityId<InlineDiffChatSurface>('agents.inlineDiff')

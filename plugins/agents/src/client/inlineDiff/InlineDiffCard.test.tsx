@@ -8,6 +8,8 @@ const store = vi.hoisted(() => ({
   sessions: [] as unknown[],
   snapshots: {} as Record<string, unknown>,
   configOptions: [] as unknown[],
+  started: [] as unknown[],
+  sent: [] as string[],
 }))
 vi.mock('../sessions/managedStore.ts', () => ({
   managedAgentStore: {
@@ -16,11 +18,17 @@ vi.mock('../sessions/managedStore.ts', () => ({
     snapshotFor: (id: string) => store.snapshots[id],
     hold: () => () => undefined,
     loadSnapshot: async () => undefined,
+    startInlineSession: async (_taskId: string, _provider: unknown, origin: unknown) => {
+      store.started.push(origin)
+      return { id: 'session-2', origin, createdAt: 2, runtimeState: 'idle' }
+    },
   },
 }))
 vi.mock('../sessions/managedClient.ts', () => ({
   managedAgentApi: {
     providers: async () => [{ id: 'codex', label: 'Codex', installed: true, configOptions: store.configOptions }],
+    snapshot: async () => ({ turns: [] }),
+    enqueue: async (_id: string, body: { input: { text: string }[] }) => void store.sent.push(body.input[0]!.text),
   },
 }))
 
@@ -30,6 +38,8 @@ afterEach(() => {
   store.sessions = []
   store.snapshots = {}
   store.configOptions = []
+  store.started = []
+  store.sent = []
   for (const surface of document.querySelectorAll('.ui-popover')) surface.remove()
 })
 
@@ -45,7 +55,22 @@ const origin = {
   pull: { owner: 'acorn', repo: 'web', number: '42' },
 } as const
 
-const mount = () => {
+const note = {
+  props: {
+    side: 'new',
+    line: 12,
+    tone: 'danger',
+    label: 'Risk',
+    author: 'Claude Code',
+    from: 'review-guide',
+    title: 'This may overflow.',
+    body: 'Check **the cap**.',
+  },
+  folded: () => false,
+  setFolded: () => {},
+} as const
+
+const mount = (notes?: readonly (typeof note)[]) => {
   const client = new QueryClient({ defaultOptions: { queries: { retry: false } } })
   const host = document.createElement('div')
   document.body.append(host)
@@ -57,7 +82,7 @@ const mount = () => {
     render(
       () => (
         <QueryClientProvider client={client}>
-          <InlineDiffCard origin={origin} loadContext={async () => 'new line'} />
+          <InlineDiffCard origin={origin} loadContext={async () => 'new line'} notes={notes} />
         </QueryClientProvider>
       ),
       host,
@@ -200,5 +225,47 @@ describe('inline diff chat', () => {
     expect(host.querySelector('textarea')).toBeNull()
     button('Show')!.click()
     expect(host.textContent).toContain('it matters')
+  })
+
+  it('opens on its notes, sends them with the first question, and keeps them on the conversation', async () => {
+    const host = mount([note])
+    expect(host.textContent).toContain('This may overflow.')
+    // The body's Markdown loads lazily.
+    await vi.waitFor(() => expect(host.querySelector('.diff-note-body strong')?.textContent).toBe('the cap'))
+    const box = host.querySelector('textarea')!
+    expect(box.placeholder).toBe('Ask a follow-up…')
+    box.value = 'Is 10 enough?'
+    box.dispatchEvent(new Event('input', { bubbles: true }))
+    const send = [...host.querySelectorAll('button')].find((button) => button.textContent?.trim() === 'Send')!
+    await vi.waitFor(() => expect(send.disabled).toBe(false))
+    send.click()
+    await vi.waitFor(() => expect(store.sent).toHaveLength(1))
+    expect(store.started).toMatchObject([
+      {
+        notes: [
+          {
+            tone: 'danger',
+            label: 'Risk',
+            author: 'Claude Code',
+            title: 'This may overflow.',
+            body: 'Check **the cap**.',
+          },
+        ],
+      },
+    ])
+    expect(store.sent[0]).toContain(
+      "from the review-guide plugin, which names Claude Code as the author. The reader didn't write it:\nRisk: This may overflow.\nCheck **the cap**.\n\nnew line",
+    )
+    expect(store.sent[0]).toMatch(/Question:\nIs 10 enough\?$/)
+  })
+
+  it('draws the notes a conversation started with when it is drawn without any', () => {
+    store.sessions = [
+      { id: 'session-1', origin: { ...origin, notes: [{ title: 'Kept note.', body: 'Kept body.' }] }, createdAt: 1 },
+    ]
+    store.snapshots = { 'session-1': { session: store.sessions[0], turns: [], events: [], requests: [] } }
+    const host = mount()
+    expect(host.textContent).toContain('Kept note.')
+    expect(host.textContent).toContain('Kept body.')
   })
 })

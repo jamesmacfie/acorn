@@ -327,7 +327,7 @@ it("keeps an open inline card mounted while the task's sessions update", async (
   const row = { path: 'a.txt', kind: 'add', newNo: 1, oldNo: null, raw: '+x' } as never
   model.source.inlineChat!.open(row)
   const host = document.createElement('div')
-  disposers.push(render(() => <div>{model.source.inlineChat!.render(row)}</div>, host))
+  disposers.push(render(() => <div>{model.source.inlineChat!.render(row, () => [])}</div>, host))
   const textarea = host.querySelector('textarea')
   expect(textarea).toBeTruthy()
 

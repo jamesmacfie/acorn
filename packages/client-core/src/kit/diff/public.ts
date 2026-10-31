@@ -11,5 +11,6 @@ export {
   linePlace,
   placeNotes,
   type DiffLinePlace,
+  type DiffNoteText,
   type PinnedNote,
 } from './diffNotes.ts'

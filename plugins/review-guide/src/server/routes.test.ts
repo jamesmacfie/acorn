@@ -404,11 +404,20 @@ describe('review guide routes', () => {
       return view
     }
 
-    it('answers each note on an asked row with its title, under the key it was asked about', async () => {
+    it('answers each note on an asked row as a note, under the key it was asked about', async () => {
       await ready()
       expect(await marks([key(1), key(2)])).toEqual({
         status: 200,
-        items: [{ key: key(1), severity: 'warn', text: 'Callers read a.', icon: 'sparkles' }],
+        items: [
+          {
+            key: key(1),
+            severity: 'warn',
+            text: 'Callers read a.',
+            icon: 'sparkles',
+            detail: { kind: 'markdown', value: 'Check them.' },
+            note: { author: 'Claude Code', label: 'Look closely' },
+          },
+        ],
       })
     })
 
@@ -435,10 +444,12 @@ describe('review guide routes', () => {
       expect((await marks([key(1)])).items).toEqual([])
     })
 
-    it("answers nothing while the guide's commit isn't the change request's head", async () => {
+    it("answers nothing while the guide's commit isn't the change request's head, and the view says so", async () => {
       await ready()
+      expect((await call('GET', '/guide?taskId=task-1')).body).toMatchObject({ matchesChangeRequest: true })
       pullHead = 'a-pushed-commit'
       expect((await marks([key(1)])).items).toEqual([])
+      expect((await call('GET', '/guide?taskId=task-1')).body).toMatchObject({ matchesChangeRequest: false })
       pullHead = null
       expect((await marks([key(1)])).items).toEqual([])
     })

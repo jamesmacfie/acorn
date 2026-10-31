@@ -281,6 +281,10 @@ export { clientCapability, clientCapabilityId } from '@acorn/client-core/infra/n
 // consumes them and can't import a plugin.
 export { AGENT_ASK, AGENT_PROMPT_SCHEDULES } from '@acorn/client-core/features/dashboards/refreshCapabilities.ts'
 export type { AgentPromptSchedules } from '@acorn/client-core/features/dashboards/refreshCapabilities.ts'
+// Where a code host provides the agent card for lines of its change requests, so a tree that shows them
+// can draw it. Core declares the key for the same reason.
+export { changeRequestLinesId } from '@acorn/client-core/features/diff/changeRequestLines.ts'
+export type { ChangeRequestLines } from '@acorn/client-core/features/diff/changeRequestLines.ts'
 export { parseJson } from '@acorn/client-core/infra/persistence'
 export type { PersistedStateSlice } from '@acorn/client-core/infra/persistence'
 export { PersistedSliceKeys, PrefKeys, storageKeyFor } from '@acorn/client-core/infra/persistence'

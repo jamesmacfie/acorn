@@ -7,6 +7,8 @@
 // goes there, so a plugin's node-environment test can still load this model.
 
 export type { CodeRow } from '@acorn/client-core/kit/diff'
+// A note as `DiffNoteCard` draws it, and what it says.
+export type { DiffNoteText, PinnedNote } from '@acorn/client-core/kit/diff'
 
 export { synth } from '@acorn/client-core/kit/diff'
 

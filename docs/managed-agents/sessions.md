@@ -107,7 +107,8 @@ commands." The permission mode is a real limit. The instruction isn't. An unknow
 and a source on an archived task gets the same refusal as a fork.
 
 `origin` is a union narrowed on `kind`: `inline-diff` for an inline diff chat, and `btw` for a side
-question. A session with any origin stays out of the main session list, and starts on the options it
+question. An `inline-diff` origin may keep `notes`, at most four, the notes pinned to the line when the
+chat started, such as a review guide's. The card draws them as its opening messages. A session with any origin stays out of the main session list, and starts on the options it
 asked for rather than the owner's saved defaults.
 
 ## Roster reads

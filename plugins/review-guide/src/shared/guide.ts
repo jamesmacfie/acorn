@@ -23,11 +23,18 @@ export type GuideNote = {
   line: number
   /** The line's text without its `+`, `-`, or space marker. The note check holds the note to it. */
   text: string
-  /** The pane labels them Explains, Look closely, and Risk. */
+  /** Labelled as `TONE_LABELS` says. */
   tone: 'explain' | 'attention' | 'risk'
   title: string
   /** Markdown. */
   body: string
+}
+
+/** The word each tone shows as, in the pane and on the change request's diff. */
+export const TONE_LABELS: Record<GuideNote['tone'], string> = {
+  explain: 'Explains',
+  attention: 'Look closely',
+  risk: 'Risk',
 }
 
 type GuideStep = {
@@ -94,6 +101,10 @@ export type GuideView = {
   profileId: string | null
   /** The newest guide for the task. */
   guide: StoredGuide | null
+  /** Whether the guide is ready and was written for the change request's head commit, so its lines are
+   *  the change request's. Only then do its notes show on the change request's diff, and its lines hold
+   *  the agent conversations that diff's lines do. */
+  matchesChangeRequest: boolean
 }
 
 export const CHANGED_CHANNEL = 'plugin:review-guide:changed'

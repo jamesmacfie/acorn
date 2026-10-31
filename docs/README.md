@@ -491,8 +491,8 @@ Each plugin landing page above has topic pages in a folder of the same name:
 
 ## Review guide v2
 
-- [What's left for review guide v2](./future/review-guide.md): the terminal walk, showing the note in
-  the agent card, the wide pane's landing offset, marks after a push, and posting a note to the code host.
+- [What's left for review guide v2](./future/review-guide.md): the terminal walk, the wide pane's
+  landing offset, marks after a push, and posting a note to the code host.
 
 ## OpenCode harness proposal
 

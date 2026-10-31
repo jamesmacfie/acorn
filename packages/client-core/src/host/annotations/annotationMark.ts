@@ -3,6 +3,7 @@ import {
   MAX_ANNOTATION_DETAIL_BYTES,
   utf8Exceeds,
   type AnnotationDetail,
+  type AnnotationNote,
   type PluginAnnotationKey,
   type PluginAnnotationMark,
 } from '@acorn/protocol/extensionPoints.ts'
@@ -19,9 +20,15 @@ function sanitizeDetail(value: unknown, nodeId: string): AnnotationDetail | unde
   return { kind, value: text.replaceAll('acorn://this/', `acorn://${nodeId}/`) }
 }
 
+function sanitizeNote(value: unknown): AnnotationNote | undefined {
+  if (!value || typeof value !== 'object') return undefined
+  const { author, label } = value as Record<string, unknown>
+  return str(author) && str(label) ? { author: author.slice(0, 64), label: label.slice(0, 32) } : undefined
+}
+
 /**
  * One mark, reduced to what the host is willing to draw: a key of scalars, one of three severities, a
- * line of text, an optional icon name, and optional detail. No colour, no verb, and markup only inside
+ * line of text, an optional icon name, and optional detail with an optional note. No colour, no verb, and markup only inside
  * `detail`, which the host sanitizes when it draws it. `nodeId` is the Node that answered.
  *
  * Every contributor's answer comes through here, loaded or compiled. A bad `detail` costs the mark its
@@ -38,6 +45,7 @@ export function sanitizeAnnotationMark(row: unknown, nodeId: string): PluginAnno
     key[field] = value
   }
   const detail = sanitizeDetail(mark.detail, nodeId)
+  const note = detail?.kind === 'markdown' ? sanitizeNote(mark.note) : undefined
   return {
     key,
     severity: mark.severity,
@@ -47,5 +55,6 @@ export function sanitizeAnnotationMark(row: unknown, nodeId: string): PluginAnno
     ...(str(mark.icon) ? { icon: mark.icon } : {}),
     ...(mark.busy === true ? { busy: true } : {}),
     ...(detail ? { detail } : {}),
+    ...(note ? { note } : {}),
   }
 }

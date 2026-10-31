@@ -1,4 +1,14 @@
-import { createEffect, createMemo, ErrorBoundary, For, onCleanup, Show, Suspense, type JSX } from 'solid-js'
+import {
+  createEffect,
+  createMemo,
+  ErrorBoundary,
+  For,
+  onCleanup,
+  Show,
+  Suspense,
+  type Component,
+  type JSX,
+} from 'solid-js'
 import { Dynamic } from 'solid-js/web'
 import type { TreeMutation } from '@acorn/protocol/tree/messages.ts'
 import { CHROME_SLOT_NODE, TEXT_NODE, isKitNode, type KitEvent } from '@acorn/protocol/tree/nodes.ts'
@@ -10,6 +20,7 @@ import type { SlotRef } from '@acorn/protocol/chrome.ts'
 import { useExclusiveSlotFailure } from '../plugins/ExclusiveSlotFailure'
 import { markdownFences } from '../markdownFences/MarkdownFences'
 import type { FenceScope } from '../markdownFences/fenceViewers'
+import type { ChangeRequestLineProps } from '../../kit/diff/diffNotes'
 
 // The DOM host's end of the remote tree (docs/plugins/tree-contract.md § The tree contract).
 //
@@ -46,6 +57,9 @@ export type TreeHostProps = {
    * owner's slot, whose `Markdown` keeps plain fences: cooperative points stay one level deep.
    */
   markdownFences?: FenceScope
+  /** The agent card for lines of the task's change request, for a tree allowed to show that request's
+   *  lines. A `StackedDiff` that sets `conversations` draws it under each line. */
+  lineCards?: () => Component<ChangeRequestLineProps> | undefined
 }
 
 export function TreeHost(props: TreeHostProps) {
@@ -79,6 +93,9 @@ export function TreeHost(props: TreeHostProps) {
       // The picture's owner is this mount's, so a tree can only show artwork from its own routes.
       if (type() === 'Artwork')
         return { ...own, owner: props.nodeId ? { nodeId: props.nodeId, pluginId: props.pluginId } : undefined }
+      if (type() === 'StackedDiff') return { ...own, lineCards: own.conversations ? props.lineCards : undefined }
+      // A note's plugin is this tree's, whatever it says, because a reader and an agent are told whose words they are.
+      if (type() === 'DiffNote') return { ...own, from: props.pluginId }
       return own
     })
     return (

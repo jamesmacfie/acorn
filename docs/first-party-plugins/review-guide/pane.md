@@ -41,22 +41,27 @@ closes, and the guide then opens on the first page that isn't done. The wide lay
 column beside the diff scrolls in the code host's view, which keeps no place for a tree.
 
 Each hunk is a `StackedDiff` under a link named by its path and first line, such as
-`src/billing/invoice.ts:42`. Each note is a `DiffNote` under its line, in the inline agent card's
-shape, with the body as Markdown and three buttons: **Ask a follow-up**, **Show in diff**, and **Mark
-checked** for Look closely and Risk, or **Got it** for Explains, which folds the note. A hunk with no
-new side, such as a deleted file's, starts on its old side, and its link shows only the path. A link or
-**Show in diff** opens the task's change request diff at that line
+`src/billing/invoice.ts:42`. Each note is a `DiffNote` under its line, with its body as Markdown and two
+buttons: **Show in diff**, and **Mark checked** for Look closely and Risk, or **Got it** for Explains,
+which folds the note. A hunk with no new side, such as a deleted file's, starts on its old side, and its
+link shows only the path. A link or **Show in diff** opens the task's change request diff at that line
 ([showing a line in the change request](../../plugins/frames.md#showing-a-line-in-the-change-request)).
 
-**Ask a follow-up** and ✦ on any line also open the inline agent card on that line of the diff
-([asking about the line](../../plugins/frames.md#asking-about-the-line)). **Ask a follow-up** sends the
-note's title and body as context for the agent, and ✦ sends none. In the Guide pane this switches to
-the change request's pane, where the card lives. Beside the diff, the diff next to it scrolls and opens
-the card. The conversation is the diff's own, so it stays on that line in the **Diff** tab. The guide
-doesn't show whether a note already has a conversation, because it can't read agent sessions.
+While `matchesChangeRequest` holds, each `StackedDiff` sets `conversations`, so the host draws the
+change request's agent card on its lines
+([asking about a change request line](../../plugins/remote-trees.md#asking-about-a-change-request-line)).
+A note is the card's opening message, with its buttons under it and a reply box under them. ✦ on any
+line opens an empty card there. Both stay in the guide: nothing switches panes. The card is the line's
+conversation in the change request's **Diff** tab too, where the note draws as the same card, so a
+reader can start in one and carry on in the other. A session starts only when the reader sends, and the
+first send gives the agent the note, labelled as the guide's, then the code around the line. Beside the
+diff only the noted lines are drawn, so only they hold a card. The Diff tab beside it has the rest.
 
-In the terminal client every one of these opens the file in the editor instead, and ✦ is Enter on the
-line.
+On a guide the change request's head has moved past, or with no agents plugin, notes draw on their own
+and ✦ shows the line in the change request's diff.
+
+In the terminal client there's no agent card. Notes draw with their body and buttons, ✦ is Enter on the
+line, and it, a link, and **Show in diff** open the file in the editor.
 
 Only the open page draws its hunks, because the host refuses a tree batch over 1 MiB. In one step
 whose hunk text passes 256 KiB, the later hunks wait behind closed folds.

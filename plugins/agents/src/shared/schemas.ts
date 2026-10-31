@@ -60,6 +60,19 @@ export const createAgentSessionSchema = z
           access: z.enum(['read-only', 'full']).optional(),
           scope: z.enum(['staged', 'unstaged']).optional(),
           pull: z.object({ owner: z.string().min(1), repo: z.string().min(1), number: z.string().min(1) }).optional(),
+          notes: z
+            .array(
+              z.object({
+                tone: z.enum(['neutral', 'warn', 'danger']).optional(),
+                label: z.string().max(64).optional(),
+                author: z.string().max(64).optional(),
+                from: z.string().max(128).optional(),
+                title: z.string().max(200).optional(),
+                body: z.string().max(2000).optional(),
+              }),
+            )
+            .max(4)
+            .optional(),
         }),
         z.object({ kind: z.literal('btw'), sourceSessionId: z.string().uuid() }),
       ])

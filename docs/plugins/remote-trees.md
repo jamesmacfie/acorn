@@ -46,6 +46,32 @@ A tree isn't the right path for two things. UI that reacts per keystroke, such a
 a large list, pays a message hop per key and should be a frame. A surface whose pixels are the
 product, such as an image editor, is a frame by definition.
 
+## Asking about a change request line
+
+A tree with the `core.changeRequests:reveal` scope that shows lines of its task's primary change
+request can set `conversations` on their `StackedDiff`. The host then draws, under each line, the same
+agent card the change request's **Diff** tab draws on it, so the line has one conversation wherever it's
+read. ✦ on a line opens an empty card in place instead of sending `onActivate`, and a line that already
+has a conversation shows it. A `DiffNote` on the line is the card's opening message, drawn from its
+`title` and `body`, with the note's own buttons under it. The host sets each note's `from` to the tree's
+plugin id, whatever the tree sent, and the card draws it beside the author. Nothing starts a session
+until the reader sends. The first send gives the agent the notes, labelled with that plugin id, then the
+code around the line, read from the change request's own diff rather than the tree's patch, then the
+question. The conversation keeps the notes, so the card shows them even after the tree stops drawing
+them.
+
+The card is the code host's, because only it knows the change request's patches, which name the line's
+conversation. Each code host provides it as `changeRequestLinesId(<its plugin id>)` on
+`@acorn/plugin-api/client`, built with `changeRequestLines` from `@acorn/change-request-ui/lines`, and
+the host picks the one the task's change request is on (`changeRequestLineCard` in
+`client-core/src/features/diff/changeRequestLines.ts`). Without one, without the agents plugin, or for a
+file the change request doesn't have, the line draws its notes and ✦ sends `onActivate`. The terminal
+client has no agent card, so it always does that.
+
+Set `conversations` only while the patch's lines are the change request's, such as when the tree
+was made from the request's head commit. A line number from another commit would start a
+conversation on the wrong line of the request's diff.
+
 ## Mounted bridge ownership and SDK compatibility
 
 The worker belongs to one accepted `(pluginId, hash)` pair, and authority belongs to each mounted
