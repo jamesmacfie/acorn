@@ -4,7 +4,7 @@ description: One file's patch, drawn as a unified diff.
 sources:
   - packages/client-core/src/kit/diff/DiffRows.tsx
   - docs/ui-design/every-node.md
-checked: '6b445c7a4'
+checked: 'a32d2bf93'
 ---
 
 Use `StackedDiff` to show one file's change from its patch text. It draws the file's header, each hunk, and each line. Put `DiffNote` children in it to pin notes under lines, and set `onActivate` to hear the ✦ button on any line, which sends `{ side, line }`. In the terminal, ✦ is Enter on the line. Set `noteContext` to draw only the noted lines and that many lines around each, for a column beside a diff that already shows the whole file.

@@ -5,7 +5,7 @@ sources:
   - packages/client-core/src/kit/diff/diffNotes.ts
   - packages/client-core/src/kit/diff/DiffRows.tsx
   - docs/ui-design/every-node.md
-checked: '6b445c7a4'
+checked: 'a32d2bf93'
 ---
 
 Use `DiffNote` as a child of a `StackedDiff` to pin a note under one of its lines. `side` and `line` name the line, `tone` and `label` say what kind of note it is, and `author` and `title` fill its header. `body` is the note's Markdown, and its children are your own buttons. The note also names your plugin, which acorn fills in. A reader can fold the note to its header. To fold it from your own button, such as **Got it**, pass `open` and `onOpenChange`, and the note's fold is yours.
