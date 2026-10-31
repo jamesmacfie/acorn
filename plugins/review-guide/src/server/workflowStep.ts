@@ -17,6 +17,14 @@ export const describeGuideStep: StepKindDescription = {
       optionsRoute: '/v1/p/review-guide/profiles',
       hint: 'Empty uses the harness you picked in the Guide pane.',
     },
+    {
+      id: 'background',
+      label: 'Background',
+      type: 'textarea',
+      templates: true,
+      placeholder: '${steps.implement.output}',
+      hint: 'Optional. Why the change exists, such as ${steps.implement.output} from the step that made it. The harness trusts the diff over this.',
+    },
   ],
   output: { description: "The guide's summary and its step titles, in reading order." },
 }
@@ -30,6 +38,7 @@ export function guideStepHandler(guides: Guides, owner: () => string | null): St
     const userId = owner()
     if (!userId) return { status: 'failed', error: 'This node has no bound owner, so it has no harness choice to use.' }
     const picked = ctx.def.with?.profileId
+    const background = ctx.def.with?.background
     ctx.emit({ at: Date.now(), event: { type: 'progress', text: 'Writing the review guide' } })
     let finished
     try {
@@ -38,6 +47,7 @@ export function guideStepHandler(guides: Guides, owner: () => string | null): St
         ctx.run.taskId,
         typeof picked === 'string' && picked ? picked : undefined,
         ctx.signal,
+        typeof background === 'string' && background.trim() ? background : undefined,
       )
     } catch (error) {
       if (error instanceof GuideError) return { status: 'failed', error: error.message }

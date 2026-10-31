@@ -130,7 +130,13 @@ export function createGuides(deps: GuideDeps) {
   /** Read the change, store a `generating` row, and start the turn. Answers once the turn has started,
    *  with the job already running for the task if there is one. `remember` saves `profileId` as the
    *  person's choice. */
-  async function start(userId: string, taskId: string, profileId: string | undefined, remember: boolean) {
+  async function start(
+    userId: string,
+    taskId: string,
+    profileId: string | undefined,
+    remember: boolean,
+    background?: string,
+  ) {
     const existing = running.get(taskId)
     if (existing) return existing
     const finished = Promise.withResolvers<FinishedGuide>()
@@ -170,7 +176,7 @@ export function createGuides(deps: GuideDeps) {
         createdAt: now,
         updatedAt: now,
       })
-      finished.resolve(runTurn(execute, job, taskId, chosen, change))
+      finished.resolve(runTurn(execute, job, taskId, chosen, change, background))
     } catch (error) {
       running.delete(taskId)
       // A caller that joined this job while it was starting fails with the same sentence.
@@ -188,14 +194,16 @@ export function createGuides(deps: GuideDeps) {
   }
 
   /** The workflow step's generate. Joins the task's running guide if there is one, and waits for it to
-   *  finish. `signal` stops it, the way the pane's Stop does. */
+   *  finish. `signal` stops it, the way the pane's Stop does. A joined guide keeps its own prompt, so
+   *  `background` only reaches a guide this call starts. */
   async function generateAndWait(
     userId: string,
     taskId: string,
     profileId: string | undefined,
     signal: AbortSignal,
+    background?: string,
   ): Promise<FinishedGuide> {
-    const job = await start(userId, taskId, profileId, false)
+    const job = await start(userId, taskId, profileId, false, background)
     const abort = () => job.controller.abort()
     signal.addEventListener('abort', abort, { once: true })
     if (signal.aborted) abort()
@@ -212,6 +220,7 @@ export function createGuides(deps: GuideDeps) {
     taskId: string,
     profileId: string,
     change: Change,
+    background: string | undefined,
   ): Promise<FinishedGuide> {
     let sessionId: string | null = null
     let outcome: Partial<typeof reviewGuides.$inferInsert>
@@ -222,7 +231,7 @@ export function createGuides(deps: GuideDeps) {
         taskId,
         profileId,
         title: 'Review guide',
-        ...guideTurn(change),
+        ...guideTurn(change, background),
         schema: GUIDE_SCHEMA,
         tools: { maxRisk: 'read' },
         // A retry on the same commits with the same harness reuses its session instead of starting another.

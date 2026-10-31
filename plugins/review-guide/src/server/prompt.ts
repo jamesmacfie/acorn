@@ -61,10 +61,17 @@ export const GUIDE_SCHEMA = {
 // The agents plugin refuses more than 512 KiB of context in one turn, and the list needs room too.
 const FULL_TEXT_BYTES = 256 * 1024
 
+// The background a workflow passes in, cut to this many characters so it and the hunks stay under that limit.
+const BACKGROUND_CHARS = 32_000
+
 const heading = (item: DiffItem) => `### ${item.id}${item.oldPath ? ` (renamed from ${item.oldPath})` : ''}`
 
-/** The prompt and context for one guide turn over `items`, the diff from `baseSha` to HEAD. */
-export function guideTurn(change: { baseRef: string; baseSha: string; items: DiffItem[] }): {
+/** The prompt and context for one guide turn over `items`, the diff from `baseSha` to HEAD. `background`
+ *  is text a workflow step passes in, such as an earlier step's output. */
+export function guideTurn(
+  change: { baseRef: string; baseSha: string; items: DiffItem[] },
+  background?: string,
+): {
   prompt: string
   context: { label: string; source: string; content: string }[]
 } {
@@ -79,6 +86,11 @@ export function guideTurn(change: { baseRef: string; baseSha: string; items: Dif
       : [
           'The change is too large to send whole, so each hunk shows only its header line. Read the files in this worktree to see the lines.',
         ]),
+    ...(background
+      ? [
+          "The context also has background from the workflow that made this change, such as the plan or an earlier step's report. Use it to understand why the change exists. Where it disagrees with the diff, trust the diff.",
+        ]
+      : []),
     'Arrange the hunks as steps of a path through the change, in the order a reviewer should read them. Start where the data or the request enters, and let each step build on the one before it. Put the core steps first. Put supporting steps, such as tests, docs, configuration, and wiring, after them.',
     'For each step, give a short title; a goal: the words that finish the sentence "After this step you\'ll know", without those opening words, such as "which answers are retried and which are final.", so the reviewer can check themselves against it; a "why" of one to three sentences in Markdown that says why the change exists rather than what its lines say; a kind, core or supporting; the IDs of the hunks it covers, in reading order; and its notes.',
     "Leave a note only where a careful reviewer would stop: a line whose purpose isn't obvious, a decision worth questioning, or a likely bug. Don't narrate what a line says. Most hunks need no note, and a hunk takes at most three.",
@@ -94,6 +106,15 @@ export function guideTurn(change: { baseRef: string; baseSha: string; items: Dif
         source: 'review-guide',
         content: change.items.map((item) => `${heading(item)}\n${body(item)}`).join('\n\n'),
       },
+      ...(background
+        ? [
+            {
+              label: 'Background from the workflow',
+              source: 'review-guide',
+              content: background.slice(0, BACKGROUND_CHARS),
+            },
+          ]
+        : []),
     ],
   }
 }
