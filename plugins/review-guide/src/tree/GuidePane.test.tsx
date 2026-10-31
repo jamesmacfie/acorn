@@ -77,10 +77,13 @@ const note = (tone: 'explain' | 'attention' | 'risk', title: string, line = 1) =
   body: 'Check **the cap**.',
 })
 
+// Each guide is a new one, so the page a test left open isn't the next test's.
+let generated = 0
 const stored = (
   status: StoredGuide['status'],
   progress: GuideProgress = { pages: [], notes: [] },
   big = '',
+  createdAt = ++generated,
 ): StoredGuide => ({
   status,
   profileId: 'claude-code',
@@ -89,6 +92,7 @@ const stored = (
   headSha: 'a'.repeat(40),
   sessionId: 'session-1',
   error: null,
+  createdAt,
   updatedAt: 1,
   progress,
   guide:
@@ -136,9 +140,25 @@ const mount = async (guide: StoredGuide, layout: 'wide' | 'narrow' = 'wide') => 
   let current = view(guide)
   const bridge = {
     api: {
-      get: () => Promise.resolve(current),
-      post: (_path: string, body: Record<string, unknown>) => {
+      get: (path: string) =>
+        Promise.resolve(
+          path.endsWith('/backends')
+            ? {
+                backends: [
+                  {
+                    id: 'harness:claude-code',
+                    kind: 'harness',
+                    label: 'Claude Code',
+                    models: [{ id: 'opus', label: 'Opus' }],
+                    defaultModelId: '',
+                  },
+                ],
+              }
+            : current,
+        ),
+      post: (path: string, body: Record<string, unknown>) => {
         posted.push(body)
+        if (path.endsWith('/generate')) return Promise.resolve(current)
         const progress = current.guide!.progress
         const field = 'page' in body ? 'pages' : 'notes'
         const key = String(body.page ?? body.note)
@@ -183,6 +203,10 @@ const mount = async (guide: StoredGuide, layout: 'wide' | 'narrow' = 'wide') => 
     nodes,
     find,
     press,
+    dispatch: async (node: TreeNode, event: string, payload?: unknown) => {
+      root.dispatch((node.props[event] as { $handler: number }).$handler, payload)
+      await settle()
+    },
     revealed,
     posted,
     parentOf: tree.parentOf,
@@ -253,6 +277,56 @@ describe('GuidePane', () => {
 
     await pane.press('Button', 'Back')
     expect(pane.diffs().map((diff) => diff.props.path)).toEqual(['a.ts', 'a.ts'])
+    pane.dispose()
+  })
+
+  it('sets the toolbar and the split straight in the pane, with each page keeping its own scroll place', async () => {
+    const guide = stored('ready')
+    const pane = await mount(guide)
+    const toolbar = pane.nodes().find((node) => node.type === 'Toolbar')!
+    const split = pane.nodes().find((node) => node.type === 'ListDetail')!
+    expect(toolbar.props.size).toBeUndefined()
+    expect([pane.parentOf(toolbar.id), pane.parentOf(split.id)]).toEqual([undefined, undefined])
+    const detail = () => pane.nodes().find((node) => node.type === 'DetailColumn')!
+    expect(detail().props).toMatchObject({
+      measure: 'pane',
+      scrollKey: `review-guide:task-1:${guide.createdAt}:overview`,
+    })
+    await pane.press('Row', 'Tests')
+    expect(detail().props.scrollKey).toBe(`review-guide:task-1:${guide.createdAt}:step-2`)
+    pane.dispose()
+  })
+
+  it('opens on the page the reader left when the pane is drawn again, and a new guide on its first page', async () => {
+    const guide = stored('ready')
+    const first = await mount(guide)
+    await first.press('Row', 'Tests')
+    first.dispose()
+    const again = await mount(guide)
+    expect(again.find('Heading', 'Tests').props.eyebrow).toBe('Step 2 of 3 · supporting · ~1 min')
+    again.dispose()
+    const regenerated = await mount(stored('ready'))
+    expect(regenerated.find('Heading', 'What changed and why')).toBeDefined()
+    regenerated.dispose()
+  })
+
+  it('regenerates from a dialog with the harness, the model, and extra context', async () => {
+    const pane = await mount(stored('ready'))
+    await pane.press('Button', 'Regenerate')
+    expect(pane.nodes().find((node) => node.type === 'Modal')?.props.title).toBe('Regenerate the guide')
+    const picker = pane.nodes().find((node) => node.type === 'ModelBackendPicker')!
+    expect(picker.props).toMatchObject({ backendId: 'harness:claude-code', modelId: '' })
+    await pane.dispatch(picker, 'onChange', { backendId: 'harness:claude-code', modelId: 'opus' })
+    await pane.dispatch(
+      pane.nodes().find((node) => node.type === 'Textarea')!,
+      'onChange',
+      '  Focus on the tests. ',
+    )
+    await pane.press('Button', 'Generate')
+    expect(pane.posted).toEqual([
+      { taskId: 'task-1', profileId: 'claude-code', model: 'opus', context: 'Focus on the tests.' },
+    ])
+    expect(pane.nodes().some((node) => node.type === 'Modal')).toBe(false)
     pane.dispose()
   })
 
@@ -328,6 +402,7 @@ describe('GuidePane', () => {
   describe('beside the diff', () => {
     it('draws a stepper and only the noted lines of each hunk', async () => {
       const pane = await mount(stored('ready', { pages: ['overview'], notes: [] }), 'narrow')
+      expect(pane.nodes().find((node) => node.type === 'Toolbar')!.props.size).toBe('sm')
       expect(pane.nodes().filter((node) => node.type === 'Row')).toEqual([])
       expect(
         pane

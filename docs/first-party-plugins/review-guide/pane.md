@@ -6,8 +6,15 @@ the notes, and the two layouts. It's part of [first-party plugins](../../first-p
 ## The path
 
 **Guide** is a task pane drawn as a remote tree, so the desktop and the terminal client draw the same
-one. Its header has the harness picker and **Generate guide**, **Regenerate**, or **Stop**. While a
+one. Its toolbar has ✦ **Generate guide** or **Regenerate**, or **Stop** while a guide generates. While a
 guide generates, the pane links to the session's transcript through its `session` destination.
+
+**Generate guide**, **Regenerate**, and a failed guide's **Try again** all open one dialog,
+`GenerateModal` in `src/tree/GenerateModal.tsx`. It reads `GET /backends` when it opens and draws the
+kit's `ModelBackendPicker` over the harnesses, the same harness and model picker as the app's other AI
+dialogs. The picker starts on the person's saved harness and its default model. A text field takes
+optional extra context, up to 2,000 characters. The ✦ popover the compiled dialogs use isn't a kit node,
+so the picker sits in the dialog's body, as in the database plugin's **Generate SQL**.
 
 A guide reads as a path: an overview, one page per step, and a wrap-up. The hunks the guide left out
 are a last step, **Not covered by the guide**, so every hunk is on exactly one page. The path is
@@ -24,8 +31,15 @@ built by `guidePath` in `src/shared/path.ts`, which the route also uses to check
   once every step is reviewed and every note on it is checked.
 
 A step's minutes are one per 40 changed lines, at least one, worked out in code, so the pane says
-"~". The pane opens on the first page that isn't done, so a reader who closes it comes back to where
+"~". A fresh guide opens on the first page that isn't done, so a reader who closes it comes back to where
 they stopped.
+
+Leaving a pane unmounts its tree, so the pane keeps the page each guide had open in the plugin's
+worker, keyed by the task and the guide's `createdAt`. A pane drawn again opens on that page, and a
+regenerated guide, with a new `createdAt`, starts fresh. The worker ends 30 seconds after its last tree
+closes, and the guide then opens on the first page that isn't done. The wide layout's columns pass a
+`scrollKey` per page and one for the rail, so the host puts each back where it was for the session. The
+column beside the diff scrolls in the code host's view, which keeps no place for a tree.
 
 Each hunk is a `StackedDiff` under a link named by its path and first line, such as
 `src/billing/invoice.ts:42`. Each note is a `DiffNote` under its line, in the inline agent card's
@@ -53,7 +67,10 @@ whose hunk text passes 256 KiB, the later hunks wait behind closed folds.
 The tree has two entries. `pane` fills the Guide pane with the wide layout: a rail on the left with
 **Review path**, a progress line such as "2 of 5 done · ~5 min" with a meter, and a row per page. A
 step's row shows its number or a check, its title, its kind, its hunk count, its minutes, and a dot per
-note in its tone. The open page is on the right.
+note in its tone. The open page is on the right, at a pane's reading width and centered
+(`measure="pane"`), as the Notes pane's reading column is. The toolbar and the split are the tree's own
+top-level nodes, because the pane's region drops its side padding only for a split that's its direct
+child.
 
 `panel` fills the `review-panel` point on GitHub, GitLab, and Bitbucket, so a task's change request
 view has a **Guide** tab beside the diff

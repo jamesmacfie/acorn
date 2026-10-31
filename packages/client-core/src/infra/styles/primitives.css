@@ -1630,6 +1630,13 @@ button.ui-chip:hover { background: var(--bg-hover); border-color: var(--accent);
 /* A form or a document in a detail column stops at a settings page's width and starts on the column's
    start edge, where the column's own header starts. Its chrome still spans the column. */
 .ui-listdetail-detail[data-measure='page'] > :not(.ui-toolbar, .ui-tabs, .section-header) { width: 100%; max-width: var(--page-measure); }
+/* A document of long prose beside diffs takes the reading column a detail region has (shell.css): a
+   pane's measure, centred in what's left, so a wide display doesn't leave it hugging the start edge. */
+.ui-listdetail-detail[data-measure='pane'] > :not(.ui-toolbar, .ui-tabs, .section-header) {
+  width: 100%;
+  max-width: var(--pane-measure);
+  margin-inline: auto;
+}
 /* A bar that heads a scrolling detail column is its header: it sits on the column's top edge rather
    than a scroll pad below it, and what follows starts a section gap under it. */
 .ui-listdetail-detail[data-scroll] > .ui-toolbar:not([data-variant='actions'], [data-size='sm']):first-child {

@@ -6,9 +6,10 @@ sources:
   - plugins/review-guide/acorn-plugin.config.mjs
   - plugins/review-guide/src/tree/GuidePane.tsx
   - plugins/review-guide/src/tree/GuidePath.tsx
+  - plugins/review-guide/src/tree/GenerateModal.tsx
   - docs/first-party-plugins/review-guide/pane.md
   - plugins/review-guide/src/server/workflowStep.ts
-checked: 'daba447b3'
+checked: 'f89139fa5'
 ---
 
 import { Steps } from '@astrojs/starlight/components'
@@ -32,14 +33,16 @@ then shows its hunks with a few short notes on the lines worth a closer look.
 
 1. Open a task that has a pull request or merge request. In its **Pull request** or **Merge request** pane, click the **Guide** tab, or open the **Guide** pane.
 
-2. Pick a harness at the top of the guide, and click **Generate guide**.
+2. Click **Generate guide** at the top of the guide. In the dialog, pick the harness and its model, and
+   add any extra context, such as what to focus on or who's reviewing. Then click **Generate**.
 
    <Checkpoint>The guide says the harness is writing it, with a link to its session. When it finishes, the guide opens on its overview.</Checkpoint>
 
 </Steps>
 
 The harness runs one turn in an agent session of the task, so a guide spends that harness's usage. The
-turn can read the worktree but can't change it. **Stop** ends the turn.
+turn can read the worktree but can't change it. **Stop** ends the turn. The extra context goes to the
+harness with that turn only. acorn doesn't keep it with the guide.
 
 ## Write a guide from a workflow
 
@@ -76,9 +79,10 @@ the **Guide** tab beside the diff, numbered buttons along the top take its place
   Check each one once you've made up your mind, then leave your review in the pull request's
   **Details**. The guide never approves or comments for you.
 
-The guide remembers which steps you marked and which notes you checked, so it opens where you
-stopped, and the pane and the tab beside the diff show the same progress. **Regenerate** starts a new
-guide with no progress. In the tab beside the diff, a step shows only its noted lines, and opening it
+The guide remembers which steps you marked and which notes you checked, and the pane and the tab
+beside the diff show the same progress. When you come back to the guide, it opens on the page you had
+open, scrolled where you left it, and a guide you open fresh starts on the first page you haven't
+reviewed. **Regenerate** opens the same dialog and starts a new guide with no progress. In the tab beside the diff, a step shows only its noted lines, and opening it
 scrolls the diff next to it to the step's first hunk.
 
 Under a line is any note the harness pinned to it. Each has a tone, **Explains** for context, **Look

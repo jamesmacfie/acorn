@@ -391,6 +391,7 @@ node: providerRequestScheduler
 node: publicConnectionProvider
 node: publicProvider
 node: readConfigFileSync
+node: readHarnessBackend
 node: readNodeRelay
 node: recordNodeRelay
 node: recordSkillDelivery

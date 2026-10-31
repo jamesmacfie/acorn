@@ -24,7 +24,9 @@ A list column is flush and scrolls its own rows. A column holding a document say
 Then it scrolls as one region and takes the pane's inline padding, as `single` and
 `header-body-footer` bodies do, and its rows, headers, and bars take the padding back. GitHub's browse
 middle column, a pull request, is the example. A detail column holding a form or document can pass
-`measure="page"`, which stops its content at `--page-measure`, 720px, from the column's start. A bar,
+`measure="page"`, which stops its content at `--page-measure`, 720px, from the column's start. Long
+prose with diffs, such as the review guide's pages, passes `measure="pane"` instead: the content stops
+at `--pane-measure`, 1200px, and sits in the middle, as a `list-detail` layout's detail region does. A bar,
 tab strip, or section header that's a direct child of the column still spans it, so put a header bar
 there, not inside the capped form. A bar heading a scrolling detail column sits on its top edge, and
 the content starts a section gap below.
@@ -37,7 +39,9 @@ of a zero-width first one. Notes' library toggle works this way.
 A list column scrolls vertically when its rows run past the bottom. A list with a scroller of its own,
 such as a virtual `Rows`, fills the column instead, so the column never scrolls and the header above
 the list stays put. Pass `scrollKey` to have the column come back where it was left. Browse sources
-get one keyed by the source id.
+get one keyed by the source id. A scrolling `DetailColumn` takes `scrollKey` too, and a key that
+changes while it's drawn, such as one per page, restores the new key's place. The offsets last for the
+session, because leaving a pane takes its DOM with it.
 
 ### Collapsing to a rail
 

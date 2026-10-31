@@ -162,10 +162,11 @@ its own task.
 | Route | What it does |
 | --- | --- |
 | `GET /v1/p/review-guide/guide?taskId=` | Reads the view |
-| `POST /v1/p/review-guide/guide/generate` | `{ taskId, profileId? }`. Saves the profile, reads the change, and starts the turn |
+| `POST /v1/p/review-guide/guide/generate` | `{ taskId, profileId?, model?, context? }`. Saves the profile, reads the change, and starts the turn. `context` ends the prompt and isn't stored. `model` goes to the turn as `configOptions.model`, which the Claude driver reads. Over 200 characters of `model` or 2,000 of `context` is a 400 |
 | `POST /v1/p/review-guide/guide/stop` | `{ taskId }`. Aborts the running turn |
 | `POST /v1/p/review-guide/guide/progress` | `{ taskId, page?, note?, done }`, with one of `page` or `note`. Marks a page reviewed or a note checked, or undoes it. A page or note the guide doesn't have is a 400, and a task with no guide is a 409 |
 | `GET /v1/p/review-guide/profiles` | `{ options: [{ value, label }] }`, the workflow step's harness choices. Not a view |
+| `GET /v1/p/review-guide/backends` | `{ backends }`, the harnesses as `harness:<profileId>` model backends with their models, from `agents.profiles`'s `backends()`. The generate dialog's picker reads it. Reading a live model list can start the harness's CLI. Not a view |
 
 A status change or a progress mark sends `plugin:review-guide:changed`, and every surface showing
 the guide reads the view again. That's how a step marked in the pane shows as done beside the diff.

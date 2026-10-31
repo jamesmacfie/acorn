@@ -78,6 +78,8 @@ export type StoredGuide = {
   error: string | null
   guide: Guide | null
   progress: GuideProgress
+  /** When generating started. A regenerated guide has a new one. */
+  createdAt: number
   updatedAt: number
 }
 
@@ -95,3 +97,15 @@ export type GuideView = {
 }
 
 export const CHANGED_CHANNEL = 'plugin:review-guide:changed'
+
+/** The longest extra context the person may add when they generate a guide. */
+export const GUIDE_CONTEXT_MAX_CHARS = 2_000
+
+/** `POST /guide/generate`'s body, less the task. Every field is optional. */
+export type GenerateRequest = {
+  profileId?: string
+  /** A model from the profile's catalog. Empty or absent leaves the harness's own default. */
+  model?: string
+  /** What the person wants the guide to focus on. It goes into the prompt and isn't stored. */
+  context?: string
+}

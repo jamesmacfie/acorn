@@ -285,15 +285,26 @@ export function ListColumn(props: {
 export function DetailColumn(props: {
   scroll?: boolean
   /** `page` caps the column's content at a settings page's width, from its start edge, for a detail
-   *  that is a form or a document rather than a canvas. Chrome still spans the column. */
-  measure?: 'page'
+   *  that is a form or a document rather than a canvas. `pane` caps it at a pane's reading width and
+   *  centres it, as a detail region does, for long prose beside diffs. Chrome still spans the column. */
+  measure?: 'page' | 'pane'
   /** Pad the column the way a pane's detail region pads its children, for a column that holds what
    *  would otherwise fill that region, such as a followed `Timeline` and the composer under it. */
   inset?: boolean
+  /** Keeps where a scrolling column was scrolled to, under this key, for when it's drawn again. A new
+   *  key, such as the next page of a document, restores that key's place. */
+  scrollKey?: string
   children: JSX.Element
 }) {
   return (
     <div
+      ref={(element) => {
+        if (props.scrollKey !== undefined)
+          retainScroll(
+            element,
+            keyedScrollStore(() => props.scrollKey ?? ''),
+          )
+      }}
       class="ui-listdetail-detail"
       data-scroll={props.scroll ? '' : undefined}
       data-measure={props.measure}

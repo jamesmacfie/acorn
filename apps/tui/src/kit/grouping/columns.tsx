@@ -121,8 +121,15 @@ export function ListColumn(props: { label?: string; scroll?: boolean; scrollKey?
   )
 }
 
-/** `measure` is ignored: a terminal column is already as narrow as a line anyone reads. */
-export function DetailColumn(props: { scroll?: boolean; measure?: 'page'; inset?: boolean; children: JSX.Element }) {
+/** `measure` is ignored: a terminal column is already as narrow as a line anyone reads. `scrollKey` is
+ *  ignored, as on `ListColumn`. */
+export function DetailColumn(props: {
+  scroll?: boolean
+  measure?: 'page' | 'pane'
+  inset?: boolean
+  scrollKey?: string
+  children: JSX.Element
+}) {
   return (
     <box flexDirection="column" flexGrow={1}>
       {props.scroll ? <ScrollViewport>{props.children}</ScrollViewport> : props.children}

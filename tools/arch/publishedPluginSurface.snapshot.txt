@@ -421,6 +421,7 @@ acorn-plugin-types: member AgentPermissionSubject.command
 acorn-plugin-types: member AgentPermissionSubject.kind
 acorn-plugin-types: member AgentPermissionSubject.paths
 acorn-plugin-types: member AgentPermissionSubject.toolCallId
+acorn-plugin-types: member AgentProfiles.backends
 acorn-plugin-types: member AgentProfiles.list
 acorn-plugin-types: member AgentRequestState.blocked
 acorn-plugin-types: member AgentRequestState.blocked.by

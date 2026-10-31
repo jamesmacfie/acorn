@@ -51,12 +51,22 @@ export const plural = (count: number, one: string, many: string) => `${count} ${
 
 const noteLine = (note: PathNote) => `${note.path}:${note.line}${note.side === 'old' ? ' (deleted)' : ''}`
 
+// The page each guide had open, by `place`, so a pane that's drawn again opens where the reader was.
+// Leaving a pane unmounts its tree, and this lives as long as the plugin's worker does.
+// shortcut: the worker ends 30 seconds after its last tree, and the guide then opens on the first page
+// that isn't done; keep it in `bridge.state` if that proves too short.
+const openPages = new Map<string, number>()
+
 /** The overview is page 0, the steps are pages 1 to n, and the wrap-up is page n + 1. */
 export function GuidePath(props: {
   guide: Guide
   progress: GuideProgress
   layout: 'wide' | 'narrow'
+  /** Names this guide for the open page and scroll places it keeps, such as its task and creation time. */
+  place: string
   author: string
+  /** Alerts drawn above the page. */
+  notices: JSX.Element
   /** Who wrote the guide, for the overview. */
   credit: JSX.Element
   /** What the coverage and note checks changed, as sentences. */
@@ -72,15 +82,18 @@ export function GuidePath(props: {
   const doneCount = () => Array.from({ length: last() + 1 }, (_, page) => page).filter(isDone).length
   const minutes = () => path().reduce((total, step) => total + step.minutes, 0)
 
-  // Opens on the first page not done, so a reader comes back to where they stopped.
+  // Opens on the page the reader had open, or else the first page not done.
   const [open, setOpen] = createSignal(
     untrack(() => {
+      const remembered = openPages.get(props.place)
+      if (remembered !== undefined && remembered <= last()) return remembered
       const first = Array.from({ length: last() }, (_, page) => page).find((page) => !isDone(page))
       return first ?? last()
     }),
   )
   const go = (page: number) => {
     setOpen(page)
+    openPages.set(props.place, page)
     // Beside the diff, opening a step shows its first hunk there. In the Guide pane it would switch
     // panes, so it doesn't.
     const first = path()[page - 1]?.items[0]
@@ -155,6 +168,7 @@ export function GuidePath(props: {
       when={props.layout === 'wide'}
       fallback={
         <Stack gap="section">
+          {props.notices}
           {progressLine()}
           <Inline wrap>
             <For each={Array.from({ length: last() + 1 }, (_, index) => index)}>
@@ -177,7 +191,7 @@ export function GuidePath(props: {
       }
     >
       <ListDetail split listLabel="Review path" selection={pageKey(open())}>
-        <ListColumn label="Review path" scroll>
+        <ListColumn label="Review path" scroll scrollKey={`review-guide:${props.place}:rail`}>
           <Stack gap="section">
             <SectionHeader>Review path</SectionHeader>
             {progressLine()}
@@ -215,8 +229,12 @@ export function GuidePath(props: {
             </Stack>
           </Stack>
         </ListColumn>
-        <DetailColumn scroll measure="page" inset>
-          {page()}
+        {/* Each page keeps its own scroll place, so the next page starts at its top. */}
+        <DetailColumn scroll measure="pane" inset scrollKey={`review-guide:${props.place}:${pageKey(open())}`}>
+          <Stack gap="section">
+            {props.notices}
+            {page()}
+          </Stack>
         </DetailColumn>
       </ListDetail>
     </Show>

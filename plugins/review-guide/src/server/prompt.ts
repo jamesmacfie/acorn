@@ -64,7 +64,11 @@ const FULL_TEXT_BYTES = 256 * 1024
 const heading = (item: DiffItem) => `### ${item.id}${item.oldPath ? ` (renamed from ${item.oldPath})` : ''}`
 
 /** The prompt and context for one guide turn over `items`, the diff from `baseSha` to HEAD. */
-export function guideTurn(change: { baseRef: string; baseSha: string; items: DiffItem[] }): {
+export function guideTurn(
+  change: { baseRef: string; baseSha: string; items: DiffItem[] },
+  /** What the person asked the guide to focus on, if anything. */
+  focus?: string,
+): {
   prompt: string
   context: { label: string; source: string; content: string }[]
 } {
@@ -85,6 +89,11 @@ export function guideTurn(change: { baseRef: string; baseSha: string; items: Dif
     "A note names one of its own step's hunks; a side, new for an added or unchanged line and old for a deleted one; the line's number on that side; the line's text, quoted exactly and whole, without its +, -, or space marker; a tone, explain for context, attention for a judgment call, or risk for a likely bug; a title of one sentence, at most 120 characters; and a body in Markdown, at most 600 characters. List a step's notes in reading order.",
     'Use every hunk ID exactly once, and only IDs from the list. Start with a summary of the whole change in two or three sentences.',
     "This is a read-only review. Don't change any files.",
+    ...(focus
+      ? [
+          `The person who asked for this guide added the context below. Let it shape the order, the steps, and the notes, and still use every hunk.\n\n${focus}`,
+        ]
+      : []),
   ].join('\n\n')
   return {
     prompt,

@@ -13,6 +13,7 @@ import {
   registerDeletedTaskPurge,
   type InternalEnvFactory,
   type NodePlugin,
+  readHarnessBackend,
   resolveCommand,
 } from '@acorn/plugin-api/node'
 import { BIND_CAPABILITY_CALLER } from '@acorn/protocol/plugin/ids.ts'
@@ -749,12 +750,10 @@ export const agentsPlugin = (dataDir: string, deps: AgentsPluginDeps): NodePlugi
         AGENTS_SESSION_EXECUTE,
         Object.assign(sessionExecute(), { [BIND_CAPABILITY_CALLER]: sessionExecute }),
       )
+      const managedProfiles = () => agentProfileRegistry.list().filter((profile) => profile.managedProvider)
       ctx.capabilities.provide(AGENTS_PROFILES, {
-        list: async () =>
-          agentProfileRegistry
-            .list()
-            .filter((profile) => profile.managedProvider)
-            .map(({ id, label }) => ({ id, label })),
+        list: async () => managedProfiles().map(({ id, label }) => ({ id, label })),
+        backends: () => Promise.all(managedProfiles().map(readHarnessBackend)),
       })
       ctx.capabilities.provide(AGENTS_SESSION_CONTROL, createSessionControl(runtime))
       // Who a signed tool call came from, for another plugin's tools (`AgentToolCallerLookup`).

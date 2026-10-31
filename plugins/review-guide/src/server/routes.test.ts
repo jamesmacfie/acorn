@@ -10,7 +10,7 @@ import type {
   AgentSessionExecuteResult,
 } from '@acorn/plugin-agents/contract/sessionExecute.ts'
 import { reviewGuides } from '../node/schema'
-import type { GuideView } from '../shared/guide'
+import { GUIDE_CONTEXT_MAX_CHARS, type GuideView } from '../shared/guide'
 import { createGuides, type GuideDeps, type Guides } from './guides'
 import { createGuideFetch } from './routes'
 import { guideStepHandler } from './workflowStep'
@@ -163,6 +163,15 @@ describe('review guide routes', () => {
           { id: 'claude-code', label: 'Claude Code' },
           { id: 'codex', label: 'Codex' },
         ],
+        backends: async () => [
+          {
+            id: 'harness:claude-code',
+            kind: 'harness',
+            label: 'Claude Code',
+            models: [{ id: 'opus', label: 'Opus' }],
+            defaultModelId: '',
+          },
+        ],
       }),
     })
     fetch = createGuideFetch(guides)
@@ -227,6 +236,34 @@ describe('review guide routes', () => {
     expect(view.guide?.guide?.steps[0]!.notes).toHaveLength(1)
     expect(view.guide?.guide?.uncovered.map((item) => item.id)).toEqual(['app.test.ts#1'])
     expect(changed).toHaveBeenCalledWith('task-1')
+  })
+
+  it("puts the person's model and context into the turn, and keeps the context out of the guide", async () => {
+    await call('POST', '/guide/generate', {
+      taskId: 'task-1',
+      profileId: 'claude-code',
+      model: 'opus',
+      context: '  Focus on the tests.  ',
+    })
+    expect(turns[0]!.request.configOptions).toEqual({ model: 'opus' })
+    expect(turns[0]!.request.prompt).toMatch(/added the context below[^]*\n\nFocus on the tests\.$/)
+    turns[0]!.finish(okResult(ANSWER))
+    expect(JSON.stringify(await settled())).not.toContain('Focus on the tests')
+  })
+
+  it('refuses extra context past its limit, and a model that is not text', async () => {
+    const tooLong = await call('POST', '/guide/generate', {
+      taskId: 'task-1',
+      context: 'x'.repeat(GUIDE_CONTEXT_MAX_CHARS + 1),
+    })
+    expect(tooLong.status).toBe(400)
+    expect((await call('POST', '/guide/generate', { taskId: 'task-1', model: 42 })).status).toBe(400)
+    expect(turns).toHaveLength(0)
+  })
+
+  it("lists the harnesses with their models for the pane's picker", async () => {
+    const response = await call('GET', '/backends')
+    expect(response.body).toMatchObject({ backends: [{ id: 'harness:claude-code', models: [{ id: 'opus' }] }] })
   })
 
   it('reads a guide stored with sections as steps with no goals or notes', async () => {

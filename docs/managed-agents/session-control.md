@@ -114,8 +114,11 @@ The plugin's `signal` crosses too: aborting it cancels the turn, and the result 
 loaded worker.
 
 To let the person pick a harness, read `agents.profiles`. Its `list()` returns the ID and label of
-each profile that has a managed driver, the profiles `agents.sessionExecute` can run on. Its trust
-line is "See which agent harnesses can run its turns".
+each profile that has a managed driver, the profiles `agents.sessionExecute` can run on. Its
+`backends()` returns the same profiles as `harness:<profileId>` model backends with each one's models,
+for a tree that draws `ModelBackendPicker`. Pass the picked model as `configOptions.model`. Reading a
+live model list can start the CLI, so call `backends()` when the picker opens. Its trust line is "See
+which agent harnesses can run its turns".
 
 ## Tool callers
 

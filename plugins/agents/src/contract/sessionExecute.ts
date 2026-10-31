@@ -1,6 +1,7 @@
 import { agentProfileRegistry, type HeadlessResult, type StreamEvent } from '@acorn/plugin-api/node'
 import { capabilityId } from '@acorn/protocol/plugin/ids.ts'
 import type { ToolCeiling } from '@acorn/protocol/toolPolicy.ts'
+import type { ModelBackend } from '@acorn/protocol/modelProviders.ts'
 import type { AgentGoalVerdict } from './wire.ts'
 
 /** The longest completion condition a step may carry, after rendering. */
@@ -135,6 +136,11 @@ export const managedProviderForProfile = (profileId: string | undefined): string
 /** The profiles a turn can run on, the ones `managedProviderForProfile` names a driver for, for a plugin
  *  that lets the person pick a harness (docs/managed-agents/session-control.md § Running a turn from a
  *  plugin). */
-export type AgentProfiles = { list(): Promise<{ id: string; label: string }[]> }
+export type AgentProfiles = {
+  list(): Promise<{ id: string; label: string }[]>
+  /** The same profiles as harness backends, `harness:<profileId>`, with each one's models, for a
+   *  `ModelBackendPicker`. Reading a live catalog can start the CLI, so call it when the picker opens. */
+  backends(): Promise<ModelBackend[]>
+}
 
 export const AGENTS_PROFILES = capabilityId<AgentProfiles>('agents.profiles')

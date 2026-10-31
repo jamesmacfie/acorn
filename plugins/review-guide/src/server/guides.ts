@@ -1,7 +1,15 @@
 import { and, desc, eq, ne } from 'drizzle-orm'
 import type { CoreServices, HeadlessResult, PluginDatabase } from '@acorn/plugin-api/node'
 import type { AgentProfiles, AgentSessionExecute } from '@acorn/plugin-agents/contract/sessionExecute.ts'
-import type { AgentProfile, Guide, GuideProgress, GuideView, ProgressMark, StoredGuide } from '../shared/guide'
+import type {
+  AgentProfile,
+  GenerateRequest,
+  Guide,
+  GuideProgress,
+  GuideView,
+  ProgressMark,
+  StoredGuide,
+} from '../shared/guide'
 import { guidePath, OVERVIEW, stepPage } from '../shared/path'
 import { reviewGuides } from '../node/schema'
 import { ChangeError, readChange, type Change } from './change'
@@ -76,6 +84,7 @@ export function createGuides(deps: GuideDeps) {
   const running = new Map<string, Running>()
 
   const listProfiles = async () => (await deps.profiles()?.list()) ?? []
+  const listBackends = async () => (await deps.profiles()?.backends()) ?? []
   const where = (change: Pick<Change, 'baseSha' | 'headSha'>, taskId: string) =>
     and(
       eq(reviewGuides.taskId, taskId),
@@ -107,6 +116,7 @@ export function createGuides(deps: GuideDeps) {
           error: row.error,
           guide: row.guide ? readGuide(row.guide) : null,
           progress: readProgress(row.progress),
+          createdAt: row.createdAt,
           updatedAt: row.updatedAt,
         }
       : null
@@ -130,7 +140,8 @@ export function createGuides(deps: GuideDeps) {
   /** Read the change, store a `generating` row, and start the turn. Answers once the turn has started,
    *  with the job already running for the task if there is one. `remember` saves `profileId` as the
    *  person's choice. */
-  async function start(userId: string, taskId: string, profileId: string | undefined, remember: boolean) {
+  async function start(userId: string, taskId: string, request: GenerateRequest, remember: boolean) {
+    const { profileId } = request
     const existing = running.get(taskId)
     if (existing) return existing
     const finished = Promise.withResolvers<FinishedGuide>()
@@ -170,7 +181,7 @@ export function createGuides(deps: GuideDeps) {
         createdAt: now,
         updatedAt: now,
       })
-      finished.resolve(runTurn(execute, job, taskId, chosen, change))
+      finished.resolve(runTurn(execute, job, taskId, chosen, change, request))
     } catch (error) {
       running.delete(taskId)
       // A caller that joined this job while it was starting fails with the same sentence.
@@ -182,8 +193,8 @@ export function createGuides(deps: GuideDeps) {
   }
 
   /** The pane's generate. The harness it names becomes the person's choice. */
-  async function generate(userId: string, taskId: string, profileId: string | undefined): Promise<GuideView> {
-    await start(userId, taskId, profileId, true)
+  async function generate(userId: string, taskId: string, request: GenerateRequest): Promise<GuideView> {
+    await start(userId, taskId, request, true)
     return view(userId, taskId)
   }
 
@@ -195,7 +206,7 @@ export function createGuides(deps: GuideDeps) {
     profileId: string | undefined,
     signal: AbortSignal,
   ): Promise<FinishedGuide> {
-    const job = await start(userId, taskId, profileId, false)
+    const job = await start(userId, taskId, { profileId }, false)
     const abort = () => job.controller.abort()
     signal.addEventListener('abort', abort, { once: true })
     if (signal.aborted) abort()
@@ -212,6 +223,7 @@ export function createGuides(deps: GuideDeps) {
     taskId: string,
     profileId: string,
     change: Change,
+    { model, context }: GenerateRequest,
   ): Promise<FinishedGuide> {
     let sessionId: string | null = null
     let outcome: Partial<typeof reviewGuides.$inferInsert>
@@ -222,7 +234,9 @@ export function createGuides(deps: GuideDeps) {
         taskId,
         profileId,
         title: 'Review guide',
-        ...guideTurn(change),
+        ...guideTurn(change, context),
+        // Through `configOptions`, because the Claude driver reads the model only from the session's.
+        ...(model ? { configOptions: { model } } : {}),
         schema: GUIDE_SCHEMA,
         tools: { maxRisk: 'read' },
         // A retry on the same commits with the same harness reuses its session instead of starting another.
@@ -329,6 +343,7 @@ export function createGuides(deps: GuideDeps) {
     markProgress,
     marks,
     profiles: listProfiles,
+    backends: listBackends,
     stop,
     markStale,
     failInterrupted,

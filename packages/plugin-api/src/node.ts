@@ -175,6 +175,9 @@ export { AGENT_TOOL_PASSTHROUGH } from '@acorn/node-core/server/agentProfiles'
 export type { AgentProfileContribution } from '@acorn/node-core/server/agentProfiles/types.ts'
 export { buildHeadlessArgv, HEADLESS_TIMEOUT_MS, runHeadless } from '@acorn/node-core/server/headless.ts'
 export type { HeadlessOpts, HeadlessResult, StreamEvent } from '@acorn/node-core/server/headless.ts'
+// A profile as a `ModelBackend` with its live model list, for a plugin that offers harness choices in a
+// `ModelBackendPicker`. Core's `models.available` reads profiles the same way.
+export { readHarnessBackend } from '@acorn/node-core/server/modelProviders'
 export {
   getProfile,
   interactiveProfile,

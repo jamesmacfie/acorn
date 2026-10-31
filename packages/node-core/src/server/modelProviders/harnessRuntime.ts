@@ -54,20 +54,21 @@ export async function harnessBackends(): Promise<{ backends: ModelBackend[]; mis
       missing.push(harnessBackend(profile))
       continue
     }
-    let models = profile.models ?? []
-    let catalogUnavailable = false
-    if (profile.listModels) {
-      try {
-        const catalog = await profile.listModels(resolveCommand(profile))
-        models = catalog.models
-        catalogUnavailable = catalog.unavailable ?? false
-      } catch {
-        catalogUnavailable = true
-      }
-    }
-    backends.push(harnessBackend(profile, models, catalogUnavailable))
+    backends.push(await readHarnessBackend(profile))
   }
   return { backends, missing }
+}
+
+/** One profile as a backend, with its live model catalog when it has one. A failed read keeps its
+ *  static models and says the catalog is unavailable. */
+export async function readHarnessBackend(profile: ProfileDef): Promise<ModelBackend> {
+  if (!profile.listModels) return harnessBackend(profile)
+  try {
+    const catalog = await profile.listModels(resolveCommand(profile))
+    return harnessBackend(profile, catalog.models, catalog.unavailable ?? false)
+  } catch {
+    return harnessBackend(profile, undefined, true)
+  }
 }
 
 const harnessBackend = (

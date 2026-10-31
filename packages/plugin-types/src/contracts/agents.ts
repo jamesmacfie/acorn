@@ -192,7 +192,24 @@ export type AgentSessionExecuteResult = {
 export type AgentSessionExecute = (request: AgentSessionExecuteRequest) => Promise<AgentSessionExecuteResult | null>
 
 /** `agents.profiles`: the profiles `agents.sessionExecute` can run on. */
-export type AgentProfiles = { list(): Promise<{ id: string; label: string }[]> }
+export type AgentProfiles = {
+  list(): Promise<{ id: string; label: string }[]>
+  /** The same profiles as harness backends for `ModelBackendPicker`, with each one's models. Reading a
+   *  live catalog can start the CLI, so call it when the picker opens. */
+  backends(): Promise<
+    {
+      /** `harness:<profileId>`. */
+      id: string
+      kind: 'connection' | 'harness'
+      label: string
+      glyph?: string
+      models: { id: string; label: string }[]
+      catalogUnavailable?: boolean
+      /** `''` leaves the CLI's own default. */
+      defaultModelId: string
+    }[]
+  >
+}
 
 /** One row of a task's input-request inbox. */
 export type AgentRequestState = {
