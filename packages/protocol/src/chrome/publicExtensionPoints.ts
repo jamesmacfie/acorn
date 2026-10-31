@@ -56,6 +56,7 @@ const CHANGE_REQUEST_DIFF_LINE = {
   kind: 'annotation',
   key: ['file', 'line', 'side', 'task'],
   max: 4,
+  acceptsDetail: true,
   note: '`task` is the task whose change request diff is open, or "" on a diff browsed outside a task; answer each mark with the key you were asked about',
 } as const
 
