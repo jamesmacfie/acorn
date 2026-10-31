@@ -73,7 +73,7 @@ const result = await execute({
   taskId,
   profileId: 'claude-code',
   title: 'Review guide',
-  prompt: 'Group these hunks into sections.',
+  prompt: 'Arrange these hunks as steps.',
   context: [{ label: 'Hunks', source: 'acme.hunks', content: hunks }],
   schema: guideSchema,
   tools: { maxRisk: 'read' },
