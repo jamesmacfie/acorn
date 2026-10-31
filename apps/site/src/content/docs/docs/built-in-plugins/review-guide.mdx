@@ -55,10 +55,17 @@ request.
 [[steps]]
 name = "guide"
 kind = "review-guide:generate"
+
+[steps.with]
+background = "${steps.implement.output}"
 ```
 
 - **Harness** is optional. Leave it empty to use the harness you picked in the pane.
-- If a guide is already being written for the task, the step waits for that one.
+- **Background** is optional. Give it what an earlier step said about the change, such as the plan or
+  the report from the step that wrote the code, so the guide can explain why the change exists. The
+  harness trusts the diff where the two disagree. Only the first 32,000 characters go to the harness.
+- If a guide is already being written for the task, the step waits for that one. That guide doesn't
+  get this step's **Background**.
 - A later step can read the summary and the step titles as `${steps.guide.output}`.
 - The turn's cost counts toward the run's `max_cost_usd`.
 - When the guide fails, or you stop the run, the step fails with the same message the pane shows.

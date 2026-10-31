@@ -60,6 +60,9 @@ type Running = {
 
 // The saved choice while the harness is still installed. Otherwise the first, which is the Agents
 // plugin's default.
+// What one turn is asked for. `background` comes only from a workflow step, never from the route.
+type TurnRequest = GenerateRequest & { background?: string }
+
 const pickProfile = (profiles: AgentProfile[], saved: string | null) =>
   profiles.find((profile) => profile.id === saved)?.id ?? profiles[0]?.id ?? null
 
@@ -148,7 +151,7 @@ export function createGuides(deps: GuideDeps) {
   /** Read the change, store a `generating` row, and start the turn. Answers once the turn has started,
    *  with the job already running for the task if there is one. `remember` saves `profileId` as the
    *  person's choice. */
-  async function start(userId: string, taskId: string, request: GenerateRequest, remember: boolean) {
+  async function start(userId: string, taskId: string, request: TurnRequest, remember: boolean) {
     const { profileId } = request
     const existing = running.get(taskId)
     if (existing) return existing
@@ -207,14 +210,16 @@ export function createGuides(deps: GuideDeps) {
   }
 
   /** The workflow step's generate. Joins the task's running guide if there is one, and waits for it to
-   *  finish. `signal` stops it, the way the pane's Stop does. */
+   *  finish. `signal` stops it, the way the pane's Stop does. A joined guide keeps its own prompt, so
+   *  `background` only reaches a guide this call starts. */
   async function generateAndWait(
     userId: string,
     taskId: string,
     profileId: string | undefined,
     signal: AbortSignal,
+    background?: string,
   ): Promise<FinishedGuide> {
-    const job = await start(userId, taskId, { profileId }, false)
+    const job = await start(userId, taskId, { profileId, ...(background ? { background } : {}) }, false)
     const abort = () => job.controller.abort()
     signal.addEventListener('abort', abort, { once: true })
     if (signal.aborted) abort()
@@ -231,7 +236,7 @@ export function createGuides(deps: GuideDeps) {
     taskId: string,
     profileId: string,
     change: Change,
-    { model, context }: GenerateRequest,
+    { model, context, background }: TurnRequest,
   ): Promise<FinishedGuide> {
     let sessionId: string | null = null
     let outcome: Partial<typeof reviewGuides.$inferInsert>
@@ -242,7 +247,7 @@ export function createGuides(deps: GuideDeps) {
         taskId,
         profileId,
         title: 'Review guide',
-        ...guideTurn(change, context),
+        ...guideTurn(change, { focus: context, background }),
         // Through `configOptions`, because the Claude driver reads the model only from the session's.
         ...(model ? { configOptions: { model } } : {}),
         schema: GUIDE_SCHEMA,

@@ -508,6 +508,23 @@ describe('review guide routes', () => {
       expect(prefs.has('profile')).toBe(false)
     })
 
+    it("passes the step's background to the harness, and nothing when it's blank", async () => {
+      const outcome = step('task-1', { background: 'The plan: bump a.' })
+      await started()
+      expect(turns[0]!.request.context?.[1]).toMatchObject({
+        label: 'Background from the workflow',
+        content: 'The plan: bump a.',
+      })
+      expect(turns[0]!.request.prompt).toContain('trust the diff')
+      turns[0]!.finish(okResult(ANSWER))
+      await outcome
+      const blank = step('task-1', { background: '  ' })
+      await vi.waitFor(() => expect(turns).toHaveLength(2))
+      expect(turns[1]!.request.context).toHaveLength(1)
+      turns[1]!.finish(okResult(ANSWER))
+      await blank
+    })
+
     it('waits for a guide that is already generating instead of starting another', async () => {
       await call('POST', '/guide/generate', { taskId: 'task-1' })
       const outcome = step('task-1')

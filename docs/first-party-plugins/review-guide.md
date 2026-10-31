@@ -86,8 +86,8 @@ profileId = "codex"
 
 - `profileId` is optional. Its choices come from `GET /v1/p/review-guide/profiles`. Empty means the
   Node owner's saved choice, then the first profile, as in the pane. The step doesn't save its pick.
-- If a guide is already generating for the task, the step waits for that one instead of starting
-  another.
+- `background`, such as `"${steps.implement.output}"`, says why the change exists: its own context, cut
+  to 32,000 characters. A step that joins a guide already generating doesn't pass its `background`.
 - `${steps.<name>.output}` is the guide's summary, then one `- ` line per step title.
 - Stopping the step, such as cancelling the run, stops the turn the way **Stop** does.
 - The turn's cost and token usage go into the step, so the run's `max_cost_usd` counts them.
