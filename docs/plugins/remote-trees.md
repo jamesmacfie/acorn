@@ -55,9 +55,10 @@ read. ✦ on a line opens an empty card in place instead of sending `onActivate`
 has a conversation shows it. A `DiffNote` on the line is the card's opening message, drawn from its
 `title` and `body`, with the note's own buttons under it. The host sets each note's `from` to the tree's
 plugin id, whatever the tree sent, and the card draws it beside the author. Nothing starts a session
-until the reader sends. The first send gives the agent the notes, labelled with that plugin id, then the
-code around the line, read from the change request's own diff rather than the tree's patch, then the
-question. The conversation keeps the notes, so the card shows them even after the tree stops drawing
+until the reader sends. The first send gives the agent each note, labelled with its own plugin id, then
+the code around the line, read from the change request's own diff rather than the tree's patch, or none
+when that diff doesn't have the line. Then it gives the question. A note's body draws remote images as
+placeholders. The conversation keeps the notes, so the card shows them even after the tree stops drawing
 them.
 
 The card is the code host's, because only it knows the change request's patches, which name the line's

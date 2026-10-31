@@ -408,8 +408,20 @@ export function DiffNoteCard(props: { note: PinnedNote<JSX.Element>; unplaced?: 
         <span class="diff-note-mark" aria-hidden="true">
           ✦
         </span>
-        <Show when={note().author}>{(author) => <span class="diff-note-author">{author()}</span>}</Show>
-        <Show when={note().from}>{(from) => <span class="diff-note-author">{`from ${from()}`}</span>}</Show>
+        <Show when={note().author}>
+          {(author) => (
+            <span class="diff-note-author" data-tip={author()}>
+              {author()}
+            </span>
+          )}
+        </Show>
+        <Show when={note().from}>
+          {(from) => (
+            <span class="diff-note-author" data-tip={`from ${from()}`}>
+              {`from ${from()}`}
+            </span>
+          )}
+        </Show>
         <Show when={note().label}>
           {(label) => (
             <Badge size="xs" tone={note().tone ?? 'neutral'}>
@@ -437,7 +449,8 @@ export function DiffNoteCard(props: { note: PinnedNote<JSX.Element>; unplaced?: 
           <div class="diff-note-title">{note().title}</div>
         </Show>
         <div class="diff-note-body">
-          <Show when={note().body}>{(body) => <Markdown text={body()} />}</Show>
+          {/* A plugin wrote it, so a remote image is a placeholder, as in mark detail. */}
+          <Show when={note().body}>{(body) => <Markdown text={body()} images="placeholder" />}</Show>
           {note().children}
         </div>
       </Show>

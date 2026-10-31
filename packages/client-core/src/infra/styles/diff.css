@@ -51,9 +51,12 @@
 .diff-note-line:empty { display: none; }
 .diff-note[data-tone='warn'] { border-color: color-mix(in srgb, var(--warn) 50%, var(--border)); }
 .diff-note[data-tone='danger'] { border-color: color-mix(in srgb, var(--danger) 50%, var(--border)); }
+/* In a narrow column the names give way first, with an ellipsis, so the tone tag and the fold stay in. */
 .diff-note-head { display: flex; align-items: center; gap: var(--space-4); min-width: 0; }
 .diff-note-mark { flex: none; color: var(--text-muted); }
-.diff-note-author { flex: none; color: var(--text-muted); }
+.diff-note-author { flex: 0 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--text-muted); }
+/* A note as the agent card's opening message sits in the card's padding, so it needs less of its own. */
+.ui-card .diff-note[data-pad] { padding: var(--space-3); }
 .diff-note-peek { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--text-muted); }
 .diff-note-fold { flex: none; padding: 0 var(--space-2); font: inherit; color: var(--text-faint); background: none; border: none; cursor: pointer; }
 .diff-note-fold:hover { color: var(--text); }

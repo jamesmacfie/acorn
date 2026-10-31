@@ -142,7 +142,8 @@ export function changeRequestLines(options: {
           path: props.path,
           oldNo: old ? props.line : null,
           newNo: old ? null : props.line,
-          raw: props.quote,
+          // Empty, not the tree's quote: a line the change request's diff doesn't have sends no code.
+          raw: '',
           toks: [],
         })
         return (

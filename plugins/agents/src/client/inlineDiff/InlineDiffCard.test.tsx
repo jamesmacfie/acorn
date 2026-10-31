@@ -254,7 +254,7 @@ describe('inline diff chat', () => {
       },
     ])
     expect(store.sent[0]).toContain(
-      "from the review-guide plugin, which names Claude Code as the author. The reader didn't write it:\nRisk: This may overflow.\nCheck **the cap**.\n\nnew line",
+      "The reader didn't write it.\n\nFrom the review-guide plugin, which names Claude Code as the author:\nRisk: This may overflow.\nCheck **the cap**.\n\nnew line",
     )
     expect(store.sent[0]).toMatch(/Question:\nIs 10 enough\?$/)
   })

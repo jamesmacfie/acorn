@@ -45,16 +45,16 @@ const noteText = (note: DiffNoteText): InlineDiffNote => ({
   ...(note.body ? { body: note.body.slice(0, 2000) } : {}),
 })
 
-/** The notes as the agent reads them, above the line's code. The reader sees them in the card. Whose
- *  they are comes from `from`, which the host set, not from the plugin's own `author`. */
+/** The notes as the agent reads them, above the line's code. The reader sees them in the card. Each
+ *  note names its own plugin from `from`, which the host set, and quotes the plugin's `author`. */
 function notesForAgent(notes: readonly InlineDiffNote[]): string {
   if (!notes.length) return ''
-  const written = notes.map((note) =>
-    [`${note.label ? `${note.label}: ` : ''}${note.title ?? ''}`, note.body ?? ''].join('\n').trim(),
-  )
-  const plugin = notes[0]!.from ? `the ${notes[0]!.from} plugin` : 'a plugin'
-  const author = notes[0]!.author ? `, which names ${notes[0]!.author} as the author` : ''
-  return `The reader is replying to ${notes.length === 1 ? 'this note' : 'these notes'} on the line, from ${plugin}${author}. The reader didn't write ${notes.length === 1 ? 'it' : 'them'}:\n${written.join('\n\n')}\n\n`
+  const written = notes.map((note) => {
+    const source = `${note.from ? `From the ${note.from} plugin` : 'From a plugin'}${note.author ? `, which names ${note.author} as the author` : ''}:`
+    const heading = `${note.label ? `${note.label}: ` : ''}${note.title ?? ''}`
+    return [source, heading, note.body ?? ''].join('\n').trim()
+  })
+  return `The reader is replying to ${notes.length === 1 ? 'this note' : 'these notes'} on the line. The reader didn't write ${notes.length === 1 ? 'it' : 'them'}.\n\n${written.join('\n\n')}\n\n`
 }
 
 // The thread's "chats only" view, drawn by the thread's own cards: messages, and the agent's questions
