@@ -225,6 +225,12 @@ export const NODE_SUPPORT = {
   Field: { dom: 'full', tui: 'full' },
   CopyButton: { dom: 'full', tui: 'fallback' },
   ModelBackendPicker: { dom: 'full', tui: 'full' },
+  // The ✦ trigger is the terminal's labelled button, because a cell has no icon.
+  ModelPickerPopover: {
+    dom: 'full',
+    tui: 'reduced',
+    loss: 'the trigger is a labelled button, and the panel opens under it',
+  },
 
   // Pixels. `absent` on a host with no pixels, and `kind="pty"` is the exception the node handles
   // itself: a terminal draws a PTY better than any of this does.

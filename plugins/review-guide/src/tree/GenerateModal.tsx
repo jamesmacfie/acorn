@@ -3,15 +3,16 @@ import {
   Alert,
   Button,
   defaultModelIdFor,
-  EmptyState,
   Field,
   Icon,
   Modal,
   ModalActions,
   ModalBody,
   ModelBackendPicker,
+  ModelPickerPopover,
   Text,
   Textarea,
+  ToolbarSpacer,
 } from '@acorn/plugin-api/ui/tree'
 import type { AcornBridge } from '@acorn/plugin-api/ui/sdk'
 import { HARNESS_BACKEND_PREFIX, type ModelBackend } from '@acorn/protocol/modelProviders.ts'
@@ -22,8 +23,9 @@ export const errorMessage = (error: unknown) =>
 
 type Pick = { backendId: string; modelId: string }
 
-/** Pick the harness and its model, and add any context, before the guide is written. The harnesses
- *  come as `harness:<profileId>` backends, so the picker is the one the app's other AI dialogs draw. */
+/** Add any context, and pick the harness and its model, before the guide is written. The harnesses
+ *  come as `harness:<profileId>` backends, so the ✦ picker is the one the app's other AI dialogs draw,
+ *  in the same place: the start of the actions. */
 export function GenerateModal(props: {
   bridge: AcornBridge
   title: string
@@ -47,6 +49,13 @@ export function GenerateModal(props: {
     if (picked()) return picked()
     const saved = list().find((backend) => backend.id === `${HARNESS_BACKEND_PREFIX}${props.profileId}`) ?? list()[0]
     return saved ? { backendId: saved.id, modelId: defaultModelIdFor(saved) } : null
+  }
+
+  // The ✦ button's tip: the harness, and the model when one is picked.
+  const pickLabel = (chosen: Pick) => {
+    const backend = list().find((candidate) => candidate.id === chosen.backendId)
+    const model = backend?.models.find((candidate) => candidate.id === chosen.modelId)?.label ?? chosen.modelId
+    return backend && model ? `${backend.label}, ${model}` : (backend?.label ?? '')
   }
 
   // A sent generation can't be taken back here; Stop in the toolbar ends it.
@@ -91,31 +100,30 @@ export function GenerateModal(props: {
             onChange={(value: string) => setContext(value)}
           />
         </Field>
-        <Show
-          when={!backends.loading}
-          fallback={
-            <EmptyState align="start" busy>
-              Loading the harnesses…
-            </EmptyState>
-          }
-        >
-          <Show
-            when={pick()}
-            fallback={<Alert>{backends.error ? errorMessage(backends.error) : 'No harness can write a guide.'}</Alert>}
-          >
-            {(chosen) => (
+        <Show when={!backends.loading && !pick()}>
+          <Alert>{backends.error ? errorMessage(backends.error) : 'No harness can write a guide.'}</Alert>
+        </Show>
+        <Show when={error()}>{(text) => <Alert>{text()}</Alert>}</Show>
+      </ModalBody>
+      <ModalActions>
+        <Show when={!busy() && pick()}>
+          {(chosen) => (
+            <ModelPickerPopover
+              sparkle
+              title="Choose who writes the guide"
+              label="Model for the guide"
+              tipSub={pickLabel(chosen())}
+            >
               <ModelBackendPicker
                 backends={list()}
                 backendId={chosen().backendId}
                 modelId={chosen().modelId}
                 onChange={(next: Pick) => setPicked(next)}
               />
-            )}
-          </Show>
+            </ModelPickerPopover>
+          )}
         </Show>
-        <Show when={error()}>{(text) => <Alert>{text()}</Alert>}</Show>
-      </ModalBody>
-      <ModalActions>
+        <ToolbarSpacer />
         <Button variant="ghost" disabled={busy()} onPress={dismiss}>
           Cancel
         </Button>

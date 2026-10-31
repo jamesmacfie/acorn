@@ -87,6 +87,7 @@ import {
   KeyValueEditor,
   MentionTextarea,
   ModelBackendPicker,
+  ModelPickerPopover,
   Picker,
   PickerRow,
   SegmentedControl,
@@ -1218,6 +1219,19 @@ const CASES: Case[] = [
     ),
     check: (frame) => has(frame, '[ Opus ▾ ]'),
   },
+  {
+    node: 'ModelPickerPopover',
+    draws: 'reduced: a button named by its label, with the picker under it once opened',
+    render: () => (
+      <ModelPickerPopover label="Model for the guide" title="Choose who writes the guide" sparkle>
+        <Text>picker</Text>
+      </ModelPickerPopover>
+    ),
+    check: (frame) => {
+      has(frame, 'Model for the guide')
+      lacks(frame, 'picker')
+    },
+  },
 
   // ── Pixels, and the host wrappers ───────────────────────────────────────────────────────────
   {
@@ -2085,6 +2099,20 @@ const BEHAVIOURS: Behaviour[] = [
       const pasted = await screen.paste('one\ntwo')
       expect(pressed.at(-1)).toBe('one\ntwo')
       expect(fieldLines(pasted, 2)).toEqual(['one', 'two'])
+    },
+  },
+  {
+    node: 'ModelPickerPopover',
+    does: 'opens its panel on Enter',
+    render: () => (
+      <ModelPickerPopover label="Model for the guide" title="Choose who writes the guide" sparkle>
+        <Text>picker</Text>
+      </ModelPickerPopover>
+    ),
+    size: { width: 40, height: 8 },
+    drive: async (screen) => {
+      const open = await screen.press('RETURN')
+      expect(open.text).toContain('picker')
     },
   },
   {

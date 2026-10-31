@@ -173,6 +173,7 @@ paint containment would clip a card's focus ring.
 | `Field` | none | The label above its child, with ` *` after it when `required`, the hint under it, then `help` as a grey line, because this host has no hover |
 | `CopyButton` | stop | A Copy control, labeled with its `title` when it has one, sends OSC 52 where the terminal takes it, and prints the value on its own line to copy by hand where it does not |
 | `ModelBackendPicker` | stop | Two `Select`s over the backends a Generate control can spend: a stored key, or an installed agent CLI |
+| `ModelPickerPopover` | stop | Reduced: the ✦ trigger is a button named by its `label`, and the panel opens as a block under it. Its children, usually a `ModelBackendPicker`, are the panel |
 
 `modelProviderFailure` is a presentation helper at `@acorn/plugin-api/ui/model-provider-failure`,
 also exported by `@acorn/plugin-api/ui` and `@acorn/plugin-api/ui/tree`. Generate controls use it for

@@ -161,6 +161,7 @@ acorn-plugin-sdk/remote: value Modal
 acorn-plugin-sdk/remote: value ModalActions
 acorn-plugin-sdk/remote: value ModalBody
 acorn-plugin-sdk/remote: value ModelBackendPicker
+acorn-plugin-sdk/remote: value ModelPickerPopover
 acorn-plugin-sdk/remote: value NonCodeRow
 acorn-plugin-sdk/remote: value Only
 acorn-plugin-sdk/remote: value Pane

@@ -1,0 +1,92 @@
+{
+  "meta": {
+    "title": "ModelPickerPopover",
+    "caption": "The ✦ model picker at the start of a dialog’s actions, shut.",
+    "terminal": {
+      "columns": 60,
+      "rows": 1
+    },
+    "width": 480
+  },
+  "batches": [
+    [
+      {
+        "op": "insert",
+        "parent": null,
+        "index": 0,
+        "node": {
+          "id": "n1",
+          "type": "Inline",
+          "props": {},
+          "children": [
+            {
+              "id": "n2",
+              "type": "ModelPickerPopover",
+              "props": {
+                "sparkle": true,
+                "label": "Model for the guide",
+                "title": "Choose who writes the guide",
+                "tipSub": "Claude Code, Opus"
+              },
+              "children": [
+                {
+                  "id": "n3",
+                  "type": "ModelBackendPicker",
+                  "props": {
+                    "backendId": "harness:claude",
+                    "modelId": "opus",
+                    "backends": [
+                      {
+                        "id": "harness:claude",
+                        "kind": "harness",
+                        "label": "Claude Code",
+                        "defaultModelId": "",
+                        "models": [
+                          {
+                            "id": "opus",
+                            "label": "Opus"
+                          },
+                          {
+                            "id": "sonnet",
+                            "label": "Sonnet"
+                          }
+                        ]
+                      }
+                    ],
+                    "onChange": {
+                      "$handler": 1
+                    }
+                  },
+                  "children": []
+                }
+              ]
+            },
+            {
+              "id": "n4",
+              "type": "ToolbarSpacer",
+              "props": {},
+              "children": []
+            },
+            {
+              "id": "n5",
+              "type": "Button",
+              "props": {
+                "variant": "solid"
+              },
+              "children": [
+                {
+                  "id": "n6",
+                  "type": "#text",
+                  "props": {
+                    "value": "Generate"
+                  },
+                  "children": []
+                }
+              ]
+            }
+          ]
+        }
+      }
+    ]
+  ]
+}

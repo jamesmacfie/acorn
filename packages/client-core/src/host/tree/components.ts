@@ -88,14 +88,14 @@ import { Fallback } from '../../kit/components/content/Fallback'
 import { Rectangle } from '../../kit/components/content/Rectangle'
 import { DiffNote } from '../../kit/diff/diffNotes'
 
-// The nine loaders, and why each one is not a component.
+// The ten loaders, and why each one is not a component.
 //
 //   - `DiffPane` reaches ../../features/diff and, through it, the syntax highlighter.
 //   - The five diff rows share `kit/diff/DiffRows.tsx` with it, so leaving one eager keeps the chunk.
 //   - `Markdown` fetches a grammar per fence at render time and is the surface a streaming transcript
 //     re-renders; keeping it out of this table's chunk keeps the parser out of the first paint.
 //   - `Timeline` carries the follow-scroll machinery.
-//   - `ModelBackendPicker` reaches ../../features/settings.
+//   - `ModelBackendPicker` and `ModelPickerPopover` reach ../../features/settings.
 //
 // One line each and no internal comma, because `tools/arch/kitTable.test.ts` reads this literal as
 // text: importing it there would pull a renderer into a node-env test.
@@ -206,4 +206,5 @@ export const KIT_COMPONENTS: KitTable = {
   NonCodeRow: load(() => import('../../kit/diff/DiffRows').then((m) => ({ default: m.NonCodeRow }))),
   SplitCell: load(() => import('../../kit/diff/DiffRows').then((m) => ({ default: m.SplitCell }))),
   ModelBackendPicker: load(() => import('../../features/settings/models/ModelBackendPicker')),
+  ModelPickerPopover: load(() => import('../../features/settings/models/ModelPickerPopover')),
 }

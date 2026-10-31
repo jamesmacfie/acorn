@@ -310,13 +310,18 @@ describe('GuidePane', () => {
     regenerated.dispose()
   })
 
-  it('regenerates from a dialog with the harness, the model, and extra context', async () => {
+  it('regenerates from a dialog with the ✦ model picker in its actions and extra context', async () => {
     const pane = await mount(stored('ready'))
     await pane.press('Button', 'Regenerate')
     expect(pane.nodes().find((node) => node.type === 'Modal')?.props.title).toBe('Regenerate the guide')
-    const picker = pane.nodes().find((node) => node.type === 'ModelBackendPicker')!
+    const popover = () => pane.nodes().find((node) => node.type === 'ModelPickerPopover')!
+    expect(pane.parentOf(popover().id)?.type).toBe('ModalActions')
+    expect(popover().props).toMatchObject({ sparkle: true, tipSub: 'Claude Code' })
+    const picker = popover().children.find((node) => node.type === 'ModelBackendPicker')!
     expect(picker.props).toMatchObject({ backendId: 'harness:claude-code', modelId: '' })
+    expect(pane.nodes().filter((node) => node.type === 'ModelBackendPicker')).toHaveLength(1)
     await pane.dispatch(picker, 'onChange', { backendId: 'harness:claude-code', modelId: 'opus' })
+    expect(popover().props.tipSub).toBe('Claude Code, Opus')
     await pane.dispatch(
       pane.nodes().find((node) => node.type === 'Textarea')!,
       'onChange',

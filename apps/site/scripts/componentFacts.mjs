@@ -44,7 +44,7 @@ const COMPONENT_GROUPS = {
   inputs: [
     'Button', 'IconButton', 'ConfirmButton', 'ToggleButton', 'CopyButton', 'Input', 'Textarea', 'Select',
     'Checkbox', 'SegmentedControl', 'Picker', 'PickerRow', 'Composer', 'MentionTextarea', 'KeyValueEditor',
-    'FindBar', 'Field', 'ModelBackendPicker',
+    'FindBar', 'Field', 'ModelBackendPicker', 'ModelPickerPopover',
   ],
   overlays: ['Modal', 'ModalBody', 'ModalActions', 'Menu', 'Popover'],
   rectangles: ['Rectangle', 'Only', 'Fallback'],

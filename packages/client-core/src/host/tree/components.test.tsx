@@ -32,6 +32,7 @@ const HEAVY: KitNodeName[] = [
   'Timeline',
   // Reaches features/settings.
   'ModelBackendPicker',
+  'ModelPickerPopover',
 ]
 
 const isLoader = (entry: KitEntry): boolean => typeof entry !== 'function'

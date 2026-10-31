@@ -97,6 +97,9 @@ export { default as Markdown } from '@acorn/client-core/kit/components/content/M
 // it is presentation only, a protocol type in and two selects out, and a plugin whose own route calls
 // `core.models.generateText` needs to offer the picker from a frame.
 export { default as ModelBackendPicker } from '@acorn/client-core/features/settings/models/ModelBackendPicker.tsx'
+// The ✦ button that holds that picker in an AI dialog or composer. It's a kit node, and `/ui/host`
+// exports it as well.
+export { default as ModelPickerPopover } from '@acorn/client-core/features/settings/models/ModelPickerPopover.tsx'
 
 // ── Diff rows ─────────────────────────────────────────────────────────────────────────────────
 // The components of the diff toolkit; its model, virtualizer and find pass are on ./ui/diff.

@@ -135,6 +135,7 @@ export declare const Field: (props: KitNodeProps) => JSX.Element
 export declare const ConfirmButton: (props: KitNodeProps) => JSX.Element
 export declare const CopyButton: (props: KitNodeProps) => JSX.Element
 export declare const ModelBackendPicker: (props: KitNodeProps) => JSX.Element
+export declare const ModelPickerPopover: (props: KitNodeProps) => JSX.Element
 export declare const Rectangle: (props: KitNodeProps) => JSX.Element
 export declare const Only: (props: KitNodeProps) => JSX.Element
 export declare const Fallback: (props: KitNodeProps) => JSX.Element

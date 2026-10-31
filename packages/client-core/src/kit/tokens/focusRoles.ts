@@ -128,6 +128,8 @@ export const NODE_FOCUS = {
   Field: 'none',
   CopyButton: 'stop',
   ModelBackendPicker: 'stop',
+  // One stop, its trigger. The picker inside is reached once the panel opens.
+  ModelPickerPopover: 'stop',
 
   // Pixels. One stop from outside; Enter hands the keys to what is in the box and Escape takes them
   // back, because whatever is in there will swallow Tab.

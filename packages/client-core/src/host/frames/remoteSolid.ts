@@ -204,6 +204,7 @@ export const {
   ConfirmButton,
   CopyButton,
   ModelBackendPicker,
+  ModelPickerPopover,
   Rectangle,
   Only,
   Fallback,

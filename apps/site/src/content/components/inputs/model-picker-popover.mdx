@@ -1,0 +1,27 @@
+---
+title: ModelPickerPopover
+description: The ✦ button that opens the model picker in an AI dialog or composer.
+sources:
+  - packages/client-core/src/features/settings/models/ModelPickerPopover.tsx
+  - docs/ui-design/every-node.md
+checked: 'dd8ac15e6'
+---
+
+Use `ModelPickerPopover` in a dialog or composer that generates text, so the reader can change the backend and model without the picker taking room. Put a `ModelBackendPicker` inside it, and pass `sparkle` for the ✦ trigger. `tipSub` is the tooltip's second line, such as the pick in force.
+
+<Specimen id="model-picker-popover" />
+
+{/* facts */}
+
+## Example
+
+<SpecimenCode id="model-picker-popover" />
+
+## Related
+
+- [`ModelBackendPicker`](/docs/components/inputs/model-backend-picker/), for the picker inside it.
+- [`Popover`](/docs/components/overlays/popover/), for any other panel behind a button.
+
+## Mistakes
+
+- Drawing `ModelBackendPicker` straight into the dialog body. The app's AI dialogs keep it behind this button, at the start of the actions.

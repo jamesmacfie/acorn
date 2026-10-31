@@ -50,10 +50,11 @@ Two hosts draw the whole kit: `dom`, the desktop and browser, from
 `apps/tui/src/kit/components.tsx`. `tools/arch/kitTable.test.ts` holds both tables and the matrix to
 the same keys.
 
-Compiled controls can compose nodes without joining the remote vocabulary. `ModelPickerPopover` and
-`IconPicker` on `@acorn/plugin-api/ui/host` are compositions each host provides, with no support-matrix
-row. The terminal `IconPicker` draws an editable icon name and a reset button, without previews or
-random selection.
+Compiled controls can compose nodes without joining the remote vocabulary. `IconPicker` on
+`@acorn/plugin-api/ui/host` is a composition each host provides, with no support-matrix row. The
+terminal `IconPicker` draws an editable icon name and a reset button, without previews or random
+selection. `ModelPickerPopover` is a node as well, so a tree's AI dialog puts the ✦ model picker where
+compiled dialogs do, with the picker as its children. Its `above` takes an element, so it doesn't cross.
 
 ### Sidebar filters
 

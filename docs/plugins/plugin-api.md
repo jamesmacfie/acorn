@@ -44,7 +44,7 @@ forms for callers that already hold a mode accessor. Both are exported beside
 The runtime draws the line between `/client`, `/ui`, and `/ui/host`. Solid compiles a component to
 code that touches `window` at module scope, so `/client` holds no `.tsx`. The `/ui` barrel holds
 presentation components. Router, query, and registry-connected components, and composed controls
-such as `ModelPickerPopover`, sit on `/ui/host`. The facade is declared side-effect free, so a frame
+such as `IconPicker`, sit on `/ui/host`. `ModelPickerPopover` is a kit node, so it's on `/ui` too. The facade is declared side-effect free, so a frame
 bundle keeps only the components it imports.
 
 That doesn't hold inside the desktop shell. The client-core modules behind `/ui/host` create stores

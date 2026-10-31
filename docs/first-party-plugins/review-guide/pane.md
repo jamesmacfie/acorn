@@ -10,11 +10,10 @@ one. Its toolbar has ✦ **Generate guide** or **Regenerate**, or **Stop** while
 guide generates, the pane links to the session's transcript through its `session` destination.
 
 **Generate guide**, **Regenerate**, and a failed guide's **Try again** all open one dialog,
-`GenerateModal` in `src/tree/GenerateModal.tsx`. It reads `GET /backends` when it opens and draws the
-kit's `ModelBackendPicker` over the harnesses, the same harness and model picker as the app's other AI
-dialogs. The picker starts on the person's saved harness and its default model. A text field takes
-optional extra context, up to 2,000 characters. The ✦ popover the compiled dialogs use isn't a kit node,
-so the picker sits in the dialog's body, as in the database plugin's **Generate SQL**.
+`GenerateModal` in `src/tree/GenerateModal.tsx`. Its body takes optional extra context, up to 2,000
+characters. Its actions start with the ✦ `ModelPickerPopover`, the same model picker and in the same place
+as the app's other AI dialogs, with a `ModelBackendPicker` over the harnesses inside. It reads
+`GET /backends` when the dialog opens, and starts on the person's saved harness and its default model.
 
 A guide reads as a path: an overview, one page per step, and a wrap-up. The hunks the guide left out
 are a last step, **Not covered by the guide**, so every hunk is on exactly one page. The path is

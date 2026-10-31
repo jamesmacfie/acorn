@@ -87,6 +87,7 @@ export {
   KeyValueEditor,
   MentionTextarea,
   ModelBackendPicker,
+  ModelPickerPopover,
   Picker,
   PickerRow,
   SegmentedControl,

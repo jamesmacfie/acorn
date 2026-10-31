@@ -92,6 +92,7 @@ export {
   ConfirmButton,
   CopyButton,
   ModelBackendPicker,
+  ModelPickerPopover,
   Rectangle,
   Only,
   Fallback,
