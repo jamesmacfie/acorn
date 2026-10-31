@@ -7,6 +7,7 @@
 import { createSignal, type Accessor } from 'solid-js'
 import {
   annotationKeyOf,
+  MAX_RAW_ANNOTATION_ROWS,
   type PluginAnnotationKey,
   type PluginAnnotationMark,
 } from '@acorn/protocol/extensionPoints.ts'
@@ -82,15 +83,19 @@ export function annotationsFor(pointId: string, key: PluginAnnotationKey): Stamp
 /**
  * Ask every eligible contributor about one visible key batch.
  *
- * Eligibility, descriptor registration, request scope, freshness revision and visible keys form the
- * request identity. A changed identity aborts and clears only that contributor before its replacement
- * starts. Exact state ownership rejects late answers even when a contributor ignores AbortSignal.
+ * Eligibility, descriptor registration, request scope and freshness revision form the request
+ * identity. A changed identity aborts and clears only that contributor before its replacement starts.
+ * A changed key set aborts too, but keeps the contributor's marks. They're still its answer at this
+ * revision, and blanking them on every scroll step would resize every row that has one. The new answer
+ * replaces the marks for the keys it was asked about. Exact state ownership rejects late answers even
+ * when a contributor ignores AbortSignal.
  */
 export function requestAnnotations(pointId: string, keys: readonly PluginAnnotationKey[]): void {
   const point = extensionPointRegistry.get(pointId)
   if (!point?.key || point.kind !== 'annotation') return
   const fields = point.key
-  const keySignature = keys.map((key) => annotationKeyOf(fields, key)).join(String.fromCharCode(0))
+  const lookups = keys.map((key) => annotationKeyOf(fields, key))
+  const keySignature = lookups.join(String.fromCharCode(0))
   // These accessors are read inside the draw site's existing Solid effect. No annotation-specific
   // timer, subscription or per-row observer is needed.
   const contributions = extensionDeliveries(pointId).filter(
@@ -114,16 +119,15 @@ export function requestAnnotations(pointId: string, keys: readonly PluginAnnotat
     const requestScope = contribution.requestScope?.() ?? 'local'
     const freshnessRevision = contribution.freshnessRevision?.() ?? 0
     const existing = state.contributors.get(contribution.id)
-    if (
+    const sameIdentity =
       existing?.registration === contribution &&
       existing.point === point &&
       existing.requestScope === requestScope &&
-      existing.freshnessRevision === freshnessRevision &&
-      existing.keySignature === keySignature
-    )
-      continue
+      existing.freshnessRevision === freshnessRevision
+    if (sameIdentity && existing.keySignature === keySignature) continue
 
     existing?.controller?.abort()
+    const kept = sameIdentity ? existing.marksByKey : new Map<string, StampedMark[]>()
     const controller = new AbortController()
     const requestState: AnnotationContributionState = {
       registration: contribution,
@@ -132,10 +136,10 @@ export function requestAnnotations(pointId: string, keys: readonly PluginAnnotat
       freshnessRevision,
       keySignature,
       controller,
-      marksByKey: new Map(),
+      marksByKey: kept,
     }
     state.contributors.set(contribution.id, requestState)
-    changed = true
+    if (!sameIdentity) changed = true
 
     void contribution
       .marks([...keys], controller.signal)
@@ -166,11 +170,23 @@ export function requestAnnotations(pointId: string, keys: readonly PluginAnnotat
             },
           )
         }
-        const marksByKey = new Map<string, StampedMark[]>()
+        const answered = new Map<string, StampedMark[]>()
         for (const mark of answer.slice(0, limit)) {
           const stamped: StampedMark = { ...mark, pluginId: contribution.pluginId }
           const lookup = annotationKeyOf(fields, mark.key)
-          marksByKey.set(lookup, [...(marksByKey.get(lookup) ?? []), stamped])
+          answered.set(lookup, [...(answered.get(lookup) ?? []), stamped])
+        }
+        const marksByKey = new Map(kept)
+        for (const lookup of lookups) marksByKey.delete(lookup)
+        // An unchanged answer keeps its objects, so a row drawn from them isn't rebuilt.
+        for (const [lookup, marks] of answered) {
+          const before = kept.get(lookup)
+          marksByKey.set(lookup, before && JSON.stringify(before) === JSON.stringify(marks) ? before : marks)
+        }
+        // Past the bound, the keys answered longest ago are dropped first.
+        for (const lookup of marksByKey.keys()) {
+          if (marksByKey.size <= MAX_RAW_ANNOTATION_ROWS) break
+          marksByKey.delete(lookup)
         }
         requestState.controller = null
         requestState.marksByKey = marksByKey
@@ -183,7 +199,8 @@ export function requestAnnotations(pointId: string, keys: readonly PluginAnnotat
       })
   }
 
-  // Stale marks disappear in the same turn. Successful answers later fill only their own partition.
+  // Marks from a changed identity disappear in the same turn. Successful answers later fill only their
+  // own partition.
   if (changed) publish(state)
 }
 

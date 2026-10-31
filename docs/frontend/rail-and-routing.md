@@ -69,10 +69,11 @@ display types live in `kit/tokens/rail.ts`.
 
 Loaded task markers come through `core:task`, the annotation point. The rail sends the visible task
 IDs once per contributor. Each request's identity includes the contributor's registration, the active
-Node, `chromeDeps(pluginId)`, and the visible keys, and the shared chrome watcher already advances that
-freshness, so annotations add no per-row query, timer, or subscription. A changed identity clears and
-aborts only that contributor, and a generation check rejects late answers. Results merge in
-registration order ([task annotations](../plugins/rows-and-annotations.md#task-annotations)).
+Node, and `chromeDeps(pluginId)`. The shared chrome watcher already advances that freshness, so
+annotations add no per-row query, timer, or subscription. A changed identity clears and aborts only
+that contributor, and a generation check rejects late answers. New visible task IDs keep the markers
+while the host asks again. Results merge in registration order
+([task annotations](../plugins/rows-and-annotations.md#task-annotations)).
 
 Tasks created through the workflow child seam carry `workflows:child`. Both rails use the same pure
 hierarchy projection to fold them under their root, show only an active descendant's ancestors, and

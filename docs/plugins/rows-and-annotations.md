@@ -112,12 +112,12 @@ ctx.extensions.register({ id: 'line-blame', point: 'editor:line', label: 'Git bl
 The host scopes it to the active Node and checks its answer exactly as it checks a loaded plugin's.
 
 Annotation state belongs to one contributor at one point. Its request identity includes the point and
-contributor registrations, the active Node, the plugin's chrome revision, and the visible-key
-signature. A changed identity aborts the previous read and removes that contributor's marks in the
-same turn. A late response can't restore stale marks, even when the contributor ignores its
-`AbortSignal`. The host merges contributors in registered order, not response order. A failed
-contributor stays empty and leaves the others' marks alone. Reload, disable, removal, and Node
-changes clear the state before replacement registrations can reuse ids.
+contributor registrations, the active Node, and the plugin's chrome revision. A changed identity aborts
+the previous read and removes that contributor's marks in the same turn. A late response can't restore
+stale marks, even when the contributor ignores its `AbortSignal`. New visible keys abort the read but
+keep the marks, so scrolling doesn't resize a marked row. The host merges contributors in registered
+order, not response order. A failed contributor stays empty and leaves the others' marks alone. Reload,
+disable, removal, and Node changes clear the state before replacement registrations can reuse ids.
 
 The transport reads at most 4,096 raw rows from one response and reports one overflow summary past
 that ceiling. The annotation host then drops malformed rows one at a time, from either tier. A point owner may set a smaller accepted-mark limit.

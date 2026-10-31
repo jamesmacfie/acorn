@@ -90,4 +90,6 @@ wrapper.
 
 The host asks only about code rows in the visible range, in one request per contributor. It compares
 the key set before asking, so scrolling within the same segments costs a string comparison, and a
-coverage plugin on a million-line diff is asked about the few hundred rows you're near.
+coverage plugin on a million-line diff is asked about the few hundred rows you're near. A row keeps
+its marks while the host asks about a new range, so scrolling never blanks and redraws a note's card
+([rows and annotations](../plugins/rows-and-annotations.md)).

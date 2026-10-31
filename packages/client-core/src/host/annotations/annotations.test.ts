@@ -317,6 +317,50 @@ describe('requestAnnotations', () => {
     expect(annotationsFor(POINT, key(1)).map((mark) => mark.pluginId)).toEqual(['lint'])
   })
 
+  it('keeps the marks it has while it asks about a new key set', async () => {
+    point()
+    const next = deferred<PluginAnnotationMark[]>()
+    let request = 0
+    contributor('guide', async () =>
+      request++ === 0 ? [{ key: key(1), severity: 'info', text: 'Note' }] : next.promise,
+    )
+    requestAnnotations(POINT, [key(1)])
+    await vi.waitFor(() => expect(annotationsFor(POINT, key(1))).toHaveLength(1))
+    const first = annotationsFor(POINT, key(1))[0]
+
+    // A scroll that brings line 2 near. Blanking line 1 until the answer comes back would shrink its
+    // row, move the scroll, and change the key set again.
+    requestAnnotations(POINT, [key(1), key(2)])
+    expect(annotationsFor(POINT, key(1))[0]).toBe(first)
+
+    next.resolve([
+      { key: key(1), severity: 'info', text: 'Note' },
+      { key: key(2), severity: 'warn', text: 'Second' },
+    ])
+    await vi.waitFor(() => expect(annotationsFor(POINT, key(2))).toHaveLength(1))
+    // The same answer keeps the same objects, so the row drawn from it isn't rebuilt.
+    expect(annotationsFor(POINT, key(1))[0]).toBe(first)
+  })
+
+  it('drops a kept mark only when an answer about its key leaves it out', async () => {
+    point()
+    const answers: PluginAnnotationMark[][] = [
+      [{ key: key(1), severity: 'info', text: 'One' }],
+      [{ key: key(2), severity: 'info', text: 'Two' }],
+      [{ key: key(2), severity: 'info', text: 'Two' }],
+    ]
+    const guide = contributor('guide', async () => answers[guide.calls.length - 1]!)
+    requestAnnotations(POINT, [key(1)])
+    await vi.waitFor(() => expect(annotationsFor(POINT, key(1))).toHaveLength(1))
+    requestAnnotations(POINT, [key(2)])
+    await vi.waitFor(() => expect(annotationsFor(POINT, key(2))).toHaveLength(1))
+    expect(annotationsFor(POINT, key(1))).toHaveLength(1)
+
+    requestAnnotations(POINT, [key(1), key(2)])
+    await vi.waitFor(() => expect(annotationsFor(POINT, key(1))).toEqual([]))
+    expect(annotationsFor(POINT, key(2))).toHaveLength(1)
+  })
+
   it('merges in registered contributor order rather than response order', async () => {
     point()
     const slow = deferred<PluginAnnotationMark[]>()

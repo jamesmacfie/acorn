@@ -2019,11 +2019,13 @@ describe('other plugins’ file marks', () => {
     first.resolve([{ key: first.keys[0]!, severity: 'warn', text: 'Old node' }])
     await marked(host, 'a.ts', 'Old node — review')
 
+    // More files to ask about is the same Node's answer, so the tab keeps its mark meanwhile.
     reportTreeFiles!(['b.ts'])
     await vi.waitFor(() => expect(answers).toHaveLength(2))
-    expect(tab(host, 'a.ts')!.getAttribute('aria-label')).toBe('a.ts')
+    expect(tab(host, 'a.ts')!.getAttribute('aria-label')).toBe('a.ts, Old node — review')
     setActiveNode('other-node')
     await vi.waitFor(() => expect(answers).toHaveLength(3))
+    expect(tab(host, 'a.ts')!.getAttribute('aria-label')).toBe('a.ts')
     answers[1]!.resolve([{ key: { taskId, path: 'a.ts' }, severity: 'warn', text: 'Late' }])
     await new Promise((resolve) => setTimeout(resolve, 20))
     expect(tab(host, 'a.ts')!.getAttribute('aria-label')).toBe('a.ts')
