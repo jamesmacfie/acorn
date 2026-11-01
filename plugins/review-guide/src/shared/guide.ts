@@ -101,6 +101,8 @@ export type GuideView = {
   profileId: string | null
   /** The newest guide for the task. */
   guide: StoredGuide | null
+  /** The change request's head commit, as the code host last reported it. Null until it has. */
+  changeRequestHead: string | null
   /** Whether the guide is ready and was written for the change request's head commit, so its lines are
    *  the change request's. Only then do its notes show on the change request's diff, and its lines hold
    *  the agent conversations that diff's lines do. */

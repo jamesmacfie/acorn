@@ -57,8 +57,9 @@ reader can start in one and carry on in the other. A session starts only when th
 first send gives the agent the note, labelled as the guide's, then the code around the line. Beside the
 diff only the noted lines are drawn, so only they hold a card. The Diff tab beside it has the rest.
 
-On a guide the change request's head has moved past, or with no agents plugin, notes draw on their own
-and ✦ shows the line in the change request's diff.
+On a guide whose commit isn't the change request's head, or with no agents plugin, notes draw on their
+own and ✦ shows the line in the change request's diff. A ready guide in that state says so above its
+page, naming both commits from the view's `changeRequestHead`, and asks the reader to push or regenerate.
 
 In the terminal client there's no agent card. Notes draw with their body and buttons, ✦ is Enter on the
 line, and it, a link, and **Show in diff** open the file in the editor.

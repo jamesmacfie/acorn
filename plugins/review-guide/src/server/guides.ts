@@ -126,27 +126,28 @@ export function createGuides(deps: GuideDeps) {
   }
 
   async function view(userId: string, taskId: string): Promise<GuideView> {
-    const [requests, profiles, saved, guide] = await Promise.all([
+    const [requests, profiles, saved, guide, head] = await Promise.all([
       deps.tasks.changeRequests(taskId),
       listProfiles(),
       deps.prefs.read(userId, PROFILE_KEY),
       newest(taskId),
+      changeRequestHead(taskId),
     ])
     return {
       hasChangeRequest: requests.some((request) => request.role === 'primary'),
       profiles,
       profileId: pickProfile(profiles, saved),
       guide,
-      matchesChangeRequest: await matchesChangeRequest(taskId, guide),
+      changeRequestHead: head,
+      matchesChangeRequest: matches(guide, head),
     }
   }
 
+  const changeRequestHead = async (taskId: string) => (await deps.tasks.changeRequestDetail(taskId))?.headSha ?? null
+
   /** A guide made on a commit the change request doesn't have yet may not have the diff's lines. */
-  async function matchesChangeRequest(taskId: string, stored: StoredGuide | null): Promise<boolean> {
-    if (stored?.status !== 'ready' || !stored.guide) return false
-    const detail = await deps.tasks.changeRequestDetail(taskId)
-    return !!detail?.headSha && detail.headSha === stored.headSha
-  }
+  const matches = (stored: StoredGuide | null, head: string | null) =>
+    stored?.status === 'ready' && !!stored.guide && !!head && head === stored.headSha
 
   /** Read the change, store a `generating` row, and start the turn. Answers once the turn has started,
    *  with the job already running for the task if there is one. `remember` saves `profileId` as the
@@ -318,7 +319,7 @@ export function createGuides(deps: GuideDeps) {
   /** The marks a ready guide on the change request's head puts under that diff's rows. */
   async function marks(taskId: string, keys: DiffLineKey[]): Promise<DiffLineMark[]> {
     const stored = await newest(taskId)
-    if (!stored?.guide || !(await matchesChangeRequest(taskId, stored))) return []
+    if (!stored?.guide || !matches(stored, await changeRequestHead(taskId))) return []
     const author = (await listProfiles()).find((profile) => profile.id === stored.profileId)?.label ?? stored.profileId
     return noteMarks(stored.guide, keys, author)
   }

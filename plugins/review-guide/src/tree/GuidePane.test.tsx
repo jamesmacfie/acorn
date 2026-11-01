@@ -125,20 +125,22 @@ const stored = (
         },
 })
 
-const view = (guide: StoredGuide): GuideView => ({
+// `head` is the change request's head commit, which matches the guide's unless a test says otherwise.
+const view = (guide: StoredGuide, head: string | null = guide.headSha): GuideView => ({
   hasChangeRequest: true,
   profiles: [{ id: 'claude-code', label: 'Claude Code' }],
   profileId: 'claude-code',
   guide,
-  matchesChangeRequest: guide.status === 'ready',
+  changeRequestHead: head,
+  matchesChangeRequest: guide.status === 'ready' && head === guide.headSha,
 })
 
-const mount = async (guide: StoredGuide, layout: 'wide' | 'narrow' = 'wide') => {
+const mount = async (guide: StoredGuide, layout: 'wide' | 'narrow' = 'wide', head: string | null = guide.headSha) => {
   const tree = liveTree()
   const root = createRemoteRoot((batch) => batch.forEach(tree.apply))
   const revealed: unknown[][] = []
   const posted: Record<string, unknown>[] = []
-  let current = view(guide)
+  let current = view(guide, head)
   const bridge = {
     api: {
       get: (path: string) =>
@@ -164,7 +166,10 @@ const mount = async (guide: StoredGuide, layout: 'wide' | 'narrow' = 'wide') => 
         const field = 'page' in body ? 'pages' : 'notes'
         const key = String(body.page ?? body.note)
         const rest = progress[field].filter((entry) => entry !== key)
-        current = view({ ...current.guide!, progress: { ...progress, [field]: body.done ? [...rest, key] : rest } })
+        current = view(
+          { ...current.guide!, progress: { ...progress, [field]: body.done ? [...rest, key] : rest } },
+          head,
+        )
         return Promise.resolve(current)
       },
     },
@@ -383,6 +388,18 @@ describe('GuidePane', () => {
     const pane = await mount(stored('stale', { pages: ['overview'], notes: [] }))
     expect(pane.diffs().map((diff) => diff.props.conversations)).toEqual([false, false])
     pane.dispose()
+  })
+
+  it("says which commits differ when a ready guide isn't for the change request's head", async () => {
+    const pane = await mount(stored('ready'), 'wide', 'b'.repeat(40))
+    expect(pane.shown()).toContain('This guide is for aaaaaaa, but the change request is at bbbbbbb.')
+    pane.dispose()
+    const unknown = await mount(stored('ready'), 'wide', null)
+    expect(unknown.shown()).toContain("The code host hasn't reported the change request's latest commit yet")
+    unknown.dispose()
+    const current = await mount(stored('ready'))
+    expect(current.shown()).not.toContain('This guide is for')
+    current.dispose()
   })
 
   it('lists only Look closely and Risk notes in the wrap-up, and checking one checks it on its step', async () => {

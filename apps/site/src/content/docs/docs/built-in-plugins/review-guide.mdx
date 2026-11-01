@@ -9,7 +9,7 @@ sources:
   - plugins/review-guide/src/tree/GenerateModal.tsx
   - docs/first-party-plugins/review-guide/pane.md
   - plugins/review-guide/src/server/workflowStep.ts
-checked: 'a32d2bf93'
+checked: '9cdd77906'
 ---
 
 import { Steps } from '@astrojs/starlight/components'
@@ -129,6 +129,9 @@ in the Diff tab doesn't open its step.
 ## When the change moves on
 
 A new commit on the task marks the guide out of date, and the pane says the change has new commits.
+When the guide and the pull request are on different commits, the pane names both. Until they match, you
+can't ask about a line in the guide and the **Diff** tab doesn't show its notes. Push the branch if it has
+commits the pull request doesn't, or click **Regenerate** if the pull request moved on.
 acorn doesn't write a new guide on its own, because each one spends usage. Click **Regenerate** when you
 want one.
 

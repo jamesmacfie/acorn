@@ -173,6 +173,7 @@ export function GuidePane(props: { taskId?: string; bridge: AcornBridge; layout:
               padded={padded}
               onSession={(id) => void props.bridge.ui.openDestination('session', id)}
               conversations={view()!.matchesChangeRequest}
+              changeRequestHead={view()!.changeRequestHead}
               onReveal={(path, line, side) =>
                 void props.bridge.ui
                   .revealChangeRequestLine(path, line, side)
@@ -207,6 +208,12 @@ export function GuidePane(props: { taskId?: string; bridge: AcornBridge; layout:
   )
 }
 
+/** Why a ready guide's lines hold no conversations: it's for another commit than the change request's. */
+const outOfStep = (guideHead: string, changeRequestHead: string | null) =>
+  changeRequestHead
+    ? `This guide is for ${guideHead.slice(0, 7)}, but the change request is at ${changeRequestHead.slice(0, 7)}. Until they match, you can't ask about a line here and the notes don't show in the Diff tab. Push this branch if it has new commits, or regenerate if the change request moved on.`
+    : "The code host hasn't reported the change request's latest commit yet, so you can't ask about a line here and the notes don't show in the Diff tab."
+
 function StoredGuideView(props: {
   stored: StoredGuide
   taskId: string
@@ -219,6 +226,7 @@ function StoredGuideView(props: {
   onSession: (sessionId: string) => void
   /** Whether the guide's lines hold the change request's agent conversations. */
   conversations: boolean
+  changeRequestHead: string | null
   onReveal: Reveal
   onRetry: () => void
   onMark: (progress: ProgressMark) => void
@@ -265,6 +273,9 @@ function StoredGuideView(props: {
                 {props.failure}
                 <Show when={props.stored.status === 'stale'}>
                   <Alert tone="warn">The change has new commits since this guide. Regenerate to cover them.</Alert>
+                </Show>
+                <Show when={props.stored.status === 'ready' && !props.conversations}>
+                  <Alert tone="warn">{outOfStep(props.stored.headSha, props.changeRequestHead)}</Alert>
                 </Show>
               </>
             }

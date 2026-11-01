@@ -449,7 +449,10 @@ describe('review guide routes', () => {
       expect((await call('GET', '/guide?taskId=task-1')).body).toMatchObject({ matchesChangeRequest: true })
       pullHead = 'a-pushed-commit'
       expect((await marks([key(1)])).items).toEqual([])
-      expect((await call('GET', '/guide?taskId=task-1')).body).toMatchObject({ matchesChangeRequest: false })
+      expect((await call('GET', '/guide?taskId=task-1')).body).toMatchObject({
+        changeRequestHead: 'a-pushed-commit',
+        matchesChangeRequest: false,
+      })
       pullHead = null
       expect((await marks([key(1)])).items).toEqual([])
     })
