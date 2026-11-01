@@ -20,9 +20,8 @@ are a last step, **Not covered by the guide**, so every hunk is on exactly one p
 built by `guidePath` in `src/shared/path.ts`, which the route also uses to check a progress mark.
 
 - **The overview** has the summary, who wrote the guide, the counts (steps, hunks, files, lines added
-  and removed, minutes, and notes by tone), "By the end you'll know" with each step's goal, a card per
-  step, and the coverage line. **Start the path** marks it reviewed and opens step 1.
-- **A step** has "Step 2 of 3", its kind, and its minutes, then its title, goal, why, and hunks. Its
+  and removed, minutes, and notes by tone), a card per step, and the coverage line. **Start the path** marks it reviewed and opens step 1.
+- **A step** has "Step 2 of 3", its kind, and its minutes, then its title, why, and hunks. Its
   foot names the next step and has **Back** and **Mark reviewed & continue**.
 - **The wrap-up** lists every **Look closely** and **Risk** note as a checkbox, with its path and
   line, a link to its step, and its tone, and counts what's still open. The guide doesn't approve or

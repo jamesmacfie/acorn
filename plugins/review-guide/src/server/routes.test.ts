@@ -77,7 +77,6 @@ const ANSWER = {
   steps: [
     {
       title: 'The bump',
-      goal: 'what a is now.',
       why: 'Because.',
       kind: 'core',
       hunks: ['app.ts#1'],
@@ -86,7 +85,6 @@ const ANSWER = {
     },
     {
       title: 'Its test',
-      goal: 'that a is read.',
       why: 'To check it.',
       kind: 'supporting',
       hunks: ['nope.ts#1'],
@@ -231,7 +229,7 @@ describe('review guide routes', () => {
     expect(view.guide).toMatchObject({ status: 'ready', sessionId: 'session-1' })
     expect(view.guide?.guide).toMatchObject({ summary: 'Bumps a.', repeated: 0, unknown: 1, misplacedNotes: 1 })
     expect(view.guide?.guide?.steps).toMatchObject([
-      { title: 'The bump', goal: 'what a is now.', notes: [{ line: 1, text: 'export const a = 2' }] },
+      { title: 'The bump', notes: [{ line: 1, text: 'export const a = 2' }] },
     ])
     expect(view.guide?.guide?.steps[0]!.notes).toHaveLength(1)
     expect(view.guide?.guide?.uncovered.map((item) => item.id)).toEqual(['app.test.ts#1'])
@@ -266,7 +264,7 @@ describe('review guide routes', () => {
     expect(response.body).toMatchObject({ backends: [{ id: 'harness:claude-code', models: [{ id: 'opus' }] }] })
   })
 
-  it('reads a guide stored with sections as steps with no goals or notes', async () => {
+  it('reads a guide stored with sections as steps with no notes', async () => {
     const guide = {
       summary: 'Old.',
       sections: [{ title: 'Core', why: 'Because.', kind: 'core', items: [] }],
@@ -287,7 +285,7 @@ describe('review guide routes', () => {
     })
     expect((await call('GET', '/guide?taskId=task-1')).body.guide?.guide).toEqual({
       summary: 'Old.',
-      steps: [{ title: 'Core', goal: '', why: 'Because.', kind: 'core', items: [], notes: [] }],
+      steps: [{ title: 'Core', why: 'Because.', kind: 'core', items: [], notes: [] }],
       uncovered: [],
       repeated: 0,
       unknown: 0,

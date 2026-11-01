@@ -19,7 +19,7 @@ const note = (hunk: string, side: GuideNote['side'], line: number, text: string)
 
 const guide = (...steps: { items: DiffItem[]; notes: GuideNote[] }[]): Guide => ({
   summary: '',
-  steps: steps.map((step, index) => ({ title: `Step ${index}`, goal: '', why: '', kind: 'core', ...step })),
+  steps: steps.map((step, index) => ({ title: `Step ${index}`, why: '', kind: 'core', ...step })),
   uncovered: [],
   repeated: 0,
   unknown: 0,

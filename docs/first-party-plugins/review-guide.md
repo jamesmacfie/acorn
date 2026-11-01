@@ -42,8 +42,7 @@ match a JSON schema: a summary, and steps. The prompt and the schema are in `src
 | Step field | What it holds |
 | --- | --- |
 | `title` | A short title |
-| `goal` | The words that finish "After this step you'll know". The coverage check drops those opening words when the harness repeats them |
-| `why` | Markdown, one to three sentences on why the change exists |
+| `why` | Markdown, two to four sentences on what this part of the change does and why it's needed |
 | `kind` | `core` or `supporting` |
 | `hunks` | Hunk IDs in reading order |
 | `notes` | Notes on lines of this step's hunks, in reading order |
@@ -139,8 +138,9 @@ pages marked reviewed, as `overview` and `step-<n>`, and the keys of the notes m
 key is its hunk ID, side, and line, such as `src/billing/invoice.ts#2:new:42`, with `:2` added for a
 second note on the same row. Progress is null until the reader marks something. It lives on the
 guide's row, so a regenerated guide starts with none, and a stale guide keeps its progress.
-A guide stored before steps had goals and notes holds `sections` instead of `steps`. It reads as steps
-with an empty goal and no notes, so a guide the person already paid for still shows.
+A guide stored before steps had notes holds `sections` instead of `steps`. It reads as steps with no
+notes, so a guide the person already paid for still shows. A guide stored with step goals keeps them in
+its JSON, and the pane ignores them.
 A task keeps one guide: generating a new one removes the guide for any earlier commits. The rows of a
 deleted task are removed.
 

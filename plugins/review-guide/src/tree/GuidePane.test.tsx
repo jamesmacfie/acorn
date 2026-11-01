@@ -103,7 +103,6 @@ const stored = (
           steps: [
             {
               title: 'Core',
-              goal: 'how a is bumped.',
               why: 'Because.',
               kind: 'core',
               items: [item('a.ts#1', `@@ -1 +1,2 @@\n-a\n+b\n+c`), item('a.ts#2', `@@ -9 +10 @@\n+${big}`)],
@@ -111,7 +110,6 @@ const stored = (
             },
             {
               title: 'Tests',
-              goal: 'that a is read.',
               why: 'To check.',
               kind: 'supporting',
               items: [item('a.test.ts#1')],
@@ -223,7 +221,7 @@ const mount = async (guide: StoredGuide, layout: 'wide' | 'narrow' = 'wide', hea
 }
 
 describe('GuidePane', () => {
-  it("opens on the overview with the counts, each step's goal, a card per step, and the coverage line", async () => {
+  it('opens on the overview with the counts, a card per step, and the coverage line', async () => {
     const pane = await mount(stored('ready'))
     const shown = pane.shown()
     expect(shown).toContain('3 steps · 4 hunks in 3 files · +5 −3 · ~3 min')
@@ -234,7 +232,6 @@ describe('GuidePane', () => {
         .map(text),
     ).toEqual(['1 risk', '1 to look at closely', '1 explained'])
     expect(pane.find('Markdown', '').props.text).toBe('Bumps a.')
-    expect(pane.nodes().some((node) => node.props.text === '- how a is bumped.\n- that a is read.')).toBe(true)
     expect(pane.nodes().filter((node) => node.type === 'Card')).toHaveLength(3)
     expect(shown).toContain("1 hunk wasn't covered by the guide.")
     expect(shown).toContain("Dropped 2 notes that didn't match a line of the change or went past the limit.")
@@ -270,7 +267,6 @@ describe('GuidePane', () => {
     await pane.press('Button', 'Start the path')
     expect(pane.posted).toEqual([{ taskId: 'task-1', page: 'overview', done: true }])
     expect(pane.find('Heading', 'Core').props.eyebrow).toBe('Step 1 of 3 · core · ~1 min')
-    expect(pane.shown()).toContain("After this step you'll know how a is bumped.")
     expect(pane.diffs().map((diff) => diff.props.path)).toEqual(['a.ts', 'a.ts'])
     expect(pane.shown()).toContain('Next: Tests')
     expect(pane.revealed).toEqual([])

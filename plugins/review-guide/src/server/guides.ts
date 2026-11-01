@@ -66,9 +66,9 @@ type TurnRequest = GenerateRequest & { background?: string }
 const pickProfile = (profiles: AgentProfile[], saved: string | null) =>
   profiles.find((profile) => profile.id === saved)?.id ?? profiles[0]?.id ?? null
 
-// A guide stored before steps had goals and notes. Each one cost harness usage, so it still reads.
+// A guide stored before steps had notes. Each one cost harness usage, so it still reads.
 type GuideWithSections = Omit<Guide, 'steps' | 'misplacedNotes'> & {
-  sections: Omit<Guide['steps'][number], 'goal' | 'notes'>[]
+  sections: Omit<Guide['steps'][number], 'notes'>[]
 }
 
 const NO_PROGRESS: GuideProgress = { pages: [], notes: [] }
@@ -78,7 +78,7 @@ function readGuide(json: string): Guide {
   const stored = JSON.parse(json) as Guide | GuideWithSections
   if (!('sections' in stored)) return stored
   const { sections, ...rest } = stored
-  return { ...rest, steps: sections.map((section) => ({ ...section, goal: '', notes: [] })), misplacedNotes: 0 }
+  return { ...rest, steps: sections.map((section) => ({ ...section, notes: [] })), misplacedNotes: 0 }
 }
 
 export function createGuides(deps: GuideDeps) {

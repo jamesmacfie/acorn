@@ -1,9 +1,6 @@
 import type { DiffItem, Guide } from '../shared/guide'
 import type { GuideAnswer } from './prompt'
 
-// A goal finishes this sentence and the pane writes its opening words. Harnesses often repeat them anyway.
-const GOAL_OPENING = /^after this step you['’]ll know\s*/i
-
 /**
  * Hold the harness's answer to the diff, so the guide shows every item exactly once. This is checked
  * here rather than asked for in the prompt, because a reviewer who trusts a guide doesn't look for what
@@ -28,7 +25,7 @@ export function checkCoverage(answer: GuideAnswer, items: DiffItem[]): Guide {
       }
       return []
     })
-    if (stepItems.length) return [{ ...step, goal: step.goal.replace(GOAL_OPENING, ''), items: stepItems }]
+    if (stepItems.length) return [{ ...step, items: stepItems }]
     misplacedNotes += step.notes.length
     return []
   })

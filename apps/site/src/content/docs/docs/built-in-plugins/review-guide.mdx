@@ -9,7 +9,7 @@ sources:
   - plugins/review-guide/src/tree/GenerateModal.tsx
   - docs/first-party-plugins/review-guide/pane.md
   - plugins/review-guide/src/server/workflowStep.ts
-checked: '9cdd77906'
+checked: '73924c21f'
 ---
 
 import { Steps } from '@astrojs/starlight/components'
@@ -19,7 +19,7 @@ import PluginFacts from '../../../../components/PluginFacts.astro'
 The Review guide plugin walks you through a task's pull request. The agent harness you pick, such as
 Claude Code or Codex, reads the change in the task's worktree and arranges its hunks into steps in the
 order you'd read them, starting where the data or the request comes in. Core changes come first, and
-tests, docs, and wiring come after. Each step says what you'll know after it and why its change exists,
+tests, docs, and wiring come after. Each step explains what its part of the change does and why,
 then shows its hunks with a few short notes on the lines worth a closer look.
 
 <PluginFacts id="review-guide">
@@ -78,9 +78,8 @@ minutes, and a dot for each note in its tone, so you can see where the risk is b
 the **Guide** tab beside the diff, numbered buttons along the top take its place.
 
 - **The overview** has a summary of the whole change, which harness wrote it for which commit, the
-  counts, what you'll know by the end, and a card for each step. Click **Start the path**.
-- **Each step** finishes the sentence "After this step you'll know", says why the change exists, and
-  shows its hunks. Click **Mark reviewed & continue** when you're done with it, or **Back** to go back.
+  counts, and a card for each step. Click **Start the path**.
+- **Each step** explains what its part of the change does and why, then shows its hunks. Click **Mark reviewed & continue** when you're done with it, or **Back** to go back.
   A binary file, a rename, or a mode change shows its path and what changed.
 - **The wrap-up** lists every **Look closely** and **Risk** note as a checkbox, with a link to its step.
   Check each one once you've made up your mind, then leave your review in the pull request's

@@ -5,7 +5,6 @@ export type GuideAnswer = {
   summary: string
   steps: {
     title: string
-    goal: string
     why: string
     kind: 'core' | 'supporting'
     hunks: string[]
@@ -27,10 +26,9 @@ export const GUIDE_SCHEMA = {
       items: {
         type: 'object',
         additionalProperties: false,
-        required: ['title', 'goal', 'why', 'kind', 'hunks', 'notes'],
+        required: ['title', 'why', 'kind', 'hunks', 'notes'],
         properties: {
           title: { type: 'string' },
-          goal: { type: 'string' },
           why: { type: 'string' },
           kind: { type: 'string', enum: ['core', 'supporting'] },
           hunks: { type: 'array', items: { type: 'string' } },
@@ -93,7 +91,7 @@ export function guideTurn(
         ]
       : []),
     'Arrange the hunks as steps of a path through the change, in the order a reviewer should read them. Start where the data or the request enters, and let each step build on the one before it. Put the core steps first. Put supporting steps, such as tests, docs, configuration, and wiring, after them.',
-    'For each step, give a short title; a goal: the words that finish the sentence "After this step you\'ll know", without those opening words, such as "which answers are retried and which are final.", so the reviewer can check themselves against it; a "why" of one to three sentences in Markdown that says why the change exists rather than what its lines say; a kind, core or supporting; the IDs of the hunks it covers, in reading order; and its notes.',
+    'For each step, give a short title; a "why" of two to four sentences in Markdown that explains what this part of the change does and why it is needed, for a reviewer who hasn\'t read the code yet, rather than restating what its lines say; a kind, core or supporting; the IDs of the hunks it covers, in reading order; and its notes.',
     "Leave a note only where a careful reviewer would stop: a line whose purpose isn't obvious, a decision worth questioning, or a likely bug. Don't narrate what a line says. Most hunks need no note, and a hunk takes at most three.",
     "A note names one of its own step's hunks; a side, new for an added or unchanged line and old for a deleted one; the line's number on that side; the line's text, quoted exactly and whole, without its +, -, or space marker; a tone, explain for context, attention for a judgment call, or risk for a likely bug; a title of one sentence, at most 120 characters; and a body in Markdown, at most 600 characters. List a step's notes in reading order.",
     'Use every hunk ID exactly once, and only IDs from the list. Start with a summary of the whole change in two or three sentences.',

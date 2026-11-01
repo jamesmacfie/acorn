@@ -14,7 +14,6 @@ export type PathStep = {
   /** 1-based, as the reader sees it. */
   number: number
   title: string
-  goal: string
   why: string
   /** Null for the hunks the guide left out, which aren't a step the harness chose. */
   kind: 'core' | 'supporting' | null
@@ -42,7 +41,7 @@ export function guidePath(guide: Guide): PathStep[] {
   const steps = [
     ...guide.steps,
     ...(guide.uncovered.length
-      ? [{ title: 'Not covered by the guide', goal: '', why: '', kind: null, items: guide.uncovered, notes: [] }]
+      ? [{ title: 'Not covered by the guide', why: '', kind: null, items: guide.uncovered, notes: [] }]
       : []),
   ]
   const seen = new Map<string, number>()
@@ -58,7 +57,6 @@ export function guidePath(guide: Guide): PathStep[] {
     return {
       number: index + 1,
       title: step.title,
-      goal: step.goal,
       why: step.why,
       kind: step.kind,
       items: step.items,

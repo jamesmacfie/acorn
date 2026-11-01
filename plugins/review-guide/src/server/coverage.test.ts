@@ -6,7 +6,6 @@ const item = (id: string): DiffItem => ({ id, path: id.split('#')[0]!, oldPath: 
 const items = ['a.ts#1', 'a.ts#2', 'b.ts#1', 'c.ts#1'].map(item)
 const step = (title: string, hunks: string[], notes: GuideNote[] = []) => ({
   title,
-  goal: `what ${title} does.`,
   why: `Why ${title}`,
   kind: 'core' as const,
   hunks,
@@ -24,7 +23,7 @@ describe('checkCoverage', () => {
       ['a.ts#1', 'c.ts#1'],
     ])
     expect(guide).toMatchObject({ summary: 'S', uncovered: [], repeated: 0, unknown: 0, misplacedNotes: 0 })
-    expect(guide.steps[0]).toMatchObject({ goal: 'what One does.', notes: [] })
+    expect(guide.steps[0]).toMatchObject({ title: 'One', notes: [] })
   })
 
   it('puts left-out items last, in file order', () => {
@@ -48,14 +47,6 @@ describe('checkCoverage', () => {
     )
     expect(guide.steps.map((s) => s.title)).toEqual(['Real'])
     expect(guide.unknown).toBe(2)
-  })
-
-  it('drops the opening words a goal repeats', () => {
-    const guide = checkCoverage(
-      { summary: '', steps: [{ ...step('One', ['a.ts#1']), goal: 'After this step you’ll know which hunks move.' }] },
-      items,
-    )
-    expect(guide.steps[0]!.goal).toBe('which hunks move.')
   })
 
   it("counts the notes of a dropped step, and passes a kept step's notes on to the note check", () => {

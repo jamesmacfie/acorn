@@ -290,7 +290,6 @@ function Overview(props: {
       `+${props.path.reduce((total, step) => total + step.added, 0)} −${props.path.reduce((total, step) => total + step.removed, 0)}`,
       `~${props.path.reduce((total, step) => total + step.minutes, 0)} min`,
     ].join(' · ')
-  const goals = () => props.path.filter((step) => step.goal).map((step) => `- ${step.goal}`)
   return (
     <Stack gap="section">
       <Heading level={2} eyebrow="Overview">
@@ -312,12 +311,6 @@ function Overview(props: {
           )}
         </For>
       </Inline>
-      <Show when={goals().length}>
-        <Stack gap="row">
-          <Heading level={3}>By the end you'll know</Heading>
-          <Markdown text={goals().join('\n')} />
-        </Stack>
-      </Show>
       <Stack gap="row">
         <Index each={props.path}>
           {(step) => (
@@ -327,9 +320,6 @@ function Overview(props: {
                 <Text emphasis="strong" wrap>
                   {step().title}
                 </Text>
-                <Show when={step().goal}>
-                  <Text wrap>{`You'll know ${step().goal}`}</Text>
-                </Show>
               </Stack>
             </Card>
           )}
@@ -386,9 +376,6 @@ function StepPage(props: {
       >
         {props.step.title}
       </Heading>
-      <Show when={props.step.goal}>
-        <Text emphasis="strong" wrap>{`After this step you'll know ${props.step.goal}`}</Text>
-      </Show>
       <Show when={props.step.why}>
         <Markdown text={props.step.why} />
       </Show>

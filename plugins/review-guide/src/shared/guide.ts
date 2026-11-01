@@ -39,8 +39,6 @@ export const TONE_LABELS: Record<GuideNote['tone'], string> = {
 
 type GuideStep = {
   title: string
-  /** Finishes "After this step you'll know". Empty on a guide stored before steps had goals. */
-  goal: string
   /** Markdown. */
   why: string
   kind: 'core' | 'supporting'
