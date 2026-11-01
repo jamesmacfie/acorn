@@ -207,6 +207,31 @@ describe('a pull request Sections sidebar', () => {
     expect(shown()).toBe('details')
     dispose()
   })
+
+  it('remembers a tab per tab key, so another pull request opens on its header', () => {
+    const [pull, setPull] = createSignal('1')
+    const dispose = render(
+      () => (
+        <Sections
+          id="github.pull"
+          tabKey={`github.pull:acme/app#${pull()}`}
+          header={{ id: 'details', label: 'Details', render: () => <span>details</span> }}
+          sections={[{ id: 'conversation', label: 'Conversation', render: () => <span>conversation</span> }]}
+        />
+      ),
+      host,
+    )
+    const shown = () => host.querySelector('.ui-tab-panel:not([hidden])')?.textContent
+
+    host.querySelector<HTMLButtonElement>('#sections-github\\.pull-tab-conversation')!.click()
+    expect(shown()).toBe('conversation')
+    setPull('2')
+    expect(shown()).toBe('details')
+    setPull('1')
+    expect(shown()).toBe('conversation')
+    expect(localStorage.getItem('sections-tab:github.pull:acme/app#1')).toBe('conversation')
+    dispose()
+  })
 })
 
 describe('a pane that does not offer the control', () => {

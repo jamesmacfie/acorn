@@ -1,4 +1,4 @@
-import { createSignal, For, Show, untrack, type JSX } from 'solid-js'
+import { createMemo, createSignal, For, Show, untrack, type JSX } from 'solid-js'
 import { DetailColumn, ListColumn, ListDetail } from './ListDetail'
 import { SectionHeader } from './SectionHeader'
 import { TabPanel, Tabs } from './Tabs'
@@ -52,6 +52,9 @@ const writeTab = (key: string, id: string): void => {
 export function Sections(props: {
   /** Distinguishes this surface's stored tab and column state from another's. */
   id: string
+  /** Remembers the open tab per thing shown rather than per surface, such as one pull request, so
+   *  the tab left open on one does not become where every other one opens. Defaults to `id`. */
+  tabKey?: string
   /** Names the column of sections. It is a landmark; name it. */
   ariaLabel?: string
   /** What the surface is about: the first tab. */
@@ -61,15 +64,20 @@ export function Sections(props: {
   main?: KitSection
 }) {
   const tabs = (): KitSection[] => [...(props.header ? [props.header] : []), ...props.sections]
-  const [chosen, setChosen] = createSignal(readTab(props.id))
+  const tabKey = () => props.tabKey ?? props.id
+  // Kept here as well as stored, so a choice survives storage that refuses writes. Keyed, because a
+  // pane can switch to another pull request without remounting.
+  const [picked, setPicked] = createSignal<Record<string, string>>({})
+  const chosen = createMemo(() => picked()[tabKey()] ?? readTab(tabKey()))
   // Falls back rather than storing a default, so a surface whose section set changes under it lands
   // on its first tab instead of on nothing. The terminal's strip keeps the same rule.
   const active = () => (tabs().some((tab) => tab.id === chosen()) ? chosen() : (tabs()[0]?.id ?? ''))
   const idPrefix = () => `sections-${props.id}`
   const activeActions = () => tabs().find((tab) => tab.id === active())?.actions
   const choose = (id: string) => {
-    setChosen(id)
-    writeTab(props.id, id)
+    const key = tabKey()
+    setPicked((current) => ({ ...current, [key]: id }))
+    writeTab(key, id)
   }
 
   return (

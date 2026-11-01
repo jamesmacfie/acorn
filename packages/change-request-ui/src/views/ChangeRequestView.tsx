@@ -65,6 +65,7 @@ export function ChangeRequestView(props: {
     <>
       <Sections
         id={props.id}
+        tabKey={`${props.id}:${props.model.scope.owner}/${props.model.scope.repo}#${props.model.scope.number}`}
         ariaLabel={noun().charAt(0).toUpperCase() + noun().slice(1)}
         header={{
           id: 'details',
