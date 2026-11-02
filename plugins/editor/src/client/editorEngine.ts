@@ -7,6 +7,7 @@ export {
   copyLineDown,
   indentLess,
   indentMore,
+  indentWithTab,
   moveLineDown,
   moveLineUp,
   redo,

@@ -386,6 +386,9 @@ export function createEditorController(input: EditorControllerInput) {
         return false
       },
     }),
+    // basicSetup leaves Tab to the browser, which moves focus out of the editor. Escape then Tab
+    // still leaves, so keyboard users aren't trapped.
+    engine!.keymap.of([engine!.indentWithTab]),
     // Highest precedence so the explicit flush wins over anything the library binds to the chord;
     // autosave still runs either way.
     engine!.Prec.highest(
