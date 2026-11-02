@@ -160,3 +160,8 @@ holds the hint "⇧↩ for newline" and **Send**.
 While sending is off, the placeholder says why: "Offline. Your draft is kept." while the Node is away,
 or that the conversation is archived or gone. Once the box holds a draft, the same words show under
 it.
+
+A new chat opens as soon as the Node has its row, before the agent is ready. As on the desktop, the
+box takes typing while the agent starts, the transcript reads "Starting the agent…", and **Send** stays
+off with "The agent is starting. You can send once it's ready." until the session leaves its starting
+states (`runtimeStarting` in `plugins/agents/src/contract/runtimeState.ts`).

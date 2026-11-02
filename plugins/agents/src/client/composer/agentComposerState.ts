@@ -1,16 +1,10 @@
+import { runtimeStarting } from '../../contract/runtimeState.ts'
 import type { AgentSession } from '../../contract/wire.ts'
-
-const STARTING_STATES: ReadonlySet<AgentSession['runtimeState']> = new Set([
-  'creating',
-  'connecting',
-  'replaying',
-  'reconnecting',
-])
 
 /** The provider is still establishing an input-ready protocol session. Drafting remains local and
  * available during these states, but submitting would race startup metadata and saved defaults. */
 export function agentSessionIsStarting(session: Pick<AgentSession, 'runtimeState'>): boolean {
-  return STARTING_STATES.has(session.runtimeState)
+  return runtimeStarting(session.runtimeState)
 }
 
 export function agentComposerDisabledMessage(

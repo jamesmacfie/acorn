@@ -5,6 +5,11 @@ import type { RailMarker } from '@acorn/plugin-api/client'
 
 type Tone = 'ok' | 'muted' | 'accent' | 'warn' | 'danger'
 
+/** The harness is still setting up its session. A client draws the conversation and lets the person
+ *  type, but holds Send until this ends. */
+export const runtimeStarting = (state: string): boolean =>
+  state === 'creating' || state === 'connecting' || state === 'replaying' || state === 'reconnecting'
+
 /** A managed session's runtime state, as shown in the pane header, task sidebar, Agent Center, the
  *  sessions dashboard panel, and the extension's agent rows.
  *
@@ -13,9 +18,7 @@ type Tone = 'ok' | 'muted' | 'accent' | 'warn' | 'danger'
  *  flight, which is the row worth finding. */
 export const runtimeTone = (state: string): Tone => {
   if (state === 'working') return 'ok'
-  if (state === 'creating' || state === 'connecting' || state === 'replaying' || state === 'reconnecting') {
-    return 'accent'
-  }
+  if (runtimeStarting(state)) return 'accent'
   if (state === 'waiting' || state === 'cancelling' || state === 'stopped') return 'warn'
   if (state === 'failed') return 'danger'
   return 'muted'

@@ -837,6 +837,25 @@ describe('conversation', () => {
     expect(button(subject.root, 'Send')!.hasAttribute('disabled')).toBe(false)
   })
 
+  it('takes typing while the agent starts, and holds Send until it is ready', async () => {
+    const subject = mount()
+    subject.state.sessions[0]!.runtimeState = 'creating'
+    await openSession(subject)
+    expect(subject.root.querySelector('.conversation-body')!.textContent).toContain('Starting the agent…')
+    type(subject.root, 'First thing')
+    await settle()
+    expect(draft(subject.root)).toBe('First thing')
+    expect(button(subject.root, 'Send')!.hasAttribute('disabled')).toBe(true)
+    expect(subject.root.querySelector('.composer .notice')!.textContent).toBe(
+      "The agent is starting. You can send once it's ready.",
+    )
+    subject.state.sessions[0]!.runtimeState = 'ready'
+    subject.state.host!.send({ v: 1, event: 'agent', nodeId: 'n1', sessions: ['s1'], tasks: [], missed: false })
+    await settle()
+    expect(subject.root.querySelector('.conversation-body')!.textContent).toContain('No messages yet.')
+    expect(button(subject.root, 'Send')!.hasAttribute('disabled')).toBe(false)
+  })
+
   it('keeps the draft of a conversation that is gone or archived and refuses to send', async () => {
     const subject = mount()
     await openSession(subject)

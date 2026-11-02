@@ -21,7 +21,7 @@ import CopyButton from '@acorn/client-core/kit/components/inputs/CopyButton.tsx'
 import { Fold, Inline, Stack } from '@acorn/client-core/kit/components/layout'
 import { Alert, Button, Card, Chip } from '@acorn/client-core/kit/components/primitives.tsx'
 import { renderMarkdown } from '@acorn/client-core/kit/lib/markdown'
-import { runtimeIcon, runtimeTone } from '@acorn/plugin-agents/contract/runtimeState.ts'
+import { runtimeIcon, runtimeStarting, runtimeTone } from '@acorn/plugin-agents/contract/runtimeState.ts'
 import { appLink, conversationLink } from '../acornLinks'
 import type { BrowserApi } from '../browser'
 import { CallFailure } from '../messages'
@@ -136,10 +136,13 @@ export function Conversation(props: {
 
   const session = () => view()?.session ?? listed
   const gone = () => readError()?.code === 'not_found'
+  const starting = () => runtimeStarting(session().runtimeState)
   const blocked = (): string | null => {
     if (gone()) return 'This conversation is no longer on the Node. Your draft is kept.'
     if (session().archivedAt) return 'This conversation is archived. Your draft is kept.'
     if (!props.online) return 'Offline. Your draft is kept.'
+    // As on the desktop: the box takes typing while the agent starts, and Send waits for it.
+    if (starting()) return "The agent is starting. You can send once it's ready."
     return null
   }
   const items = createMemo(() => conversationItems(view()?.records ?? []))
@@ -200,7 +203,7 @@ export function Conversation(props: {
           <Button label="Earlier messages" onPress={() => void reader.earlier()} />
         </Show>
         <Show when={view()} fallback={<p class="quiet">{gone() ? '' : 'Loading the conversation…'}</p>}>
-          <Show when={items().length || view()!.queued.length} fallback={<p class="quiet">No messages yet.</p>}>
+          <Show when={items().length || view()!.queued.length} fallback={<p class="quiet">{starting() ? 'Starting the agent…' : 'No messages yet.'}</p>}>
             <ol class="transcript">
               <For each={items()}>
                 {(item) => {
