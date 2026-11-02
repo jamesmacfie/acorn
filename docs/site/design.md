@@ -148,6 +148,24 @@ against an element's background, and it can't see paint from a pseudo-element or
 hero's picture ends in a negative margin of `--site-overhang`, so the window hangs over the stage's
 edge onto the page, and whatever follows the hero starts that far down.
 
+## The landing page's look
+
+The landing page reads as a compact, technical sheet. The other marketing pages keep the site's look.
+The rules sit in the `<style>` block of `apps/site/src/pages/index.astro`, so they ship with that page
+only.
+
+- Every word is JetBrains Mono. The page passes `mono` to `Marketing.astro`, which sets
+  `--site-font-body` to the mono face and skips Inter's preload.
+- The type is smaller. The page sets its own `--site-fs-hero`, `--site-fs-display`, `--site-fs-lede`,
+  `--site-fs-body`, and `--site-section`, so the headline tops out at 52 pixels, not 80.
+- Every window, specimen, and list sits in a _box_: a 2-pixel edge in the page's ink and square
+  corners. Mark an element with `.box`. Every `.frame` on the page is a box already.
+- A box can carry a title on its top edge with `.legend`, as the lanes' `billing-api` does.
+- Buttons have square corners, to match the boxes.
+
+A picture restates `--text` in the app's theme, so a box draws its edge in `--ink`, a copy of the
+page's `--text` that the picture inherits. The stage copies its own.
+
 ## Starlight's replaced parts
 
 `apps/site/src/components/starlight/` replaces Starlight's `Header`, `Sidebar`, `PageTitle`, `Footer`,

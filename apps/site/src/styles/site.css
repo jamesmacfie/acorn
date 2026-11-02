@@ -583,6 +583,10 @@ select {
   font-size: var(--site-fs-body);
   line-height: var(--site-lh-body);
 }
+/* A page set all in mono, as the landing page is (Marketing.astro's `mono`). */
+.site-page[data-mono] {
+  --site-font-body: var(--font-mono);
+}
 .site-page > * + * {
   margin-block-start: var(--space-8);
 }
@@ -1080,31 +1084,27 @@ ul.cards {
   text-decoration: underline;
   text-decoration-color: var(--accent);
 }
-/* A switch between two or three views of one thing, such as the hero's desktop and terminal: buttons in
-   a tray, the selected one inverse. */
+/* A switch between two or three views of one window, such as the hero's desktop and terminal: folder
+   tabs standing on the window's top edge, the open one filled with the edge's ink. */
 .segmented {
-  justify-self: center;
-  gap: var(--space-1);
-  padding: var(--space-2);
-  background: var(--bg);
-  border: var(--surface-border);
-  border-radius: var(--radius-lg);
+  justify-self: start;
 }
 .segmented [role='tab'] {
-  min-block-size: var(--control-h);
-  padding-inline: var(--space-9);
-  font-family: var(--font-mono);
+  min-block-size: auto;
+  padding: var(--space-4) var(--space-8);
   font-size: var(--fs-md);
-  border-radius: var(--radius-control);
+  background: var(--bg);
+  border: var(--bw-strong) solid var(--text);
+  border-block-end: 0;
   transition: var(--transition-color);
+}
+.segmented [role='tab'] + [role='tab'] {
+  border-inline-start: 0;
 }
 .segmented [aria-selected='true'] {
   color: var(--bg);
   background: var(--text);
   box-shadow: none;
-}
-.segmented [role='tab']:hover {
-  text-decoration: none;
 }
 
 .install {

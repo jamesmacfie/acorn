@@ -22,8 +22,9 @@ The components are in `apps/site/src/components/`. Each has a comment that says 
 | `Search` | The header's search, drawn with the command palette's markup ([search](../agent-outputs.md#search)). |
 
 A primary button is the accent, with `--bg` as its ink, and `data-size="lg"` makes it a page's main
-action. A page has one. `.segmented` turns a tab strip into buttons in a tray, the selected one
-inverse, as the hero's desktop and terminal switch does. A heading is one color. The hero's verb is the
+action. A page has one. `.segmented` turns a tab strip into folder tabs standing on the top edge of
+the window they switch, the open one filled with the edge's ink, as the hero's desktop and terminal
+switch does. A heading is one color. The hero's verb is the
 only words set apart, and only on the landing page.
 
 A label, such as a footer column's name or a changelog entry's date, is mono, a step smaller, in

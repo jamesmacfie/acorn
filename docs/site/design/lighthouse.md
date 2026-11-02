@@ -26,6 +26,6 @@ the header's mark.
 
 Lighthouse 13.5 simulates a slow phone connection, and on it the fonts cost the most. With the full
 JetBrains Mono files the landing page scored 90, and a page with almost no content scored 95. The site
-serves subsets of the fonts, and marketing pages preload the regular and bold faces and
-Inter ([fonts](./fonts.md)). `astro preview` serves gzip, so the landing page's HTML arrives as
+serves subsets of the fonts, and marketing pages preload the regular and bold faces. Every marketing
+page but the landing page also preloads Inter ([fonts](./fonts.md)). `astro preview` serves gzip, so the landing page's HTML arrives as
 73 KB there, against 27 KB with Brotli.

@@ -7,7 +7,7 @@ how the site looks.
 | Face | Where it comes from | Used by |
 | --- | --- | --- |
 | JetBrains Mono 2.304 | `apps/site/public/fonts/`, regular, bold, and italic, with its license in `OFL.txt` | Every pack's `--font-mono`, and the Terminal pack's `--font-ui`: every heading, label, button, and line of code, and all of a docs page |
-| Inter | The app's own file, through `@acorn/client-core/infra/styles/fonts.css` | A marketing page's paragraphs, as `--site-font-body` |
+| Inter | The app's own file, through `@acorn/client-core/infra/styles/fonts.css` | A marketing page's paragraphs, as `--site-font-body`, except on the landing page |
 
 `site.css` puts JetBrains Mono first in `--font-mono`, ahead of the app's fallback stack. A marketing
 page reads in Inter beside mono headings, the way the app's Modern pack pairs them. Until Inter loads,
@@ -21,7 +21,9 @@ punctuation and symbols the site writes, arrows, the Mac key symbols, and the bo
 shape ranges the terminal view of a specimen draws. They leave out the programming ligatures, which
 the app doesn't draw either. A character outside the subset falls back to the next face in
 `--font-mono`. `Marketing.astro` preloads the regular and bold faces and Inter, the three the first
-screen uses. Inter's preload reads the file's built URL through the export client-core gives it.
+screen uses. Inter's preload reads the file's built URL through the export client-core gives it. A
+page that passes `mono` to `Marketing.astro`, as the landing page does, sets its paragraphs in
+JetBrains Mono too and doesn't preload Inter, so the browser never fetches it.
 
 To rebuild them, take the `.woff2` files from the JetBrains Mono 2.304 release and run this for each of
 `Regular`, `Bold`, and `Italic`:

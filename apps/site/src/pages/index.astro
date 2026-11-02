@@ -237,7 +237,7 @@ const cap = art.slice(0, 4).join('\n')
 const nut = art.slice(4).join('\n')
 ---
 
-<Marketing title="A workspace for working with coding agents" meta={meta}>
+<Marketing title="A workspace for working with coding agents" meta={meta} mono>
   <SoftwareApplication slot="head" release={release} />
   <Hero slot="hero" title="Let your agents go nuts." highlight="go nuts." split>
     <p>
@@ -266,7 +266,8 @@ const nut = art.slice(4).join('\n')
         copy of the repo, so several tasks can run at once without touching each other's files.
       </p>
     </header>
-    <figure class="lanes">
+    <figure class="lanes box">
+      <p class="legend">billing-api</p>
       <p class="lanes-main"><code>main</code></p>
       <ol>
         {
@@ -332,7 +333,7 @@ const nut = art.slice(4).join('\n')
       <h3>What ships with acorn</h3>
       <a href="/plugins/">See what each one adds</a>
     </div>
-    <ul class="wall">
+    <ul class="wall box">
       {
         plugins.map((plugin) => (
           <li>
@@ -478,7 +479,7 @@ const nut = art.slice(4).join('\n')
       <h2 id="questions">Questions</h2>
       <a href="/docs/help/faq/">More in the FAQ</a>
     </div>
-    <div class="faq-list">
+    <div class="faq-list box">
       {
         faq.map((item) => (
           <details>
@@ -515,13 +516,59 @@ const nut = art.slice(4).join('\n')
 </script>
 
 <style>
-  :global(.hero) {
-    --site-fs-hero: clamp(2.5rem, 1rem + 4.5vw, 5rem);
+  /* ── The page's look ──
+     A compact, technical sheet: every word in mono at a smaller size, every window and list in a square
+     box with a hard ink edge, and folder tabs on the windows they switch. These rules ship with this
+     page only, so the other marketing pages keep the site's look until they take it up. */
+  :global(.site-page) {
+    --site-fs-hero: clamp(2.25rem, 1.5rem + 2.2vw, 3.25rem);
+    --site-fs-display: clamp(1.75rem, 1.3rem + 1.4vw, 2.5rem);
+    --site-fs-lede: clamp(1rem, 0.94rem + 0.25vw, 1.125rem);
+    --site-fs-body: 1rem;
+    --site-section: clamp(4rem, 2.5rem + 4vw, 6.5rem);
+    /* The ink a box is drawn in. A picture restates --text in the app's theme, so the page's --text is
+       copied here for the picture to inherit. The stage copies its own. */
+    --ink: var(--text);
+  }
+  :global(.site-page .site-dark) {
+    --ink: var(--text);
+  }
+
+  .box,
+  :global(.site-page .frame) {
+    position: relative;
+    background-color: var(--bg);
+    border: var(--bw-strong) solid var(--ink);
+    border-radius: 0;
+    box-shadow: none;
+  }
+  /* A picture keeps the app's own background. */
+  :global(.site-page .frame) {
+    background-color: var(--pane-bg);
+  }
+
+  /* A box's title, set into its top edge. */
+  .legend {
+    position: absolute;
+    inset-block-start: 0;
+    inset-inline-start: var(--space-9);
+    translate: 0 -50%;
+    margin: 0;
+    padding-inline: var(--space-4);
+    font-family: var(--font-mono);
+    font-size: var(--fs-lg);
+    font-weight: var(--fw-bold);
+    line-height: 1;
+    background: var(--bg);
+  }
+
+  /* Square, to match the boxes. */
+  :global(.site-page .button) {
+    border-radius: 0;
   }
 
   .hero-shot {
     display: grid;
-    gap: var(--space-10);
   }
   .hero-shot > * {
     margin: 0;
@@ -542,7 +589,7 @@ const nut = art.slice(4).join('\n')
   .chapter h2,
   .finale h2,
   .faq-head h2 {
-    max-inline-size: 18ch;
+    max-inline-size: 28ch;
     font-size: var(--site-fs-display);
     font-weight: var(--fw-bold);
     letter-spacing: var(--site-track-display);
@@ -573,6 +620,7 @@ const nut = art.slice(4).join('\n')
     --elbow: clamp(2.5rem, 1rem + 4vw, 5rem);
     --head: 0.75rem;
     margin: 0;
+    padding: var(--space-11) var(--space-10) var(--space-4);
     font-family: var(--font-mono);
     font-size: var(--fs-lg);
   }
@@ -615,6 +663,9 @@ const nut = art.slice(4).join('\n')
     padding-inline-start: calc(var(--trunk) + var(--elbow));
     background: linear-gradient(var(--border), var(--border)) no-repeat right bottom /
       calc(100% - var(--trunk) - var(--elbow)) var(--bw);
+  }
+  .lane:last-child {
+    background: none;
   }
   .lane > * {
     min-inline-size: 0;
@@ -842,17 +893,18 @@ const nut = art.slice(4).join('\n')
     gap: var(--space-4) var(--space-10);
     margin-block-start: var(--space-11);
   }
-  /* A hairline grid: each cell draws its own end and bottom rules and the list draws the first ones, so
-     a short last row just stops. */
+  /* A hairline grid in a box: each cell draws its own end and bottom rules, so a short last row just
+     stops. The box's edge is an outline laid over the outer cells' rules, so it's one weight all round. */
   .wall {
     display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(min(11.5rem, 50%), 1fr));
+    grid-template-columns: repeat(auto-fill, minmax(min(13rem, 50%), 1fr));
     max-inline-size: none;
     margin: 0;
     padding: 0;
     list-style: none;
-    border-block-start: var(--divider);
-    border-inline-start: var(--divider);
+    border: 0;
+    outline: var(--bw-strong) solid var(--ink);
+    outline-offset: calc(-1 * var(--bw));
   }
   .wall > li {
     position: relative;
@@ -876,7 +928,7 @@ const nut = art.slice(4).join('\n')
   }
   .wall > li:hover,
   .wall > li:has(a:focus-visible) {
-    background: var(--bg);
+    background: var(--bg-subtle);
     box-shadow: inset var(--stripe-w) 0 var(--accent);
   }
   .wall-icon {
@@ -893,7 +945,7 @@ const nut = art.slice(4).join('\n')
   }
   .wall-yours {
     font-weight: var(--fw-semibold);
-    background: var(--bg);
+    background: var(--bg-subtle);
     outline: var(--bw-strong) dashed var(--accent);
     outline-offset: calc(-1 * var(--bw-strong));
   }
@@ -949,24 +1001,20 @@ const nut = art.slice(4).join('\n')
     inline-size: min(100%, 26rem);
     margin: 0;
   }
-  .away-shot {
-    display: grid;
-    gap: var(--space-10);
-    align-content: start;
-    justify-items: center;
-    margin-block-end: var(--space-6);
-  }
-  .away-shot > [role='tabpanel'] {
-    inline-size: 100%;
-  }
-  /* Each frame hugs its picture: the panel at the width a browser gives it, the phone a little narrower,
+  /* Each shot hugs its picture: the panel at the width a browser gives it, the phone a little narrower,
      both at one height. The panel runs to that height with its rail at the foot, as in a browser. */
-  .away-shot :global(.snapshot) {
-    max-inline-size: calc(360px + 2 * var(--bw));
-    margin-inline: auto;
+  .away-item > .away-shot {
+    display: grid;
+    align-content: start;
+    inline-size: min(100%, calc(360px + 2 * var(--bw-strong)));
+    margin-block-end: var(--space-8);
   }
-  .away-shot :global(.snapshot[data-host='phone']) {
-    max-inline-size: calc(300px + 2 * var(--bw));
+  .away-item > .away-shot:has([data-host='phone']) {
+    inline-size: min(100%, calc(300px + 2 * var(--bw-strong)));
+  }
+  /* The box draws the panel's edge, so the panel's own side rules would only thicken it. */
+  .away-shot :global(.panel.acorn-ui) {
+    border-inline: 0;
   }
   .away-shot :global(.panel .snapshot-sidebar) {
     min-block-size: 649px;
@@ -1063,11 +1111,11 @@ const nut = art.slice(4).join('\n')
   .faq-head > * {
     margin: 0;
   }
-  .faq-list {
+  .faq details + details {
     border-block-start: var(--divider);
   }
-  .faq details {
-    border-block-end: var(--divider);
+  .faq details:nth-child(even) {
+    background: var(--bg-subtle);
   }
   /* Each question is a row with a plus that turns to a cross as its answer opens. Where the browser can
      animate to a height, the answer slides open. */
@@ -1076,7 +1124,7 @@ const nut = art.slice(4).join('\n')
     align-items: center;
     justify-content: space-between;
     gap: var(--space-10);
-    padding-block: var(--space-9);
+    padding: var(--space-8) var(--space-9);
     font-family: var(--font-mono);
     font-weight: var(--fw-semibold);
     letter-spacing: var(--site-track-heading);
@@ -1116,7 +1164,7 @@ const nut = art.slice(4).join('\n')
   .faq details p {
     max-inline-size: var(--site-measure);
     margin: 0;
-    padding-block-end: var(--space-9);
+    padding: 0 var(--space-9) var(--space-8);
   }
   @media (min-width: 64rem) {
     .faq {

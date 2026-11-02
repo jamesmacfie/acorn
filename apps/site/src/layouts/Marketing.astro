@@ -12,9 +12,11 @@ import { marketingCard } from '../og'
 interface Props {
   title: string
   meta: PageMeta
+  /** Sets the paragraphs in mono too, so the page never draws in Inter and doesn't fetch it. */
+  mono?: boolean
 }
 
-const { title, meta } = Astro.props
+const { title, meta, mono = false } = Astro.props
 // A marketing page with a missing or malformed field fails the build, as a docs page does.
 pageMeta.parse(meta)
 const canonical = new URL(Astro.url.pathname, Astro.site)
@@ -29,7 +31,7 @@ const card = new URL(`/og/${marketingCard(Astro.url.pathname)}.png`, Astro.site)
     <!-- The three faces the first screen draws in. Found only through the stylesheet, they'd start late. -->
     <link rel="preload" href="/fonts/JetBrainsMono-Regular.woff2" as="font" type="font/woff2" crossorigin />
     <link rel="preload" href="/fonts/JetBrainsMono-Bold.woff2" as="font" type="font/woff2" crossorigin />
-    <link rel="preload" href={inter} as="font" type="font/woff2" crossorigin />
+    {!mono && <link rel="preload" href={inter} as="font" type="font/woff2" crossorigin />}
     <AppearanceScript />
     <title>{title} · acorn</title>
     <meta name="description" content={meta.description} />
@@ -50,7 +52,7 @@ const card = new URL(`/og/${marketingCard(Astro.url.pathname)}.png`, Astro.site)
   <body>
     {/* The header, the hero under it, and the footer draw dark in either scheme (docs/site/design.md). */}
     <header class="site-bar site-dark"><SiteHeader /></header>
-    <main class="site-page">
+    <main class="site-page" data-mono={mono || undefined}>
       {/* A page with a hero lets it carry the page's heading. */}
       {Astro.slots.has('hero') ? <slot name="hero" /> : <Hero title={title} />}
       <slot />
