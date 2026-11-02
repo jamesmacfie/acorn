@@ -6,7 +6,13 @@ import { DatabaseSync } from 'node:sqlite'
 import { promisify } from 'node:util'
 import { expect, test } from 'vitest'
 
-const run = promisify(execFile)
+const execute = promisify(execFile)
+// A failed seed reports its output as text. Its own stack trace would reach Vitest's source map reader,
+// which failed on Linux x64 and hid the error.
+const run = (...args) => execute(...args).catch((error) => {
+  const output = `${error.stderr ?? ''}${error.stdout ?? ''}`.replace(/^/gm, '| ')
+  throw new Error(`seed.ts failed (exit ${error.code ?? error.signal}):\n${output}`)
+})
 
 test.each([
   { mode: 'off', names: ['repo', 'side-project'] },
