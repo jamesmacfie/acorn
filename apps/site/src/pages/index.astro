@@ -143,7 +143,10 @@ const tour: { id: string; label: string; snapshot: SnapshotId; text: string; hre
   },
 ]
 
-const plugins = Object.values(PLUGINS).sort((a, b) => a.name.localeCompare(b.name))
+// Onboarding is the first-run wizard, not something you'd use after it, so the wall leaves it out.
+const plugins = Object.values(PLUGINS)
+  .filter((plugin) => plugin !== PLUGINS.onboarding)
+  .sort((a, b) => a.name.localeCompare(b.name))
 
 // The phone's two pictures, each captured in Catppuccin Latte and Mocha so it follows the page's light
 // and dark switch as the HTML pictures do.

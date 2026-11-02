@@ -13,15 +13,19 @@ const COMPILED = ['apps/desktop/src/client/plugins.ts', 'apps/tui/src/roster.ts'
 // The bundled packages, read as text so the check never loads the build script's imports.
 const BUNDLED = 'scripts/bundled-plugins.mjs'
 
+// Plugins that ship and that the site leaves out on purpose. Sentry telemetry sends the Node's own
+// telemetry to Sentry, which only the acorn team uses.
+const UNLISTED = ['sentry-telemetry']
+
 const read = (path) => readFileSync(join(ROOT, path), 'utf8')
 
-/** The plugins acorn ships: `compiled` into the app, and `bundled` as installed packages. */
+/** The plugins acorn ships and the site lists: `compiled` into the app, and `bundled` as installed packages. */
 export function shippedPlugins() {
   const compiled = COMPILED.flatMap((file) => [...read(file).matchAll(/'@acorn\/plugin-([\w-]+)\//g)].map((m) => m[1]))
   const list = read(BUNDLED).match(/const BUNDLED_PLUGINS = \[([^\]]*)\]/)?.[1] ?? ''
   return {
-    compiled: [...new Set(compiled)].sort(),
-    bundled: [...list.matchAll(/'([\w-]+)'/g)].map((m) => m[1]),
+    compiled: [...new Set(compiled)].filter((id) => !UNLISTED.includes(id)).sort(),
+    bundled: [...list.matchAll(/'([\w-]+)'/g)].map((m) => m[1]).filter((id) => !UNLISTED.includes(id)),
   }
 }
 

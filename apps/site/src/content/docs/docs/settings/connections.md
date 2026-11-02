@@ -20,7 +20,7 @@ never shown again ([Credentials and secrets](/docs/security/credentials-and-secr
 
 ## Services
 
-Every connection that isn't a model key: GitHub, Linear, Rollbar, the Sentry export, and services a
+Every connection that isn't a model key: GitHub, Linear, Rollbar, Sentry, and services a
 plugin adds. A connection that needs you is listed first, with a dot, and the dot shows beside the page
 in the rail.
 

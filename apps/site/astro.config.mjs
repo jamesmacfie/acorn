@@ -255,7 +255,6 @@ export default defineConfig({
             'docs/built-in-plugins/review-guide',
             'docs/built-in-plugins/rollbar',
             'docs/built-in-plugins/sentry',
-            'docs/built-in-plugins/sentry-telemetry',
             'docs/built-in-plugins/terminal',
             'docs/built-in-plugins/workflows',
           ],

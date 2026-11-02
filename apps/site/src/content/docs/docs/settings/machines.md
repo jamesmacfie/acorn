@@ -100,12 +100,8 @@ Nothing to set ([The audit log](/docs/security/the-audit-log/)).
 
 ## Sentry export
 
-The Sentry export plugin's page: which kinds of record go to your Sentry project, and how much detail.
-It's stored on the Node, and its settings are listed on
-[Telemetry and privacy](/docs/security/telemetry-and-privacy/#send-telemetry-to-sentry).
-
-In a release of the desktop app, the page also has **Share with the acorn team**, off by default. It
-sends errors and a sample of traces to the acorn team's Sentry project
+In a release of the desktop app, this page has **Share with the acorn team**, off by default. It's
+stored on the Node, and sends errors and a sample of traces to the acorn team's Sentry project
 ([Share with the acorn team](/docs/security/telemetry-and-privacy/#share-with-the-acorn-team)).
 
 ## Storage and memory

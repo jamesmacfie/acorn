@@ -1,6 +1,6 @@
 ---
 title: Telemetry and privacy
-description: acorn's telemetry is off by default. What a record holds when it's on, what never leaves the machine, and how to send it to Sentry.
+description: acorn's telemetry is off by default. What a record holds when it's on, what never leaves the machine, and how to share errors with the acorn team.
 sources:
   - docs/telemetry.md
   - docs/telemetry/model.md
@@ -12,20 +12,17 @@ checked: '6fec87ef7'
 ---
 
 This page covers acorn's telemetry: the timings, logs, and errors it can collect about itself, the
-switch that's off by default, what a record holds, what never leaves your machine, how to send
-records to your own Sentry project, and how to share errors with the acorn team. acorn runs no
-telemetry server. Records go only to a Sentry project: yours, or the acorn team's if you turn on
-**Share with the acorn team**.
+switch that's off by default, what a record holds, what never leaves your machine, and how to share
+errors with the acorn team. acorn runs no telemetry server. Records leave the machine only if you turn
+on **Share with the acorn team**.
 
 ## Off by default
 
 Telemetry has one switch per Node: **Collect timings, logs, and errors on this node**, under
 **Settings** > **Machines** > **Telemetry**. It's off until you turn it on.
 
-Even on, nothing leaves the machine unless a plugin that sends records somewhere, called a _sink_, is
-installed and set up. acorn ships one sink, **Sentry export**, and it sends nothing until you connect a
-Sentry project, start the Node with `ACORN_SENTRY_DSN` set, or turn on **Share with the acorn team**.
-With the switch off, nothing is collected at all.
+Even on, nothing leaves the machine until you turn on **Share with the acorn team**. With the switch
+off, nothing is collected at all.
 
 The page's **What this node has collected** counts records since the Node started, without showing the
 records themselves, and says where they're sent.
@@ -61,34 +58,6 @@ A record never holds:
 Pattern cleaning catches known credential shapes, not every possible secret. Code that knows it holds a
 secret leaves it out of the record before the cleaner ever sees it.
 
-## Send telemetry to Sentry
-
-1. Turn on **Collect timings, logs, and errors on this node** under **Settings** > **Machines** >
-   **Telemetry**.
-2. Open **Settings** > **Connections** > **Services**, click **Add connection**, and pick Sentry. Paste
-   the project's DSN, and optionally an environment and a release. acorn checks the DSN with Sentry
-   before it saves it.
-3. Open **Settings** > **Machines** > **Sentry export** to choose what goes.
-
-| Setting | What it sends | Default |
-| --- | --- | --- |
-| **How many traces to send** | The share of traces sent | Every trace |
-| **Errors** | Errors, as Sentry issues | On |
-| **Traces** | Requests, commands, page changes, and schedule runs | On |
-| **Logs** | Log lines from acorn and its plugins | On |
-| **Metrics** | Counts and timings | On |
-| **Events** | One-off events, as info logs | On |
-| **Stack traces on errors** | Stacks, with your home folder replaced by `~` | On |
-| **Task ids as tags** | A task's ID, never its contents, so an issue links to its task | On |
-
-A DSN can only send to its project. It can't read anything back, so acorn asks for nothing wider. The
-DSN is stored like any other credential, and the plugin borrows it for each send without holding it
-([Credentials and secrets](/docs/security/credentials-and-secrets/)). Disconnecting stops the export
-within five seconds.
-
-A sink sees every record from every part of acorn and every plugin, so its trust prompt marks that
-grant as broad.
-
 ## Share with the acorn team
 
 A release of the desktop app can send errors to the acorn team's Sentry project, so we can find and
@@ -96,15 +65,13 @@ fix bugs. It's a second switch, **Share with the acorn team**, on **Settings** >
 **Sentry export**, and it's off by default. Nothing goes to the team unless both it and **Collect
 timings, logs, and errors on this node** are on.
 
-The switch appears only in a release build, and only when you haven't connected your own Sentry
-project or set `ACORN_SENTRY_DSN`. Either of those takes priority, and then nothing goes to the team.
-A build from source, a fork, the terminal client's standalone Node, and the CLI never send to the
+The switch appears only in a release build. A build from source, a fork, the terminal client's standalone Node, and the CLI never send to the
 team.
 
 Only records from acorn itself and the plugins it ships go to the team. A plugin you installed, or a
-built-in one you edited, sends nothing there, though it still reaches your own project.
+built-in one you edited, sends nothing there.
 
-While you share, acorn ignores the settings on that page and sends a fixed set:
+While you share, acorn sends a fixed set:
 
 | Kind | Sent to the acorn team |
 | --- | --- |
@@ -134,11 +101,10 @@ Telemetry is one path. The others are the services you connect and the agents yo
 
 ## In the terminal
 
-The terminal client posts its records to the Node, which applies the same switch. **Telemetry** opens
-in the desktop app, and **Sentry export** isn't listed in the terminal client's Settings.
+The terminal client posts its records to the Node, which applies the same switch. **Telemetry** and
+**Share with the acorn team** open in the desktop app.
 
 ## Limits
 
 - The switch is per Node. Each Node you pair keeps its own.
-- **Sentry export** holds one Sentry connection. To send to another project, replace its DSN.
 - A record can still hold a repository-relative path, such as a file name a log line names.

@@ -1,7 +1,7 @@
-// Every plugin acorn ships, for the `/plugins/` page and the docs' Built-in plugins pages. A test
-// (scripts/pluginPages.test.mjs) fails when a plugin in the app's compiled roster or in the bundled
-// packages has no entry here or no docs page, and when an installed package's manifest asks for a
-// permission that has no reason below.
+// Every plugin acorn ships, for the `/plugins/` page and the docs' Built-in plugins pages, except the
+// ones scripts/pluginPages.mjs leaves unlisted. A test (scripts/pluginPages.test.mjs) fails when a
+// plugin in the app's compiled roster or in the bundled packages has no entry here or no docs page,
+// and when an installed package's manifest asks for a permission that has no reason below.
 
 export type PluginId = keyof typeof PLUGINS
 
@@ -281,27 +281,6 @@ export const PLUGINS = {
       'node.env:ACORN_SENTRY_ORG': "Reads the organization that token's issues come from.",
       'node.env:ACORN_SENTRY_PROJECT': 'Reads the project whose issues the rail lists.',
       'node.env:ACORN_SENTRY_URL': "Reads which Sentry region to ask, if it isn't the US one.",
-    },
-  },
-  'sentry-telemetry': {
-    name: 'Sentry telemetry',
-    sentence: "Sends the Node's own errors, logs, and timings to your Sentry project, when you turn it on.",
-    icon: 'activity',
-    ships: 'package',
-    worksIn: 'Desktop',
-    worksInNote: 'It sends from the Node whichever client you use. Its settings page opens only in the desktop app.',
-    docs: '/docs/built-in-plugins/sentry-telemetry/',
-    reasons: {
-      'node.core:telemetry': "Reads the Node's telemetry records, which are what it sends.",
-      'node.core:prefs': 'Reads the choices you make on its settings page.',
-      'node.core:identity':
-        'Finds your Sentry connection and settings when it sends, with no request to read you from.',
-      'node.net:*.ingest.sentry.io': "Sends records to Sentry's ingest address that your DSN names.",
-      'node.net:*.ingest.us.sentry.io': "Sends records to Sentry's US ingest address.",
-      'node.net:*.ingest.de.sentry.io': "Sends records to Sentry's EU ingest address.",
-      'node.net:sentry.io': 'Sends records to Sentry.',
-      'node.env:ACORN_SENTRY_DSN':
-        'Reads a DSN from the environment, for when you start the Node with one and skip the connection.',
     },
   },
   terminal: {
