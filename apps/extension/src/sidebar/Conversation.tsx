@@ -203,7 +203,10 @@ export function Conversation(props: {
           <Button label="Earlier messages" onPress={() => void reader.earlier()} />
         </Show>
         <Show when={view()} fallback={<p class="quiet">{gone() ? '' : 'Loading the conversation…'}</p>}>
-          <Show when={items().length || view()!.queued.length} fallback={<p class="quiet">{starting() ? 'Starting the agent…' : 'No messages yet.'}</p>}>
+          <Show
+            when={items().length || view()!.queued.length}
+            fallback={<p class="quiet">{starting() ? 'Starting the agent…' : 'No messages yet.'}</p>}
+          >
             <ol class="transcript">
               <For each={items()}>
                 {(item) => {
