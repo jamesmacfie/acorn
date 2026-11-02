@@ -47,6 +47,9 @@ const MAIN_COLUMN_AT = 120
  *  that panel comes back, and a second Escape crosses to the rail (../../keys/regions.ts). */
 export function Sections(props: {
   id: string
+  /** The desktop kit stores the open tab under this key. The terminal keeps it in memory for one mount
+   *  and stores nothing, so it takes the prop and has no use for it. */
+  tabKey?: string
   ariaLabel?: string
   header?: KitSection
   sections: readonly KitSection[]

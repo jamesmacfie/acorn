@@ -42,8 +42,7 @@ hero headline size, the header bar's height, and the width of a docs page's tabl
 
 The document defaults, such as the body's font and link color, sit in a cascade layer called
 `site-base`. That layer loads before Starlight's, so on a docs page Starlight's component rules still
-beat them. Element rules skip anything inside `.acorn-ui`, so a specimen draws exactly as the app draws
-it.
+beat them. Element rules skip anything inside `.acorn-ui`, so a specimen draws exactly as the app draws it.
 
 Components with their own look keep it in a `<style>` block beside their markup, written to the same
 rules.

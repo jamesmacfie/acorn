@@ -419,7 +419,8 @@ describe('a tree becomes the host’s own components', () => {
     plain.apply([{ op: 'insert', parent: null, index: 0, node: diff(false) }])
     expect(await settled(() => !!host.querySelector('.diff-note'))).toBe(true)
     expect(host.querySelector('.line-card')).toBeNull()
-    expect(host.querySelector('.diff-note-body strong')?.textContent).toBe('went')
+    // The body's Markdown loads on demand, so it can land after the card.
+    expect(await settled(() => host.querySelector('.diff-note-body strong')?.textContent === 'went')).toBe(true)
     // Whose note it is comes from the host, whatever the tree says.
     expect(host.querySelector('.diff-note')!.textContent).toContain('from stranger')
   })
