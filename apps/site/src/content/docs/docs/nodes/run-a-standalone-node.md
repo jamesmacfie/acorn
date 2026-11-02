@@ -23,10 +23,10 @@ service, and what it can do.
 
 ### From a platform archive
 
-A packaging run of acorn's GitHub Actions builds a self-contained archive for macOS arm64 and x64, Linux
-x64 and arm64, and Windows x64. It carries its own Node.js and every dependency, so the machine needs no
-Node.js or build tools. Download `acorn-node-<platform>` from the run's artifacts, then check, extract,
-and install it, as yourself rather than as root:
+Each release on GitHub carries a self-contained archive for macOS arm64 and x64, Linux x64 and arm64,
+and Windows x64, with a `.sha256` file beside each. It carries its own Node.js and every dependency, so
+the machine needs no Node.js or build tools. Download the archive for your platform and its `.sha256`
+file from the release, then check, extract, and install it, as yourself rather than as root:
 
 ```sh
 shasum -a 256 -c acorn-node-*.tar.gz.sha256

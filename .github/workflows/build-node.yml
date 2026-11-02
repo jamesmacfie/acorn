@@ -7,7 +7,7 @@ name: Build the Node archives
 #
 # Called by ci.yml for `v*` tags and manual dispatches, after the Linux suite passes for the same
 # commit. It needs no secrets beyond the workflow token, and reads the ACORN_RELEASE_ACCOUNT_URL
-# repository variable.
+# repository variable. On a tag, it attaches the archives to the tag's GitHub release.
 on:
   workflow_call:
 
@@ -94,6 +94,31 @@ jobs:
           # Above the repository's one-day cap, which has to rise to 14 days in Settings → Actions →
           # General. Saying so here keeps the 90-day default from returning when the cap does.
           retention-days: 14
+
+  # A tag attaches every archive and its checksum to the tag's GitHub release, so a machine can download
+  # one with curl long after the run's artifacts expire. The installers stay off it until they're signed
+  # (build-desktop.yml's publish job). Run again for the same tag, it replaces the files.
+  release:
+    needs: archive
+    if: startsWith(github.ref, 'refs/tags/v')
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@634f93cb2916e3fdff6788551b99b062d0335ce0 # v5
+        with:
+          pattern: acorn-node-*
+          path: archives
+          merge-multiple: true
+      # Through the environment, never interpolated into the script: a tag name is untrusted text here.
+      - name: Attach the archives to the release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          TAG: ${{ github.ref_name }}
+        run: |
+          gh release view "$TAG" >/dev/null 2>&1 || gh release create "$TAG" --verify-tag --title "$TAG" --notes ""
+          gh release upload "$TAG" archives/* --clobber
 
   # The standalone Node as a Linux container image (docs/node-distribution/container.md). It's for x64
   # only, because the image compiles node-pty and an arm64 build would run under emulation. A tag pushes

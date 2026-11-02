@@ -133,7 +133,9 @@ README.md, BUILD           how to check and install it; version, commit, build t
 checkout with a bare environment, then runs `scripts/node-archive/smoke.mjs`: help, a node-pty
 terminal, `node start`, `node status`, `node pair`, `node stop`, a log search for device tokens, and an
 install and uninstall where the runner isn't root or an administrator. The run keeps each archive as a
-14-day artifact. A tag publishes only the [container image](./node-distribution/container.md).
+14-day artifact. A tag also attaches every archive and its `.sha256` file to the tag's GitHub release, and
+publishes the [container image](./node-distribution/container.md). The desktop installers stay off the
+release until they're signed.
 
 The Linux archives build node-pty in a Debian 11 container, so they need glibc 2.31 or later: Ubuntu
 22.04, Debian 11, Raspberry Pi OS 11, or later. musl distributions such as Alpine can't run them. On

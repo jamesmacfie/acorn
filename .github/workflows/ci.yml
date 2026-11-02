@@ -179,8 +179,9 @@ jobs:
   package-node:
     needs: [lint, test]
     if: startsWith(github.ref, 'refs/tags/v') || github.event_name == 'workflow_dispatch'
-    # The image job pushes to the GitHub container registry on a tag.
+    # On a tag, the image job pushes to the GitHub container registry, and the release job attaches the
+    # archives to the tag's GitHub release.
     permissions:
-      contents: read
+      contents: write
       packages: write
     uses: ./.github/workflows/build-node.yml
