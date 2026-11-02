@@ -83,7 +83,8 @@ The LaunchAgent keeps the default `ProcessType` and writes the launcher's own er
 `<root>/logs/launcher.log`.
 
 On Linux, `install` runs `loginctl enable-linger`, so the user manager starts at boot and keeps the
-Node running after logout or the end of an SSH session. When that's refused, it reports the
+Node running after logout or the end of an SSH session. It skips that when `loginctl show-user` says
+lingering is already on, because `enable-linger` asks for authorization even then. When it's refused, it reports the
 `sudo loginctl enable-linger <user>` command. On a machine with no systemd user manager, it says to
 start the Node from a login script and fails.
 

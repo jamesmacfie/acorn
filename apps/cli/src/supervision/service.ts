@@ -253,8 +253,11 @@ function platformManager(): Manager {
       must('systemctl', ['--user', 'daemon-reload'])
       must('systemctl', ['--user', 'enable', '--now', UNIT])
       // Lingering starts the user manager at boot and keeps it after logout, so an SSH session can end.
+      // enable-linger asks polkit even when lingering is already on, and fails without sudo, so check first.
+      const user = userInfo().username
+      if (run('loginctl', ['show-user', user, '-p', 'Linger', '--value']).stdout?.trim() === 'yes') return null
       if (run('loginctl', ['enable-linger']).status === 0) return null
-      return `The Node stops when you log out. To keep it running, run sudo loginctl enable-linger ${userInfo().username}.`
+      return `The Node stops when you log out. To keep it running, run sudo loginctl enable-linger ${user}.`
     },
     uninstall() {
       run('systemctl', ['--user', 'disable', '--now', UNIT])
