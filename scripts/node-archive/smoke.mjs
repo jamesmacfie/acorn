@@ -80,8 +80,11 @@ const pty = require(${JSON.stringify(join(root, 'lib/node_modules/node-pty'))})
 const term = ${windows} ? pty.spawn('cmd.exe', ['/c', 'echo ok'], {}) : pty.spawn('/bin/sh', ['-c', 'echo ok'], {})
 let output = ''
 term.onData((data) => { output += data })
+// Exits either way, because on Windows the terminal's connection stays open after cmd.exe ends and
+// keeps this process alive until the timeout.
 term.onExit(({ exitCode }) => setTimeout(() => {
   if (exitCode !== 0 || !output.includes('ok')) { console.error('exit ' + exitCode + ': ' + JSON.stringify(output)); process.exit(1) }
+  process.exit(0)
 }, 200))
 `
 const pty = spawnSync(join(root, 'runtime', windows ? 'node.exe' : 'node'), ['-e', ptyCheck], { env, encoding: 'utf8', timeout: 30_000 })
