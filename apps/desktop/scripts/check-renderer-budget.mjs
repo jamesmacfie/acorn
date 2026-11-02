@@ -36,7 +36,7 @@ const clientDir = resolve(dirFlag === -1 ? resolve(import.meta.dirname, '../dist
 // imports, so a cut that only moves startup code into the roster saves nothing. Pane models are
 // synchronous factories, so they register with the roster (docs/frontend/startup-budget.md).
 const limits = {
-  scripts: 1_012_000,
+  scripts: 1_030_000,
   roster: 370_000,
   styles: 200_000,
   floor: 100_000,

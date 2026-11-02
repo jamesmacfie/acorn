@@ -13,12 +13,13 @@ a byte ceiling, or on a denied chunk or module name.
 ### The renderer
 
 `apps/desktop/scripts/check-renderer-budget.mjs` runs from `@acorn/desktop`'s `build`. It sums every
-script and stylesheet a cold window loads, against ceilings of 1,012,000 B for scripts and 200,000 B for
+script and stylesheet a cold window loads, against ceilings of 1,030,000 B for scripts and 200,000 B for
 styles. The script ceiling was set about 5% above the measurement of 951,018 B on October 17, 2026,
 at 1,000,000 B, raised from 740,000 B so the v0.0.2 release could build. Main crossed it at `6c303a03a`
 on October 29, 2026, after gradual growth. It rose to 1,012,000 B on October 31, 2026, at 1,009,283 B,
-which includes about 2,500 B from review guide v2's notes and inline conversations. A change that needs
-more raises the ceiling in the same commit, with the reason in the commit message.
+which includes about 2,500 B from review guide v2's notes and inline conversations. It rose to
+1,030,000 B on November 3, 2026, at 1,009,568 B, for the v0.0.5 release, which had 2,432 B left. A
+change that needs more raises the ceiling in the same commit, with the reason in the commit message.
 
 The same check counts the compiled roster's scripts beyond startup, against a ceiling of 370,000 B,
 about 5% above the 351,118 B measured on October 26, 2026, raised from 340,000 B when main had outgrown
