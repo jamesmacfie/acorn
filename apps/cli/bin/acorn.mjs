@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 // The launcher is intentionally free of imports from either host. Help and commands never load the
 // terminal renderer; no arguments retain the terminal client's existing attach-or-start lifetime.
-import { fileURLToPath } from 'node:url'
+import { fileURLToPath, pathToFileURL } from 'node:url'
 import { dirname, resolve } from 'node:path'
 import { existsSync } from 'node:fs'
 
@@ -18,8 +18,9 @@ for (let i = 0; i < argv.length; i++) {
   remaining.push(arg)
 }
 
-if (!remaining.length) await import(tui)
+// import() takes a URL. A Windows path such as C:\... reads as one with the scheme c:.
+if (!remaining.length) await import(pathToFileURL(tui).href)
 else {
-  const { main } = await import(cli)
+  const { main } = await import(pathToFileURL(cli).href)
   process.exitCode = await main(argv)
 }
