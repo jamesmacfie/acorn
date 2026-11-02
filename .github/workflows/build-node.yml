@@ -98,9 +98,11 @@ jobs:
   # A tag attaches every archive and its checksum to the tag's GitHub release, so a machine can download
   # one with curl long after the run's artifacts expire. The installers stay off it until they're signed
   # (build-desktop.yml's publish job). Run again for the same tag, it replaces the files.
+  # It runs when an archive job fails too, because an archive is uploaded only after its smoke test
+  # passes, so one platform's failure leaves the others' release files out for no reason.
   release:
     needs: archive
-    if: startsWith(github.ref, 'refs/tags/v')
+    if: ${{ !cancelled() && startsWith(github.ref, 'refs/tags/v') }}
     runs-on: ubuntu-24.04
     permissions:
       contents: write
