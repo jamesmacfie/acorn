@@ -90,6 +90,8 @@ chooses the destination and keeps panel plans outside plugin frames.
   doesn't know.
 - [Events](./plugins/events.md): hearing core and other plugins, and the shipped event list.
 - [Collaboration rules](./plugins/collaboration.md): contracts, capabilities, and client capabilities.
+- [Supplied terminal tabs](./plugins/supplied-terminal-tabs.md): read-only tabs another plugin puts in
+  a task's terminal strip.
 - [Data ownership](./plugins/data-ownership.md): plugin databases, uninstalling, and tool projection.
 - [Adding a plugin contribution](./plugins/adding-a-contribution.md): the steps, the files, and the
   golden lists.

@@ -4,6 +4,7 @@ import { activeNodeId, readBytes, readJson, sendForm, writeJson } from '@acorn/p
 import type {
   AgentAttachment,
   AgentArtifact,
+  AgentBackgroundCommand,
   AgentDeleteResult,
   AgentEventPage,
   AgentFootprint,
@@ -12,6 +13,7 @@ import type {
   AgentSession,
   AgentSessionList,
   AgentSessionSnapshot,
+  AgentToolCallRead,
   AgentTurn,
 } from '../../contract/wire.ts'
 import type { CreateAgentSessionInput, EnqueueAgentTurnInput, ImportAgentTranscriptInput } from '../../shared/schemas'
@@ -165,6 +167,10 @@ export const managedAgentApi = {
     ),
   events: (sessionId: string, afterSeq: number, limit = 2_000, options: AgentOrigin = {}) =>
     readJson<AgentEventPage>(sessionRoute(sessionId, `/events?afterSeq=${afterSeq}&limit=${limit}&fold=1`), options),
+  toolCall: (sessionId: string, toolId: string, options: AgentOrigin = {}) =>
+    readJson<AgentToolCallRead>(sessionRoute(sessionId, `/tools/${encodeURIComponent(toolId)}`), options),
+  backgroundCommands: (taskId: string, options: AgentOrigin = {}) =>
+    readJson<AgentBackgroundCommand[]>(`${ROOT}/background-commands?taskId=${encodeURIComponent(taskId)}`, options),
   enqueue: (
     sessionId: string,
     input: Omit<EnqueueAgentTurnInput, 'idempotencyKey'>,

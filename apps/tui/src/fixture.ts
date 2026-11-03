@@ -863,6 +863,14 @@ export function stubTransport(): {
         if (/^\/v1\/p\/agents\/sessions\/[^/]+\?/.test(path)) return json(agentSnapshot())
         if (path.startsWith('/v1/p/agents/sessions/') && path.includes('/events'))
           return json({ events: [], nextCursor: null })
+        // The header's chip counts the task's running background commands from this list, not from
+        // the transcript, so it names the same flagged command the card above is.
+        if (path.startsWith('/v1/p/agents/background-commands?'))
+          return json(
+            process.env.ACORN_FIXTURE_BACKGROUND_COMMAND
+              ? [{ sessionId: 'session-1', turnId: 'turn-1', toolCallId: 'tool-3', title: 'pnpm test', startedAt: 0 }]
+              : [],
+          )
         if (path === `/v1/p/git/tasks/${TASK.id}/local/status`) return json(LOCAL_STATUS)
         if (path === `/v1/p/git/tasks/${TASK.id}/review-notes`) return json([])
         if (path === `/v1/p/git/tasks/${TASK.id}/local/document`) return json({ files: localDocument().files })

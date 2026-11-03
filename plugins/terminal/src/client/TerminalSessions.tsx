@@ -1,7 +1,8 @@
-import { createEffect, createMemo, createSignal, For, onCleanup, onMount, Show } from 'solid-js'
+import { createEffect, createMemo, createSignal, For, onCleanup, onMount, Show, untrack } from 'solid-js'
 import { createQuery, useQueryClient } from '@tanstack/solid-query'
 import {
   activeNodeId,
+  clientCapability,
   queryOwner,
   clientEvents,
   consumeTerminalFocusIntent,
@@ -18,7 +19,7 @@ import { activeTerminal, addSession, refreshSessions, rememberActiveTerminal, se
 import { terminalApi } from './terminalClient'
 import TerminalSurface from './TerminalSurface'
 import type { TerminalProfile, TerminalSession } from '@acorn/plugin-terminal/contract/wire.ts'
-import { Alert, Button, DocumentTabs, EmptyState, IconButton, Menu } from '@acorn/plugin-api/ui'
+import { Alert, attachPty, Button, DocumentTabs, EmptyState, IconButton, Menu, Rectangle } from '@acorn/plugin-api/ui'
 import { Slot } from '@acorn/plugin-api/ui/host'
 import {
   interruptRefusal,
@@ -26,9 +27,11 @@ import {
   type TerminalToolbarProps,
   type TerminalToolbarResult,
 } from '../contract/toolbarActions'
+import { TERMINAL_TAB_SUPPLIER } from '../contract/suppliedTabs'
 import { resolveTerminalFontSize } from './preferences'
 
 const PROFILES_STALE_MS = 5 * 60_000
+const NO_SUPPLIED_TABS = { loaded: true, tabs: [] }
 
 // A task's terminal sessions: the tab strip and a surface per session, drawn by the desktop's drawer
 // (./TerminalPanel.tsx) and the phone's pane (./TerminalPane.tsx). The "+" opens a profile menu; the
@@ -66,6 +69,8 @@ export default function TerminalSessions(props: {
   // Optimistic tab: the title of a session whose create() is still round-tripping (worktree +
   // spawn can take seconds), so the click gives instant feedback in the tab strip.
   const [pendingTitle, setPendingTitle] = createSignal<string | null>(null)
+  // Whether this mount's first roster read has finished, answered or not.
+  const [rosterSettled, setRosterSettled] = createSignal(false)
   const surfaceFontSize = () => resolveTerminalFontSize(prefs.data?.[PrefKeys.terminalFontSize], termFontSize())
 
   // Scope the strip to the active task (docs/workspaces-and-tasks.md). A session opened in task A
@@ -79,14 +84,31 @@ export default function TerminalSessions(props: {
   // nothing does not rebuild an xterm. See the comment on the list itself.
   const visibleIds = createMemo(() => visibleSessions().map((session) => session.id))
 
-  // Keep the active session in sync with what's visible (e.g. after switching tasks). On a fresh
-  // mount (task/workspace switch back) prefer the tab we last viewed for this task, so you return to
-  // the same terminal instead of the first one; fall back to the first visible session.
+  // Read-only tabs another plugin supplies, after the sessions (docs/plugins/supplied-terminal-tabs.md).
+  // A supplied tab is no session: Cmd+W, Stop, the toolbar and closing all pass it by, because each
+  // looks its tab up in `visibleSessions`.
+  const supplied = createMemo(() => {
+    const id = taskId()
+    return (id && clientCapability(TERMINAL_TAB_SUPPLIER)?.tabs(id)) || NO_SUPPLIED_TABS
+  })
+  const suppliedTabs = () => supplied().tabs
+  // Every tab in strip order. The shortcuts, the active tab and the empty state go by this.
+  const tabIds = createMemo(() => [...visibleIds(), ...suppliedTabs().map((tab) => tab.id)])
+  // A string, so a list update that keeps the selected tab doesn't rebuild its view.
+  const activeSuppliedId = createMemo(() => suppliedTabs().find((tab) => tab.id === activeId())?.id)
+
+  // Keep the active tab in sync with what's visible (e.g. after switching tasks). On a fresh mount
+  // (task/workspace switch back) prefer the tab we last viewed for this task, so you return to the
+  // same terminal instead of the first one; fall back to the first tab. A supplied tab that went away
+  // falls back the same way.
   createEffect(() => {
-    const vis = visibleSessions()
-    if (vis.some((s) => s.id === activeId())) return
+    const ids = tabIds()
+    if (ids.includes(activeId() ?? '')) return
+    // Before this mount's first roster read, the shells may not be in the strip yet, and a supplied tab
+    // picked in their place would keep the drawer off the one you were last on.
+    if (!rosterSettled() && !visibleIds().length) return
     const remembered = activeTerminal(ws()?.id ?? '')
-    setActiveId((remembered && vis.some((s) => s.id === remembered) ? remembered : vis[0]?.id) ?? null)
+    setActiveId((remembered && ids.includes(remembered) ? remembered : ids[0]) ?? null)
   })
 
   // Remember the viewed tab per task so the effect above can restore it after a remount. Only
@@ -96,7 +118,7 @@ export default function TerminalSessions(props: {
   createEffect(() => {
     const id = ws()?.id
     const a = activeId()
-    if (id && a && visibleSessions().some((s) => s.id === a)) rememberActiveTerminal(id, a)
+    if (id && a && tabIds().includes(a)) rememberActiveTerminal(id, a)
   })
 
   createEffect(() => {
@@ -127,11 +149,15 @@ export default function TerminalSessions(props: {
       // A failed roster is not fresh enough to decide whether to auto-launch another session.
       await refreshSessions()
       if (!live(captured)) return
-      if (willAutoLaunch && visibleSessions().length === 0) await startProfile(def as string)
+      // Not when the drawer opened to show a supplied tab, which a new shell would only cover.
+      if (willAutoLaunch && tabIds().length === 0 && !heldFocus()) await startProfile(def as string)
     } catch (failure) {
       if (live(captured)) setError(failure instanceof Error ? failure.message : 'Failed to load terminals.')
     } finally {
-      if (live(captured)) setLaunching(false)
+      if (live(captured)) {
+        setLaunching(false)
+        setRosterSettled(true)
+      }
     }
   })
 
@@ -151,11 +177,20 @@ export default function TerminalSessions(props: {
     })
   }
 
-  const applyTerminalFocus = (sessionId: string) => {
-    if (!visibleSessions().some((session) => session.id === sessionId)) return
-    setActiveId(sessionId)
+  // A requested supplied tab can arrive before its supplier's first read of the task does. It waits
+  // for that read, then shows or is dropped.
+  const [heldFocus, setHeldFocus] = createSignal<string | null>(null)
+  const applyTerminalFocus = (id: string) => {
+    const shown = tabIds().includes(id)
+    setHeldFocus(!shown && !supplied().loaded ? id : null)
+    if (!shown) return
+    setActiveId(id)
     focusActiveSurface()
   }
+  createEffect(() => {
+    const id = heldFocus()
+    if (id && supplied().loaded) untrack(() => applyTerminalFocus(id))
+  })
   onMount(() => {
     const off = clientEvents.on('presentation:terminal-focus', ({ taskId, sessionId }) => {
       if (taskId === ws()?.id) applyTerminalFocus(sessionId)
@@ -170,23 +205,23 @@ export default function TerminalSessions(props: {
   })
 
   const focusTerminalAt = (index: number) => {
-    const session = visibleSessions()[index]
-    if (!session) return
-    setActiveId(session.id)
+    const id = tabIds()[index]
+    if (!id) return
+    setActiveId(id)
     focusActiveSurface()
   }
   const stepTerminal = (step: -1 | 1) => {
-    const visible = visibleSessions()
-    if (!visible.length) return
-    const current = visible.findIndex((session) => session.id === activeId())
-    focusTerminalAt((Math.max(current, 0) + step + visible.length) % visible.length)
+    const ids = tabIds()
+    if (!ids.length) return
+    const current = ids.indexOf(activeId() ?? '')
+    focusTerminalAt((Math.max(current, 0) + step + ids.length) % ids.length)
   }
   onMount(() => {
     const numbered = Array.from({ length: 9 }, (_, index) => ({
       id: `terminal.focus.${index + 1}`,
       title: `Focus terminal ${index + 1}`,
       category: 'terminal' as const,
-      when: () => visibleSessions().length > index,
+      when: () => tabIds().length > index,
       run: () => focusTerminalAt(index),
     }))
     const commands = registerCommands([
@@ -207,7 +242,7 @@ export default function TerminalSessions(props: {
         category: 'Terminal',
         defaultChord: `meta+shift+${index + 1}`,
         when: 'task' as const,
-        active: () => visibleSessions().length > index,
+        active: () => tabIds().length > index,
       })),
       {
         id: 'terminal.focus.previous',
@@ -309,14 +344,15 @@ export default function TerminalSessions(props: {
   }
 
   // One click closes the tab: remove() kills a running session first, then drops it.
-  // Closing the last tab closes the whole drawer, and leaves the pane empty.
+  // Closing the last tab closes the whole drawer, and leaves the pane empty. A supplied tab still
+  // open keeps it.
   async function closeTab(s: TerminalSession) {
     const captured = view()
     try {
       await api.remove(s.id)
       if (!live(captured)) return
       await refreshSessions()
-      if (live(captured) && visibleSessions().length === 0) props.onClose?.()
+      if (live(captured) && tabIds().length === 0) props.onClose?.()
     } catch (failure) {
       if (live(captured)) setError(failure instanceof Error ? failure.message : 'Failed to close the terminal.')
     }
@@ -351,6 +387,13 @@ export default function TerminalSessions(props: {
           // The launching session has no id yet, so it cannot be activated or closed. It is a
           // placeholder tab that the real session replaces.
           ...(pendingTitle() ? [{ id: 'pending', label: pendingTitle()!, pending: true }] : []),
+          // Closed by its supplier, never by the person.
+          ...suppliedTabs().map((tab) => ({
+            id: tab.id,
+            label: tab.title,
+            closable: false,
+            ...(tab.icon ? { marks: [{ tone: 'muted' as const, label: tab.icon.label, icon: tab.icon.name }] } : {}),
+          })),
         ]}
         actions={
           <>
@@ -410,8 +453,8 @@ export default function TerminalSessions(props: {
             </Show>
             {/* Other plugins' controls, between the drawer's own and Hide, which stays last. Keyed on
                 the task, so a task switch remounts them and an action can't reach the next task's
-                sessions. */}
-            <Show when={taskId()} keyed>
+                sessions. Gone while a supplied tab is selected, because there is no session to act on. */}
+            <Show when={!activeSuppliedId() && taskId()} keyed>
               {(mountedTaskId) => (
                 <Slot
                   point={TERMINAL_TOOLBAR_ACTIONS_POINT}
@@ -454,7 +497,7 @@ export default function TerminalSessions(props: {
           the second session to the first tab's live xterm. An id is a string, which `<For>` compares by
           value, so a refresh that changes nothing keeps every element. */}
       <Show
-        when={visibleIds().length > 0}
+        when={tabIds().length > 0}
         fallback={
           <Show when={!launching() && !pendingTitle()} fallback={<EmptyState busy>Starting…</EmptyState>}>
             <EmptyState
@@ -485,6 +528,15 @@ export default function TerminalSessions(props: {
             />
           )}
         </For>
+        {/* Only the selected supplied tab has a view. The host's terminal view takes focus when it
+            opens, so one built behind a shell would take the caret from it, and a supplied tab's
+            output is small enough to write again on the next visit. */}
+        <Show when={activeSuppliedId()} keyed>
+          {(id) => {
+            const tab = untrack(suppliedTabs).find((candidate) => candidate.id === id)!
+            return <Rectangle kind="pty" label={tab.title} mount={(element) => attachPty(element, tab.io)} />
+          }}
+        </Show>
       </Show>
     </>
   )

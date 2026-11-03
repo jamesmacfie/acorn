@@ -4,14 +4,16 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { QueryClient, QueryClientProvider } from '@tanstack/solid-query'
 import type { ServerMsg, TerminalSession } from '@acorn/plugin-terminal/contract/wire.ts'
 import { prefsKey } from '@acorn/protocol/api.ts'
-import { PrefKeys, savePref, type Task } from '@acorn/plugin-api/client'
+import { PrefKeys, requestTerminalFocusIntent, savePref, type Task } from '@acorn/plugin-api/client'
 import {
   extensionPointRegistry,
   extensionRegistry,
+  provideClientCapability,
   type Disposable,
   type ExtensionContribution,
 } from '@acorn/plugin-api/testkit/client'
 import { TERMINAL_TOOLBAR_ACTIONS_POINT, type TerminalToolbarProps } from '../contract/toolbarActions'
+import { TERMINAL_TAB_SUPPLIER, type TerminalSuppliedTab } from '../contract/suppliedTabs'
 
 // What a terminal tab switch costs, in jsdom. A switch must not destroy an xterm and its WebGL context
 // or ask the node to serialize a thousand-line framebuffer, and nothing short of a person clicking tabs
@@ -99,6 +101,7 @@ const attachSizes: ({ cols: number; rows: number } | undefined)[] = []
 const listeners = new Map<string, (m: ServerMsg) => void>()
 const resizes: string[] = []
 const interrupts: string[] = []
+const removes: string[] = []
 vi.mock('./terminalClient', () => ({
   terminalApi: () => ({
     list: async () => {
@@ -121,7 +124,10 @@ vi.mock('./terminalClient', () => ({
       interrupts.push(id)
       return true
     },
-    remove: async () => true,
+    remove: async (id: string) => {
+      removes.push(id)
+      return true
+    },
     attach: (id: string, on: (m: ServerMsg) => void, size?: { cols: number; rows: number }) => {
       attaches.push(id)
       attachSizes.push(size)
@@ -205,6 +211,7 @@ afterEach(async () => {
   attachSizes.length = 0
   listeners.clear()
   resizes.length = 0
+  removes.length = 0
   StubTerminal.built = []
   StubWebgl.made = []
   vi.unstubAllGlobals()
@@ -761,5 +768,166 @@ describe('the terminal:toolbar-actions point', () => {
     expect(document.querySelector('[data-contributor="stopper"]')).toBeNull()
     document.querySelector<HTMLButtonElement>('button[aria-label="Stop"]')!.click()
     expect(interrupts).toEqual([A])
+  })
+})
+
+describe('tabs another plugin supplies', () => {
+  const [supplied, setSupplied] = createSignal<{ loaded: boolean; tabs: TerminalSuppliedTab[] }>({
+    loaded: true,
+    tabs: [],
+  })
+  const opened: string[] = []
+  const typed: string[] = []
+  const suppliedTab = (id: string, title = `tail ${id}`): TerminalSuppliedTab => ({
+    id,
+    title,
+    icon: { name: 'bot', label: 'Agent background command' },
+    io: {
+      open: (_size, onEvent) => {
+        opened.push(id)
+        onEvent({ kind: 'out', data: `${id} says hello` })
+        return () => {}
+      },
+      input: (data) => typed.push(data),
+      resize: () => {},
+    },
+  })
+  const selected = (): string | null =>
+    document.querySelector('[role="tab"][aria-selected="true"]')?.id.replace('terminal-tab-', '') ?? null
+  const labels = (): string[] =>
+    [...document.querySelectorAll('[role="tab"]')].map(
+      (element) => element.querySelector('.ui-doctab-text')!.textContent!,
+    )
+  let provided: Disposable
+
+  beforeEach(() => {
+    opened.length = 0
+    typed.length = 0
+    setSupplied({ loaded: true, tabs: [] })
+    provided = provideClientCapability(TERMINAL_TAB_SUPPLIER, { tabs: () => supplied() })
+  })
+  afterEach(() => {
+    provided.dispose()
+    Reflect.deleteProperty(window, 'acorn')
+  })
+
+  it('draws them after the sessions with no close button, and builds a view only for the selected one', async () => {
+    setSupplied({ loaded: true, tabs: [suppliedTab('bg-1')] })
+    mount()
+    await settle()
+
+    // The shells arrive after the supplied tab, and the drawer still opens on one of them.
+    expect([A, B]).toContain(selected())
+    expect(labels()).toEqual(['first', 'second', 'tail bg-1'])
+    expect(document.querySelector('[aria-label="Close first"]')).not.toBeNull()
+    expect(document.querySelector('[aria-label="Close tail bg-1"]')).toBeNull()
+    expect(tab('bg-1')?.getAttribute('aria-label')).toBe('tail bg-1, Agent background command')
+    expect(opened).toEqual([])
+
+    tab('bg-1')?.click()
+    await settle()
+    expect(opened).toEqual(['bg-1'])
+    expect(StubTerminal.built.at(-1)?.written).toEqual(['bg-1 says hello'])
+    // Nothing to stop and no session for another plugin's control to act on.
+    expect(document.querySelector('button[aria-label="Stop"]')).toBeNull()
+
+    // A list update that keeps the tab, with new objects, keeps its view.
+    setSupplied({ loaded: true, tabs: [suppliedTab('bg-1')] })
+    await settle()
+    expect(opened).toEqual(['bg-1'])
+  })
+
+  it('holds a request for a tab its supplier has not read yet, then shows it', async () => {
+    setSupplied({ loaded: false, tabs: [] })
+    requestTerminalFocusIntent('t1', 'bg-2')
+    mount()
+    await settle()
+    expect(selected()).not.toBe('bg-2')
+
+    setSupplied({ loaded: true, tabs: [suppliedTab('bg-2')] })
+    await settle()
+    expect(selected()).toBe('bg-2')
+  })
+
+  it('drops a held request the supplier never lists', async () => {
+    setSupplied({ loaded: false, tabs: [] })
+    requestTerminalFocusIntent('t1', 'bg-gone')
+    mount()
+    await settle()
+    tab(B)?.click()
+    await settle()
+
+    setSupplied({ loaded: true, tabs: [] })
+    await settle()
+    expect(selected()).toBe(B)
+  })
+
+  it('starts no shell in a task with none when it opens to show a supplied tab', async () => {
+    roster = []
+    setSupplied({ loaded: true, tabs: [suppliedTab('bg-3')] })
+    requestTerminalFocusIntent('t1', 'bg-3')
+    mount({ defaultProfile: 'shell' })
+    await settle()
+    expect(created).toEqual([])
+    expect(selected()).toBe('bg-3')
+
+    // When the command ends, the drawer shows its empty state rather than starting one.
+    setSupplied({ loaded: true, tabs: [] })
+    await settle()
+    expect(created).toEqual([])
+    expect(document.body.textContent).toContain('No terminals')
+  })
+
+  it('still starts the default shell in a task with no tabs at all', async () => {
+    roster = []
+    mount({ defaultProfile: 'shell' })
+    await settle()
+    expect(created).toEqual(['create'])
+  })
+
+  it('ignores Cmd+W on a supplied tab and still closes a shell with it', async () => {
+    let closePane = () => {}
+    Object.defineProperty(window, 'acorn', {
+      configurable: true,
+      value: {
+        onClosePane: (callback: () => void) => {
+          closePane = callback
+          return () => {}
+        },
+        onCommandPalette: () => () => {},
+        onWillQuit: () => () => {},
+        openConfigFile: async () => {},
+      },
+    })
+    setSupplied({ loaded: true, tabs: [suppliedTab('bg-4')] })
+    mount()
+    await settle()
+
+    tab('bg-4')?.click()
+    tab('bg-4')?.focus()
+    await settle()
+    closePane()
+    await settle()
+    expect(removes).toEqual([])
+    expect(labels()).toContain('tail bg-4')
+
+    tab(A)?.click()
+    tab(A)?.focus()
+    await settle()
+    closePane()
+    await settle()
+    expect(removes).toEqual([A])
+  })
+
+  it('selects the first tab when the selected supplied tab goes away', async () => {
+    setSupplied({ loaded: true, tabs: [suppliedTab('bg-5'), suppliedTab('bg-6')] })
+    mount()
+    await settle()
+    tab('bg-6')?.click()
+    await settle()
+
+    setSupplied({ loaded: true, tabs: [suppliedTab('bg-5')] })
+    await settle()
+    expect(selected()).toBe(A)
   })
 })

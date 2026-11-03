@@ -1,6 +1,12 @@
 import { sql } from 'drizzle-orm'
 import type { PluginDatabase } from '@acorn/plugin-api/node'
-import type { AgentEventRecord, AgentSession, AgentToolCall, AgentTurn } from '../../contract/wire'
+import type {
+  AgentBackgroundCommand,
+  AgentEventRecord,
+  AgentSession,
+  AgentToolCall,
+  AgentTurn,
+} from '../../contract/wire'
 import { isActiveSubagent } from './stateMachine'
 import { mergeToolCall } from '../../shared/toolFold'
 
@@ -107,6 +113,39 @@ export function unfinishedCommands(tx: Transaction, scope: CommandScope = {}): A
         tool: mergeToolCall(JSON.parse(openerJson).tool, JSON.parse(eventJson).tool),
       },
     }))
+}
+
+/**
+ * The task's background commands still running, oldest first, for the terminal drawer's tabs.
+ *
+ * Only sessions whose harness is alive are read, because `commandStatus` says no other session can
+ * have one running. Most of a task's sessions are stopped, so this skips most of the ledger.
+ */
+export function runningBackgroundCommands(
+  tx: Transaction,
+  sessions: readonly AgentSession[],
+): AgentBackgroundCommand[] {
+  const live = sessions.filter(
+    (session) => !['stopped', 'failed', 'archived', 'reconnecting'].includes(session.runtimeState),
+  )
+  return live
+    .flatMap((session) =>
+      unfinishedCommands(tx, { sessionId: session.id }).flatMap((record) => {
+        if (record.event.type !== 'tool') return []
+        const tool = record.event.tool
+        if (!tool.background || commandStatus(tool, undefined, session) !== 'running') return []
+        return [
+          {
+            sessionId: session.id,
+            turnId: record.turnId,
+            toolCallId: tool.id,
+            title: tool.title || 'Command',
+            startedAt: record.createdAt,
+          },
+        ]
+      }),
+    )
+    .sort((left, right) => left.startedAt - right.startedAt)
 }
 
 export function commandTurnQuery(sessionId: string, tool: AgentToolCall) {

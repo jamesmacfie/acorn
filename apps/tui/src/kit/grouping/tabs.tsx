@@ -144,6 +144,7 @@ export function DocumentTabs(props: {
     title?: string
     fileStatus?: { letter: string; label: string; tone: 'muted' | 'ok' | 'accent' | 'danger' }
     marks?: readonly { tone: 'muted' | 'warn' | 'danger'; label: string; icon?: string }[]
+    closable?: boolean
   }[]
   active: string
   onActivate: (id: string) => void
@@ -194,7 +195,7 @@ export function DocumentTabs(props: {
         return true
       },
       delete: () => {
-        if (!props.onClose) return false
+        if (!props.onClose || props.tabs.find((tab) => tab.id === props.active)?.closable === false) return false
         props.onClose(props.active)
         return true
       },
@@ -250,7 +251,7 @@ export function DocumentTabs(props: {
                   tone={tab.dirty ? 'accent' : tab.status === 'warn' ? 'warn' : undefined}
                 >
                   {tab.dirty ? ' ●' : ''}
-                  {props.active === tab.id && props.onClose ? ' ×' : ''}
+                  {props.active === tab.id && props.onClose && tab.closable !== false ? ' ×' : ''}
                 </Line>
               </box>
               {props.menu && (

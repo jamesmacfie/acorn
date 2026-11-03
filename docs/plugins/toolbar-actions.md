@@ -22,6 +22,8 @@ input or output, no environment, and no command history. A need for any of those
 capability, not a toolbar prop.
 
 The terminal client has no native page, so Preview isn't offered there and its point never draws.
+The terminal's point doesn't draw while a [supplied terminal tab](./supplied-terminal-tabs.md) is
+selected, because there is no session for it to act on.
 
 ```ts
 const answer = await mount.host.invoke('interrupt', { expectedSessionId: props.session.id })

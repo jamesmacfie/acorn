@@ -20,6 +20,7 @@ import {
 import type { CoreServices, PluginDatabase, SearchHit } from '@acorn/plugin-api/node'
 import * as schema from '../../node/schema'
 import type {
+  AgentBackgroundCommand,
   AgentEventPage,
   AgentEventRecord,
   AgentNormalizedEvent,
@@ -1339,6 +1340,19 @@ export class AgentStore {
   async toolCall(sessionId: string, toolId: string): Promise<AgentToolCallRead | null> {
     const { readToolCall } = await import('./toolCallRead')
     return this.db.transaction((tx) => readToolCall(tx, sessionId, toolId))
+  }
+
+  /** The task's background commands still running, across its sessions (`runningBackgroundCommands`). */
+  async runningBackgroundCommands(taskId: string): Promise<AgentBackgroundCommand[]> {
+    const { runningBackgroundCommands } = await import('./commandLifecycle')
+    return this.db.transaction((tx) => {
+      const sessions = tx
+        .select()
+        .from(schema.agentSessions)
+        .where(and(eq(schema.agentSessions.taskId, taskId), isNull(schema.agentSessions.archivedAt)))
+        .all()
+      return runningBackgroundCommands(tx, sessions.map(mapAgentSession))
+    })
   }
 
   async unfinishedCommands(scope: CommandScope = {}): Promise<AgentEventRecord[]> {

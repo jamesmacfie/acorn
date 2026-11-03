@@ -68,6 +68,7 @@ it('folds a call whose rows fit in one page', async () => {
     }),
     turnId: null,
     taskId,
+    seq: 2,
   })
 })
 

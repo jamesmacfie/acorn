@@ -1,9 +1,10 @@
 // The two command reads against a real migrated ledger: what they return, and which index they use.
 import { randomUUID } from 'node:crypto'
-import { afterEach, beforeEach, expect, it } from 'vitest'
-import { sql } from 'drizzle-orm'
+import { afterEach, beforeEach, expect, it, vi } from 'vitest'
+import { eq, sql } from 'drizzle-orm'
 import { makeTestNodeContext, type TestNodeContext } from '@acorn/plugin-api/testkit'
 import type { AgentProviderDescriptor, AgentToolCall } from '../../contract/wire.ts'
+import * as schema from '../../node/schema'
 import {
   commandTurn,
   type CommandScope,
@@ -37,10 +38,10 @@ beforeEach(() => {
 })
 afterEach(() => ctx.cleanup())
 
-const newSession = async () =>
+const newSession = async (taskId = randomUUID()) =>
   (
     await store.createSession(
-      { taskId: randomUUID(), providerId: 'fake', profileId: 'fake', kind: 'interactive', config: {} },
+      { taskId, providerId: 'fake', profileId: 'fake', kind: 'interactive', config: {} },
       PROVIDER,
     )
   ).id
@@ -122,4 +123,52 @@ it('finds the owner of a late update through the tool index', async () => {
   await store.recordEvent(sessionId, turnId, tool({ id: 'cmd', status: 'running' }))
   expect(ctx.storage.open().transaction((tx) => commandTurn(tx, sessionId, { id: 'cmd', title: '' }))).toBe(turnId)
   expect(plan(commandTurnQuery(sessionId, { id: 'cmd', title: '' }))).toContain('agent_events_session_tool_idx')
+})
+
+it("lists the task's running background commands across its sessions, oldest first", async () => {
+  vi.useFakeTimers({ toFake: ['Date'] })
+  try {
+    const taskId = randomUUID()
+    const [first, second, stopped, elsewhere] = [
+      await newSession(taskId),
+      await newSession(taskId),
+      await newSession(taskId),
+      await newSession(),
+    ]
+    const turnOf = new Map<string, string>()
+    for (const sessionId of [first, second, stopped, elsewhere]) turnOf.set(sessionId, await newTurn(sessionId))
+    const launch = (sessionId: string, id: string, title: string) =>
+      store.recordEvent(sessionId, turnOf.get(sessionId)!, tool({ id, title, status: 'running', background: true }))
+
+    vi.setSystemTime(1_000)
+    await launch(second, 'server', 'pnpm dev')
+    vi.setSystemTime(2_000)
+    await launch(first, 'tests', 'pnpm test --watch')
+    await launch(first, 'build', 'pnpm build')
+    await store.recordEvent(first, turnOf.get(first)!, tool({ id: 'build', status: 'completed', exitCode: 0 }))
+    await store.recordEvent(first, turnOf.get(first)!, tool({ id: 'plain', title: 'ls', status: 'running' }))
+    // Output carries no status, so the command still reads running.
+    await store.recordEvent(first, turnOf.get(first)!, tool({ id: 'tests', output: 'ok\n', outputAppend: true }))
+    await launch(stopped, 'orphan', 'sleep 100')
+    await launch(elsewhere, 'other', 'pnpm dev')
+    ctx.storage
+      .open()
+      .update(schema.agentSessions)
+      .set({ runtimeState: 'stopped' })
+      .where(eq(schema.agentSessions.id, stopped))
+      .run()
+
+    expect(await store.runningBackgroundCommands(taskId)).toEqual([
+      { sessionId: second, turnId: turnOf.get(second), toolCallId: 'server', title: 'pnpm dev', startedAt: 1_000 },
+      {
+        sessionId: first,
+        turnId: turnOf.get(first),
+        toolCallId: 'tests',
+        title: 'pnpm test --watch',
+        startedAt: 2_000,
+      },
+    ])
+  } finally {
+    vi.useRealTimers()
+  }
 })

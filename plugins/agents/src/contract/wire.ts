@@ -616,6 +616,20 @@ export type AgentToolCallRead = {
   tool: AgentToolCall
   turnId: string | null
   taskId: string
+  /** The newest ledger row folded into `tool`. A reader that also follows event frames skips the
+   *  ones at or below it, because they are already in the fold. */
+  seq: number
+}
+
+/** A background command that is still running, as the task's terminal drawer lists it
+ *  (docs/managed-agents/background-commands.md). Its output stays on its card. */
+export type AgentBackgroundCommand = {
+  sessionId: string
+  turnId: string | null
+  toolCallId: string
+  title: string
+  /** When its card first read running in the background. For Codex that is when its turn ended. */
+  startedAt: number
 }
 
 export type AgentDeleteResult = {

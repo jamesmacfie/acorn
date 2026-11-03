@@ -23,6 +23,7 @@ import type {
   AgentEventPage,
   AgentAttachment,
   AgentArtifact,
+  AgentBackgroundCommand,
   AgentDeleteResult,
   AgentFootprint,
   AgentProviderDescriptor,
@@ -105,6 +106,7 @@ export type ManagedAgentsBridge = {
   events(sessionId: string, afterSeq?: number, limit?: number, foldTools?: boolean): Promise<AgentEventPage>
   /** Rejects with a 404 for a call the session doesn't have. */
   toolCall(sessionId: string, toolId: string): Promise<AgentToolCallRead>
+  runningBackgroundCommands(taskId: string): Promise<AgentBackgroundCommand[]>
   enqueueTurn(sessionId: string, input: EnqueueAgentTurnInput): Promise<AgentTurn>
   implementCodexPlan(sessionId: string, itemId: string): Promise<AgentTurn>
   patchQueuedTurn(
@@ -439,6 +441,14 @@ export const managedAgents = new Hono<AppEnv>()
     const filter = confineFilter(c, rest)
     if (!filter) return respondError(c, 404, 'not_found')
     return viaBridge(c, MANAGED_AGENTS, (bridge) => bridge.search(q, filter))
+  })
+  // The task's running background commands, for the terminal drawer (docs/managed-agents/background-commands.md).
+  .get('/background-commands', (c) => {
+    const parsed = z.object({ taskId: z.string().uuid() }).safeParse(c.req.query())
+    if (!parsed.success) return respondError(c, 400, 'bad_request')
+    // taskId is a query param here, so no mount and no resolver reaches it.
+    if (!mayActOnTask(c, parsed.data.taskId)) return respondError(c, 404, 'not_found')
+    return viaBridge(c, MANAGED_AGENTS, (bridge) => bridge.runningBackgroundCommands(parsed.data.taskId))
   })
   .post('/sessions', async (c) => {
     const key = idempotencyKey(c.req.raw.headers)

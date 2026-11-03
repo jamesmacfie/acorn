@@ -1,7 +1,8 @@
 # The terminal drawer
 
-This page covers the client side of the terminal plugin: the desktop drawer, the phone's pane, why its
-terminals outlive their task, the `pty` rectangle and `attachPty`, and the terminal client's sessions view. The client is
+This page covers the client side of the terminal plugin: the desktop drawer, its supplied tabs, the
+phone's pane, why its terminals outlive their task, the `pty` rectangle and `attachPty`, and the
+terminal client's sessions view. The client is
 in `plugins/terminal/src/client/`.
 
 ## Client
@@ -21,6 +22,16 @@ terminal.
 the selected session's id, title, and running state, and can ask for `interrupt`. The drawer sends the
 same interrupt as its own control, and only after a person's press inside that contributor's tree
 ([toolbar actions](../plugins/toolbar-actions.md)).
+
+## Supplied tabs
+
+Another compiled plugin can put read-only tabs in the strip, after the task's sessions, through
+`TERMINAL_TAB_SUPPLIER` ([supplied terminal tabs](../plugins/supplied-terminal-tabs.md)). The agents
+plugin gives one per running background command. A supplied tab has no close button, ignores `Cmd+W`,
+and hides **Stop** and the toolbar actions while it's selected. Its body is an `attachPty` view, built
+only while the tab is selected, whose input goes nowhere. The drawer doesn't auto-launch a shell while
+the strip has a supplied tab or holds a request for one, so opening it to watch a command never starts
+a shell.
 
 ## The phone's terminal pane
 

@@ -167,6 +167,7 @@ export function managedAgentsBridge(
         if (!read) throw new BridgeError(404, 'not_found', 'This session has no such tool call.')
         return read
       }),
+    runningBackgroundCommands: (taskId) => guarded(() => runtime.store.runningBackgroundCommands(taskId)),
     enqueueTurn: (sessionId, input) => guarded(() => runtime.enqueueTurn(sessionId, input)),
     implementCodexPlan: (sessionId, itemId) => guarded(() => runtime.implementCodexPlan(sessionId, itemId)),
     patchQueuedTurn: (sessionId, turnId, patch) => guarded(() => runtime.patchQueuedTurn(sessionId, turnId, patch)),
