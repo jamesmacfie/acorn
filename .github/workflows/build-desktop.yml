@@ -85,6 +85,11 @@ jobs:
           node-version: 24
           cache: pnpm
       - run: pnpm install --frozen-lockfile
+      # node-pty has no Linux prebuild, and a restored pnpm cache can hold a copy another Linux job
+      # installed without its build, so the install leaves no pty.node. This compiles it when it can't
+      # load and returns at once where it can, as before the test shards (ci.yml).
+      - name: Build node-pty for this runner
+        run: pnpm rebuild:node
 
       - uses: dtolnay/rust-toolchain@6bed0761d98439e5a578e2877258200ad565ba87 # stable
         with:
