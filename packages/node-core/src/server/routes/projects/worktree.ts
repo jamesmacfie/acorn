@@ -2,8 +2,15 @@ import { recordSetupDecision } from '../../taskScripts/setup'
 import { Hono } from 'hono'
 import { z } from 'zod'
 import type { TeardownResult } from '../../storage/archive'
-import { taskIdsQuerySchema, type ArchiveOpts, type ArchiveResult } from '@acorn/protocol/task.ts'
+import {
+  ARCHIVE_RUN_WAIT_MS,
+  taskIdsQuerySchema,
+  type ArchiveOpts,
+  type ArchiveResult,
+  type ArchiveRun,
+} from '@acorn/protocol/task.ts'
 import { archiveTask, restoreTask, taskArchiveTree } from '../../storage/archive'
+import { archiveRunState, startArchiveRun } from '../../storage/archiveRuns'
 import { runProcess } from '../../core/proc'
 import { broadcastWorktreeStatusChanged } from '../../notify'
 import { buildSessionEnv } from '../../taskEnv'
@@ -221,6 +228,30 @@ export const worktree = new Hono<AppEnv>()
         throw new BridgeError(404, 'not_found')
       return archive(getDb(c.env), c.req.param('id'), parsed.data, sessions)
     })
+  })
+  // The same archive, answered as soon as it starts, because a teardown script can outlast any one
+  // request (docs/workspaces-and-tasks/background-archive.md). The caller reads the outcome from the
+  // GET below.
+  .post('/tasks/:id/archive-run', async (c) => {
+    const parsed = archiveBody.safeParse(await c.req.json().catch(() => ({})))
+    if (!parsed.success) return respondError(c, 400, 'bad_request')
+    const sessions = routeCapabilityFor(c, TASK_SESSIONS)
+    if (!sessions) return respondError(c, 503, 'bridge-unavailable')
+    const db = getDb(c.env)
+    const id = c.req.param('id')
+    if (taskArchiveTree(db, id).some((task) => !mayActOnTask(c, task.id))) return respondError(c, 404, 'not_found')
+    startArchiveRun(id, async () => {
+      await sessions.ready()
+      return archive(db, id, parsed.data, sessions)
+    })
+    return c.json({ state: 'running' } satisfies ArchiveRun, 202)
+  })
+  // `waitMs` holds the answer until the archive finishes or that long passes, whichever is first.
+  .get('/tasks/:id/archive-run', async (c) => {
+    const id = c.req.param('id')
+    if (!mayActOnTask(c, id)) return respondError(c, 404, 'not_found')
+    const waitMs = Math.min(Math.max(Number(c.req.query('waitMs')) || 0, 0), ARCHIVE_RUN_WAIT_MS)
+    return c.json(await archiveRunState(id, waitMs))
   })
   .post('/tasks/:id/restore', async (c) => {
     const parsed = restoreBody.safeParse(await c.req.json().catch(() => ({})))

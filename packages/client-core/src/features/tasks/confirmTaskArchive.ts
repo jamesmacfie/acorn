@@ -94,12 +94,15 @@ export async function archiveOrDeleteTask(
     const deleted = await bridge.task.delete(taskId)
     return deleted.ok ? { ok: true, archivedTaskIds: deleted.taskIds } : { ...deleted, archivedTaskIds }
   }
-  if (action !== DELETE_TASK_ACTION) return bridge.task.archive(taskId, { deleteWorktree: true, ...archiveOpts })
-  const deleted = await bridge.task.delete(taskId, archiveOpts)
-  if (!deleted.ok) return deleted
+  // A delete archives first, here rather than inside the delete route, so the teardown runs in the
+  // background however long it takes. The delete of the archived tree that follows is quick.
+  const archived = await bridge.task.archive(taskId, { deleteWorktree: true, ...archiveOpts })
+  if (action !== DELETE_TASK_ACTION || !archived.ok) return archived
+  const deleted = await bridge.task.delete(taskId)
+  if (!deleted.ok) return { ...deleted, archivedTaskIds: archived.archivedTaskIds ?? [taskId] }
   return {
     ok: true,
     archivedTaskIds: deleted.taskIds,
-    ...(deleted.cleanupFailed ? { cleanupFailed: deleted.cleanupFailed } : {}),
+    ...(archived.cleanupFailed ? { cleanupFailed: archived.cleanupFailed } : {}),
   }
 }

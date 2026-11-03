@@ -165,6 +165,34 @@ describe('worktree routes', () => {
     expect(seen).toEqual(['count:task1'])
   })
 
+  // A teardown script can outlast any one request, so the start answers first and the outcome is read
+  // after. The held `ready` stands in for the slow part.
+  it('archives in the background: answers before the archive finishes, then waits for its outcome', async () => {
+    const app = authed()
+    expect((await app.fetch(req('/core/tasks/task1/archive-run', 'POST', { force: true }), env())).status).toBe(503)
+
+    let release!: () => void
+    const held = new Promise<void>((resolve) => (release = resolve))
+    setTaskSessionsBridge(sessions({ ready: () => held }))
+    const started = await app.fetch(req('/core/tasks/task1/archive-run', 'POST', { force: true }), env())
+    expect(started.status).toBe(202)
+    expect(await started.json()).toEqual({ state: 'running' })
+    // A second start joins the archive already running.
+    expect((await app.fetch(req('/core/tasks/task1/archive-run', 'POST', { force: true }), env())).status).toBe(202)
+    expect(await (await app.fetch(req('/core/tasks/task1/archive-run?waitMs=10'), env())).json()).toEqual({
+      state: 'running',
+    })
+    expect((await loadTask(testDb.db, 'task1'))?.status).toBe('active')
+
+    const waiting = app.fetch(req('/core/tasks/task1/archive-run?waitMs=20000'), env())
+    release()
+    expect(await (await waiting).json()).toEqual({ state: 'finished', result: { ok: true } })
+    expect((await loadTask(testDb.db, 'task1'))?.status).toBe('archived')
+    expect(await (await app.fetch(req('/core/tasks/never-started/archive-run'), env())).json()).toEqual({
+      state: 'none',
+    })
+  })
+
   it('delete archives an active task, deletes it, and tells plugins which ids went', async () => {
     const deleted = vi.fn(async () => undefined)
     const handler = registerHookHandler({
@@ -225,6 +253,8 @@ describe('worktree routes', () => {
       .route('/core', worktree)
     const response = await confined.fetch(req('/core/tasks/task1/archive', 'POST', { force: true }), env())
     expect(response.status).toBe(404)
+    const started = await confined.fetch(req('/core/tasks/task1/archive-run', 'POST', { force: true }), env())
+    expect(started.status).toBe(404)
     expect((await testDb.db.select().from(schema.tasks)).every((row) => row.status === 'active')).toBe(true)
   })
 

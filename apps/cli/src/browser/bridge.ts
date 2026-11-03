@@ -20,7 +20,13 @@ import { ACCOUNT_TICKET_ROUTE } from '@acorn/plugin-account/contract/routes.ts'
 import { nodeAdoptResultSchema, type NodeProvidersResponse } from '@acorn/protocol/nodeProviders.ts'
 import { dataRootDir, runningNode } from '@acorn/custody/local'
 import type { NodeFetchBody, NodeFetchResponse, NodeStatus } from '@acorn/protocol/broker.ts'
-import type { ArchiveResult, DeleteResult } from '@acorn/protocol/task.ts'
+import {
+  ARCHIVE_RUN_WAIT_MS,
+  archiveInBackground,
+  type ArchiveResult,
+  type ArchiveRun,
+  type DeleteResult,
+} from '@acorn/protocol/task.ts'
 import {
   ATTACHMENT_MAX_BYTES,
   NATIVE_REPLY_MAX_CHARS,
@@ -39,6 +45,7 @@ import {
   projectConfigRoute,
   projectsRoute,
   taskArchiveRoute,
+  taskArchiveRunRoute,
   taskDeleteRoute,
   tasksRoute,
   workspacesRoute,
@@ -367,6 +374,8 @@ export function createBridge(options: {
       form?: Extract<NodeFetchBody, { kind: 'form' }>
       key?: string
       maxResponseBytes?: number
+      // A read the Node may hold open, sent through the broker's own pool for those.
+      long?: boolean
       // A POST that changes nothing, such as a handoff resolution, is a read: refused if the selection
       // moved while it was out, and never reported as an uncertain change.
       read?: boolean
@@ -390,6 +399,7 @@ export function createBridge(options: {
             ? { body: request.form }
             : {}),
         ...(request.maxResponseBytes ? { maxResponseBytes: request.maxResponseBytes } : {}),
+        ...(request.long ? { long: true } : {}),
       })
     } catch (error) {
       if (!write) requireSelected(nodeId)
@@ -967,17 +977,47 @@ export function createBridge(options: {
       }
       case 'task.archive':
       case 'task.delete': {
+        const { nodeId, taskId } = request
         // No `force`, so the Node refuses a worktree with uncommitted changes rather than discard them.
-        const result = (await nodeRequest(request.nodeId, {
+        const body = { deleteWorktree: true }
+        // A teardown script can outlast any one request, so the Node archives in the background and
+        // this waits on the outcome. A delete archives first, so its teardown runs the same way.
+        // The start sends no key: a second start joins the archive already running, and starting one
+        // for an archived task answers ok. The key goes on the call that has no such guard.
+        const archived = await archiveInBackground({
+          start: () =>
+            (
+              nodeRequest(nodeId, { method: 'POST', path: taskArchiveRunRoute(taskId), body }) as Promise<ArchiveRun>
+            ).catch((error: unknown) => {
+              if (error instanceof BridgeFailure && error.code === 'not_found') return null
+              throw error
+            }),
+          wait: () =>
+            nodeRequest(nodeId, {
+              method: 'GET',
+              path: `${taskArchiveRunRoute(taskId)}?waitMs=${ARCHIVE_RUN_WAIT_MS}`,
+              long: true,
+            }) as Promise<ArchiveRun>,
+          legacy: () =>
+            nodeRequest(nodeId, {
+              method: 'POST',
+              path: taskArchiveRoute(taskId),
+              ...(request.op === 'task.archive' ? { key: request.key } : {}),
+              body,
+            }) as Promise<ArchiveResult>,
+        })
+        if (!archived?.ok)
+          throw new BridgeFailure('node_error', archived?.reason ?? 'The Node returned an unreadable answer.')
+        if (request.op === 'task.archive') return { nodeId, taskIds: archived.archivedTaskIds ?? [taskId] }
+        const deleted = (await nodeRequest(nodeId, {
           method: 'POST',
-          path: request.op === 'task.archive' ? taskArchiveRoute(request.taskId) : taskDeleteRoute(request.taskId),
+          path: taskDeleteRoute(taskId),
           key: request.key,
-          body: request.op === 'task.archive' ? { deleteWorktree: true } : {},
-        })) as ArchiveResult | DeleteResult | null
-        if (!result?.ok)
-          throw new BridgeFailure('node_error', result?.reason ?? 'The Node returned an unreadable answer.')
-        const taskIds = 'taskIds' in result ? result.taskIds : (result.archivedTaskIds ?? [request.taskId])
-        return { nodeId: request.nodeId, taskIds }
+          body: {},
+        })) as DeleteResult | null
+        if (!deleted?.ok)
+          throw new BridgeFailure('node_error', deleted?.reason ?? 'The Node returned an unreadable answer.')
+        return { nodeId, taskIds: deleted.taskIds }
       }
       case 'session.cancel': {
         await nodeRequest(request.nodeId, {

@@ -12,6 +12,32 @@ export type ArchiveResult =
   | { ok: true; cleanupFailed?: string[]; archivedTaskIds?: string[] }
   | { ok: false; reason: string; teardownFailed?: boolean; output?: string; archivedTaskIds?: string[] }
 
+// What the Node knows about an archive running in the background
+// (docs/workspaces-and-tasks/background-archive.md). `none` means it holds no record: none was
+// started, the Node restarted since, or the finished answer expired.
+export type ArchiveRun = { state: 'running' } | { state: 'finished'; result: ArchiveResult } | { state: 'none' }
+
+// The longest a client asks the Node to hold one wait open. It stays under the broker's 30-second
+// request deadline, which is why archive runs in the background at all.
+export const ARCHIVE_RUN_WAIT_MS = 20_000
+
+const LOST_ARCHIVE =
+  'The Node lost track of this archive, which happens when it restarts. If the task is still listed, archive it again.'
+
+/** Archives in the background and waits for the outcome, so no one request outlives a client's deadline
+ *  however long the teardown script runs. `start` answers null for a Node without the background routes,
+ *  and `legacy` then archives in one request. Mixed-version path until 2027-02-02. */
+export async function archiveInBackground(io: {
+  start(): Promise<ArchiveRun | null>
+  wait(): Promise<ArchiveRun>
+  legacy(): Promise<ArchiveResult>
+}): Promise<ArchiveResult> {
+  let run = await io.start()
+  if (!run) return io.legacy()
+  while (run.state === 'running') run = await io.wait()
+  return run.state === 'finished' ? run.result : { ok: false, reason: LOST_ARCHIVE }
+}
+
 export type ArchiveOpts = {
   deleteWorktree?: boolean
   force?: boolean

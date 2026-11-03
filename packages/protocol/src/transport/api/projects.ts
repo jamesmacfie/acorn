@@ -241,6 +241,9 @@ export const projectMcpRoute = (id: string) => `${projectRoute(id)}/mcp`
 export const projectMcpStarterRoute = (id: string) => `${projectRoute(id)}/mcp/starter`
 export type ProjectMcpFile = { file: string; servers: McpServerSummary[] }
 export const taskArchiveRoute = (id: string) => `/v1/core/tasks/${id}/archive`
+// The same archive, answered before it runs: POST starts it, GET reads or waits for its outcome
+// (docs/workspaces-and-tasks/background-archive.md).
+export const taskArchiveRunRoute = (id: string) => `/v1/core/tasks/${id}/archive-run`
 export const taskRestoreRoute = (id: string) => `/v1/core/tasks/${id}/restore`
 // Delete a task for good (docs/workspaces-and-tasks/archive.md § Deleting a task). Device-only.
 export const taskDeleteRoute = (id: string) => `/v1/core/tasks/${id}/delete`

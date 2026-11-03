@@ -65,9 +65,9 @@ the folder goes back where it was. Any other set-aside folder is deleted.
 The teardown, the stops, and the cleanups sit before removal, so anything that needs the worktree
 still has it, and nothing is writing into it when it goes.
 
-The teardown takes seconds. While it runs, the task's close button and its rail row both spin. One
-flag in `packages/client-core/src/features/tasks/archiveLifecycle.ts` holds that state until the
-archive finishes or fails. On the rail row, teardown is the highest-priority marker
+While the teardown runs, which can take minutes, the close button and rail row spin. One flag in
+`packages/client-core/src/features/tasks/archiveLifecycle.ts` holds that state until the archive
+finishes or fails ([in the background](./background-archive.md)). On the rail row, teardown is the highest-priority marker
 ([status markers](../ui-design/shell-hierarchy.md#status-markers)). Markers it outranks keep their
 place in the row's tooltip.
 
@@ -149,8 +149,8 @@ Delete is `POST /v1/core/tasks/:id/delete`. Unlike archive, it's device-only: a 
 token can archive its own tree but never delete one. The Node runs these steps:
 
 1. If any task in the tree is still active, archive the tree first with the options you chose. A
-   refused archive stops the delete and answers with the archive's reason. Without the terminal
-   plugin, the client archives with the status flip first and then deletes.
+   refused archive stops the delete with its reason. Clients archive [in the background](./background-archive.md)
+   first, then delete. Without the terminal plugin, they archive with the status flip instead.
 2. Claim every task in the tree with the archive gate and check that each is still archived. Another
    archive in progress, or a restore that got there first, answers 409.
 3. In one core transaction, delete the `tasks`, `task_change_requests`, `task_pulls`, `task_links`, and `task_script_attempts`

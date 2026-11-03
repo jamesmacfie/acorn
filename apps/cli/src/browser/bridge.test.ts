@@ -130,6 +130,10 @@ async function fakeNode(nodeId: string, options: { protocolVersion?: number } = 
     archives: [] as { key: string; body: unknown }[],
     // Every task archive or delete, with its path and key.
     taskRemovals: [] as { path: string; key: string; body: unknown }[],
+    // Set to play a Node without the background archive routes.
+    legacyArchive: false,
+    // Each background archive's outcome, which its first wait reports as still running.
+    archiveRuns: new Map<string, { result: unknown; waited: boolean }>(),
     // Every stop of a session's turn, with its key.
     cancels: [] as { key: string; body: unknown }[],
     // The body of the last session start.
@@ -334,7 +338,17 @@ async function fakeNode(nodeId: string, options: { protocolVersion?: number } = 
         },
         { id: 'orphan', name: 'Orphan', providerId: 'gone', options: {}, instructions: '', source: { kind: 'user' } },
       ])
-    if (/^\/v1\/core\/tasks\/[^/]+\/(archive|delete)$/.test(url.pathname) && req.method === 'POST') {
+    const archiveRun = /^\/v1\/core\/tasks\/([^/]+)\/archive-run$/.exec(url.pathname)
+    if (archiveRun && !state.legacyArchive && req.method === 'GET') {
+      const run = state.archiveRuns.get(archiveRun[1]!)
+      if (!run) return reply(200, { state: 'none' })
+      if (!run.waited) return ((run.waited = true), reply(200, { state: 'running' }))
+      return reply(200, { state: 'finished', result: run.result })
+    }
+    if (
+      /^\/v1\/core\/tasks\/[^/]+\/(archive|delete)$/.test(url.pathname) ||
+      (archiveRun && !state.legacyArchive && req.method === 'POST')
+    ) {
       let body = ''
       for await (const chunk of req) body += chunk
       state.taskRemovals.push({
@@ -342,10 +356,14 @@ async function fakeNode(nodeId: string, options: { protocolVersion?: number } = 
         key: String(req.headers['idempotency-key']),
         body: JSON.parse(body),
       })
-      if (url.pathname.includes('dirty')) return reply(200, { ok: false, reason: 'Worktree has uncommitted changes.' })
-      return url.pathname.endsWith('/delete')
-        ? reply(200, { ok: true, taskIds: ['t1', 't2'] })
-        : reply(200, { ok: true, archivedTaskIds: ['t1', 't2'] })
+      const result = url.pathname.includes('dirty')
+        ? { ok: false, reason: 'Worktree has uncommitted changes.' }
+        : url.pathname.endsWith('/delete')
+          ? { ok: true, taskIds: ['t1', 't2'] }
+          : { ok: true, archivedTaskIds: ['t1', 't2'] }
+      if (!archiveRun) return reply(200, result)
+      state.archiveRuns.set(archiveRun[1]!, { result, waited: false })
+      return reply(202, { state: 'running' })
     }
     if (url.pathname === '/v1/p/agents/sessions/s1/cancel' && req.method === 'POST') {
       let body = ''
@@ -1021,7 +1039,9 @@ describe('browser bridge agent operations', () => {
     expect(node.state.archives).toEqual([{ key: 'archive-key-1', body: { archived: true } }])
   })
 
-  it('archives and deletes a task through the core routes, without forcing', async () => {
+  // The archive runs in the background on the Node, so a teardown script longer than one request's
+  // deadline still reports its outcome. A delete archives the same way first.
+  it('archives and deletes a task in the background, waiting out a running archive, without forcing', async () => {
     const { call, node } = await selected()
     expect(await call({ op: 'task.archive', nodeId: 'node-a', taskId: 't1', key: 'k1' })).toEqual({
       nodeId: 'node-a',
@@ -1036,9 +1056,22 @@ describe('browser bridge agent operations', () => {
       message: 'Worktree has uncommitted changes.',
     })
     expect(node.state.taskRemovals).toEqual([
-      { path: '/v1/core/tasks/t1/archive', key: 'k1', body: { deleteWorktree: true } },
+      { path: '/v1/core/tasks/t1/archive-run', key: 'undefined', body: { deleteWorktree: true } },
+      { path: '/v1/core/tasks/t1/archive-run', key: 'undefined', body: { deleteWorktree: true } },
       { path: '/v1/core/tasks/t1/delete', key: 'k2', body: {} },
-      { path: '/v1/core/tasks/dirty/archive', key: 'k3', body: { deleteWorktree: true } },
+      { path: '/v1/core/tasks/dirty/archive-run', key: 'undefined', body: { deleteWorktree: true } },
+    ])
+  })
+
+  it('archives in one request on a Node without the background routes', async () => {
+    const { call, node } = await selected()
+    node.state.legacyArchive = true
+    expect(await call({ op: 'task.archive', nodeId: 'node-a', taskId: 't1', key: 'k1' })).toEqual({
+      nodeId: 'node-a',
+      taskIds: ['t1', 't2'],
+    })
+    expect(node.state.taskRemovals).toEqual([
+      { path: '/v1/core/tasks/t1/archive', key: 'k1', body: { deleteWorktree: true } },
     ])
   })
 

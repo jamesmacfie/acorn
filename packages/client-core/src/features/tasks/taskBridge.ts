@@ -1,6 +1,7 @@
 import type {
   ArchiveOpts,
   ArchiveResult,
+  ArchiveRun,
   DeleteOpts,
   DeleteResult,
   RestoreOpts,
@@ -8,12 +9,13 @@ import type {
   TaskArchiveConcern,
   TaskStatus,
 } from '@acorn/protocol/task.ts'
-import { taskIdsQuery } from '@acorn/protocol/task.ts'
+import { ARCHIVE_RUN_WAIT_MS, archiveInBackground, taskIdsQuery } from '@acorn/protocol/task.ts'
 import {
   projectConfigRoute,
   projectRunTargetsRoute,
   taskArchiveConcernsRoute,
   taskArchiveRoute,
+  taskArchiveRunRoute,
   taskDeleteRoute,
   taskOnCreatedRoute,
   taskPreviewUrlRoute,
@@ -21,7 +23,7 @@ import {
   taskStatusesRoute,
 } from '@acorn/protocol/api.ts'
 import type { ProjectConfigPatch, ProjectConfigResponse } from '@acorn/protocol/api.ts'
-import { readJson, writeJson, type WriteInit } from '../../infra/node/apiClient'
+import { ApiError, readJson, writeJson, type WriteInit } from '../../infra/node/apiClient'
 import { createLogger } from '../../infra/telemetry/logger'
 
 const log = createLogger('tasks')
@@ -72,9 +74,19 @@ export const taskBridge = (): TaskBridge => {
     previewUrl: (taskId, script) =>
       post<{ ok: boolean; url?: string; reason?: string }>(taskPreviewUrlRoute(taskId), { script }),
     task: {
-      // Archive tears down a whole task tree and removes each worktree, which can take minutes, so it
-      // goes through the broker's long pool.
-      archive: (id, opts) => post<ArchiveResult>(taskArchiveRoute(id), opts ?? {}, { long: true }),
+      // Archive runs each task's teardown script, which can take minutes, so the Node runs it in the
+      // background and this waits on its outcome one bounded request at a time. A Node without the
+      // background routes answers 404 and gets the single request it knows.
+      archive: (id, opts) =>
+        archiveInBackground({
+          start: () =>
+            post<ArchiveRun>(taskArchiveRunRoute(id), opts ?? {}).catch((error: unknown) => {
+              if (error instanceof ApiError && error.status === 404) return null
+              throw error
+            }),
+          wait: () => readJson<ArchiveRun>(`${taskArchiveRunRoute(id)}?waitMs=${ARCHIVE_RUN_WAIT_MS}`, { long: true }),
+          legacy: () => post<ArchiveResult>(taskArchiveRoute(id), opts ?? {}, { long: true }),
+        }),
       archiveConcerns: (id) =>
         readJson<{ concerns?: TaskArchiveConcern[] }>(taskArchiveConcernsRoute(id))
           .then((body) => body?.concerns ?? [])

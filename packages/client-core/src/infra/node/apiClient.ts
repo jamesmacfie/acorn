@@ -269,7 +269,8 @@ const raise = (res: ApiResponse, fallback: string): never => {
   })
 }
 
-type ReadOptions = { signal?: AbortSignal; nodeId?: string | null; owner?: string }
+// `long` is as on `SendOptions`: a read the Node may hold open, kept off the pool fast reads share.
+type ReadOptions = { signal?: AbortSignal; nodeId?: string | null; owner?: string; long?: boolean }
 
 // A cast, not a parse. Within a protocol major every change is additive, so a read tolerates fields it
 // does not know about (docs/api-reference/versioning.md § Versioning).
@@ -278,6 +279,7 @@ export async function readJson<T>(url: string, options: ReadOptions = {}): Promi
     signal: options.signal,
     nodeId: options.nodeId,
     ...(options.owner ? { owner: options.owner } : {}),
+    ...(options.long ? { long: true } : {}),
   })
   if (!res.ok) raise(res, `${url} ${res.status}`)
   recordSample(options.owner ?? 'core', 'api.response.bytes', res.body.byteLength, 'byte', { route: apiRouteAttr(url) })
