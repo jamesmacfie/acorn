@@ -19,6 +19,7 @@ import {
 import { Dynamic } from 'solid-js/web'
 import CopyButton from '../components/inputs/CopyButton'
 import { fileStatusMeta } from '../lib/rendering/displayMeta'
+import { formatRelativeTime } from '../lib/rendering/formatRelativeTime'
 import MentionTextarea from '../components/inputs/MentionTextarea'
 import type { DiffFile, DiffThread } from './diffModel'
 import { UserAvatar } from '../components/content/UserAvatar'
@@ -784,6 +785,9 @@ function ThreadRow(props: {
               <div class="comment-meta comment-meta-with-avatar">
                 <UserAvatar login={c.author} src={c.avatarUrl} />
                 <strong>{c.author ?? 'unknown'}</strong>
+                <Show when={c.createdAt}>
+                  {(at) => <span data-tip={new Date(at()).toLocaleString()}>{formatRelativeTime(at())}</span>}
+                </Show>
               </div>
               <SanitizedHtml html={c.body ?? ''} />
             </div>
