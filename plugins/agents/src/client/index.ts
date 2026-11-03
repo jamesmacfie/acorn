@@ -25,6 +25,8 @@ import {
   openManagedSession,
 } from './sessions/managedSelection'
 import { activateManagedAgentNotifications, managedAgentStore } from './sessions/managedStore'
+import { TERMINAL_TAB_SUPPLIER } from '@acorn/plugin-terminal/contract/suppliedTabs.ts'
+import { activateBackgroundCommands, backgroundCommandTabs } from './sessions/taskBackgroundCommands'
 import { acknowledgeAgentRows, clearableAgents, markAgentsRead } from './sessions/markAgentsRead'
 import { AGENT_PANE_ID, agentPaneContribution } from './paneContribution'
 import { agentRailMarkerContribution } from './railMarkerContribution'
@@ -127,6 +129,9 @@ export const agentsClientPlugin: ClientPlugin = {
         openManagedSession(taskId, session.id)
       },
     })
+    // A read-only tab in the task's terminal drawer for each background command still running
+    // (docs/managed-agents/background-commands.md).
+    ctx.capabilities.provide(TERMINAL_TAB_SUPPLIER, backgroundCommandTabs)
     ctx.capabilities.provide(AGENTS_INLINE_DIFF, {
       prime: (taskId) => {
         void managedAgentStore.loadTask(taskId).catch(() => undefined)
@@ -492,6 +497,7 @@ export const agentsClientPlugin: ClientPlugin = {
         managedAgentStore.upsertSession(await managedAgentApi.resumeManaged(sessionId))
       }),
       activateManagedAgentNotifications(),
+      activateBackgroundCommands(),
       activateManagedAgentNoticeTargets(),
       activateManagedAgentPaneIntents(),
     ]

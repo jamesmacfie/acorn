@@ -21,20 +21,18 @@ type Transaction = Parameters<Parameters<PluginDatabase['transaction']>[0]>[0]
 export function readToolCall(tx: Transaction, sessionId: string, toolId: string): AgentToolCallRead | null {
   const session = tx.select().from(schema.agentSessions).where(eq(schema.agentSessions.id, sessionId)).get()
   if (!session) throw new Error(`Managed agent session not found: ${sessionId}`)
-  const rows = tx.all<{ turnId: string | null; eventJson: string }>(sql`
-    SELECT turn_id AS turnId, event_json AS eventJson FROM agent_events
+  const rows = tx.all<{ turnId: string | null; seq: number; eventJson: string }>(sql`
+    SELECT turn_id AS turnId, seq, event_json AS eventJson FROM agent_events
     WHERE session_id = ${sessionId} AND event_json ->> '$.tool.id' = ${toolId} AND event_json ->> '$.type' = 'tool'
     ORDER BY seq
   `)
   const turnId = rows[0]?.turnId ?? null
-  const calls = rows
-    .filter((row) => row.turnId === turnId)
-    .map((row) => (JSON.parse(row.eventJson) as { tool: AgentToolCall }).tool)
-  if (!calls.length) return null
-  const tool = calls.reduce(mergeToolCall)
+  const own = rows.filter((row) => row.turnId === turnId)
+  if (!own.length) return null
+  const tool = own.map((row) => (JSON.parse(row.eventJson) as { tool: AgentToolCall }).tool).reduce(mergeToolCall)
   const turn = turnId ? tx.select().from(schema.agentTurns).where(eq(schema.agentTurns.id, turnId)).get() : undefined
   // The status every client read projects, so a call whose turn ended without its result reads as it
   // does in the transcript.
   const status = tool.status && commandStatus(tool, turn && mapAgentTurn(turn), mapAgentSession(session))
-  return { tool: status ? { ...tool, status } : tool, turnId, taskId: session.taskId }
+  return { tool: status ? { ...tool, status } : tool, turnId, taskId: session.taskId, seq: own.at(-1)!.seq }
 }

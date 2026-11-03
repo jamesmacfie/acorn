@@ -20,6 +20,8 @@ export type DocTabDef = {
   /** Facts another source pinned to the document, such as a review note. Up to three glyphs draw;
    *  every label is read out with the tab. */
   marks?: readonly DocTabMark[]
+  /** False for a tab the strip's `onClose` must not reach: no close button, middle-click or Delete. */
+  closable?: boolean
 }
 
 type DocTabMark = { tone: 'muted' | 'warn' | 'danger'; label: string; icon?: string }
@@ -52,6 +54,7 @@ export function DocumentTabs(props: {
   level?: 'pane'
 }) {
   let stripRef: HTMLDivElement | undefined
+  const closable = (id: string) => props.tabs.find((tab) => tab.id === id)?.closable !== false
 
   // A tab activated by keyboard, or opened off-screen in a long strip, has to be brought into view
   // or the selection is invisible.
@@ -104,7 +107,7 @@ export function DocumentTabs(props: {
           } else if (event.key === 'ArrowLeft') {
             event.preventDefault()
             move(-1)
-          } else if (event.key === 'Delete' && props.onClose) {
+          } else if (event.key === 'Delete' && props.onClose && closable(props.active)) {
             event.preventDefault()
             props.onClose(props.active)
           }
@@ -152,7 +155,7 @@ export function DocumentTabs(props: {
                 onDblClick={() => props.onPromote?.(tab.id)}
                 // Middle-click closes, which is the convention every editor has and none of these had.
                 onAuxClick={(event) => {
-                  if (event.button === 1 && props.onClose) {
+                  if (event.button === 1 && props.onClose && tab.closable !== false) {
                     event.preventDefault()
                     props.onClose(tab.id)
                   }
@@ -185,7 +188,7 @@ export function DocumentTabs(props: {
                   <StatusDot tone="accent" label="Unsaved changes" />
                 </Show>
               </button>
-              <Show when={props.onClose}>
+              <Show when={props.onClose && tab.closable !== false}>
                 <IconButton icon="x" label={`Close ${tab.label}`} onPress={() => props.onClose?.(tab.id)} />
               </Show>
               <Show when={props.menu}>{props.menu?.(tab.id, menuControl(tab.id))}</Show>

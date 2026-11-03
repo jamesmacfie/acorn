@@ -61,6 +61,7 @@ const OPEN_TO_A_TASK_TOKEN: Record<string, string> = {
 
   // The task is in the body or query, so no mount can see it. The handler checks it.
   'POST /v1/p/agents/attachments': 'checks the taskId query with mayActOnTask',
+  'GET /v1/p/agents/background-commands': 'checks the taskId query with mayActOnTask',
 
   // Refused to a task's agent in the handler.
   'GET /v1/p/agents/runs': 'answers 403 to a task-confined caller',

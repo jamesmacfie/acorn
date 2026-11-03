@@ -54,6 +54,7 @@ const METHODS = [
   'snapshot',
   'events',
   'toolCall',
+  'runningBackgroundCommands',
   'enqueueTurn',
   'patchQueuedTurn',
   'cancelTurn',
@@ -453,6 +454,17 @@ describe('a task-scoped credential is confined to its own agent sessions', () =>
     )
     expect(res.status).toBe(404)
     expect(uploaded).toEqual([])
+  })
+
+  it("reads only its own task's background commands", async () => {
+    const asked: string[] = []
+    setManagedAgentsBridge(fake({ runningBackgroundCommands: async (taskId) => (asked.push(taskId), []) }))
+    const own = '00000000-0000-4000-8000-000000000001'
+    const other = '00000000-0000-4000-8000-000000000002'
+    const app = as({ kind: 'internal', userId: 'james', scope: 'task', taskId: own })
+    expect((await app.fetch(req(`/api/background-commands?taskId=${other}`), {} as Env)).status).toBe(404)
+    expect((await app.fetch(req(`/api/background-commands?taskId=${own}`), {} as Env)).status).toBe(200)
+    expect(asked).toEqual([own])
   })
 
   it('has its list and search pinned to its own task', async () => {

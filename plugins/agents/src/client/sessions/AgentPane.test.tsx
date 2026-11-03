@@ -24,6 +24,8 @@ const cancelSubagent = vi.fn(async () => ({ ok: true }))
 const openAccountTerminal = vi.fn(async () => ({ terminalSessionId: 'term-1' }))
 const setTerminalOpen = vi.fn()
 const requestTerminalFocusIntent = vi.fn()
+const [backgroundCommands, setBackgroundCommands] = createSignal<{ tabId: string; title: string }[]>([])
+let narrow = false
 
 const usageReading = (accountName: string | undefined, percentRemaining: number): AgentProviderUsage => ({
   provider: 'claude',
@@ -66,6 +68,9 @@ vi.mock('../usage/usageStore', () => ({
 }))
 
 vi.mock('./managedClient', () => ({ managedAgentApi: { cancel, cancelSubagent, openAccountTerminal } }))
+vi.mock('./taskBackgroundCommands', () => ({
+  backgroundCommandsFor: () => ({ loaded: true, commands: backgroundCommands() }),
+}))
 
 // A stand-in that says which session it shows and whether it takes the caret. The real one needs a
 // snapshot, a transcript and a composer, and what the split decides is only which conversations it draws.
@@ -81,6 +86,7 @@ vi.mock('./AgentConversation', () => ({
 vi.mock('@acorn/plugin-api/client', async (importOriginal) => ({
   ...(await importOriginal<Record<string, unknown>>()),
   clientCapability: () => ({ runForSession }),
+  formFactor: () => (narrow ? 'narrow' : 'desktop'),
   openPane: (...args: unknown[]) => openPane(...args),
   setTerminalOpen: (...args: unknown[]) => setTerminalOpen(...args),
   requestTerminalFocusIntent: (...args: unknown[]) => requestTerminalFocusIntent(...args),
@@ -301,6 +307,43 @@ describe('stopping the selected agent', () => {
     expect(stop().disabled).toBe(false)
     stop().click()
     expect(cancel).toHaveBeenCalledWith('sess-1')
+  })
+})
+
+describe('the background commands chip', () => {
+  afterEach(() => {
+    setBackgroundCommands([])
+    narrow = false
+  })
+
+  it("counts the task's running commands and opens the drawer on the first one's tab", async () => {
+    setBackgroundCommands([
+      { tabId: 'background:sess-2:turn-1:call-1', title: 'pnpm dev' },
+      { tabId: 'background:sess-1:turn-4:call-9', title: 'pnpm test --watch' },
+    ])
+    mount(session({}))
+    await settle()
+
+    expect(chip()?.textContent).toContain('2 commands running in background')
+    ;(chip() as HTMLElement).click()
+    expect(setTerminalOpen).toHaveBeenCalledWith('task-1', true)
+    expect(requestTerminalFocusIntent).toHaveBeenCalledWith('task-1', 'background:sess-2:turn-1:call-1')
+
+    setBackgroundCommands([])
+    await settle()
+    expect(chip()).toBeNull()
+  })
+
+  it('opens the Terminal pane on a phone, which draws no drawer', async () => {
+    narrow = true
+    setBackgroundCommands([{ tabId: 'background:sess-1:turn-1:call-1', title: 'pnpm dev' }])
+    mount(session({}))
+    await settle()
+
+    ;(chip() as HTMLElement).click()
+    expect(openPane).toHaveBeenCalledWith('task-1', 'terminal')
+    expect(setTerminalOpen).not.toHaveBeenCalled()
+    expect(requestTerminalFocusIntent).toHaveBeenCalledWith('task-1', 'background:sess-1:turn-1:call-1')
   })
 })
 

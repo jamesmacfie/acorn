@@ -216,6 +216,7 @@
     "GET /v1/p/agents/artifacts/:artifactId/content",
     "GET /v1/p/agents/attachments/:attachmentId",
     "GET /v1/p/agents/attachments/:attachmentId/content",
+    "GET /v1/p/agents/background-commands",
     "GET /v1/p/agents/concurrency",
     "GET /v1/p/agents/custom-agents",
     "GET /v1/p/agents/footprint",

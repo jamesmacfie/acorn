@@ -12,10 +12,29 @@ A background command is the command's own tool card, marked with `background` on
 `exit code N`. While it runs, new output lands on the card. The card shows the last 12 lines, and
 **Show all output** opens everything the card holds (`toolRendererRegistry.tsx`).
 
-The pane header carries a chip, such as **2 commands running in background**, while any are still
-running. Its tooltip lists the commands (`client/sessions/backgroundCommands.ts`). The chip reads
-the transcript the pane has loaded, so a command whose card is older than the loaded pages is left
-out.
+The pane header carries a chip, such as **2 commands running in background**, while any command in
+the task is still running, in any of its sessions. Its tooltip lists them. Pressing it opens the
+terminal drawer on the first one's tab, in start order, or the **Terminal** pane on a phone. In the
+terminal client the chip is a label.
+
+Each running background command also has a read-only tab in the task's terminal strip, after its
+shells ([supplied terminal tabs](../plugins/supplied-terminal-tabs.md)). The tab's title is the card's
+title. It shows what the card holds, then each change to the card's output, and it closes in the
+update that settles the card. The exit code and the outcome stay on the card. Typing in the tab sends
+nothing, and nothing stops the command from there.
+
+### Where the chip and the tabs read
+
+The chip and the tabs read one list per task, in `client/sessions/taskBackgroundCommands.ts`:
+
+1. The first reader of a task asks the Node once, through `GET /v1/p/agents/background-commands`.
+   The Node's read, `runningBackgroundCommands` in `server/sessions/commandLifecycle.ts`, reads only
+   the sessions whose harness is alive, because no other session can have a command running.
+2. After that, the list follows the `agent:event` frames every client already receives. A launch reads
+   the list again, a settled status drops the command, and a reconnect reads every list again.
+3. A tab reads its card once through `GET /v1/p/agents/sessions/:sessionId/tools/:toolId`, then writes
+   each output frame. That read answers the `seq` it folded through, and the tab skips frames at or
+   below it, so no chunk draws twice.
 
 A background command doesn't make its session busy. The session reads `ready` when its turn ends,
 the same as with a background subagent. The idle sweep doesn't stop a session while one of its
@@ -99,6 +118,9 @@ either.
   saw launch as background commands.
 - A harness other than these two gets plain command cards. Its driver adds detection when it has
   background commands to report.
+- A tab shows only what its card holds. When the card's output is cut to its newest part, the tab
+  clears and draws that part. Coming back to a tab reads the card again.
+- The terminal client's Sessions view has no background tabs.
 
 ## Why
 
@@ -106,3 +128,8 @@ The tool card already folds a call's updates, keeps its output in the ledger, at
 updates to the turn that opened it, and draws on both the desktop and the terminal client. A separate
 roster would have repeated each of those. Keeping the command on its own card also means a restart
 restores its output from the ledger with no extra state.
+
+The terminal tab is a second view of the card's data, not a second record of the command. Its list
+comes from the same ledger rows, its output is the card's output, and it follows the same frames. So
+the chip, the tabs, and the cards can't disagree, and a Node restart, which reads every command as
+**lost**, leaves no tab behind.

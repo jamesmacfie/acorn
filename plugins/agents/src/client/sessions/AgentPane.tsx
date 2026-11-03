@@ -37,6 +37,7 @@ import {
   Toolbar,
 } from '@acorn/plugin-api/ui'
 import { InlineAnnotationMarks, Slot } from '@acorn/plugin-api/ui/host'
+import { HOST } from '@acorn/plugin-api/ui/tokens'
 import { registerSessionActionCommands } from '../commands'
 import { WORKFLOW_CONTROL } from '../../contract/workflowControl'
 import AgentConversation from './AgentConversation'
@@ -60,7 +61,7 @@ import { managedAgentApi } from './managedClient'
 import { agentPricingOptions } from '../pricingClient'
 import { emptyAgentPricingPreferences } from '../../shared/pricing'
 import { sameSessionHeaderProps, sessionHeaderContext } from './sessionHeaderContext'
-import { runningBackgroundCommands } from './backgroundCommands'
+import { backgroundCommandsFor } from './taskBackgroundCommands'
 import SessionSummaryModal from './SessionSummaryModal'
 import { AGENT_PANE_ID } from '../../shared/paneIdentity'
 import { requestSessionMarks } from './sessionMarks'
@@ -105,9 +106,20 @@ export function AgentDetailHeader(props: { task: Task; model: AgentPaneModel }) 
     () => (model.selected()?.kind === 'workflow' ? model.selected()?.id : undefined),
     async (sessionId) => (await clientCapability(WORKFLOW_CONTROL)?.runForSession(sessionId)) ?? null,
   )
-  const runningBackground = createMemo(() => runningBackgroundCommands(model.snapshot()?.events ?? []), [], {
-    equals: (left, right) => left.length === right.length && left.every((title, at) => title === right[at]),
-  })
+  // Every session's in the task, not only the one on screen, so the chip and the drawer's tabs agree.
+  const runningBackground = () => backgroundCommandsFor(props.task.id).commands
+  // The drawer on the first command's tab, or the Terminal pane on a phone, which draws no drawers.
+  // The terminal client has no tab to open yet, so its chip stays a label.
+  const openBackground =
+    HOST === 'tui'
+      ? undefined
+      : () => {
+          const first = runningBackground()[0]
+          if (!first) return
+          if (formFactor() === 'narrow') openPane(props.task.id, 'terminal')
+          else setTerminalOpen(props.task.id, true)
+          requestTerminalFocusIntent(props.task.id, first.tabId)
+        }
   // What the session is part of: chips on the bar, and rows of the session menu on a phone, where the
   // bar has room for one row.
   const sessionChips = (): SessionChip[] => {
@@ -133,7 +145,10 @@ export function AgentDetailHeader(props: { task: Task; model: AgentPaneModel }) 
         id: 'background',
         icon: 'terminal',
         label: count === 1 ? '1 command running in background' : `${count} commands running in background`,
-        title: runningBackground().join('\n'),
+        title: runningBackground()
+          .map((command) => command.title)
+          .join('\n'),
+        press: openBackground,
       })
     // The custom agent the session started from, by the name it had then. The snapshot is the
     // session's own, so renaming or deleting the agent later leaves this alone.
