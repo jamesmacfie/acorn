@@ -6,6 +6,7 @@ import { SecretService, testCoreSeams } from '@acorn/plugin-api/testkit'
 import { memoryIdentityStore } from '@acorn/plugin-api/testkit'
 import { createCoreServices } from '@acorn/plugin-api/testkit'
 import { makeTestDb, makeTestPluginDb, schema, type TestDb, type TestPluginDb } from '@acorn/plugin-api/testkit'
+import * as agentSchema from '../../node/schema'
 import { AgentAttachmentStore } from './attachmentStore'
 
 // Two databases, which is the point of the exercise: the attachment rows are in this plugin's file and
@@ -50,6 +51,19 @@ afterEach(async () => {
 })
 
 describe('managed-agent attachment store', () => {
+  it("removes a retired attachment's file after the grace period without retiring the row again", async () => {
+    const attachment = await store.upload('task', 'notes.md', 'text/markdown', new TextEncoder().encode('# old'))
+    const path = (await store.resolve(attachment.id))!.localPath
+    await store.removeUnreferenced(attachment.id)
+    const retiredAt = Date.now() - 2 * 24 * 60 * 60 * 1_000
+    await pluginDb.db.update(agentSchema.agentAttachments).set({ deletedAt: retiredAt })
+
+    expect(await store.collectGarbage()).toBe(1)
+    await expect(stat(path)).rejects.toThrow()
+    const [row] = await pluginDb.db.select().from(agentSchema.agentAttachments)
+    expect(row?.deletedAt).toBe(retiredAt)
+  })
+
   it('deduplicates bytes while keeping filenames out of storage paths', async () => {
     const first = await store.upload('task', '../../notes.md', 'text/markdown', new TextEncoder().encode('# hello'))
     const second = await store.upload('task', 'renamed.md', 'text/markdown', new TextEncoder().encode('# hello'))

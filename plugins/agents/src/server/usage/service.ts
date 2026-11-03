@@ -15,7 +15,8 @@ import {
 import { agentUsageCollectors, type AgentUsageCollectorEntry, type AgentUsageCollectorRegistry } from './collectors'
 import { UsageProcessError } from './processRunner'
 
-const DEFAULT_TTL_MS = 5 * 60_000
+// The client polls on the same period (`createAgentUsageStore`), and a forced refresh skips it.
+const DEFAULT_TTL_MS = 15 * 60_000
 
 type PricingReader = (userId: string) => Promise<AgentPricingPreferences>
 

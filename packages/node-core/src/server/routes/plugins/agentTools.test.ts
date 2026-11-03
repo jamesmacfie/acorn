@@ -230,7 +230,7 @@ describe('agent-tool harness projection (docs/agent-tools.md)', () => {
     expect(availabilityCalls).toBe(1)
   })
 
-  it('times each shared availability check once, owned by the plugin that contributed the tool', async () => {
+  it('times each shared availability check once, owned by the plugin that contributed the tool, with no span for a fast one', async () => {
     const records: TelemetryRecord[] = []
     startTelemetry({ node: 'n', version: '1', readPref: async () => '1' })
     onTelemetryBatch((batch) => void records.push(...batch.records))
@@ -240,10 +240,13 @@ describe('agent-tool harness projection (docs/agent-tools.md)', () => {
       await get('/api/tasks/ready/tools')
       flushTelemetry()
       const spans = records.filter((record) => record.kind === 'span' && record.name === 'tool.availability')
-      expect(spans).toEqual([
+      expect(spans).toEqual([])
+      const histograms = records.filter((record) => record.kind === 'metric' && record.name === 'tool.availability')
+      expect(histograms).toEqual([
         expect.objectContaining({
-          status: 'ok',
-          attrs: expect.objectContaining({ owner: OWNER, tool: 'exec_tool', available: true }),
+          type: 'histogram',
+          value: expect.objectContaining({ count: 1 }),
+          attrs: expect.objectContaining({ owner: OWNER }),
         }),
       ])
     } finally {

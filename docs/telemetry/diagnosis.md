@@ -47,7 +47,7 @@ file path. Workload sizes are histogram values, never labels.
 | Is terminal output flooding its parser? | `terminal.output.size`, `terminal.pending.size`, `terminal.write`, and `terminal.fit`. |
 | Is the Node or helper under pressure? | `runtime.event_loop.p95`, `.max`, and `.utilization`, `runtime.cpu`, `runtime.memory.rss`, `runtime.memory.heap`, and `runtime.suspended`. The first two are histograms, so Sentry stores them as `runtime.event_loop.max.max`, `.p95`, `.p50`, and `.count`. |
 | Is it Acorn or the Mac? | `host.load.1m`, `host.memory.free`, and `host.swap.used` ([is it Acorn or the Mac?](#is-it-acorn-or-the-mac)). |
-| What held a slow Node request? | Its child spans: slow `git.*`, `proc.spawn`, and `sql.*` samples, `checkout.admission.wait`, `tool.availability`, `task.archive.phase`, and the plugins' `*.api` spans. |
+| What held a slow Node request? | Its child spans: slow `git.*`, `proc.spawn`, and `sql.*` samples, `checkout.admission.wait`, slow `tool.availability` samples, `task.archive.phase`, and the plugins' `*.api` spans. |
 | Where is the memory going? | [Memory over a day](#memory-over-a-day). |
 
 A measured client operation of at least 100 ms can also produce a detailed span under its original
@@ -146,7 +146,7 @@ read against each other. Each keeps its name in Sentry with no suffix.
 | `ui.page.query_entries` | count | the same | the same | Query cache entries for the active Node |
 | `ui.page.diff_cache.rows`, `.bytes` | count, bytes | the same | the same | The active Node's diff segment cache, by its own estimate |
 | `ui.page.workers.tree`, `.highlight`, `.word_diff` | count | the same | the same | Live plugin tree workers, and the highlighter and word-diff workers |
-| `agents.snapshots.events` | count | `owner: agents` | After each transcript load and release | Events in the transcripts the Agent pane keeps: those on screen and the three drawn last |
+| `agents.snapshots.events` | count | `owner: agents` | After each transcript load and release | Events in the transcripts the Agent pane keeps: those on screen and up to five drawn last, within an event budget ([what the store keeps](../managed-agents/transcript-store.md#what-the-store-keeps)) |
 | `agent.processes.live`, `.idle` | count | `runtime: node`, `owner: agents` | 60 s | Provider processes, and those the idle rules would stop |
 | `agent.processes.idle_past_limit` | count | the same | 60 s | Processes the idle rules would stop, idle past the time limit by more than one sweep. Above zero means the idle stop missed one |
 | `agent.processes.memory` | bytes | the same | 60 s | Resident bytes over each provider's process tree. Left out when `ps` fails |

@@ -99,8 +99,11 @@ const snapshotLoads = new Map<string, Promise<AgentSessionSnapshot>>()
 // and the five most recently drawn beyond those keep theirs too, which is what makes going back to
 // one of them a short read (see loadSnapshot). The rest drop their events and keep their row, so the
 // rail, Agent Center and notices still draw them, and opening one reads it from the start. Only five,
-// because one long session's snapshot can run to megabytes of JSON.
+// because one long session's snapshot can run to megabytes of JSON. The kept ones also share an
+// event budget, because the window's memory grows with events, not sessions. The last one drawn
+// stays whatever its size, so going back and forth between two sessions stays a short read.
 const KEEP_RECENT = 5
+const KEEP_RECENT_EVENTS = 5_000
 const holds = new Map<string, number>()
 // Every stored snapshot's id, least recently drawn first. A load and a release both move one to the end.
 const recent = new Set<string>()
@@ -156,8 +159,12 @@ function forgetSnapshot(sessionId: string): void {
 // Drop what is past the bound. A session being read is left alone: its load is about to put it back
 // as the newest, and dropping it under a resumed read would only make that read start over.
 function trimSnapshots(): void {
-  const idle = [...recent].filter((id) => !holds.has(id) && !snapshotLoads.has(id))
-  const dropped = idle.slice(0, -KEEP_RECENT)
+  const newestFirst = [...recent].filter((id) => !holds.has(id) && !snapshotLoads.has(id)).reverse()
+  let events = 0
+  const dropped = newestFirst.filter((id, index) => {
+    events += peekSnapshot(id)?.events.length ?? 0
+    return index >= KEEP_RECENT || (index > 0 && events > KEEP_RECENT_EVENTS)
+  })
   if (dropped.length) {
     for (const id of dropped) forgetSnapshot(id)
     batch(() => {

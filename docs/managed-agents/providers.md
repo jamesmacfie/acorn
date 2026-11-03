@@ -42,11 +42,12 @@ The client reads the list through the shared `['agents', 'providers']` query
 Plan usage is per harness and per account. A collector that can read one account's folder gets a row
 for each [extra account](./accounts.md#plan-usage) too. The built-in CLI probes and a contributed harness's
 `probes.usage` route feed one registry (`collectors.ts`), and a harness with no collector shows no
-usage section. The Node probes availability and usage on bounded intervals. Five-minute polling and
-the full refresh action check every harness. The refresh icon beside the harness name probes only
-that harness. A read that finds the last snapshot older than five minutes answers with that snapshot at
-once and probes behind it, then raises `usage-refreshed` so the client reads again. Only the first read
-after the Node starts, and a forced refresh, wait for a probe.
+usage section. The Node probes availability and usage on bounded intervals. Fifteen-minute polling
+and the full refresh action check every harness. The refresh icon beside the harness name probes
+only that harness. The poll is that long because a Claude probe starts the CLI and takes several
+seconds for each account. A read that finds the last snapshot older than fifteen minutes answers
+with that snapshot at once and probes behind it, then raises `usage-refreshed` so the client reads
+again. Only the first read after the Node starts, and a forced refresh, wait for a probe.
 
 Each quota row draws a bar under its sentence, colored by the same reading as the dot beside the
 harness name. A small triangle marks where steady spending would have left the fill by now, because

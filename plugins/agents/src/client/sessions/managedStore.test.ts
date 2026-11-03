@@ -500,6 +500,24 @@ describe('which snapshots the store keeps', () => {
     ).toEqual(['a', 'b', 'c', 'd', 'e', 'f', 'g'])
   })
 
+  it('keeps fewer than five when they hold too many events, but always the last one drawn', async () => {
+    const withEvents = (id: string, count: number): AgentSessionSnapshot => ({
+      ...answer(id),
+      events: Array.from({ length: count }, (_, index) => ({
+        ...prose(index + 1),
+        id: `${id}-e${index}`,
+        sessionId: id,
+      })),
+    })
+    for (const id of ['b', 'c', 'd']) servedBy[id] = withEvents(id, 2_000)
+    servedBy.huge = withEvents('huge', 6_000)
+    await visit('a', 'b', 'c', 'd')
+    // Newest first, d and c come to 4,000 events, and b would take them past the budget.
+    expect(kept()).toEqual(['c', 'd'])
+    await visit('huge')
+    expect(kept()).toEqual(['huge'])
+  })
+
   it('reports the events it keeps, which stop growing at the bound', async () => {
     const gauge = vi.spyOn(agentTelemetry, 'gauge')
     await visit('a', 'b', 'c', 'd', 'e', 'f', 'g')

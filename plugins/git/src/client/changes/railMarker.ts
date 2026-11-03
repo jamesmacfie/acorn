@@ -4,8 +4,12 @@
 // the status read comes back empty.
 //
 // Read on core's status poll (taskStatusRevision) rather than a clock of its own, and skipped whenever
-// that poll already says the tree is clean, so a clean task costs no read. A task in the project folder
-// has no entry in that poll, so it is asked about rather than assumed clean.
+// that poll already says the tree is clean, so a clean task costs no read. A dirty task is read again
+// only when its summary on that poll moves (the changed-file count, branch, or HEAD), or every
+// BACKSTOP_POLLS polls, because each read is a `git status` and two line-count reads on the node. An
+// edit that only moves line counts inside files that were already changed can leave the dot's colour
+// one backstop behind. A task in the project folder has no entry in that poll, so it is asked about
+// on the backstop rather than assumed clean.
 import { createSignal } from 'solid-js'
 import {
   taskStatus,
@@ -14,6 +18,7 @@ import {
   type RailMarkerDot,
 } from '@acorn/plugin-api/client'
 import type { LocalChange } from '@acorn/protocol/localGit.ts'
+import type { TaskStatus } from '@acorn/protocol/task.ts'
 import { localGitApi } from './changesClient'
 import { GIT_PANE } from '../gitPane'
 
@@ -36,16 +41,23 @@ const LABEL: Partial<Record<RailMarkerDot, string>> = {
 }
 
 const [dots, setDots] = createSignal<Record<string, RailMarkerDot | null>>({})
-const askedAt = new Map<string, number>()
+// About a minute on the focused ten-second poll.
+const BACKSTOP_POLLS = 6
+const asked = new Map<string, { summary: string; revision: number }>()
 
-// Once per poll per task, however many times the rail redraws in between. A failed read keeps the last
-// dot, and the next poll asks again.
-function ask(taskId: string, revision: number): void {
-  if (askedAt.get(taskId) === revision) return
-  askedAt.set(taskId, revision)
+const summaryOf = (status: TaskStatus | undefined): string =>
+  status ? `${status.dirtyCount}:${status.branch}:${status.head}` : ''
+
+// At most once per poll per task, however many times the rail redraws in between. A failed read
+// keeps the last dot, and the backstop asks again.
+function ask(taskId: string, status: TaskStatus | undefined, revision: number): void {
+  const summary = summaryOf(status)
+  const last = asked.get(taskId)
+  if (last && last.summary === summary && revision - last.revision < BACKSTOP_POLLS) return
+  asked.set(taskId, { summary, revision })
   localGitApi.status(taskId).then(
-    (status) => {
-      const dot = changesDot(status.changes)
+    (answer) => {
+      const dot = changesDot(answer.changes)
       // Same dot, same map: every rail row reads it, and most polls answer what the last one did.
       setDots((current) => (current[taskId] === dot ? current : { ...current, [taskId]: dot }))
     },
@@ -59,8 +71,9 @@ export const changesRailMarkerContribution: RailMarkerContribution = {
   markers: (target) => {
     const taskId =
       target.kind === 'task' ? target.id : target.kind === 'pane' && target.id === GIT_PANE ? target.taskId : null
-    if (!taskId || taskStatus(taskId)?.dirty === false) return []
-    ask(taskId, taskStatusRevision())
+    const status = taskId ? taskStatus(taskId) : undefined
+    if (!taskId || status?.dirty === false) return []
+    ask(taskId, status, taskStatusRevision())
     const dot = dots()[taskId]
     if (!dot) return []
     // A task row's top corners go to notices and the pin, so its dot takes a bottom one.

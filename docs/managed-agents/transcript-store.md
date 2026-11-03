@@ -75,8 +75,10 @@ The retention pass is the one exception to "nothing below the mark changes"
 
 The store keeps the snapshots on screen and the five drawn last, and drops the rest. A surface that
 draws a session holds it through `managedAgentStore.hold(sessionId)`: the conversation holds its
-session, and the sidebar holds each session waiting on you. Past the five most recent, an unheld
-snapshot drops its events, seen IDs, usage line, and mark. The row stays in the roster, with its draft,
+session, and the sidebar holds each session waiting on you. The five unheld ones also share a budget
+of 5,000 events, counted from the most recently drawn, because the window's memory grows with events
+rather than sessions. The last one drawn stays whatever its size. Past the five most recent, or past
+the budget, an unheld snapshot drops its events, seen IDs, usage line, and mark. The row stays in the roster, with its draft,
 reading place, and live sequence. Opening it again reads from the start. Eight real sessions opened in
 turn used to hold 46 MB of JSON.
 

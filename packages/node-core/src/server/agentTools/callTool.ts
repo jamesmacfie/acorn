@@ -4,7 +4,7 @@ import type { AppDatabase } from '../db'
 import { schema } from '../db'
 import type { Principal } from '../middleware/auth'
 import { runHook } from '../pluginHost/hooks'
-import { startSpan } from '../telemetry/collector'
+import { measure, startSpan } from '../telemetry/collector'
 import { issueAgentToolProvenance } from './provenance'
 import {
   agentToolContributions,
@@ -51,25 +51,23 @@ export async function toolAvailable(
   ctx: ToolContext,
   cache: AvailabilityCache,
 ): Promise<boolean> {
-  if (!tool.when) return true
-  let result = cache.get(tool.when)
+  const when = tool.when
+  if (!when) return true
+  let result = cache.get(when)
   if (!result) {
-    // Owned by the plugin that contributed the tool, so a slow `/tools` call names whose check held it.
-    const span = startSpan(agentToolOwner(tool.name), {
-      name: 'tool.availability',
-      attrs: { seam: 'tool.availability', tool: tool.name },
-    })
-    result = Promise.resolve(tool.when(ctx)).then(
-      (ok) => {
-        span.end('ok', { available: ok })
-        return ok
-      },
-      () => {
-        span.end('error', { available: false })
-        return false
-      },
-    )
-    cache.set(tool.when, result)
+    // A histogram, with a span only for a slow check. Every agent's tool server asks for its list
+    // every few seconds, and nearly every check answers in a millisecond. Owned by the plugin that
+    // contributed the tool, so a slow `/tools` call names whose check held it. The tool rides on the
+    // slow span only, because a histogram label per tool would spend the collector's series budget.
+    let available = false
+    result = measure(
+      agentToolOwner(tool.name),
+      'tool.availability',
+      () => Promise.resolve(when(ctx)).then((ok) => (available = ok)),
+      undefined,
+      () => ({ tool: tool.name, available }),
+    ).catch(() => false)
+    cache.set(when, result)
   }
   return result
 }

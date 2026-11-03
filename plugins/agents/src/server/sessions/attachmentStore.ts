@@ -369,7 +369,9 @@ export class AgentAttachmentStore {
       )
     let removed = 0
     for (const row of rows) {
-      if (!(await this.removeUnreferenced(row.id))) continue
+      // A row that is already retired only waits for its file to go. Retiring it again would move
+      // its deletion forward, so every start a day after the last would write once per retired row.
+      if (row.deletedAt == null && !(await this.removeUnreferenced(row.id))) continue
       await this.#unlinkIfUnused(row.storageKey)
       removed++
     }

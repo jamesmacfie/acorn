@@ -3,7 +3,9 @@ import { latestSignal } from '@acorn/plugin-api/client'
 import type { AgentUsageSnapshot } from '../../shared/usage'
 import { agentUsageClient, type AgentUsageClient } from './usageClient'
 
-const POLL_MS = 5 * 60_000
+// Matches the Node's snapshot lifetime (`createAgentUsageService`). A Claude probe starts the CLI
+// and takes several seconds per account, so a shorter poll costs more than a fresher number is worth.
+const POLL_MS = 15 * 60_000
 
 export type AgentUsageStore = {
   snapshot: Accessor<AgentUsageSnapshot | null>

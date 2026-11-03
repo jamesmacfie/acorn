@@ -68,7 +68,7 @@ nanoseconds, measured on September 11, 2026.
 | Every serve-then-revalidate decision | `server/sync/engine.ts` | Count `sync.fresh`, `sync.stale`, or `sync.cold` with the resource |
 | Every outbound WebSocket frame | `server/transport/wsHub.ts` | Histogram `ws.frame` with the channel prefix. Event `ws.shed` when a socket falls behind |
 | Every agent tool call | `server/routes/plugins/agentTools.ts` | Span `tool.call`, owner from the plugin that contributed the tool |
-| Every tool availability check | `server/routes/plugins/agentTools.ts` `available()` | Span `tool.availability` with `tool` and `available`, owner from the contributing plugin, once per check per request |
+| Every tool availability check | `server/agentTools/callTool.ts` `toolAvailable()` | Histogram `tool.availability`, owner from the contributing plugin, once per check per request. A slow check is also a span with `tool` and `available` |
 | Every archive dialog check | `server/pluginHost/taskChecks.ts` | Span `task.check` with `check` and `outcome`, owned by the plugin |
 | Task archiving | `server/storage/archive.ts` | Span `task.archive` with `task.id`, and `task.archive.phase` children ([task archiving](#task-archiving)) |
 | Task worktree preparation | `server/worktrees/taskWorktree.ts`, `worktrees.ts` | Spans `task.prepare`, `task.prepare.wait`, and `task.prepare.phase` ([task preparation](#task-preparation)) |

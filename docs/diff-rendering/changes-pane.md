@@ -156,7 +156,9 @@ a push from behind fails.
 
 Nothing watches the file system. The panel reads again after its own writes, on the rail's status
 poll every 10 seconds, and on `head:changed` ([events](../api-reference/websocket.md)). An agent's
-save shows within 10 seconds, the same freshness as the rail's changes dot. The poll and
+save shows within 10 seconds. The rail's changes dot reads again only when a task's changed-file
+count, branch, or HEAD moves on that poll, and otherwise every sixth poll. An edit that only moves
+line counts inside files that were already changed can take about a minute to recolor it. The poll and
 `head:changed` count only while the pane is drawn. The host keeps the pane's model after you leave the
 task, and a missed refresh runs once when the pane is drawn again
 ([pane models](../panes/models.md) § Pane models).

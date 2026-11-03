@@ -25,7 +25,7 @@ weekly limit, has a sentence and a bar. A small triangle on the bar marks where 
 put you by now, because 20% left is fine an hour into a week and alarming an hour into a five-hour
 window. The refresh button beside a harness reads its usage again.
 
-acorn reads plan usage from each CLI, with its own login. The Node checks every five minutes, and the
+acorn reads plan usage from each CLI, with its own login. The Node checks every 15 minutes, and the
 numbers are the same on every device paired with it. A harness that reports no usage has no section.
 
 With [accounts](/docs/agents/harnesses-and-defaults/#logins-and-accounts), each account is a tab in the
