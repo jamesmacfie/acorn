@@ -3,6 +3,7 @@ import type { TopbarProps } from '@acorn/protocol/chrome.ts'
 import Picker from '../../kit/components/inputs/Picker'
 import { Button } from '../../kit/components/primitives'
 import NodeChip from '../../features/fleet/NodeChip'
+import NodeReconnectButton from '../../features/fleet/NodeReconnectButton'
 import OverflowMenu from '../../features/settings/OverflowMenu'
 import { NestedChromeSlot } from '../plugins/NestedChromeSlot'
 import { WorkspaceIdentity } from '../../features/workspaces/WorkspaceIcon'
@@ -44,6 +45,7 @@ export default function Topbar(own: { value?: unknown }) {
             isActive={(entry) => entry.id === props().node?.id}
             onSelect={(entry) => props().pickNode(entry.id)}
           />
+          <Show when={props().node}>{(node) => <NodeReconnectButton nodeId={node().id} />}</Show>
         </Show>
         <Show when={props().workspacesMode && props().workspacePickerVisible !== false && props().workspaces.length}>
           <Picker
@@ -135,7 +137,12 @@ export default function Topbar(own: { value?: unknown }) {
       </div>
       <div class="topbar-side topbar-end">
         <Show when={props().nodes.length <= 1 && props().node}>
-          {(node) => <NodeChip nodeId={node().id} compact query={{}} />}
+          {(node) => (
+            <>
+              <NodeReconnectButton nodeId={node().id} />
+              <NodeChip nodeId={node().id} compact query={{}} />
+            </>
+          )}
         </Show>
         <NestedChromeSlot slotRef={props().slots.right} />
         <OverflowMenu
