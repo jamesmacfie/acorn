@@ -7,7 +7,14 @@
 import { randomUUID } from 'node:crypto'
 import { readdir, rename, rm, rmdir, stat } from 'node:fs/promises'
 import { isAbsolute, join } from 'node:path'
-import { CLONE_RUN_WAIT_MS, type CloneResult, type CloneRun } from '@acorn/protocol/api.ts'
+import {
+  CLONE_PROTOCOLS,
+  CLONE_RUN_WAIT_MS,
+  checkCloneUrl,
+  cloneFolderProblem,
+  type CloneResult,
+  type CloneRun,
+} from '@acorn/protocol/api.ts'
 import { eq } from 'drizzle-orm'
 import { schema, type AppDatabase } from '../db'
 import { gitOrThrow } from '../core/git'
@@ -42,64 +49,11 @@ export type CloneContext = {
   protocols?: readonly string[]
 }
 
-const CLONE_PROTOCOLS = ['https', 'ssh'] as const
 const CLONE_TIMEOUT_MS = 30 * 60_000
 // An importer can start up to a hundred clones at once.
 const MAX_RUNNING = 3
 // Long enough for every client waiting on the clone to read its outcome.
 const KEEP_FINISHED_MS = 10 * 60_000
-
-const SCHEME_URL = /^([a-z][a-z0-9+.-]*):\/\//i
-// Git's scp form. A user is required, which keeps a Windows drive path and `ext::` out of it.
-const SCP_URL = /^([^@/:]+)@([^@/:]+):(.+)$/
-
-/** The folder a URL clones into by default, or why the URL may not be cloned. The URL reaches
- *  `git clone` as given, so this is what stops one that names a local path, runs a command through a
- *  remote helper, or hands ssh an option. */
-export function checkCloneUrl(
-  url: string,
-  protocols: readonly string[] = CLONE_PROTOCOLS,
-): { folder: string } | { error: string } {
-  if (!url || /[\s\p{Cc}]/u.test(url)) return { error: "A Git URL can't contain spaces or control characters." }
-  let user: string
-  let host: string
-  let path: string
-  let password = ''
-  const scheme = SCHEME_URL.exec(url)?.[1]!.toLowerCase()
-  if (scheme) {
-    if (!protocols.includes(scheme)) return { error: `Acorn clones https and ssh Git URLs, not ${scheme}.` }
-    let parsed: URL
-    try {
-      parsed = new URL(url)
-    } catch {
-      return { error: `${url} isn't a URL Acorn can read.` }
-    }
-    if (parsed.search || parsed.hash) return { error: 'Remove the query or fragment from the Git URL.' }
-    user = parsed.username
-    password = parsed.password
-    host = parsed.hostname
-    path = parsed.pathname.replace(/^\//, '')
-  } else {
-    const scp = SCP_URL.exec(url)
-    if (!scp) return { error: `${url} isn't an https, ssh, or user@host:path Git URL.` }
-    ;[, user, host, path] = scp as unknown as [string, string, string, string]
-  }
-  if (password)
-    return {
-      error:
-        "Leave the password or token out of the Git URL, because Git saves the URL in the clone's settings as plain text. Use a credential helper or an SSH key.",
-    }
-  if ([user, host, path].some((part) => part.startsWith('-')))
-    return { error: 'The user, host, and path in a Git URL can\'t start with "-".' }
-  const folder = path
-    .replace(/\/+$/, '')
-    .split('/')
-    .pop()!
-    .replace(/\.git$/i, '')
-  return folderNameProblem(folder) ? { error: `${url} doesn't name a repository folder.` } : { folder }
-}
-
-const folderNameProblem = (name: string): boolean => !name || name === '.' || name === '..' || /[/\\\p{Cc}]/u.test(name)
 
 const isDirectory = (path: string): Promise<boolean> =>
   stat(path).then(
@@ -147,7 +101,7 @@ export async function startCloneRun(
   const url = checkCloneUrl(input.url, context.protocols)
   if ('error' in url) return { ok: false, error: url.error }
   const name = input.name?.trim() || url.folder
-  if (folderNameProblem(name)) return { ok: false, error: `${JSON.stringify(name)} can't be a folder name.` }
+  if (cloneFolderProblem(name)) return { ok: false, error: `${JSON.stringify(name)} can't be a folder name.` }
   if (!isAbsolute(input.parentDir)) return { ok: false, error: 'The parent folder must be an absolute path.' }
   if (!(await isDirectory(input.parentDir)))
     return { ok: false, error: `${input.parentDir} doesn't exist on this Node.` }

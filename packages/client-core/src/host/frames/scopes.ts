@@ -128,6 +128,11 @@ const RULES: readonly RouteRule[] = [
     note: 'Lets the repository run its setup, committed config, workflows, and agent settings. Only the owner, on the settings page.',
   },
   {
+    path: shape(`/v1/core/projects/clone-runs/${SEG}`),
+    scopes: {},
+    note: 'Fetches code onto the Node. Device only.',
+  },
+  {
     path: shape(`/v1/core/projects/${SEG}/worktrees`),
     scopes: {},
     note: "Absolute paths and branches of git worktrees on the machine, for the host's own new-task dialog.",

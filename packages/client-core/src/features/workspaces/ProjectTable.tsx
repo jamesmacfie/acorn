@@ -206,6 +206,11 @@ export function ProjectTable(props: {
                           <Show when={project().hidden}>
                             <Badge size="xs">Hidden</Badge>
                           </Show>
+                          <Show when={project().trusted === false}>
+                            <Badge size="xs" tone="danger">
+                              Untrusted
+                            </Badge>
+                          </Show>
                         </span>
                       </TableCell>
                       <TableCell>

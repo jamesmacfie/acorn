@@ -6,8 +6,8 @@ provider projects from Linear and Rollbar map onto them. The data model is in
 
 ## Add a project
 
-You add folders from Settings → Projects, import repositories through the GitHub plugin, or add them
-in the first-run wizard. When the active Node is local and the host has a folder picker,
+You add folders from Settings → Projects, import repositories through the GitHub plugin, clone a Git
+URL with [Clone from URL](./clone-runs.md#clone-from-url), or add them in the first-run wizard. When the active Node is local and the host has a folder picker,
 **Add project…** at the foot of the topbar's workspace switcher and **Add project** in the palette
 pick a folder and add it to the active workspace (`addProjectFromFolder`). The topbar reaches it
 through the `addProject` verb, gated by `canAddProject`, so a replacement topbar can offer the same
@@ -73,7 +73,9 @@ to treat the repository's files as data. That line helps against prompt injectio
 prevent it. Codex and contributed harnesses are refused with "This harness can't ignore a
 repository's own settings, so it can't run in an untrusted project."
 
-To trust a project, open its settings page and choose **Trust this project** under **Untrusted**.
+The project table in Settings → Overview and the header of the project's settings page mark an
+untrusted project **Untrusted**. To trust it, open its settings page and choose **Trust this
+project** under **Untrusted**.
 That calls `POST /v1/core/projects/:id/trust`, which only a device can call. Trust is one-way.
 Sessions and tasks that started before keep how they started, and the next ones load the
 repository's settings and run setup.

@@ -1,7 +1,7 @@
 # Clone a project from a Git URL and run a workflow on it
 
-Date: November 6, 2026. Status: in progress. [Phase 1](./01-clone-runs.md) and [phase 2](./02-project-trust.md)
-landed November 6, 2026.
+Date: November 6, 2026. Status: in progress. [Phase 1](./01-clone-runs.md), [phase 2](./02-project-trust.md),
+and [phase 3](./03-clone-from-url.md) landed November 6, 2026.
 
 ## What this is
 

@@ -3,13 +3,14 @@ title: Workspaces and projects
 description: Add projects, group them into workspaces or keep them separate, and change their settings.
 sources:
   - docs/workspaces-and-tasks/projects.md
+  - docs/workspaces-and-tasks/clone-runs.md
   - docs/workspaces-and-tasks/workspace-icons.md
   - docs/workspaces-and-tasks.md
   - docs/frontend/settings-groups.md
   - packages/client-core/src/features/workspaces/ProjectTable.tsx
   - packages/client-core/src/features/workspaces/WorkspaceIconEditor.tsx
   - packages/client-core/src/features/settings/ProjectConfigTabs.tsx
-checked: 90ded85ca
+checked: 'ebfb2cc1a'
 ---
 
 This page covers adding projects, choosing between grouped workspaces and separate projects, hiding
@@ -47,6 +48,9 @@ Pick whichever is nearest:
 - In the command palette, run **Add project**.
 - In **Settings** > **Overview**, click **Add folder…** or **Import from GitHub**. Importing clones a
   repository, or links one you already have on this computer.
+- In **Settings** > **Overview**, click **Clone from URL**, paste a Git URL, and say where the folder
+  goes. A cloned project starts **Untrusted**: nothing its repository ships runs until you choose
+  **Trust this project…** in its settings.
 - From the command line, run `acorn project add --path /absolute/path`.
 
 If the folder already belongs to a project in another workspace, acorn names that workspace and sends

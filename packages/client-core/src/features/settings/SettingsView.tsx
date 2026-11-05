@@ -701,6 +701,9 @@ export default function SettingsView(props: {
     return (
       <>
         <Badge>{resolved.project ? 'Project' : 'Workspace'}</Badge>
+        <Show when={resolved.project?.trusted === false}>
+          <Badge tone="danger">Untrusted</Badge>
+        </Show>
         <Show when={nodes().length > 1}>{nodeSelector()}</Show>
       </>
     )

@@ -6,11 +6,22 @@ import { activeNodeId } from '../../infra/node/activeNode'
 import { canAddProjectFromFolder, pickNodeFolder } from './addProject'
 import { createProject } from './workspaceMutations'
 import { NodePathForm } from './NodePathForm'
-import { projectImporterContributions } from '../../host/registries/sources/projectImporters'
+import { projectImporterContributions, projectImporterRegistry } from '../../host/registries/sources/projectImporters'
 import { Alert, Button } from '../../kit/components/primitives'
 import { latestSignal } from '../../kit/lib/state/latestSignal'
 import Icon from '../../kit/components/content/Icon'
+import CloneFromUrl from './CloneFromUrl'
 import './projects.css'
+
+// Core's own importer, registered here because these controls are the only place that offers
+// importers. No `requires`: the host advertises no core routes, so a Node too old for clone runs
+// answers Clone with a 404, and the form says to update it.
+projectImporterRegistry.register({
+  id: 'git-url',
+  label: 'Clone from URL',
+  glyph: 'folder-git-2',
+  component: CloneFromUrl,
+})
 
 /** Both Settings Overview and the empty Node use the same creation and import lifecycle. A folder
  *  joins `workspaceId` when given; without one the Node files it under its default workspace. */
