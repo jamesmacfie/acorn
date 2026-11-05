@@ -3,7 +3,7 @@ import { type NodePlugin, type PluginDatabase } from '@acorn/plugin-api/node'
 import { workflowTaskResolutionScope } from '../definitions/resolution'
 import { validateWorkflowDestination } from '../validation/destination'
 import { WorkflowStartService } from './admission'
-import { WorkflowAuthorityError } from './authority'
+import { authorizeRepoWorkflow, WorkflowAuthorityError } from './authority'
 import type { WorkflowRunner } from './runner'
 
 type PluginContext = Parameters<NonNullable<NodePlugin['init']>>[0]
@@ -26,8 +26,9 @@ export const workflowStartService = (
       reconciled: reconciled,
       taskScope,
       project: (projectId) => core.projects.byId(projectId),
-      authorizeRepoConfig: (taskId) => core.projects.assertConfigTrusted(taskId),
-      authorizeProjectConfig: (projectId) => core.projects.assertProjectConfigTrusted(projectId),
+      authorizeRepoConfig: (taskId) => authorizeRepoWorkflow(core, taskId),
+      authorizeProjectConfig: async (projectId) =>
+        (await import('./repoWorkflowTrust')).authorizeProjectWorkflow(core, projectId),
       onTrustRequired: (taskId) => ctx.events.repoConfigTrustNotice(taskId),
       validateDestination: async (graph, scope) => {
         const userId = core.identity.active()

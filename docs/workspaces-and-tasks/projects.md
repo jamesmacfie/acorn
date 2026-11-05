@@ -47,6 +47,37 @@ URL](./clone-runs.md) covers the URL checks and the background run.
 `path` is nullable, and the model reads a project with no path, but nothing creates one. Give an old
 path-less row a folder in Settings → Overview to repair it.
 
+## Untrusted projects
+
+Each project is trusted or untrusted (`projects.trusted`). A project cloned from a URL you pasted
+starts untrusted. Folder adds, `acorn project add`, and importer clones stay trusted, and so does
+every project that existed before the column. Until you trust a project, nothing its repository
+ships runs on the Node. An agent can still read the code.
+
+| Path | In an untrusted project |
+| --- | --- |
+| Task setup | Never runs. The Node records it as `skipped` with the reason `disabled`, because an older client's parse refuses a reason it doesn't know. A run by hand is refused with `untrusted`. The task's rail row shows a shield. |
+| Committed `.acorn/config.toml` | Left out of the merge, so its run targets, layouts, `copy` list, preview, and database script don't exist for this project. The project row and `~/.acorn/config.toml` still apply ([project configuration](./project-config.md#trust)). |
+| Committed workflows | Refused with `WorkflowAuthorityError('untrusted')` at every start. The task's workflow list leaves them out and shows one row saying why. |
+| Agents | Start locked down, or are refused. See below. |
+| Terminal shells | Unchanged. A shell, or a command line you type, is your own. |
+
+The Node reads trust each time a session or terminal starts. Claude Code is the only harness that
+can lock down. A locked-down Claude session loads only your user settings and the MCP servers Acorn
+passes it: `settingSources: ['user']` and `strictMcpConfig` for a managed session, and
+`--setting-sources user --strict-mcp-config` for a terminal, a headless step, a one-shot step, and a
+terminal handoff. The checkout's `.claude/` settings and hooks, its `.mcp.json`, and its `CLAUDE.md`
+don't load. Every locked-down managed session is also kept out of Acorn's data folder
+([read block](../managed-agents/read-block.md)), and its instructions start with a line telling it
+to treat the repository's files as data. That line helps against prompt injection. It doesn't
+prevent it. Codex and contributed harnesses are refused with "This harness can't ignore a
+repository's own settings, so it can't run in an untrusted project."
+
+To trust a project, open its settings page and choose **Trust this project** under **Untrusted**.
+That calls `POST /v1/core/projects/:id/trust`, which only a device can call. Trust is one-way.
+Sessions and tasks that started before keep how they started, and the next ones load the
+repository's settings and run setup.
+
 ## Arrange projects
 
 Settings → Overview is one table of projects grouped under their workspaces. Select rows to open a

@@ -130,7 +130,10 @@ export const claudeHarness: HarnessLaunchSpec = {
   loopHooks: true,
   // The read block goes in the same flag settings, so like the hooks it applies from each start.
   readBlock: true,
-  acpSessionMeta: (session, skills, loopHooks, attendanceInstructions, readBlock) => {
+  // The user's settings only, which leaves out the checkout's `.claude/` settings, hooks, skills, and
+  // `CLAUDE.md`, and only the MCP servers acorn passes.
+  untrusted: true,
+  acpSessionMeta: (session, skills, loopHooks, attendanceInstructions, readBlock, untrusted) => {
     const append = [
       sessionCustomAgent(session.config)?.instructions,
       attendanceInstructions,
@@ -163,6 +166,7 @@ export const claudeHarness: HarnessLaunchSpec = {
             ...(block ? { sandbox: block.sandbox } : {}),
           },
           ...plugins,
+          ...(untrusted ? { settingSources: ['user'], strictMcpConfig: true } : {}),
         },
       },
       ...(append ? { systemPrompt: { append } } : {}),

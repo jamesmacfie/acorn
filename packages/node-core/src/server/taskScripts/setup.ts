@@ -15,7 +15,9 @@ export async function recordSetupDecision(db: AppDatabase, taskId: string, publi
       ? 'not_applicable'
       : task.skipSetup
         ? 'user_skipped'
-        : config?.config.setupScriptTrigger === 'off'
+        : // An untrusted project has no reason of its own, because an older client's parse refuses a value
+          // it doesn't know. The project's `trusted` says why.
+          project?.trusted === false || config?.config.setupScriptTrigger === 'off'
           ? 'disabled'
           : !config?.config.setupScript?.trim()
             ? 'not_configured'

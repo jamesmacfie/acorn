@@ -1135,6 +1135,7 @@ acorn-plugin-types: member ProjectRef.id
 acorn-plugin-types: member ProjectRef.name
 acorn-plugin-types: member ProjectRef.path
 acorn-plugin-types: member ProjectRef.repository
+acorn-plugin-types: member ProjectRef.trusted
 acorn-plugin-types: member ProjectRef.workspaceId
 acorn-plugin-types: member ProjectRepository.externalId
 acorn-plugin-types: member ProjectRepository.host

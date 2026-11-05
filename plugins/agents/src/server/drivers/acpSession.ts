@@ -406,6 +406,7 @@ export async function startAcpSession(
     options.loopHooks,
     options.attendanceInstructions,
     options.readBlock,
+    options.untrusted,
   )
   // A custom agent's instructions, for a harness with no system prompt acorn can reach. Owed to each
   // provider session this driver creates, and never to one it picks back up, which already has them.

@@ -82,6 +82,7 @@ const toWireProject = (row: ProjectRow): Project => {
     remoteUrl: row.remoteUrl,
     repository,
     github: githubFacet(repository),
+    trusted: row.trusted,
   }
 }
 
@@ -124,7 +125,7 @@ export const projects = new Hono<AppEnv>()
     const parsed = cloneBody.safeParse(await c.req.json().catch(() => null))
     if (!parsed.success) return respondError(c, 400, 'bad_request', ['url and parentDir are required.'])
     const { startCloneRun } = await import('../../projects/clone')
-    const started = await startCloneRun(parsed.data, { db: getDb(c.env), ownerId: ownerId(c) })
+    const started = await startCloneRun({ ...parsed.data, trusted: false }, { db: getDb(c.env), ownerId: ownerId(c) })
     if (!started.ok) return respondError(c, 400, 'bad_request', [started.error])
     return c.json({ cloneId: started.cloneId, state: 'running' } satisfies CloneRunStart, 202)
   })
@@ -137,6 +138,14 @@ export const projects = new Hono<AppEnv>()
     const row = await getProject(getDb(c.env), c.req.param('id'))
     if (!row) return respondError(c, 404, 'not_found', ['No such project.'])
     return c.json(toWireProject(row))
+  })
+  // One-way: turns on what the repository ships (docs/workspaces-and-tasks/projects.md § Untrusted
+  // projects). Device-only, so an agent in the project can't trust it for itself.
+  .post('/:id/trust', requireDevice, async (c) => {
+    const { trustProject } = await import('../../projects/projectTrust')
+    return (await trustProject(getDb(c.env), c.req.param('id')))
+      ? c.json({ ok: true })
+      : respondError(c, 404, 'not_found', ['No such project.'])
   })
   .get('/:id/config', async (c) => {
     const response = await getProjectConfigWithRepo(getDb(c.env), c.req.param('id'))

@@ -6,7 +6,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { schema } from '../db'
 import { makeTestDb, type TestDb } from '../../testkit/db'
 import { checkCloneUrl, cloneRunState, startCloneRun, stopCloneRuns } from './clone'
-import { createProjectRef, getProject } from './projects'
+import { createProject, createProjectRef, getProject } from './projects'
 
 const { broadcasts } = vi.hoisted(() => ({ broadcasts: [] as Record<string, unknown>[] }))
 vi.mock('../transport/wsHub', async (importOriginal) => ({
@@ -93,11 +93,29 @@ describe('clone runs', () => {
     if (run.state !== 'finished' || !run.result.ok) throw new Error(JSON.stringify(run))
 
     const project = await getProject(t.db, run.result.projectId)
-    expect(project).toMatchObject({ path: join(parent(), 'web'), vcs: 'git', name: 'web' })
+    expect(project).toMatchObject({ path: join(parent(), 'web'), vcs: 'git', name: 'web', trusted: true })
     expect(readdirSync(parent())).toEqual(['web'])
     expect(existsSync(join(parent(), 'web', 'README.md'))).toBe(true)
     expect(broadcasts).toContainEqual({ channel: 'project:changed', projectId: project!.id })
     expect(broadcasts).toContainEqual({ channel: 'workspace:changed', workspaceId: project!.workspaceId })
+  })
+
+  it('writes an untrusted row, even over a row that already named the empty folder', async () => {
+    const target = join(parent(), 'web')
+    mkdirSync(target)
+    const existing = await createProject(t.db, { path: target })
+    if (!existing.ok) throw new Error(existing.reason)
+    expect(existing.project.trusted).toBe(true)
+    const started = await startCloneRun(
+      { url: `file://${origin}`, parentDir: parent(), trusted: false },
+      { db: t.db, ownerId: '', protocols },
+    )
+    if (!started.ok) throw new Error(started.error)
+    expect(await finish(started.cloneId)).toEqual({
+      state: 'finished',
+      result: { ok: true, projectId: existing.project.id },
+    })
+    expect((await getProject(t.db, existing.project.id))?.trusted).toBe(false)
   })
 
   it('fills a placeholder project and writes the fields with its folder', async () => {

@@ -43,7 +43,10 @@ export const workflowControl = (
     defs: async (taskId, includeRows) => {
       const scope = await taskScope(taskId)
       if (!scope) return { workflows: [], errors: [] }
-      const files = loadWorkflowFiles(scope.repoDir, homedir(), runner.validationCatalog())
+      const files =
+        scope.project.trusted === false
+          ? (await import('./repoWorkflowTrust')).untrustedWorkflowFiles(scope.repoDir, runner.validationCatalog())
+          : loadWorkflowFiles(scope.repoDir, homedir(), runner.validationCatalog())
       if (!includeRows || !scope.project) return files
       const ids = new Set(files.workflows.map((workflow) => workflow.id))
       const rows = (

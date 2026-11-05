@@ -116,6 +116,7 @@ describe('CoreServices.projects', () => {
       id: 'project-old',
       name: 'widget',
       path: join(dir, 'old'),
+      trusted: true,
       workspaceId: 'workspace-1',
       repository: { provider: 'github', host: 'github.com', path: 'acme/widget', externalId: '7' },
       github: { owner: 'acme', name: 'widget', repoId: 7 },

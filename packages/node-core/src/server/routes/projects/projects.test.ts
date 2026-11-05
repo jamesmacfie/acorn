@@ -1,5 +1,5 @@
 import { Hono } from 'hono'
-import { existsSync, mkdtempSync, rmSync, symlinkSync, writeFileSync } from 'node:fs'
+import { existsSync, mkdirSync, mkdtempSync, rmSync, symlinkSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
@@ -222,5 +222,52 @@ describe('clone runs over the API', () => {
   it('answers none for a clone it never started', async () => {
     const res = await call('/api/projects/clone-runs/unknown?waitMs=20000')
     expect(await res.json()).toEqual({ state: 'none' })
+  })
+})
+
+describe('trusting a project', () => {
+  let t: TestDb
+  let dir: string
+
+  beforeEach(async () => {
+    t = makeTestDb()
+    vi.mocked(getDb).mockReturnValue(t.db)
+    dir = mkdtempSync(join(tmpdir(), 'acorn-trust-'))
+    await seedProject(t, dir)
+    await t.db.update(schema.projects).set({ trusted: false })
+  })
+
+  afterEach(() => {
+    t.cleanup()
+    rmSync(dir, { recursive: true, force: true })
+  })
+
+  it('reads as untrusted, then trusted once the owner trusts it', async () => {
+    expect(await (await call('/api/projects/project-widget')).json()).toMatchObject({ trusted: false })
+    expect(await (await call('/api/projects/project-widget/trust', 'POST')).json()).toEqual({ ok: true })
+    expect(await (await call('/api/projects/project-widget')).json()).toMatchObject({ trusted: true })
+    expect((await call('/api/projects/missing/trust', 'POST')).status).toBe(404)
+  })
+
+  it("leaves the committed config out of an untrusted project's settings", async () => {
+    mkdirSync(join(dir, '.acorn'))
+    writeFileSync(join(dir, '.acorn', 'config.toml'), '[scripts.run.dev]\ncommand = "pnpm dev"\n')
+    expect(await (await call('/api/projects/project-widget/config')).json()).not.toHaveProperty('repoConfig')
+    await call('/api/projects/project-widget/trust', 'POST')
+    expect(await (await call('/api/projects/project-widget/config')).json()).toHaveProperty('repoConfig')
+  })
+
+  it('refuses a task token', async () => {
+    const scoped = new Hono<AppEnv>()
+    scoped.use('/api/*', async (c, next) => {
+      c.set('principal', { kind: 'internal', userId: 'james', scope: 'task', taskId: 'task-1' })
+      await next()
+    })
+    scoped.route('/api/projects', projects)
+    const res = await scoped.fetch(
+      new Request('http://acorn.test/api/projects/project-widget/trust', { method: 'POST' }),
+      {} as Env,
+    )
+    expect(res.status).toBe(403)
   })
 })

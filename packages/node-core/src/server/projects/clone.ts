@@ -8,7 +8,8 @@ import { randomUUID } from 'node:crypto'
 import { readdir, rename, rm, rmdir, stat } from 'node:fs/promises'
 import { isAbsolute, join } from 'node:path'
 import { CLONE_RUN_WAIT_MS, type CloneResult, type CloneRun } from '@acorn/protocol/api.ts'
-import type { AppDatabase } from '../db'
+import { eq } from 'drizzle-orm'
+import { schema, type AppDatabase } from '../db'
 import { gitOrThrow } from '../core/git'
 import { createLogger, describeError } from '../telemetry/logger'
 import { createProject, updateProjectRef, type ProjectUpdateRefInput } from './projects'
@@ -27,6 +28,9 @@ export type ProjectCloneInput = {
   fillProjectId?: string
   // Written to the row as soon as it has its folder, before the run reports finished.
   fields?: Omit<ProjectUpdateRefInput, 'path'>
+  // False for a URL the owner pasted (docs/workspaces-and-tasks/projects.md § Untrusted projects).
+  // Omitted means trusted, which is what an importer's clone stays.
+  trusted?: boolean
 }
 
 export type CloneContext = {
@@ -223,10 +227,13 @@ async function register(target: string, input: ProjectCloneInput, context: Clone
   }
   const created = await createProject(
     context.db,
-    { path: target, name: input.name, workspaceId: input.workspaceId },
+    { path: target, name: input.name, workspaceId: input.workspaceId, trusted: input.trusted },
     context.ownerId,
   )
   if (!created.ok) throw new Error(created.reason)
+  // A row that already named this empty folder was trusted for whatever used to be there.
+  if (input.trusted === false && created.project.trusted)
+    await context.db.update(schema.projects).set({ trusted: false }).where(eq(schema.projects.id, created.project.id))
   if (input.fields) await updateProjectRef(context.db, created.project.id, input.fields, context.holder)
   return created.project.id
 }

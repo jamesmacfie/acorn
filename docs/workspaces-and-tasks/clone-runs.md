@@ -11,7 +11,9 @@ A clone runs in the background, because a large repository takes longer than one
 `{ state: 'running', elapsedMs }`, `{ state: 'finished', result }`, or `{ state: 'none' }`. `result` is
 `{ ok: true, projectId }` or `{ ok: false, error }`. The Node keeps a finished answer for 10 minutes,
 and a restart loses every run. Both routes accept only a device token, so an agent with a task token
-can't fetch code onto the Node. `cloneOutcome` in `@acorn/protocol/api.ts` is the client side.
+can't fetch code onto the Node. `cloneOutcome` in `@acorn/protocol/api.ts` is the client side. A
+project this route clones starts [untrusted](./projects.md#untrusted-projects). A plugin's
+`core.projects.clone` and the importers that use it write a trusted project.
 
 The URL is untrusted input. The Node accepts `https://host/path`, `ssh://[user@]host[:port]/path`, and
 `user@host:path`. It refuses every other scheme, including `http`, `file`, `git`, and `ext::`, a

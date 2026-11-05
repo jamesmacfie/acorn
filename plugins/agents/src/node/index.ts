@@ -341,11 +341,13 @@ export const agentsPlugin = (dataDir: string, deps: AgentsPluginDeps): NodePlugi
                 : profile.id === codexProfile.id
                   ? codexHandoffMcp(servers, mcp.secrets)
                   : { args: [], env: {} }
+            const { handoffArgs } = await import('../server/untrusted')
+            const args = await handoffArgs(core, session.taskId, profile, [...resume.args, ...handoff.args])
             const terminal = await sessions.create({
               taskId: session.taskId,
               profileId: session.profileId,
               title: `${session.title} · terminal`,
-              command: [resume.file, ...resume.args, ...handoff.args].map(shellQuote).join(' '),
+              command: [resume.file, ...args].map(shellQuote).join(' '),
               // The CLI finds the session only in the folder of the account it started under.
               env: { ...handoff.env, ...(await runtime!.accountEnv(session)) },
               agentSessionId: session.id,
@@ -541,7 +543,8 @@ export const agentsPlugin = (dataDir: string, deps: AgentsPluginDeps): NodePlugi
               managedMcp: () => runtime!.mcpServers.list(),
               instructionObservation: async (projectId) =>
                 (await runtime!.instructionAdmission.built())?.latest(projectId) ?? null,
-              readBlockProviders: () => runtime!.providers.readBlockProviders(),
+              readBlockProviders: () => runtime!.providers.providersWith('readBlock'),
+              untrustedProviders: () => runtime!.providers.providersWith('untrusted'),
               staticDependencyPolicy: async (root, signal) => {
                 const policy = ctx.capabilities.get(STATIC_DEPENDENCY_POLICY)
                 return policy?.read(root, signal)

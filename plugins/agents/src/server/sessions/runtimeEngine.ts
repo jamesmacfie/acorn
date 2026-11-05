@@ -352,6 +352,7 @@ export class ManagedAgentEngine {
           const userId = this.currentUserId()
           return !!userId && (await readAgentSessionDefaults(this.core.prefs, userId)).blockDataRootReads
         },
+        untrusted: async (taskId) => (await import('../untrusted')).taskProjectUntrusted(this.core, taskId),
         readBlock: async (input) => {
           // Claude's own file tools run outside its sandbox, so a blocked session doesn't start without
           // the guard that checks them.

@@ -38,6 +38,9 @@ export type SecurityDiagnosticPorts = {
   instructionObservation?(projectId: string): Promise<InstructionAdmissionObservation | null>
   /** Harness ids that can keep their agent out of the data root (docs/managed-agents/read-block.md). */
   readBlockProviders?(): string[]
+  /** Harness ids that can start in an untrusted project (docs/workspaces-and-tasks/projects.md §
+   *  Untrusted projects). */
+  untrustedProviders?(): string[]
   staticDependencyPolicy?(root: string, signal?: AbortSignal): Promise<StaticDependencyPolicy | undefined>
 }
 
@@ -204,6 +207,41 @@ export async function collectSecurityDiagnostics(
       'session defaults',
       'Instruction settings could not be read.',
       'A failed read does not mean checks are disabled.',
+      'Retry Check this node.',
+    )
+  }
+
+  try {
+    const checkouts = await bounded(() => ports.core.projects.checkouts())
+    const projects = await bounded(() => Promise.all(checkouts.map(({ id }) => ports.core.projects.byId(id))))
+    const untrusted = projects.filter((project) => project?.trusted === false).length
+    const harnesses = ports.untrustedProviders?.() ?? []
+    add(
+      'projects.untrusted',
+      'agents',
+      'configured_only',
+      'info',
+      'core:projects',
+      `${untrusted} untrusted project${untrusted === 1 ? '' : 's'}; harnesses that can run in them: ${harnesses.join(', ') || 'none'}.`,
+      "Applies from each session's next start. Other harnesses are refused in an untrusted project, and a terminal command you type yourself runs as you typed it.",
+      "Trust a project on its settings page once you've reviewed what it ships.",
+      {
+        title: 'Untrusted projects',
+        description: untrusted
+          ? "Agents there ignore the repository's own settings, hooks, MCP servers, and instruction files."
+          : 'Every project is trusted.',
+        facts: [{ label: 'Untrusted', value: String(untrusted) }],
+      },
+    )
+  } catch {
+    add(
+      'projects.untrusted',
+      'agents',
+      'failed',
+      'attention',
+      'core:projects',
+      'Project trust could not be read.',
+      'A failed read does not mean every project is trusted.',
       'Retry Check this node.',
     )
   }

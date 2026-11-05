@@ -1,4 +1,4 @@
-import { isRepoConfigTrustError } from '@acorn/plugin-api/node'
+import { isRepoConfigTrustError, type CoreServices } from '@acorn/plugin-api/node'
 import type { WorkflowAuthorityReason } from '../../shared/workflowContracts'
 
 /** An unattended start refused for a reason only the owner can fix. A trigger moves to Needs review on
@@ -24,3 +24,8 @@ export function asAuthorityError(error: unknown): unknown {
     ? new WorkflowAuthorityError(code, message)
     : error
 }
+
+/** The check before a task runs a committed workflow: the project's trust, then core's review of the
+ *  checkout's configuration. The trust rules load on first use (./repoWorkflowTrust.ts). */
+export const authorizeRepoWorkflow = async (core: Pick<CoreServices, 'tasks' | 'projects'>, taskId: string) =>
+  (await import('./repoWorkflowTrust')).authorizeTaskWorkflow(core, taskId)

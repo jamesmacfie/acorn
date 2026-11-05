@@ -123,6 +123,11 @@ const RULES: readonly RouteRule[] = [
   },
   { path: shape(`/v1/core/projects/${SEG}/mcp/starter`), scopes: {}, note: 'Writes a file into the project folder.' },
   {
+    path: shape(`/v1/core/projects/${SEG}/trust`),
+    scopes: {},
+    note: 'Lets the repository run its setup, committed config, workflows, and agent settings. Only the owner, on the settings page.',
+  },
+  {
     path: shape(`/v1/core/projects/${SEG}/worktrees`),
     scopes: {},
     note: "Absolute paths and branches of git worktrees on the machine, for the host's own new-task dialog.",

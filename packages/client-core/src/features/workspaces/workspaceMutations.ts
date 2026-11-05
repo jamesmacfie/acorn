@@ -13,6 +13,7 @@ import {
   type IntegrationMapping,
   projectRoute,
   projectsRoute,
+  projectTrustRoute,
   type Workspace,
   workspaceRoute,
   workspaceProjectOrderRoute,
@@ -51,6 +52,10 @@ export const patchProject = (id: string, patch: ProjectPatch) =>
     { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(patch) },
     (res) => `project ${res.status}`,
   )
+// One-way. Turns on what the project's repository ships (docs/workspaces-and-tasks/projects.md §
+// Untrusted projects).
+export const trustProject = (id: string) =>
+  writeJson<{ ok: true }>(projectTrustRoute(id), { method: 'POST' }, (res) => `project trust ${res.status}`)
 // Takes the project's tasks with it. Folders and worktrees on disk are untouched.
 export const deleteProject = (id: string) =>
   writeJson<{ ok: true }>(projectRoute(id), { method: 'DELETE' }, (res) => `project ${res.status}`)

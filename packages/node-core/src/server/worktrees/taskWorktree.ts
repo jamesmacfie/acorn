@@ -16,7 +16,6 @@ import { loadRepoConfig, type LayoutRecipe, type RunTarget } from '../projects/r
 import { getProject, githubFacet, projectRepository, type ProjectRow } from '../projects/projects'
 import { changeRequestFetch, changeRequestName, primaryChangeRequest } from '../core/changeRequests'
 import { gitText } from '../core/git'
-import { getProjectConfig } from '../projects/projectConfig'
 import { readRepoConfigSnapshot, type RepoConfigSnapshot } from '../projects/repoConfigSnapshot'
 import {
   asideOriginal,
@@ -440,7 +439,7 @@ export async function resolveTaskCwd(
       // (docs/plugins/events.md § Hearing a core event).
       broadcastTasksChanged({ taskId: t.id })
       if (wt.created) {
-        await prepareWorktreePhase('files.copy', () => copyConfiguredFiles(db, t, checkout, wt.path))
+        await prepareWorktreePhase('files.copy', () => copyConfiguredFiles(project!.trusted, checkout, wt.path))
         // Awaited, not fired and forgotten: `core:worktree-created` admits the setup process before the
         // next terminal opens. This awaits spawning, not completion; callers read task scripts for
         // completion. The chain runner bounds each handler, so an interceptor that hangs delays this by
@@ -504,28 +503,30 @@ export async function requireTaskRoot(db: AppDatabase, taskId: string): Promise<
 
 // The setup script and trigger configured for this project. 'off' never runs, 'created' pre-creates
 // the worktree at task creation, and 'terminal' leaves creation lazy. The script runs once when the
-// worktree is first created through the onWorktreeCreated hook.
+// worktree is first created through the onWorktreeCreated hook. An untrusted project reads as 'off',
+// so every automatic path records setup as skipped (docs/workspaces-and-tasks/projects.md § Untrusted
+// projects).
 export type SetupTrigger = 'off' | 'created' | 'terminal'
 export async function projectSetup(
   db: AppDatabase,
   projectId: string,
 ): Promise<{ script: string | null; trigger: SetupTrigger }> {
-  const config = await getProjectConfig(db, projectId)
-  return { script: config?.config.setupScript ?? null, trigger: config?.config.setupScriptTrigger ?? 'terminal' }
+  const project = await getProject(db, projectId)
+  if (project?.trusted === false) return { script: null, trigger: 'off' }
+  return {
+    script: project?.setupScript ?? null,
+    trigger: (project?.setupScriptTrigger as SetupTrigger | null) ?? 'terminal',
+  }
 }
 
 // Copy files into a fresh worktree (docs/workspaces-and-tasks/worktrees.md § Worktrees and setup): read the
 // config from the source checkout, since the entries are usually gitignored and only it has them.
 // Warnings are logged, never thrown, so a failed copy never blocks worktree creation.
-async function copyConfiguredFiles(
-  db: AppDatabase,
-  t: Pick<TaskRef, 'projectId'>,
-  checkout: string,
-  worktreePath: string,
-): Promise<void> {
+async function copyConfiguredFiles(trusted: boolean, checkout: string, worktreePath: string): Promise<void> {
   try {
-    // `copy` is repo/user config only, so this layer needs nothing from the project row.
-    const cfg = loadRepoConfig(checkout, homedir(), {})
+    // `copy` is repo/user config only, so this layer needs nothing from the project row. An untrusted
+    // project's committed list is left out (docs/workspaces-and-tasks/projects.md § Untrusted projects).
+    const cfg = loadRepoConfig(trusted ? checkout : null, homedir(), {})
     if (!cfg.copy.length) return
     const res = copyWorktreeFiles(checkout, worktreePath, cfg.copy)
     for (const w of res.warnings) log.warn(w)
@@ -591,7 +592,9 @@ export async function taskRunConfig(
       devRestartScript: project?.devRestartScript,
       runTargetsJson: project?.runTargets,
     },
-    repoText,
+    // An untrusted project's committed layer doesn't exist for it (docs/workspaces-and-tasks/projects.md
+    // § Untrusted projects).
+    project?.trusted === false ? null : repoText,
   )
   return {
     targets: cfg.runTargets,

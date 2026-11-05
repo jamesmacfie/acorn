@@ -48,6 +48,10 @@ export type AgentProfileContribution = {
   launchArgs?: string[]
   /** Compiled profile seam for context that must reach the system prompt before the first turn. */
   launchContextArgs?: (context: string | null) => string[]
+  /** Argv that stops the CLI loading the checkout's own settings, hooks, MCP servers, and instruction
+   *  files, put first on every launch in an untrusted project: interactive, headless, and one-shot.
+   *  A profile without it is refused there (docs/workspaces-and-tasks/projects.md § Untrusted projects). */
+  untrustedArgs?: string[]
   // Whether `command` can be opened as a terminal. Omitted means yes, which is every built-in profile:
   // a shell, and three agent CLIs that all run interactively. `false` is for a profile that exists only
   // to answer one prompt, where running `command` bare would fail in front of whoever picked it. The

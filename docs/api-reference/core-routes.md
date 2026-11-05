@@ -123,6 +123,7 @@ Workspace and project routes are device-only. Task tokens reach only their own t
 | `GET`, `POST` | `/v1/core/projects`, `/clone-runs`, `/clone-runs/:id` | List projects and their facets, or add one. `POST /clone-runs` clones a Git URL in the background, and `GET /clone-runs/:id?waitMs=` reads the outcome. Both are device only ([clone a Git URL](../workspaces-and-tasks/clone-runs.md)) |
 | `GET`, `PATCH`, `DELETE` | `/v1/core/projects/:id` | Read, update identity, colour, folder, or visibility, or delete with its tasks |
 | `POST` | `/v1/core/projects/:id/detect` | Detect the project's facets again |
+| `POST` | `/v1/core/projects/:id/trust` | Trust an [untrusted project](../workspaces-and-tasks/projects.md#untrusted-projects). Device only, and one-way |
 | `GET`, `PUT` | `/v1/core/projects/:id/config` | Read or write project configuration |
 | `PUT` | `/v1/core/projects/:id/run-targets` | Replace the project's run targets |
 | `GET` | `/v1/core/projects/:id/branches` | Local branches grouped by active task, with the checkout branch |
@@ -154,8 +155,7 @@ Workspace and project routes are device-only. Task tokens reach only their own t
 | `GET` | `/v1/core/search` | Search core and every plugin's search provider. Device-only |
 | `GET` | `/v1/core/runs` | Every plugin's runs, merged. A task token sees only its task's runs |
 
-`GET /v1/core/tasks`, `GET /v1/core/task-statuses`, and `GET /v1/core/runs` are filtered rather than
-gated: a task token gets its own task and nothing else.
+`GET /v1/core/tasks`, `GET /v1/core/task-statuses`, and `GET /v1/core/runs` are filtered, not gated: a task token gets its own task only.
 
 `POST /v1/core/tasks` takes `origin` and `projectId` and may take a branch, pinned base, or
 worktree attachment. See [task creation and navigation](../workspaces-and-tasks/task-creation.md#branch-names)

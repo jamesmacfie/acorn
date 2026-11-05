@@ -330,6 +330,7 @@ node: TelemetryBatch
 node: TelemetryRecord
 node: ToolContext
 node: ToolError
+node: UNTRUSTED_REPOSITORY_PROMPT
 node: acornFileGuard
 node: acornLoopHook
 node: acornMcp
@@ -425,6 +426,8 @@ node: textAdapter
 node: tmuxAvailable
 node: toolOutputDir
 node: truncateBytes
+node: untrustedHarnessRefusal
+node: untrustedLaunchArgs
 node: viaBridge
 node: withinDataBudget
 node: worktreeGitText

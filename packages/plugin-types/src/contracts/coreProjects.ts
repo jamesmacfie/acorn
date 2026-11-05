@@ -10,6 +10,9 @@ export type ProjectRef = {
   repository: ProjectRepository | null
   /** `repository` read as GitHub's owner and name, for a `github.com` remote only. */
   github: { owner: string; name: string; repoId: number | null } | null
+  /** False until the owner trusts the project. Nothing its repository ships may run in it until then:
+   *  no setup, committed config, committed workflow, or agent settings and hooks. */
+  trusted?: boolean
 }
 
 export type ProjectCreateRefInput = {

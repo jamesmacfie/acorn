@@ -63,6 +63,7 @@ export type HarnessLaunchSpec = {
     loopHooks?: AgentDriverLoopHooks,
     attendanceInstructions?: string,
     readBlock?: AgentDriverReadBlock,
+    untrusted?: boolean,
   ) => Record<string, unknown>
   /** Built-in only. Set when `acpSessionMeta` installs `loopHooks` in the harness's own hooks, so the
    *  lifecycle passes them and the descriptor reports the loop capabilities. */
@@ -70,6 +71,10 @@ export type HarnessLaunchSpec = {
   /** Built-in only. Set when `acpSessionMeta` turns `readBlock` into the harness's own sandbox, so the
    *  lifecycle passes it when the person switched the block on (docs/managed-agents/read-block.md). */
   readBlock?: true
+  /** Built-in only. Set when `acpSessionMeta` turns `untrusted` into the harness's own settings, so the
+   *  harness may start in an untrusted project (docs/workspaces-and-tasks/projects.md § Untrusted
+   *  projects). */
+  untrusted?: true
   /** Built-in only. Set when `acpSessionMeta` passes `skills.plugins` to the harness's own skill loader,
    *  so the lifecycle writes them (docs/managed-agents/native-skills.md § Native skills). */
   nativeSkills?: true

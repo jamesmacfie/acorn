@@ -300,6 +300,33 @@ it("says whether agents are kept out of Acorn's data folder", async () => {
   })
 })
 
+it('counts untrusted projects and names the harnesses that can run in them', async () => {
+  const projects = [
+    { id: 'cloned', trusted: false },
+    { id: 'mine', trusted: true },
+  ]
+  const { findings } = await collectSecurityDiagnostics(
+    ports({
+      core: {
+        ...ports().core,
+        projects: {
+          checkouts: async () => projects.map(({ id }) => ({ id, path: `/projects/${id}` })),
+          byId: async (id: string) => projects.find((project) => project.id === id) ?? null,
+        },
+      } as never,
+      untrustedProviders: () => ['claude'],
+    }),
+    'node-1',
+    'owner',
+    {},
+    new AbortController().signal,
+  )
+  expect(findings.find((item) => item.id === 'projects.untrusted')).toMatchObject({
+    state: 'configured_only',
+    summary: '1 untrusted project; harnesses that can run in them: claude.',
+  })
+})
+
 it('does not inspect encrypted approval bodies during a passive project check', async () => {
   const report = await collectSecurityDiagnostics(
     ports(),

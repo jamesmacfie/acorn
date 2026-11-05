@@ -98,8 +98,9 @@ export class ProviderCatalogue {
   }
 
   /** Harnesses that turn the person's read block into their own sandbox. */
-  readBlockProviders(): string[] {
-    return this.registry.providers().filter((id) => this.registry.create(id)?.readBlock === true)
+  /** Harness ids whose driver declares `capability`, for Check this node. */
+  providersWith(capability: 'readBlock' | 'untrusted'): string[] {
+    return this.registry.providers().filter((id) => this.registry.create(id)?.[capability] === true)
   }
 
   /** Probes discover availability; connected sessions advertise the actual model and effort values.

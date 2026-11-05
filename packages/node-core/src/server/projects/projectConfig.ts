@@ -79,7 +79,8 @@ export async function getProjectConfigWithRepo(
   const project = await getProject(db, projectId)
   if (!project) return null
   const response = projectConfigFromRow(project)
-  const repoConfig = project.path ? readCommittedConfig(project.path) : null
+  // An untrusted project's committed file applies to nothing, so the page doesn't show it either.
+  const repoConfig = project.path && project.trusted ? readCommittedConfig(project.path) : null
   return repoConfig ? { ...response, repoConfig } : response
 }
 

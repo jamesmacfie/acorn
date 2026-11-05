@@ -47,6 +47,11 @@ the trust gate only to those. `config_acks` stores a hash of the reviewed snapsh
 snapshot needs a new review before a task or workflow runs it. Values you set on the row or in your
 personal file don't need a review.
 
+An [untrusted project](./projects.md#untrusted-projects) has no committed layer at all. The merge
+leaves the file out, so none of its run targets, layouts, `copy` entries, preview, or database
+script exist for that project, and the settings page doesn't show them. The project row and your
+personal file still apply. Trusting the project brings the file back, behind the same review.
+
 ## Layout recipes
 
 A `[layout.<id>]` block seeds a task's pane layout:
