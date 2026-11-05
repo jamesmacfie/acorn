@@ -12,7 +12,8 @@ import {
   type ProjectRef,
   type ProjectUpdateRefInput,
 } from '../projects/projects'
-import type { ProjectConfig, ProjectConfigResponse } from '@acorn/protocol/api.ts'
+import type { CloneRun, ProjectConfig, ProjectConfigResponse } from '@acorn/protocol/api.ts'
+import type { ProjectCloneInput } from '../projects/clone'
 import { getProjectConfig } from '../projects/projectConfig'
 import { assertProjectRepoConfigTrusted, assertRepoConfigTrusted } from '../projects/repoConfigTrust'
 import { projectSetup, type SetupTrigger } from '../worktrees/taskWorktree'
@@ -48,6 +49,11 @@ export type ProjectService = {
   // A loaded plugin's calls pass its id as `holder` (server/plugins/permissions.ts), so it can't set an
   // external id on a repository another code host holds.
   update(id: string, patch: ProjectUpdateRefInput, holder?: string): Promise<ProjectRef | null>
+  // Clone a Git URL in the background (docs/workspaces-and-tasks/clone-runs.md). It
+  // throws a refusal of the URL or the folder, and `cloneRun` reports everything after that. `holder`
+  // works as it does for `update`, on `input.fields`.
+  clone(input: ProjectCloneInput, holder?: string): Promise<{ cloneId: string }>
+  cloneRun(cloneId: string, waitMs?: number): Promise<CloneRun>
   // Without site associations: they only steer the browser extension's suggestions, so they stay out of
   // the plugin contract.
   config(id: string): Promise<PluginProjectConfigResponse | null>
@@ -62,6 +68,8 @@ type PluginProjectConfigResponse = Omit<ProjectConfigResponse, 'config'> & {
 
 export type CompiledProjectService = ProjectService & {
   assertProjectConfigTrusted(projectId: string): Promise<void>
+  // For the Node's shutdown: git runs in its own process group, so a clone would outlive the Node.
+  stopClones(): Promise<void>
 }
 
 export function createProjectService(db: AppDatabase, activeIdentity: ActiveIdentityStore): CompiledProjectService {
@@ -114,6 +122,16 @@ export function createProjectService(db: AppDatabase, activeIdentity: ActiveIden
     },
     create: (input) => createProjectRef(db, input, activeIdentity.get() ?? ''),
     update: (id, patch, holder) => updateProjectRef(db, id, patch, holder),
+    // The clone service loads on first use, to stay inside the service boot budget
+    // (apps/node/scripts/check-service-budget.mjs).
+    clone: async (input, holder) => {
+      const { startCloneRun } = await import('../projects/clone')
+      const started = await startCloneRun(input, { db, ownerId: activeIdentity.get() ?? '', holder })
+      if (!started.ok) throw new Error(started.error)
+      return { cloneId: started.cloneId }
+    },
+    cloneRun: async (cloneId, waitMs = 0) => (await import('../projects/clone')).cloneRunState(cloneId, waitMs),
+    stopClones: async () => (await import('../projects/clone')).stopCloneRuns(),
     config: async (id) => {
       const response = await getProjectConfig(db, id)
       if (!response) return null

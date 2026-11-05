@@ -112,6 +112,8 @@ const modes = {
       externalProjects: 'async',
       create: 'async',
       update: 'async',
+      clone: 'async',
+      cloneRun: 'async',
       config: 'async',
       assertConfigTrusted: 'async',
       setup: 'async',

@@ -31,6 +31,13 @@ leaves them out unless `--include-hidden` is set. Paths belong to the Node's hos
 CLI is remote. Removing a project deletes its task rows and links and leaves the folder and worktrees on
 disk. With workspaces off, removal also deletes the project's workspace, links, and datasets.
 
+`project clone URL --into ABSOLUTE` clones a Git URL into a new folder under `--into` on the Node's
+host, then adds it as a project and writes the project. The folder is `--name`, or the URL's last
+path segment without `.git`. The CLI starts the clone in one request and waits for it in requests of
+up to 20 seconds each, so a clone can run for as long as it needs, up to the Node's 30-minute limit.
+A failed clone exits 4 with Git's reason. The Node accepts only HTTPS, SSH, and `user@host:path`
+URLs. [Clone a Git URL](../workspaces-and-tasks/clone-runs.md) has the rules.
+
 `agent list --project ID` and `run list --project ID` resolve the project's workspace and use the
 workspace-filtered routes. Each conflicts with `--workspace`; the agent filter also conflicts with
 `--task`.

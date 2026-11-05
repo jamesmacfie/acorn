@@ -174,3 +174,53 @@ describe('a project’s site associations', () => {
     expect((await config()).siteAssociations).toEqual([])
   })
 })
+
+describe('clone runs over the API', () => {
+  let t: TestDb
+  let dir: string
+
+  beforeEach(() => {
+    t = makeTestDb()
+    vi.mocked(getDb).mockReturnValue(t.db)
+    dir = mkdtempSync(join(tmpdir(), 'acorn-clone-route-'))
+  })
+
+  afterEach(() => {
+    t.cleanup()
+    rmSync(dir, { recursive: true, force: true })
+  })
+
+  it.each([
+    ['task', { kind: 'internal', userId: 'james', scope: 'task', taskId: 'task-1' }],
+    ['service', { kind: 'internal', userId: 'james', scope: 'service' }],
+  ] as const)('refuses a %s token on both routes', async (_name, principal) => {
+    const scoped = new Hono<AppEnv>()
+    scoped.use('/api/*', async (c, next) => {
+      c.set('principal', principal)
+      await next()
+    })
+    scoped.route('/api/projects', projects)
+    const post = await scoped.fetch(
+      new Request('http://acorn.test/api/projects/clone-runs', {
+        method: 'POST',
+        body: JSON.stringify({ url: 'https://github.com/acme/web.git', parentDir: dir }),
+        headers: { 'content-type': 'application/json' },
+      }),
+      {} as Env,
+    )
+    expect(post.status).toBe(403)
+    const get = await scoped.fetch(new Request('http://acorn.test/api/projects/clone-runs/some-id'), {} as Env)
+    expect(get.status).toBe(403)
+  })
+
+  it('refuses a URL it may not clone before anything starts', async () => {
+    const res = await call('/api/projects/clone-runs', 'POST', { url: 'file:///etc', parentDir: dir })
+    expect(res.status).toBe(400)
+    expect(await res.text()).toContain('not file')
+  })
+
+  it('answers none for a clone it never started', async () => {
+    const res = await call('/api/projects/clone-runs/unknown?waitMs=20000')
+    expect(await res.json()).toEqual({ state: 'none' })
+  })
+})

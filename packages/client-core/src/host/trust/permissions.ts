@@ -102,7 +102,7 @@ const NODE_CORE_DESCRIPTIONS: Readonly<Record<string, GrantDescription>> = {
   },
   'projects:config': { text: 'Read every project’s build, dev and database scripts', icon: 'file-cog', high: true },
   'projects:write': {
-    text: 'Create and update projects, including their on-disk locations',
+    text: 'Create and update projects, including their on-disk locations, and clone Git repositories onto this Node',
     icon: 'folder-plus',
     high: true,
   },

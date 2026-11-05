@@ -1,147 +1,85 @@
 # Phase 1: clone a Git URL in the background
 
-Date: November 6, 2026. Status: proposed. Depends on nothing.
+Date: November 6, 2026. Status: landed, except the checkpoint. Depends on nothing.
 
-## Goal
+## Completion note
 
-The Node can clone any HTTPS or SSH Git URL into a folder on its own machine, and register the
-result as a project. A client starts a clone in one request and reads its outcome in later ones, so
-a slow clone never runs into the broker's 30-second deadline. Plugins reach the same service through
-`CoreServices.projects`, and the CLI gets `acorn project clone`.
+November 6, 2026. The Node can clone an HTTPS, SSH, or `user@host:path` URL into a folder in the
+background and add it as a project. [Clone a Git URL](../../workspaces-and-tasks/clone-runs.md) now
+owns the contract: the URL checks, the routes, the hidden folder and rename, the queue, and the plugin
+facet. The CLI command is in [Workspaces, projects, and tasks](../../cli/workspaces-projects-tasks.md).
 
-This phase has no UI. Phase 3 adds the form, and phase 4 moves the importers onto this service.
+What landed:
 
-## Starting point
+- `packages/node-core/src/server/projects/clone.ts`: `checkCloneUrl`, `startCloneRun`,
+  `cloneRunState`, and `stopCloneRuns`, with tests that clone a local bare repository through the
+  test-only `file` protocol.
+- `POST /v1/core/projects/clone-runs` and `GET /v1/core/projects/clone-runs/:id?waitMs=`, both behind
+  `requireDevice`. Task and service tokens get 403.
+- `core.projects.clone(input)` and `core.projects.cloneRun(id, waitMs)`, in `PROJECT_WRITES`, the call
+  modes, the published types (`ProjectCloneInput`, `ProjectCloneRun`, `ProjectCloneResult`), and the
+  surface snapshot. A loaded plugin's call passes its ID as the holder, as `update` does. The
+  `projects:write` trust line now says it can clone.
+- `acorn project clone URL --into ABSOLUTE [--name FOLDER] [--workspace ID] [--request-id UUID]`. A
+  failed clone exits 4 with `clone_failed`.
+- The Node's shutdown drain stops running and queued clones (`CompiledProjectService.stopClones`),
+  because git runs in its own process group and would outlive the Node.
 
-- Three importers clone today, each with its own copy of the code:
-  `plugins/github/src/server/routes/repos/import.ts`, `plugins/gitlab/src/server/routes/import.ts`,
-  and `plugins/bitbucket/src/server/routes/import.ts`. Each checks that the parent folder is absolute
-  and exists, runs `core.git.gitOrThrow(['clone', ...])`, then calls `core.projects.create`.
-- They clone inside the request and inherit `GIT_TIMEOUT_MS`, 30 seconds, from
-  `packages/node-core/src/server/core/git.ts`. A repository that takes longer than that fails today.
-- `git.ts` already sets `GIT_TERMINAL_PROMPT=0` and passes `SSH_AUTH_SOCK` through, so SSH clones use
-  the Node machine's agent.
-- [Archive in the background](../../workspaces-and-tasks/background-archive.md) is the pattern to copy:
-  a `POST` that answers 202, a `GET ?waitMs=20000` that holds for up to 20 seconds, and an outcome
-  kept in memory for 10 minutes. The routes are in `packages/node-core/src/server/routes/projects/worktree.ts`,
-  and `archiveInBackground` in `packages/protocol/src/projects/task.ts` is the client side.
-- The plugin project facet is `ProjectService` in `packages/node-core/src/server/core/projectRefs.ts`.
-  Its write methods are listed in `PROJECT_WRITES` in `packages/node-core/src/server/plugins/permissions.ts`,
-  and each method's call mode is in `packages/node-core/src/server/plugins/hostCallModes.ts`.
+Decisions and deviations:
 
-## Design
+- **No `trusted` field yet.** Nothing can store it until phase 2 adds the column, so phase 2 adds
+  `trusted` to `ProjectCloneInput` and has the route pass `false`.
+- **No `allowHttp`.** GitLab connections accept only `https` server addresses (`gitlabOrigin` in
+  `plugins/gitlab/src/server/serverAddress.ts`), which settles phase 4's open question.
+- **`fields` follow the row, not inside one write.** The run creates or fills the row, then writes
+  `fields` through `updateProjectRef`, so the holder check isn't copied. Both happen before the run
+  reports finished. A client that refetches in that moment can see the row without its provider ID
+  for one invalidation, which is what today's importers already do.
+- **A failure after the rename keeps the folder.** If the project can't be added, the error names the
+  folder and says to add it or delete it. Deleting a real-named folder a row may already point at
+  isn't worth the tidiness.
+- **Protocol types go through `@acorn/protocol/api.ts`.** The protocol package is capped at 99 entry
+  points and had 99, so the types and `cloneOutcome(wait)` live in
+  `packages/protocol/src/transport/api/cloneRuns.ts`. The helper has no legacy fallback, because no
+  older route exists.
+- **The docs got their own page.** `projects.md` would have passed 200 lines, so the contract is in
+  `docs/workspaces-and-tasks/clone-runs.md`, with a pointer from **Add a project**.
+- **`git clone --quiet`**, so git's "Cloning into <hidden folder>" line stays out of error messages.
+- **The route golden list also gained the two `archive-run` routes**, which an earlier commit added
+  without regenerating it.
 
-### The clone run
+Verify before building, answered:
 
-A new service, `packages/node-core/src/server/projects/clone.ts` (new), owns clone runs. A run takes:
+- `GIT_ALLOW_PROTOCOL` in `opts.env` wins. `brokerEnv` in `packages/node-core/src/server/core/proc.ts`
+  returns `{ ...allowlistAndPassthrough, ...spec.env }`, so a value in the Node's environment can't
+  widen it.
+- A folder rename within one parent never crosses a filesystem and works on macOS, Linux, and
+  Windows. The one difference is renaming onto an existing empty folder. POSIX replaces it, and
+  Windows refuses. The run removes the empty folder with `rmdir` first, which also fails if something
+  filled it meanwhile.
 
-| Field | Meaning |
-| --- | --- |
-| `url` | The Git URL, checked as described below |
-| `parentDir` | An absolute folder that exists on the Node |
-| `name` | Optional folder name. Defaults to the last path segment of the URL, without `.git` |
-| `workspaceId` | Optional, with the same rules as `createProject` |
-| `trusted` | Whether the new project starts trusted. Only the plugin facet can set it. Phase 2 stores it |
-| `fillProjectId` | Optional. Give this existing path-less project the folder instead of creating a row. For the importers' placeholder rows |
-| `fields` | Optional. The same fields `projects.update` takes, such as `githubRepoId` or `repositoryExternalId`, written with the row. Only the plugin facet can set it |
-| `allowHttp` | Optional. Allows `http://` for a self-hosted GitLab whose connection URL is plain HTTP. Only the plugin facet can set it |
+For later phases:
 
-The steps:
+- The Node service's boot graph is 1,946,429 bytes against a 1,947,000-byte ceiling, so about 570
+  bytes are left. The clone service, routes, and facet load `clone.ts` on first use. Keep new code
+  out of the boot graph the same way, or ask before raising the ceiling.
+- A URL clone is an ordinary trusted project until phase 2 lands. Don't advertise `project clone` on
+  the public site before then. Site pages that cite the changed docs weren't touched for that reason.
+- Phases 3 to 5 should update `clone-runs.md`, not the **Add a project** section, for clone contracts.
+- `cloneRunState` caps `waitMs` at `CLONE_RUN_WAIT_MS`, 20 seconds, for the route and the facet alike.
 
-1. Check the URL and the target. Refuse when `<parentDir>/<name>` exists and isn't an empty folder.
-2. Clone into a hidden sibling folder, `<parentDir>/.<name>.acorn-clone-<runId>`, with
-   `git clone --no-recurse-submodules -- <url> <hidden>`.
-3. Rename the hidden folder to `<parentDir>/<name>`. If something took that name meanwhile, the
-   rename fails and the run fails.
-4. Create the project row, or fill `fillProjectId`, with `fields` in the same write, and return its
-   ID. Writing them together means no client ever sees a GitHub clone without its GitHub link.
-5. On any failure, delete the hidden folder. The real folder never holds half a clone.
+## What's left
 
-The clone uses a 30-minute timeout and its own `AbortSignal`, so Node shutdown stops it. At most three
-clones run at once and the rest queue, because phase 4 lets an importer start up to 100.
+- **Checkpoint, skipped.** Cloning a public repository of a few hundred megabytes from the CLI
+  against a remote Node needs `pnpm dev:remote` and a paired CLI, which this run didn't set up. The
+  tests run a real `git clone` end to end through the service. Run the checkpoint by hand and record
+  the time here.
 
-### URL checks
+## Risks still open
 
-The URL is untrusted input. The check is a pure function in `clone.ts` with its own tests:
-
-- Allow `https://host/path`, `ssh://[user@]host[:port]/path`, and the scp form `user@host:path`.
-- Refuse every other scheme, including `http://` (unless the plugin facet passed `allowHttp`),
-  `file://`, `git://`, and `ext::`.
-- Refuse a URL with a password or token in it, such as `https://user:token@host/...`. Git writes the
-  remote into `.git/config` in plain text. A bare user name, like `git@`, is fine.
-- Refuse a host or path that starts with `-`, and anything with whitespace or control characters.
-
-The clone then sets, on top of what `git.ts` already does:
-
-- `GIT_ALLOW_PROTOCOL=https:ssh`, so a redirect or a submodule can't switch transport.
-- `GIT_LFS_SKIP_SMUDGE=1`, so Git LFS doesn't download large files during the clone.
-- `--` before the URL, which the GitLab and Bitbucket routes do and the GitHub route doesn't.
-
-The service takes its allowed protocols as a dependency, so tests can add `file` and clone a local
-bare repository. Production code never passes it.
-
-### Routes
-
-Device principal only. Task and service tokens get 403, so an agent can't fetch code onto the Node.
-
-- `POST /v1/core/projects/clone-runs` takes `{ url, parentDir, name?, workspaceId? }` and answers 202
-  with `{ cloneId, state: 'running' }`. A URL clone from this route is always untrusted.
-- `GET /v1/core/projects/clone-runs/:id?waitMs=20000` answers `{ state: 'running', elapsedMs }`,
-  `{ state: 'finished', result }`, or `{ state: 'none' }`. `result` is `{ ok: true, projectId }` or
-  `{ ok: false, error }`.
-
-The wire types go in `packages/protocol/src/projects/cloneRuns.ts` (new), with a client helper in the
-shape of `archiveInBackground`. A finished run publishes the same project and workspace invalidations
-as `createProject`.
-
-### Plugin facet
-
-`ProjectService` gets `clone(input)`, which returns `{ cloneId }`, and `cloneRun(id, waitMs)`. Both go
-in `PROJECT_WRITES` and `hostCallModes.ts`. The plugin context fake in
-`packages/node-core/src/testkit/pluginContext.ts` and the published surface snapshot change with them.
-
-### CLI
-
-`acorn project clone <url> --into <parent> [--name <folder>] [--workspace <id>]` starts a run, waits
-with repeated `GET` calls, and prints the project ID. It retries a lost `POST` response the way other
-CLI writes do ([retrying a write](../../cli/workspaces-projects-tasks.md#retrying-a-write)).
-
-## Steps
-
-1. Write the URL check and its tests.
-2. Write the clone run service with the hidden-folder rename, the queue, and cleanup.
-3. Add the route pair, the protocol types, and the client helper.
-4. Add `clone` and `cloneRun` to the plugin facet, the permissions list, the call modes, and the testkit.
-5. Add the CLI command.
-6. Update [Projects and workspaces](../../workspaces-and-tasks/projects.md#add-a-project) and the CLI page.
-
-## Acceptance
-
-- URL check tests cover each allowed form and each refusal above, including `ext::sh -c ...`,
-  `file:///tmp/x`, `https://u:p@host/r`, and `-oProxyCommand=...`.
-- An integration test clones a local bare repository through the test-only `file` protocol, and
-  checks the new row, its path, and the invalidations.
-- A failed clone leaves neither the hidden folder nor the target folder behind.
-- A target that exists and isn't empty is refused before git runs.
-- A task token gets 403 from both routes.
-- Checkpoint: clone a public repository of a few hundred megabytes from the CLI against a remote
-  Node, and record how long it took.
-
-## Risks
-
-- **A Node restart mid-clone** loses the run, because runs live in memory like archive runs. The
-  hidden folder stays on disk, and its name says what it is. A boot sweep would need the parent
-  folders stored somewhere. Leave it until someone hits it.
-- **No progress percentage.** `runProcess` collects output and has no streaming callback, so the run
-  reports elapsed time only. Parsing `git clone --progress` needs a streaming hook in
-  `packages/node-core/src/server/core/proc.ts`. Add it only if elapsed time proves not enough.
+- **A Node that dies mid-clone** loses the run, and its hidden folder stays on disk, named
+  `.<name>.acorn-clone-<cloneId>`. A clean shutdown stops the clone and deletes it. A boot sweep would
+  need the parent folders stored somewhere. Leave it until someone hits it.
+- **No progress percentage.** The run reports elapsed time only. `runProcess` now has `onStderr`, so
+  parsing `git clone --progress` is possible if elapsed time proves not enough.
 - **No cancel.** The 30-minute timeout bounds a mistaken clone. Add `DELETE` on the run if people ask.
-- **Private repositories** need the Node machine's own Git login: a credential helper for HTTPS or an
-  unlocked SSH agent. A failure says which one git asked for.
-
-## Verify before building
-
-- That `GIT_ALLOW_PROTOCOL` in `opts.env` wins over a value in the Node's own environment, given the
-  `GIT_*` passthrough in `git.ts`. The spread order in `spec` suggests it does.
-- That `fs.rename` of a folder works across every platform the Node ships on when both paths share a
-  parent. It should, because it never crosses a filesystem.

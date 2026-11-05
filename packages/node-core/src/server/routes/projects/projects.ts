@@ -3,7 +3,7 @@ import { homedir } from 'node:os'
 import { resolve } from 'node:path'
 import { Hono } from 'hono'
 import { z } from 'zod'
-import type { Project, ProjectMcpFile, ProjectsResponse } from '@acorn/protocol/api.ts'
+import type { CloneRunStart, Project, ProjectMcpFile, ProjectsResponse } from '@acorn/protocol/api.ts'
 import { inspectMcpConfig, MCP_CANDIDATES, STARTER_MCP_JSON } from '@acorn/protocol/mcp.ts'
 import { isValidProjectColor } from '@acorn/protocol/projectColor.ts'
 import { siteAssociationsSchema } from '@acorn/protocol/siteAssociations.ts'
@@ -21,8 +21,7 @@ import { getProjectConfigWithRepo, setProjectConfig, setProjectRunTargets } from
 import { getDb } from '../../db'
 import type { AppEnv } from '../../middleware/auth'
 import { respondError } from '../../respond'
-import { isTaskConfined } from '../../middleware/requireUser'
-import { ownerId } from '../../middleware/requireUser'
+import { isTaskConfined, ownerId, requireDevice } from '../../middleware/requireUser'
 import { unclaimedWorktrees } from '../../worktrees/taskWorktree'
 import { projectBranches } from '../../worktrees/branches'
 
@@ -34,6 +33,12 @@ const createBody = z.object({
   path: z.string().min(1),
   workspaceId: z.string().optional(),
   name: z.string().max(120).optional(),
+})
+const cloneBody = z.object({
+  url: z.string().min(1).max(2048),
+  parentDir: z.string().min(1),
+  name: z.string().max(255).optional(),
+  workspaceId: z.string().optional(),
 })
 const patchBody = z.object({
   name: z.string().max(120).optional(),
@@ -111,6 +116,22 @@ export const projects = new Hono<AppEnv>()
     const result = await createProject(getDb(c.env), parsed.data, ownerId(c))
     if (!result.ok) return respondError(c, result.code ? 409 : 400, result.code ?? 'bad_request', [result.reason])
     return c.json({ project: toWireProject(result.project) })
+  })
+  // Clone a Git URL in the background (docs/workspaces-and-tasks/clone-runs.md).
+  // Device-only, so an agent holding a task token can't fetch code onto the Node. The service loads on
+  // first use, to stay inside the service boot budget (apps/node/scripts/check-service-budget.mjs).
+  .post('/clone-runs', requireDevice, async (c) => {
+    const parsed = cloneBody.safeParse(await c.req.json().catch(() => null))
+    if (!parsed.success) return respondError(c, 400, 'bad_request', ['url and parentDir are required.'])
+    const { startCloneRun } = await import('../../projects/clone')
+    const started = await startCloneRun(parsed.data, { db: getDb(c.env), ownerId: ownerId(c) })
+    if (!started.ok) return respondError(c, 400, 'bad_request', [started.error])
+    return c.json({ cloneId: started.cloneId, state: 'running' } satisfies CloneRunStart, 202)
+  })
+  // `waitMs` holds the answer until the clone finishes or that long passes, whichever is first.
+  .get('/clone-runs/:id', requireDevice, async (c) => {
+    const { cloneRunState } = await import('../../projects/clone')
+    return c.json(await cloneRunState(c.req.param('id'), Number(c.req.query('waitMs')) || 0))
   })
   .get('/:id', async (c) => {
     const row = await getProject(getDb(c.env), c.req.param('id'))

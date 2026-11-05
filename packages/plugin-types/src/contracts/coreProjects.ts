@@ -29,6 +29,27 @@ export type ProjectUpdateRefInput = {
   githubRepoId?: number | null
 }
 
+export type ProjectCloneInput = {
+  /** An https, ssh, or `user@host:path` Git URL. Any other scheme, or a password in the URL, is refused. */
+  url: string
+  /** An absolute folder that exists on the Node. The clone goes in `<parentDir>/<name>`. */
+  parentDir: string
+  /** Defaults to the URL's last path segment, without `.git`. */
+  name?: string
+  workspaceId?: string
+  /** A project with no folder yet to give the clone to, instead of creating a row. */
+  fillProjectId?: string
+  /** Written to the row as soon as it has its folder, before the run reports finished. */
+  fields?: Omit<ProjectUpdateRefInput, 'path'>
+}
+
+export type ProjectCloneResult = { ok: true; projectId: string } | { ok: false; error: string }
+/** `none` means the Node holds no record: a wrong ID, a restart since, or an answer older than ten minutes. */
+export type ProjectCloneRun =
+  | { state: 'running'; elapsedMs: number }
+  | { state: 'finished'; result: ProjectCloneResult }
+  | { state: 'none' }
+
 export type SetupTrigger = 'off' | 'created' | 'terminal'
 export type PreviewMode = 'url' | 'port' | 'script'
 export type DbSchemaMode = 'auto' | 'script' | 'file'
@@ -68,6 +89,11 @@ export type CoreProjectService = {
   ): Promise<Array<{ connectionId: string; externalId: string; projectId: string }>>
   create(input: ProjectCreateRefInput): Promise<ProjectRef>
   update(id: string, patch: ProjectUpdateRefInput): Promise<ProjectRef | null>
+  /** Starts cloning a Git URL in the background and answers at once. It throws when the URL or the
+   *  target folder is refused. At most three clones run at once, and the rest wait their turn. */
+  clone(input: ProjectCloneInput): Promise<{ cloneId: string }>
+  /** The clone's state, after waiting up to `waitMs` (at most 20 seconds) for it to finish. */
+  cloneRun(cloneId: string, waitMs?: number): Promise<ProjectCloneRun>
   /** The project's build, dev and database scripts: commands acorn executes, behind their own grant. */
   config(id: string): Promise<ProjectConfigResponse | null>
   /** An expected hash binds execution to the selected configuration snapshot; drift is refused. */

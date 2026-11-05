@@ -48,6 +48,7 @@ acorn [--node NODE] workspace list|show ID|create --name NAME|rename ID --name N
 acorn [--node NODE] workspace external-projects list ID|replace ID --file FILE|-
 acorn [--node NODE] project list [--workspace ID] [--include-hidden]|show ID
 acorn [--node NODE] project add --path ABSOLUTE [--workspace ID] [--name NAME]
+acorn [--node NODE] project clone URL --into ABSOLUTE [--name FOLDER] [--workspace ID]
 acorn [--node NODE] project rename ID --name NAME|move ID --workspace ID|hide ID|unhide ID|detect ID|remove ID
 acorn [--node NODE] project config show ID|set ID --patch-file FILE|-
 acorn [--node NODE] task list [--project ID] [--status active|archived|all]

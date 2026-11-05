@@ -120,7 +120,7 @@ Workspace and project routes are device-only. Task tokens reach only their own t
 | `GET` | `/v1/core/workspaces/icon-images/:imageId` | Read a durable workspace PNG thumbnail |
 | `PUT` | `/v1/core/workspaces/:id/project-order` | [Save the complete project order](../workspaces-and-tasks/projects.md#arrange-projects) |
 | `GET`, `PUT` | `/v1/core/workspaces/:id/external-projects` | Read or replace provider projects linked to a workspace |
-| `GET`, `POST` | `/v1/core/projects` | List projects and their facets, or add one |
+| `GET`, `POST` | `/v1/core/projects`, `/clone-runs`, `/clone-runs/:id` | List projects and their facets, or add one. `POST /clone-runs` clones a Git URL in the background, and `GET /clone-runs/:id?waitMs=` reads the outcome. Both are device only ([clone a Git URL](../workspaces-and-tasks/clone-runs.md)) |
 | `GET`, `PATCH`, `DELETE` | `/v1/core/projects/:id` | Read, update identity, colour, folder, or visibility, or delete with its tasks |
 | `POST` | `/v1/core/projects/:id/detect` | Detect the project's facets again |
 | `GET`, `PUT` | `/v1/core/projects/:id/config` | Read or write project configuration |

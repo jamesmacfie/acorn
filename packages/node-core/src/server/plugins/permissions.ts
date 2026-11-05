@@ -22,7 +22,7 @@ const PROJECT_READS = ['byId', 'byGithub', 'byRepository', 'byWorkspace', 'check
 // trust assertion sits on the same surface: code with no reason to read project config has no reason
 // to assert its trust.
 const PROJECT_CONFIG = ['config', 'assertConfigTrusted', 'setup'] as const
-const PROJECT_WRITES = ['create', 'update'] as const
+const PROJECT_WRITES = ['create', 'update', 'clone', 'cloneRun'] as const
 
 const pick = <T extends object, K extends keyof T>(source: T, keys: readonly K[]): Pick<T, K> =>
   Object.fromEntries(keys.map((key) => [key, source[key]])) as Pick<T, K>
@@ -77,6 +77,9 @@ const projectsFor = (
         // Core checks the holder against the repository it writes, not one read here beforehand.
         update: (id: string, patch: Parameters<ProjectService['update']>[1]) => projects.update(id, patch, pluginId),
       }
+    : {}),
+  ...(keys.includes('clone')
+    ? { clone: (input: Parameters<ProjectService['clone']>[0]) => projects.clone(input, pluginId) }
     : {}),
 })
 

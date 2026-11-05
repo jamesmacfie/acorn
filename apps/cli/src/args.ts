@@ -17,6 +17,7 @@ const valueOptions = new Set([
   'status',
   'name',
   'path',
+  'into',
   'title',
   'branch',
   'base',
@@ -109,6 +110,7 @@ export function helpFor(positionals: string[]): string {
         ? [
             'project list [--workspace ID] [--include-hidden]|show ID',
             'project add --path ABSOLUTE [--workspace ID] [--name NAME]',
+            'project clone URL --into ABSOLUTE [--name FOLDER] [--workspace ID] [--request-id UUID]',
             'project rename ID --name NAME|move ID --workspace ID|hide ID|unhide ID|detect ID|remove ID',
             'project config show ID|set ID --patch-file FILE|- (scripts follow Node trust rules)',
             'project remove deletes related tasks, but leaves folders and worktrees on disk',
@@ -163,7 +165,7 @@ export function helpFor(positionals: string[]): string {
                       : [
                           'node info|start|status|stop|restart|pair|devices|revoke|reach|service',
                           'workspace list|show|create|rename|remove|external-projects',
-                          'project list|show|add|rename|move|hide|unhide|detect|remove|config',
+                          'project list|show|add|clone|rename|move|hide|unhide|detect|remove|config',
                           'task list|show|create|scripts status|scripts wait|scripts logs',
                           'agent providers|list|show|start|send|events|wait',
                           'workflow list|start|run list|run show|run steps|run wait',
