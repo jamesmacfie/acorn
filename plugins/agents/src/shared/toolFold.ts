@@ -27,6 +27,7 @@ export const mergeToolCall = (previous: AgentToolCall, next: AgentToolCall): Age
   ...(next.background || previous.background ? { background: true } : {}),
   ...((next.exitCode ?? previous.exitCode) != null ? { exitCode: next.exitCode ?? previous.exitCode } : {}),
   web: next.web && previous.web ? mergeWebActivity(previous.web, next.web) : (next.web ?? previous.web),
+  ...(next.secretValues || previous.secretValues ? { secretValues: next.secretValues ?? previous.secretValues } : {}),
 })
 
 // Same convention, one level down. A provider reports the request and the sources on different

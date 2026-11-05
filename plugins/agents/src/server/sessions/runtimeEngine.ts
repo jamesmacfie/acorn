@@ -27,6 +27,7 @@ import type {
   AgentInputPart,
   AgentNormalizedEvent,
   AgentSession,
+  AgentToolCall,
   AgentTurn,
 } from '../../contract/wire.ts'
 import type { EnqueueAgentTurnInput } from '../../shared/schemas'
@@ -432,7 +433,9 @@ export class ManagedAgentEngine {
     // The redaction list grows as sessions start, rather than being computed once, because each session
     // mints its own scoped internal token (docs/security/credentials.md § Credential handling). #mintedSecrets
     // accumulates them and the materializer holds a live reference to the same array.
-    this.eventMaterializer = new ProviderEventMaterializer(this.artifacts, this.mintedSecrets)
+    this.eventMaterializer = new ProviderEventMaterializer(this.artifacts, this.mintedSecrets, (sessionId, tool) =>
+      this.carriedKeys(sessionId, tool),
+    )
     this.webhooks = new AgentWebhookService(options.db, options.secrets, options.core)
     this.mcpServers = new AgentMcpServerStore(
       options.db,
@@ -989,6 +992,21 @@ export class ManagedAgentEngine {
       if (this.repeatedToolCalls) (await this.repeatedToolCalls).forget(sessionId)
       if (turnId) void this.goals.get().then((goals) => goals.check(sessionId, turnId))
       void this.pump()
+    }
+  }
+
+  /** The known key values a tool call's input carried, looked up against its task folder's env files
+   *  (docs/future/agent-command-checks.md § Where it runs). Advisory, so a failure logs and finds none. */
+  private async carriedKeys(sessionId: string, tool: AgentToolCall) {
+    const knownValues = this.core.knownValues
+    if (!knownValues || !tool.input) return []
+    try {
+      const { taskId } = await this.store.requireSession(sessionId)
+      const folder = await this.core.tasks.requireRoot(taskId).catch(() => null)
+      return await knownValues.carried({ sessionId, toolCallId: tool.id, folder, text: tool.input })
+    } catch (error) {
+      log.warn(`known key check failed: ${describeError(error).message}`)
+      return []
     }
   }
 

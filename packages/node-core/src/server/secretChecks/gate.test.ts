@@ -150,6 +150,7 @@ describe('the secret publication gate', () => {
     })
     const state = (await (await call(DEVICE, 'GET')).json()) as SecretPublicationState
     expect(state.block).toBe(true)
+    expect(Array.isArray(state.knownKeys)).toBe(true)
     expect(state.decisions[0]).toMatchObject({
       destination: 'https://github.test/o/r refs/heads/a',
       highCount: 1,

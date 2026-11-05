@@ -1,6 +1,6 @@
 import { createEffect, createSignal, For, Index, mergeProps, on, onCleanup, Show, type Component } from 'solid-js'
 import { agentToolTone } from '../../contract/toolTone'
-import { Button, CodeBlock, Fold, Inline, Stack, StackedDiff, StatusDot, Text } from '@acorn/plugin-api/ui'
+import { Alert, Button, CodeBlock, Fold, Inline, Stack, StackedDiff, StatusDot, Text } from '@acorn/plugin-api/ui'
 import { formatRelativeTime, openPane } from '@acorn/plugin-api/client'
 import { AGENT_TOOL_CARD_POINT, type AgentToolCardProps } from '@acorn/protocol/extensionPoints.ts'
 import { Slot } from '@acorn/plugin-api/ui/host'
@@ -8,6 +8,7 @@ import { useAgentToolFold } from './toolFoldPrefs'
 import { WebStatusText, WebToolBody, webStatusIsNews, webSummary } from './webToolCard'
 import { eventTime } from './eventTime'
 import { lastLines } from './backgroundCommands'
+import type { KnownValueMatch } from '@acorn/protocol/secretChecks.ts'
 import type { AgentToolCall } from '../../contract/wire.ts'
 
 /** What the built-in card draws with: the point's props plus host-only metadata and a callback.
@@ -269,7 +270,9 @@ const GenericAgentTool: Component<AgentToolRendererProps> = (props) => (
  * built-in one or a contributed one. Here rather than in the transcript so a contributed renderer
  * honours the setting without the transcript having to pass anything down for it.
  */
-export const AgentToolCallCard: Component<Omit<AgentToolRendererProps, 'defaultOpen' | 'onOpenChange'>> = (props) => {
+export const AgentToolCallCard: Component<
+  Omit<AgentToolRendererProps, 'defaultOpen' | 'onOpenChange' | 'tool'> & { tool: AgentToolCall }
+> = (props) => {
   const fold = useAgentToolFold()
   // Read at mount and not tracked, because the seed in the fold is not either: changing the setting
   // decides how the next card opens, it does not reach back and reopen every card the reader has shut.
@@ -284,7 +287,7 @@ export const AgentToolCallCard: Component<Omit<AgentToolRendererProps, 'defaultO
   // Keyed on the stable MCP name when available, otherwise `kind`, which is the harness's own name for what
   // the call did — ACP's tool kind, or whatever a driver normalised to it. It is the only name for a call
   // that reaches a transcript; `title` is a sentence the provider wrote for a person to read.
-  return (
+  const card = () => (
     <Slot
       point={AGENT_TOOL_CARD_POINT}
       key={props.tool.name ?? props.tool.kind ?? ''}
@@ -301,4 +304,22 @@ export const AgentToolCallCard: Component<Omit<AgentToolRendererProps, 'defaultO
       <GenericAgentTool {...full} />
     </Slot>
   )
+  // Outside the slot, so a contributed renderer can't leave it out.
+  return (
+    <Show when={props.tool.secretValues?.length ? props.tool.secretValues : null} fallback={card()}>
+      {(keys) => (
+        <Stack gap="row">
+          <Alert tone="warn">{carriedKeysLine(keys())}</Alert>
+          {card()}
+        </Stack>
+      )}
+    </Show>
+  )
+}
+
+/** "This tool call contained STRIPE_SECRET_KEY from .env.local." */
+const carriedKeysLine = (keys: KnownValueMatch[]): string => {
+  const named = keys.map((key) => `${key.name} from ${key.source}`)
+  const list = named.length > 1 ? `${named.slice(0, -1).join(', ')} and ${named.at(-1)}` : named[0]
+  return `This tool call contained ${list}.`
 }

@@ -61,10 +61,18 @@ export type SecretPublicationDecision = {
   allowed: boolean
 }
 
+/** A known key a text carried: the key's name and where Acorn read it, never its value. */
+export type KnownValueMatch = { name: string; source: string }
+
+/** One place the known key index reads, as Settings lists it. `folder` is the task folder a project
+ *  file sits in, and null for a home folder file or the environment. */
+export type KnownKeySource = { source: string; folder: string | null; names: string[] }
+
 export type SecretPublicationState = {
   block: boolean
   detectorVersion: string
   decisions: SecretPublicationDecision[]
+  knownKeys: KnownKeySource[]
 }
 
 export const coreSecretPublicationRoute = '/v1/core/security/secret-publication'

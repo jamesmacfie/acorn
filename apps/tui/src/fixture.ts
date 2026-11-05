@@ -394,6 +394,10 @@ const agentSnapshot = () =>
               title: 'Read src/login.ts',
               status: 'completed',
               output: 'export async function signIn(',
+              // Behind a flag for the same reason as the request's origin below.
+              ...(process.env.ACORN_FIXTURE_CARRIED_KEYS
+                ? { secretValues: [{ name: 'STRIPE_SECRET_KEY', source: '.env.local' }] }
+                : {}),
             },
           }),
           ...agentWebActivity(),

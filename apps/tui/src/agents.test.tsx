@@ -122,6 +122,23 @@ describe('running an agent from a terminal', () => {
     }
   }, 180_000)
 
+  it('warns on a tool card whose input carried a known key', async () => {
+    process.env.ACORN_FIXTURE_CARRIED_KEYS = '1'
+    // Tall enough that the earlier tests' draft and context lines leave the tool card in view.
+    const screen = await renderFixture({ pane: 'agents', width: 120, height: 60 })
+    try {
+      await openFirstSession(screen)
+      await enterDetail(screen)
+      // The pane wraps the sentence after "from".
+      expect(await screen.until('This tool call contained')).toContain(
+        'This tool call contained STRIPE_SECRET_KEY from',
+      )
+    } finally {
+      screen.done()
+      delete process.env.ACORN_FIXTURE_CARRIED_KEYS
+    }
+  }, 180_000)
+
   // `onSubmit` on the shared props means "Enter without a modifier. Absent leaves Enter as a newline",
   // and the composer's own hint says "Shift+Enter for newline". Binding it to the `commit` chord alone
   // would make that hint describe a keyboard nobody has.

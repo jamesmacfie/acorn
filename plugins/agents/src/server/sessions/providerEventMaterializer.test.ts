@@ -1,7 +1,7 @@
 import { mkdtemp, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import { afterEach, beforeEach, describe, expect, it } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { makeTestPluginDb, type TestPluginDb } from '@acorn/plugin-api/testkit'
 import { AgentArtifactStore } from './artifactStore'
 import { ProviderEventMaterializer } from './providerEventMaterializer'
@@ -15,7 +15,7 @@ beforeEach(async () => {
   testDb = makeTestPluginDb('agents')
   dataDir = await mkdtemp(join(tmpdir(), 'acorn-provider-artifacts-'))
   artifacts = new AgentArtifactStore(testDb.db, dataDir)
-  materializer = new ProviderEventMaterializer(artifacts, [])
+  materializer = new ProviderEventMaterializer(artifacts, [], async () => [])
 })
 
 afterEach(async () => {
@@ -62,5 +62,25 @@ describe('provider event materialization', () => {
         message: 'The provider returned a generated artifact larger than 16 MiB.',
       },
     ])
+  })
+
+  it('marks a call whose input carried a known key, once per call, before a large input moves out', async () => {
+    const carried = vi.fn(async () => [{ name: 'STRIPE_SECRET_KEY', source: '.env.local' }])
+    const marking = new ProviderEventMaterializer(artifacts, [], carried)
+    const input = `curl -d ${'x'.repeat(70 * 1024)}`
+    const call = { id: 'call-1', title: 'curl', kind: 'execute', input }
+
+    const [first, artifact] = await marking.map('session', 'turn', { type: 'tool', tool: call })
+    const [repeat] = await marking.map('session', 'turn', { type: 'tool', tool: { ...call, status: 'completed' } })
+
+    expect(carried).toHaveBeenCalledTimes(1)
+    expect(carried).toHaveBeenCalledWith('session', expect.objectContaining({ id: 'call-1', input }))
+    expect(first).toMatchObject({
+      type: 'tool',
+      tool: { secretValues: [{ name: 'STRIPE_SECRET_KEY', source: '.env.local' }] },
+    })
+    expect(artifact?.type).toBe('artifact')
+    expect(repeat).toMatchObject({ type: 'tool', tool: { status: 'completed' } })
+    expect(repeat?.type === 'tool' && repeat.tool.secretValues).toBeFalsy()
   })
 })

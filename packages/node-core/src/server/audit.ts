@@ -40,6 +40,9 @@ type CoreAuditAction =
   // (docs/security/secret-publication.md § Audit).
   | 'secrets.publication.blocked'
   | 'secrets.publication.allowed'
+  // An agent's tool call carried the value of a key Acorn knows about. Details carry the tool call
+  // and the key names, never a value.
+  | 'secrets.agent.carried'
   // Node administration: which plugins run decides which routes exist and which databases open.
   | 'plugins.disabled.changed'
   // Attachment to a control plane, both directions (docs/node-enrollment.md). On the same trail as

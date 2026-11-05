@@ -1,5 +1,5 @@
 // Which earlier tool result a command repeats a URL, pipe-to-shell line, or package name from, for the
-// line on a permission card (docs/future/agent-command-checks.md § Where a command came from). Display
+// line on a permission card (docs/future/agent-command-checks.md § Part 2: where a command came from). Display
 // only: a wrong match costs a line of text, so the extraction is plain patterns, not a shell parser.
 import type { AgentRequestOrigin, AgentToolCall } from '../../contract/wire.ts'
 

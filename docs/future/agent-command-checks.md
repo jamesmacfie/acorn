@@ -1,5 +1,70 @@
 # Known key values and command origins in agent sessions
 
+## Phase 2 completion note
+
+November 6, 2026. Phase 2, the index and the after-the-fact warning, landed. Phase 3 isn't started.
+
+What landed:
+
+- `packages/node-core/src/server/secretChecks/knownValues.ts`. `createKnownValueIndex({ home, env })`
+  builds an index with a salt drawn per Node start. `knownValueIndex()` is the Node's one shared
+  index. `lookup(text, folder)` returns `{ matches, truncated }`. `sources()` returns each source
+  with its key names, for Settings. The index reads the task folder's env files, the four home
+  folder files, and the environment. It rereads a file when its size or modification time changes.
+- `auditCarriedKeys(db, index, input)` in the same file. It runs the lookup and, on a match, writes
+  `secrets.agent.carried` with the session as the subject and `toolCallId` and `names` as details.
+- `CompiledCoreServices.knownValues.carried(...)`, an optional facet beside `secretPublication`. It
+  loads the module on first use.
+- `secretValues?: KnownValueMatch[]` on `AgentToolCall`, kept by `mergeToolCall`. The protocol
+  types `KnownValueMatch` and `KnownKeySource` live in `packages/protocol/src/secretChecks.ts`.
+- The lookup runs in `ProviderEventMaterializer.map`, before an input over 64 KiB moves to an
+  artifact, through a `carriedKeys` port that `ManagedAgentEngine.carriedKeys` fills. The engine
+  passes the session's task root as the folder. A failure logs a warning and finds no keys.
+- The warning line in `AgentToolCallCard`, outside the `agents:tool-card` slot so a contributed
+  renderer can't drop it: "This tool call contained `STRIPE_SECRET_KEY` from .env.local." The
+  terminal client draws it too. Its fixture shows it only behind `ACORN_FIXTURE_CARRIED_KEYS`.
+- **Keys Acorn knows about** in Settings > Security and backup > Secret checks. Each source shows a
+  count, and a closed fold shows its names. The list rides on the secret publication route as
+  `knownKeys`, so it needs no route of its own.
+
+Decisions and deviations:
+
+- `knownValues.ts` isn't exported through `@acorn/plugin-api/node`. The facade check fails on an
+  export with no importer, and the export also needs a `./server/secretChecks/knownValues.ts` entry in
+  `packages/node-core/package.json`, which would take node-core past its cap of 70 entry points
+  (`boundaries.test.ts`). The agents plugin reaches the index through the `knownValues` facet
+  instead. Phase 3 adds the export when the bridge check or the Git rule imports it, and needs to
+  make room under the cap first.
+
+- The environment source is the Node's own `process.env`, labeled "Acorn's environment". Each
+  harness gets its environment from `brokerEnv` over that same parent, and the event store doesn't
+  hold a session's own environment when it saves a call. This indexes more than any one harness
+  sees, such as the Node's internal tokens. That only adds warnings, and every one is a real value.
+- Only the top level of a task folder is read, as the plan says. A `.env` in `apps/api/` of a
+  monorepo isn't indexed.
+- One lookup and one audit row per call. The materializer checks the first event that carries a
+  call's input, as `RepeatedToolCalls` counts it, and remembers the last 1,000 calls it checked.
+  Codex repeats the input on completion, and that repeat isn't looked up again.
+- The index has no version string. Phase 3 is its only reader, and what it should cover (one task
+  folder or all of them) depends on how the Git cache key uses it.
+- The value rules follow Stroq's `extract.ts`, trimmed. A quoted dotenv value ends at its first
+  matching quote, with no escape handling. Docker `auth` is indexed both as the base64 string and as
+  its decoded password.
+- The index forgets a task folder after 50 others have been looked up more recently. Settings shows
+  a folder only after an agent in that task has made a tool call since the Node started.
+
+For Phase 3:
+
+- The Node service size check is 1,946,325 bytes against a 1,944,000 ceiling. This phase adds 844
+  bytes to the static graph, all in the event store and the core facet. The index loads lazily. I
+  didn't raise the ceiling.
+- The bridge check and the Git rule can call `knownValueIndex().lookup(text, folder)` and use
+  `truncated`. Import it lazily: no boot-path module imports `knownValues.ts` today.
+- I fixed a citation from Phase 1 in `commandOrigin.ts`: it cited "§ Where a command came from",
+  but the heading is "Part 2: where a command came from", and `docCitations.test.ts` failed on it.
+- `docs/security/secret-publication.md` doesn't mention the agent check, the audit verb, the home
+  folder reads, or the Settings list. That doc update is Phase 3's.
+
 ## Phase 1 completion note
 
 November 6, 2026. Phase 1, the origin line, landed. Phases 2 and 3 aren't started.

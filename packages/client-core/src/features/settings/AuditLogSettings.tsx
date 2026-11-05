@@ -37,6 +37,7 @@ const ACTION_LABELS: Record<string, string> = {
   'config.trusted': 'Repo config trusted',
   'secrets.publication.blocked': 'Publication blocked by secret check',
   'secrets.publication.allowed': 'Publication allowed once',
+  'secrets.agent.carried': 'Agent tool call carried a known key',
   'plugins.disabled.changed': 'Plugins changed',
   'node.reach.changed': 'Network reach changed',
   'backup.created': 'Backup created',

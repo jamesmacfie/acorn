@@ -1,5 +1,5 @@
 import { createResource, createSignal, For, Show } from 'solid-js'
-import type { SecretPublicationDecision } from '@acorn/protocol/secretChecks.ts'
+import type { KnownKeySource, SecretPublicationDecision } from '@acorn/protocol/secretChecks.ts'
 import {
   allowSecretPublication,
   nodeSecretPublication,
@@ -7,6 +7,7 @@ import {
 } from '../../infra/node/nodeSecurity'
 import { Button, Checkbox } from '../../kit/components/primitives'
 import { Text } from '../../kit/components/content/Text'
+import { Fold } from '../../kit/components/layout/Fold'
 import { SettingRow } from '../../kit/components/layout/SettingRow'
 import { SettingsSection } from '../../kit/components/layout/SettingsSection'
 import { createSettingSave } from './settingSave'
@@ -30,6 +31,10 @@ const describe = (decision: SecretPublicationDecision): string => {
       : `${decision.unscannedCount} input${decision.unscannedCount === 1 ? '' : 's'} not checked`
   return `${OPERATIONS[decision.operation]} to ${decision.destination}: ${found}.`
 }
+
+/** "`.env.local` in ~/work/api: 4 keys", or "~/.aws/credentials: 2 keys". */
+const describeSource = (source: KnownKeySource): string =>
+  `${source.source}${source.folder ? ` in ${source.folder}` : ''}: ${source.names.length} key${source.names.length === 1 ? '' : 's'}`
 
 export default function SecretPublicationSection(props: { nodeId: string | null }) {
   const nodeId = () => props.nodeId ?? undefined
@@ -75,6 +80,21 @@ export default function SecretPublicationSection(props: { nodeId: string | null 
             })
           }
         />
+      </SettingRow>
+      <SettingRow
+        label="Keys Acorn knows about"
+        layout="stacked"
+        description="An agent's tool call that contains one of these values gets a warning on its card. Acorn reads them on this node and keeps a hash of each value, never the value. Task folders appear once an agent in that task runs a tool."
+      >
+        <Show when={state()?.knownKeys.length} fallback={<Text emphasis="muted">None found.</Text>}>
+          <For each={state()!.knownKeys}>
+            {(source) => (
+              <Fold label={describeSource(source)} level="sub">
+                <Text wrap>{source.names.join(', ')}</Text>
+              </Fold>
+            )}
+          </For>
+        </Show>
       </SettingRow>
       <Show when={state()?.decisions.length}>
         <SettingRow label="Blocked operations" layout="stacked" error={allowError() || undefined}>
