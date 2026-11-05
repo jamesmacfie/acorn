@@ -35,6 +35,7 @@ const valueOptions = new Set([
   'timeout',
   'until',
   'definition',
+  'workflow',
   'inputs-file',
   'input-file',
   'phase',
@@ -110,7 +111,7 @@ export function helpFor(positionals: string[]): string {
         ? [
             'project list [--workspace ID] [--include-hidden]|show ID',
             'project add --path ABSOLUTE [--workspace ID] [--name NAME]',
-            'project clone URL --into ABSOLUTE [--name FOLDER] [--workspace ID] [--request-id UUID]',
+            'project clone URL --into ABSOLUTE [--name FOLDER] [--workspace ID] [--workflow ID [--inputs-file FILE|-]] [--request-id UUID]',
             'project rename ID --name NAME|move ID --workspace ID|hide ID|unhide ID|detect ID|remove ID',
             'project config show ID|set ID --patch-file FILE|- (scripts follow Node trust rules)',
             'project remove deletes related tasks, but leaves folders and worktrees on disk',

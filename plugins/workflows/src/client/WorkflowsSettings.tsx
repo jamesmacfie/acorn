@@ -1,14 +1,72 @@
 import { createResource, createSignal, For, Show } from 'solid-js'
-import { activeTaskId, hasHostCapability } from '@acorn/plugin-api/client'
+import { createQuery, useQueryClient } from '@tanstack/solid-query'
+import {
+  activeNodeId,
+  activeTaskId,
+  createSettingSave,
+  hasHostCapability,
+  PrefKeys,
+  prefsOptions,
+  savePref,
+} from '@acorn/plugin-api/client'
 import { workflowApi } from './workflowsClient'
-import { Alert, Button, EmptyState, SettingRow, SettingsSection, Stack } from '@acorn/plugin-api/ui'
+import { createCloneLaunchWorkflows } from './cloneLaunchWorkflows'
+import { Alert, Button, EmptyState, Select, SettingRow, SettingsSection, Stack } from '@acorn/plugin-api/ui'
 
 // Settings → Workflows (docs/workflows.md): a read-only inspector over the workflow definitions the
 // active task's worktree loads, from `.acorn/workflows/*.toml` and ~/.acorn, plus any parse errors,
 // so a malformed file surfaces instead of vanishing. Task-scoped through activeTaskId, like
-// McpSettings. Launching a workflow happens in the command palette (⌘K). One section, matching the
-// one the plugin's settings page declares for search.
+// McpSettings. Launching a workflow happens in the command palette (⌘K). The sections match the ones
+// the plugin's settings page declares for search.
 export default function WorkflowsSettings() {
+  return (
+    <>
+      <AfterCloneSettings />
+      <LoadedWorkflows />
+    </>
+  )
+}
+
+// The workflow a clone form fills in to run after the clone (docs/workflows/starting-runs.md § After a
+// clone). The form can change or clear it for each clone.
+function AfterCloneSettings() {
+  const cache = useQueryClient()
+  const prefs = createQuery(() => prefsOptions(true))
+  const save = createSettingSave()
+  const { workflows } = createCloneLaunchWorkflows(activeNodeId())
+  const saved = () => prefs.data?.[PrefKeys.workflowsCloneDefault] ?? ''
+  // A saved default that no longer resolves stays visible as missing, and the form doesn't fill it in.
+  const missing = () => !!saved() && !workflows().some((entry) => entry.id === saved())
+  return (
+    <SettingsSection
+      id="after-clone"
+      label="After a clone"
+      description="This runs on code you haven't reviewed. Pick a workflow that only reads it."
+    >
+      <SettingRow
+        label="Then run"
+        description="Filled into Clone from URL. Only workflows from ~/.acorn/workflows and ones saved here are offered, never one the repository ships."
+        error={save.error()}
+        savedAt={save.savedAt()}
+      >
+        <Select
+          label="Then run"
+          value={saved()}
+          options={[
+            { value: '', label: 'None' },
+            ...workflows().map((entry) => ({ value: entry.id, label: entry.name })),
+            ...(missing() ? [{ value: saved(), label: `${saved()} (missing)` }] : []),
+          ]}
+          onChange={(value) =>
+            void save.run(() => savePref(cache, PrefKeys.workflowsCloneDefault, value, { throwOnFailure: true }))
+          }
+        />
+      </SettingRow>
+    </SettingsSection>
+  )
+}
+
+function LoadedWorkflows() {
   const taskId = () => activeTaskId()
 
   const [failure, setFailure] = createSignal('')

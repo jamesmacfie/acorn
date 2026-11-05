@@ -44,6 +44,9 @@ export type ProjectCloneInput = {
   fillProjectId?: string
   /** Written to the row as soon as it has its folder, before the run reports finished. */
   fields?: Omit<ProjectUpdateRefInput, 'path'>
+  /** `false` makes the clone an untrusted project, which runs nothing its repository ships until the
+   *  owner trusts it. A plugin can only lower trust, so `true` isn't accepted. */
+  trusted?: false
 }
 
 export type ProjectCloneResult = { ok: true; projectId: string } | { ok: false; error: string }

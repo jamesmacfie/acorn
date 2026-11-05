@@ -217,3 +217,17 @@ export type WorkflowRunProjection = WorkflowRunRow & {
 export type WorkflowStepProjection = WorkflowStepRow & {
   children: WorkflowChildRunSummary[]
 }
+
+// A clone that starts a workflow as the new project's first task
+// (docs/workflows/starting-runs.md § After a clone). The desktop, the terminal client, and the CLI
+// read it.
+export type WorkflowCloneLaunch = {
+  launchId: string
+  stage: 'cloning' | 'starting' | 'started' | 'failed'
+  projectId?: string
+  taskId?: string
+  runId?: string
+  /** Set when `stage` is `failed`: the stage that failed, and the Node's message. */
+  failedAt?: 'cloning' | 'starting'
+  error?: string
+}

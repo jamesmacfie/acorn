@@ -124,7 +124,7 @@ export function validateCommand(args: ParsedArgs): void {
       list: { count: 2, options: ['workspace', 'include-hidden'] },
       show: { count: 3 },
       add: { count: 2, options: ['workspace', 'path', 'name', 'request-id'] },
-      clone: { count: 3, options: ['into', 'name', 'workspace', 'request-id'] },
+      clone: { count: 3, options: ['into', 'name', 'workspace', 'workflow', 'inputs-file', 'request-id'] },
       rename: { count: 3, options: ['name', 'request-id'] },
       move: { count: 3, options: ['workspace', 'request-id'] },
       hide: { count: 3, options: ['request-id'] },

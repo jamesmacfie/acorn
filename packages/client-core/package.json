@@ -87,6 +87,7 @@
     "./features/workspaces/NoProjects.tsx": "./src/features/workspaces/NoProjects.tsx",
     "./features/workspaces/NodePathForm.tsx": "./src/features/workspaces/NodePathForm.tsx",
     "./features/workspaces/cloneRun.ts": "./src/features/workspaces/cloneRun.ts",
+    "./features/workspaces/cloneFollowUp.ts": "./src/features/workspaces/cloneFollowUp.ts",
     "./features/workspaces/WorkspaceIcon.tsx": "./src/features/workspaces/WorkspaceIcon.tsx",
     "./host/annotations": "./src/host/annotations/public.ts",
     "./host/annotations/annotationKey.ts": "./src/host/annotations/annotationKey.ts",

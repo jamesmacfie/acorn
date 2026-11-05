@@ -1092,6 +1092,7 @@ acorn-plugin-types: member ProjectCloneInput.fields
 acorn-plugin-types: member ProjectCloneInput.fillProjectId
 acorn-plugin-types: member ProjectCloneInput.name
 acorn-plugin-types: member ProjectCloneInput.parentDir
+acorn-plugin-types: member ProjectCloneInput.trusted
 acorn-plugin-types: member ProjectCloneInput.url
 acorn-plugin-types: member ProjectCloneInput.workspaceId
 acorn-plugin-types: member ProjectCloneResult.error

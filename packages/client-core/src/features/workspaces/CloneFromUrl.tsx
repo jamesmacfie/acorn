@@ -1,7 +1,9 @@
 import { createSignal, Show } from 'solid-js'
+import { Dynamic } from 'solid-js/web'
 import { checkCloneUrl, cloneFolderProblem } from '@acorn/protocol/api.ts'
 import type { ProjectImporterProps } from '../../host/registries/sources/projectImporters'
 import { activeNodeId } from '../../infra/node/activeNode'
+import { clientCapability } from '../../infra/node/clientCapabilities'
 import { Alert, Button, Card, Field, Input } from '../../kit/components/primitives'
 import { Heading } from '../../kit/components/content/Heading'
 import { Text } from '../../kit/components/content/Text'
@@ -9,6 +11,7 @@ import { IconButton } from '../../kit/components/inputs/IconButton'
 import { Inline } from '../../kit/components/layout/Inline'
 import { Stack } from '../../kit/components/layout/Stack'
 import { canAddProjectFromFolder, pickNodeFolder } from './addProject'
+import { CLONE_FOLLOW_UP, type CloneFollowUpChoice } from './cloneFollowUp'
 import { createCloneRun, lastCloneParent } from './cloneRun'
 
 // Clone from URL, core's own project importer (docs/workspaces-and-tasks/clone-runs.md § Clone from
@@ -25,6 +28,10 @@ export default function CloneFromUrl(props: ProjectImporterProps) {
   const [error, setError] = createSignal('')
   const [cloned, setCloned] = createSignal('')
   const clone = createCloneRun()
+  // A workflow to run after the clone, when the workflows plugin offers one.
+  const followUp = () => clientCapability(CLONE_FOLLOW_UP)
+  const [choice, setChoice] = createSignal<CloneFollowUpChoice | null>(null)
+  const [launching, setLaunching] = createSignal(false)
 
   const checked = () => checkCloneUrl(url().trim())
   const urlProblem = () => {
@@ -35,8 +42,13 @@ export default function CloneFromUrl(props: ProjectImporterProps) {
     const result = checked()
     return typedName() ?? ('folder' in result ? result.folder : '')
   }
-  const running = () => clone.elapsed() !== null
-  const ready = () => !running() && 'folder' in checked() && !!parent().trim() && !cloneFolderProblem(name().trim())
+  const running = () => clone.elapsed() !== null || launching()
+  const ready = () =>
+    !running() &&
+    (choice()?.ready ?? true) &&
+    'folder' in checked() &&
+    !!parent().trim() &&
+    !cloneFolderProblem(name().trim())
 
   const chooseParent = async () => {
     const folder = await pickNodeFolder(nodeId)
@@ -48,13 +60,18 @@ export default function CloneFromUrl(props: ProjectImporterProps) {
     const folder = name().trim()
     setError('')
     setCloned('')
-    const result = await clone.start(nodeId, { url: url().trim(), parentDir: parent().trim(), name: folder })
+    const request = { url: url().trim(), parentDir: parent().trim(), name: folder }
+    const then = choice()
+    if (then) setLaunching(true)
+    const result = then
+      ? await then.start(request).finally(() => setLaunching(false))
+      : await clone.start(nodeId, request)
     if (!result) return
     if (!result.ok) {
       setError(result.error)
       return
     }
-    setCloned(`Cloned ${folder}. It's untrusted until you trust it in its settings.`)
+    if (!then) setCloned(`Cloned ${folder}. It's untrusted until you trust it in its settings.`)
     props.onImported([result.projectId])
   }
 
@@ -88,9 +105,12 @@ export default function CloneFromUrl(props: ProjectImporterProps) {
         <Field label="Folder name">
           <Input value={name()} onInput={setTypedName} disabled={running()} />
         </Field>
+        <Show when={followUp()}>
+          {(offer) => <Dynamic component={offer().Picker} nodeId={nodeId} disabled={running()} onChange={setChoice} />}
+        </Show>
         <Inline gap="row">
           <Button submit variant="solid" disabled={!ready()}>
-            Clone
+            {choice()?.label ?? 'Clone'}
           </Button>
           <Show when={clone.elapsed()}>
             {(elapsed) => (

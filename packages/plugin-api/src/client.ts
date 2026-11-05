@@ -285,6 +285,13 @@ export type { AgentPromptSchedules } from '@acorn/client-core/features/dashboard
 // can draw it. Core declares the key for the same reason.
 export { changeRequestLinesId } from '@acorn/client-core/features/diff/changeRequestLines.ts'
 export type { ChangeRequestLines } from '@acorn/client-core/features/diff/changeRequestLines.ts'
+// Where a plugin provides what a clone form does after the clone, such as running a workflow on it.
+// Core declares the key for the same reason.
+export { CLONE_FOLLOW_UP } from '@acorn/client-core/features/workspaces/cloneFollowUp.ts'
+export type {
+  CloneFollowUpChoice,
+  CloneFollowUpPickerProps,
+} from '@acorn/client-core/features/workspaces/cloneFollowUp.ts'
 export { parseJson } from '@acorn/client-core/infra/persistence'
 export type { PersistedStateSlice } from '@acorn/client-core/infra/persistence'
 export { PersistedSliceKeys, PrefKeys, storageKeyFor } from '@acorn/client-core/infra/persistence'

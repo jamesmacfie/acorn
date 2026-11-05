@@ -66,6 +66,7 @@ export const directPreferenceSlices: readonly PersistedStateSlice<unknown>[] = [
   direct('terminal.rail-default', PrefKeys.terminalRailDefault),
   direct('terminal.height', PrefKeys.terminalHeight, 'panes'),
   direct('terminal.font-size', PrefKeys.terminalFontSize, 'panes'),
+  direct('workflows.clone-default', PrefKeys.workflowsCloneDefault, 'workspace', 512),
   direct('core.startup-context-injection', PrefKeys.startupContextInjection),
   direct('core.onboarded', PrefKeys.onboarded),
   // A JSON array, so `direct` (a bare string) rather than `jsonObject` (a record): the value is read

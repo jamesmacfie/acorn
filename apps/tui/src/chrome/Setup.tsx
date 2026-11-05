@@ -1,5 +1,6 @@
 /** @jsxImportSource @acorn/tui/jsx */
 import { createEffect, createResource, createSignal, For, onCleanup, Show } from 'solid-js'
+import { Dynamic } from 'solid-js/web'
 import { createQuery, useQueryClient } from '@tanstack/solid-query'
 import {
   integrationsKey,
@@ -15,6 +16,8 @@ import {
 import { createCredentialForm, createDeviceFlow } from '@acorn/client-core/features/integrations'
 import { createProject, createWorkspace } from '@acorn/client-core/features/workspaces'
 import { createCloneRun, lastCloneParent } from '@acorn/client-core/features/workspaces/cloneRun.ts'
+import { CLONE_FOLLOW_UP, type CloneFollowUpChoice } from '@acorn/client-core/features/workspaces/cloneFollowUp.ts'
+import { clientCapability } from '@acorn/client-core/infra/node'
 import { savePref } from '@acorn/client-core/features/settings/savePref.ts'
 import { activeNodeId } from '@acorn/client-core/infra/node/activeNode.ts'
 import { WORKSPACES_PREF_KEY, workspacesMode, type WorkspacesMode } from '@acorn/protocol/workspacesMode.ts'
@@ -70,6 +73,9 @@ export function Setup(props: { model: ShellModel; nodeId: string; initialStep?: 
   // Null until edited, so the folder name follows the URL until then.
   const [typedCloneName, setTypedCloneName] = createSignal<string | null>(null)
   const clone = createCloneRun()
+  // A workflow to run after the clone, when the workflows plugin offers one.
+  const followUp = () => clientCapability(CLONE_FOLLOW_UP)
+  const [thenRun, setThenRun] = createSignal<CloneFollowUpChoice | null>(null)
   const [title, setTitle] = createSignal('')
   const [branch, setBranch] = createSignal('')
   const [branchEdited, setBranchEdited] = createSignal(false)
@@ -225,7 +231,10 @@ export function Setup(props: { model: ShellModel; nodeId: string; initialStep?: 
     return typedCloneName() ?? ('folder' in checked ? checked.folder : '')
   }
   const cloneReady = () =>
-    'folder' in checkedCloneUrl() && !!cloneParent().trim() && !cloneFolderProblem(cloneName().trim())
+    (thenRun()?.ready ?? true) &&
+    'folder' in checkedCloneUrl() &&
+    !!cloneParent().trim() &&
+    !cloneFolderProblem(cloneName().trim())
 
   // As the desktop's Clone from URL, except that a grouped Node files the clone in the chosen
   // workspace, as this screen's folder add does.
@@ -234,19 +243,24 @@ export function Setup(props: { model: ShellModel; nodeId: string; initialStep?: 
       if (!cloneReady()) return
       if (mode() === 'on' && !workspaceId()) throw new Error('Choose or create a workspace first.')
       const name = cloneName().trim()
-      const result = await clone.start(nodeId, {
+      const request = {
         url: cloneUrl().trim(),
         parentDir: cloneParent().trim(),
         name,
         ...(mode() === 'on' ? { workspaceId: workspaceId() } : {}),
-      })
+      }
+      const then = thenRun()
+      const result = then ? await then.start(request) : await clone.start(nodeId, request)
       if (!result || !stillHere()) return
       if (!result.ok) throw new Error(result.error)
       await Promise.all([
         client.invalidateQueries({ queryKey: projectsKey }),
         client.invalidateQueries({ queryKey: workspacesKey }),
+        client.invalidateQueries({ queryKey: tasksKey }),
       ])
       if (!stillHere()) return
+      // The follow-up opened the run's task, which is where the reader wants to be.
+      if (then) return props.onClose()
       setCreatedProjectId(result.projectId)
       setProjectId(result.projectId)
       setCloneUrl('')
@@ -412,11 +426,22 @@ export function Setup(props: { model: ShellModel; nodeId: string; initialStep?: 
             </Show>
             <Input placeholder="/absolute/parent/folder" value={cloneParent()} onInput={setCloneParent} />
             <Input placeholder="Folder name" value={cloneName()} onInput={setTypedCloneName} onSubmit={cloneFromUrl} />
+            <Show when={followUp()}>
+              {(offer) => (
+                <Dynamic
+                  component={offer().Picker}
+                  nodeId={nodeId}
+                  workspaceId={mode() === 'on' ? workspaceId() || undefined : undefined}
+                  disabled={busy()}
+                  onChange={setThenRun}
+                />
+              )}
+            </Show>
             <Show
               when={clone.elapsed()}
               fallback={
                 <Button disabled={busy() || !cloneReady()} onPress={cloneFromUrl}>
-                  Clone
+                  {thenRun()?.label ?? 'Clone'}
                 </Button>
               }
             >

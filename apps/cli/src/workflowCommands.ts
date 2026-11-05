@@ -1,4 +1,6 @@
+import { randomUUID } from 'node:crypto'
 import type {
+  WorkflowCloneLaunch,
   WorkflowDefSummary,
   WorkflowRunProjection,
   WorkflowStepProjection,
@@ -389,4 +391,47 @@ export async function runWorkflowCommand(node: CliNode, args: ParsedArgs): Promi
     if (action === 'wait') return wait(node, args, id)
   }
   throw new CliError('usage', 'Unknown workflow command.', 2)
+}
+
+// Clone, then start a workflow as the project's first task. The workflows plugin's route does both, so
+// the run starts even if this command is stopped mid-clone (docs/workflows/starting-runs.md § After a
+// clone). The request ID is the launch ID, so a retry with it joins the launch or resumes a failed one.
+export async function cloneAndRun(
+  node: CliNode,
+  clone: Record<string, string>,
+  defId: string,
+  inputsFile: string | undefined,
+  key: string,
+) {
+  const inputs = inputsFile ? await readJsonFile(inputsFile) : undefined
+  if (inputs !== undefined && !object(inputs))
+    throw new CliError('invalid_input', 'Workflow inputs must be a JSON object.', 2)
+  const route = `${base}/clone-launches`
+  let launch = (await node.mutate(
+    'POST',
+    route,
+    { clone, defId, ...(inputs === undefined ? {} : { inputs }), launchId: key },
+    // Not `key`: the Node would answer a retry from its idempotency cache instead of resuming a failed
+    // launch. The launch ID already makes a repeat safe.
+    randomUUID(),
+  )) as WorkflowCloneLaunch
+  while (launch.stage === 'cloning' || launch.stage === 'starting')
+    launch = (await node.get(`${route}/${encodeURIComponent(key)}?waitMs=20000`)) as WorkflowCloneLaunch
+  if (launch.stage === 'failed')
+    throw new CliError(
+      launch.failedAt === 'cloning' ? 'clone_failed' : 'workflow_start_refused',
+      launch.failedAt === 'starting'
+        ? `Cloned, but the workflow didn't start: ${launch.error} Retry with --request-id ${key}.`
+        : (launch.error ?? 'The clone failed.'),
+      4,
+      key,
+    )
+  return {
+    apiVersion: version,
+    kind: 'WorkflowCloneLaunch',
+    nodeId: node.nodeId,
+    projectId: launch.projectId,
+    taskId: launch.taskId,
+    runId: launch.runId,
+  }
 }

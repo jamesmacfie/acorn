@@ -10,7 +10,7 @@ sources:
   - packages/client-core/src/features/workspaces/ProjectTable.tsx
   - packages/client-core/src/features/workspaces/WorkspaceIconEditor.tsx
   - packages/client-core/src/features/settings/ProjectConfigTabs.tsx
-checked: 'ebfb2cc1a'
+checked: 'a95744e3c'
 ---
 
 This page covers adding projects, choosing between grouped workspaces and separate projects, hiding
@@ -50,7 +50,8 @@ Pick whichever is nearest:
   repository, or links one you already have on this computer.
 - In **Settings** > **Overview**, click **Clone from URL**, paste a Git URL, and say where the folder
   goes. A cloned project starts **Untrusted**: nothing its repository ships runs until you choose
-  **Trust this project…** in its settings.
+  **Trust this project…** in its settings. To run one of your workflows on it once it's cloned, pick
+  it under **Then run** ([after a clone](/docs/automation/start-and-schedule-runs/#run-a-workflow-after-a-clone)).
 - From the command line, run `acorn project add --path /absolute/path`.
 
 If the folder already belongs to a project in another workspace, acorn names that workspace and sends

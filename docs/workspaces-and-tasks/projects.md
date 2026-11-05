@@ -41,8 +41,8 @@ machine. Core compares the resolved path with registered project paths, so a sym
 reuses the project ID it finds. The row keeps the path as first registered.
 [Command-line client](../cli.md) has the commands.
 
-The Node can also clone a Git URL into a new folder and add that folder as a project. [Clone a Git
-URL](./clone-runs.md) covers the URL checks and the background run.
+The Node can also clone a Git URL into a new folder and add that folder as a project. [Clone a Git URL](./clone-runs.md)
+covers the checks and the background run, and [Starting runs](../workflows/starting-runs.md#after-a-clone) a workflow after one.
 
 `path` is nullable, and the model reads a project with no path, but nothing creates one. Give an old
 path-less row a folder in Settings → Overview to repair it.

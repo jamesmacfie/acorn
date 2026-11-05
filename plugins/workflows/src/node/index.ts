@@ -1,5 +1,6 @@
 import {
   describeError,
+  lazyRouter,
   registerDeletedTaskPurge,
   type InternalEnvFactory,
   type NodePlugin,
@@ -115,6 +116,19 @@ export const workflowsPlugin = (deps: WorkflowsPluginDeps): NodePlugin => {
       ctx.routes.register(workflow, { prefix: '', note: 'workflow control' })
       ctx.routes.register(workflowDefsRoutes, { prefix: '', note: '/defs — definitions stored as rows, device only' })
       ctx.routes.register(workflowTriggerRoutes, { prefix: '/workflows/triggers', note: 'approved workflow triggers' })
+      // Clone a URL, then run a workflow on it. Loaded on the first request, to stay inside the service
+      // boot budget (apps/node/scripts/check-service-budget.mjs).
+      ctx.routes.register(
+        lazyRouter(async () =>
+          (await import('../server/routes/cloneLaunches')).cloneLaunchRoutes({
+            db: store,
+            core,
+            starts,
+            catalog: () => runner.validationCatalog(),
+          }),
+        ),
+        { prefix: '/clone-launches', note: 'clone a Git URL, then run a workflow on it, device only' },
+      )
       ctx.routes.register(legacyWorkflowScheduleRoutes, {
         prefix: '/workflows/schedules',
         note: 'alias of /workflows/triggers for clients built before triggers',

@@ -4,7 +4,9 @@ import { QueryClient, QueryClientProvider } from '@tanstack/solid-query'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import type { CloneRun } from '@acorn/protocol/api.ts'
 import { projectsKey } from '../../infra/queries'
+import { provideClientCapability } from '../../infra/node/clientCapabilities'
 import AddProjectControls from './AddProjectControls'
+import { CLONE_FOLLOW_UP, type CloneFollowUpChoice } from './cloneFollowUp'
 
 // Clone from URL as the add controls host it: the real importer registry, a fake Node.
 
@@ -147,5 +149,28 @@ describe('Clone from URL', () => {
     state.setNode('node-a')
     openForm()
     expect(field('Parent folder on this Node')!.value).toBe('/src')
+  })
+
+  it('runs the follow-up a plugin offers instead of a plain clone', async () => {
+    const start = vi.fn<CloneFollowUpChoice['start']>(async () => ({ ok: true, projectId: 'cloned' }))
+    const offered = provideClientCapability(CLONE_FOLLOW_UP, {
+      Picker: (props) => {
+        props.onChange({ label: 'Clone and run', ready: true, start })
+        return null
+      },
+    })
+    try {
+      mount()
+      openForm()
+      type('Git URL', 'https://github.com/acme/web.git')
+      type('Parent folder on this Node', '/src')
+      expect(button('Clone')).toBeUndefined()
+      submit()
+      await vi.waitFor(() => expect(opened).toEqual(['cloned']))
+      expect(start).toHaveBeenCalledWith({ url: 'https://github.com/acme/web.git', parentDir: '/src', name: 'web' })
+      expect(state.post).not.toHaveBeenCalled()
+    } finally {
+      offered.dispose()
+    }
   })
 })

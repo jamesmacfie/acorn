@@ -1,6 +1,91 @@
 # Phase 5: run a workflow after a clone
 
-Date: November 6, 2026. Status: proposed. Depends on phases 1 to 3.
+Date: November 6, 2026. Status: landed, except the checkpoint. Depends on phases 1 to 3.
+
+## Completion note
+
+November 6, 2026. **Clone from URL** can start a workflow as the new project's first task, and the
+Node does the whole launch. [Starting runs](../../workflows/starting-runs.md#after-a-clone) owns the
+contract. [Clone a Git URL](../../workspaces-and-tasks/clone-runs.md#clone-from-url), [Projects and
+workspaces](../../workspaces-and-tasks/projects.md#add-a-project), and the CLI page point at it.
+
+What landed:
+
+- `plugins/workflows/src/server/runs/cloneLaunch.ts`, behind `lazyRouter` at `/clone-launches`
+  (`server/routes/cloneLaunches.ts`). `POST /v1/p/workflows/clone-launches` answers 202,
+  `GET .../:launchId?waitMs=` follows the launch, and `GET .../workflows?workspaceId=` lists what the
+  form may offer. All three are device only. Records live in memory for 10 minutes after they settle.
+- The checks before cloning: a `repo:` ID, a saved definition with no named workspace, one from another
+  workspace, one bound to a project, an unpublished or broken one, and missing or unknown inputs. Core's
+  URL and folder refusals come back as 400s too.
+- The background run clones with `trusted: false`, calls `createRoot` with a task ID made when the
+  launch started, the title `<workflow name> · first run`, and origin `workflows:clone`, then calls
+  `startById` with the caller's `launchId`. A replayed `launchId` with the same body joins. A different
+  body gets 409. A failed launch retries from the stage that failed, reusing the project and task.
+  Posts with one launch ID are admitted one after another, so two at once can't clone twice.
+- `trusted?: false` on the plugin facet's `ProjectCloneInput`. A plugin can only lower trust.
+- `CLONE_FOLLOW_UP` in `packages/client-core/src/features/workspaces/cloneFollowUp.ts`, re-exported from
+  `@acorn/plugin-api/client`. The workflows client provides a lazy **Then run** picker
+  (`client/CloneLaunchPicker.tsx`). The desktop form and the terminal client's clone step draw it under
+  **Folder name**. The submit button reads **Clone and run**, then **Retry** after a failed start.
+- Settings → Workflows → **After a clone**, stored in the Node pref `workflows_clone_default`
+  (`PrefKeys.workflowsCloneDefault`). A default that no longer resolves shows as missing and isn't
+  filled in.
+- `acorn project clone URL --into ABSOLUTE --workflow ID [--inputs-file FILE|-]`.
+- Site pages updated and marked checked: start-and-schedule-runs, workspaces-and-projects, and
+  settings/automation.
+
+Decisions and deviations:
+
+- **`--inputs-file`, not repeatable `--input name=value`.** The CLI's parser holds one value per
+  option, and `workflow start` already takes inputs this way, typed values included.
+- **A saved definition needs a named workspace.** Without a `workspaceId` the Node can't tell where the
+  project lands, so the route allows only `user:` files. The client fills in the Default workspace on a
+  Node that groups projects, so saved definitions still work from the desktop. A Node with workspaces
+  off offers only files.
+- **The picker owns its list route.** `defsList` needs a workspace and includes committed files, so the
+  Node lists the eligible definitions itself, with the same rule the POST checks.
+- **The CLI's idempotency key is fresh on each run.** With `--request-id` as the key, the Node would
+  answer a retry from its idempotency cache instead of resuming the launch. The launch ID makes a repeat
+  safe on its own.
+- **A restart answers 404.** The form says the Node lost the launch and to start the workflow from the
+  project's task. It doesn't offer **Open project**, because the record that knew the project is gone.
+- **No frame table entry.** Plugin routes aren't in the frame table, so the new routes need no
+  classification there.
+- `boundedValues` moved out of `startBody` in `server/routes/workflow.ts`, so both routes parse inputs
+  the same way.
+- client-core's entrypoint cap went from 219 to 220 for `cloneFollowUp.ts`.
+
+Verify before building, answered:
+
+- A client-core capability ID provided by a plugin passes `tools/arch/boundaries.test.ts`.
+  `changeRequestLinesId` already works that way, and the arch suite passed with the new key.
+- A built-in plugin stores a Node preference through `savePref` with a key in `PrefKeys` that isn't a
+  device key, as `startupContextInjection` does. The workflows plugin had none to copy.
+
+Checkpoint: skipped. `pnpm dev:agent` builds the Node service, and that build fails the boot budget,
+so the hostile-fixture walk couldn't run. Route and service tests cover the refusals, replay, and
+retry. Run it once the ceiling is raised.
+
+Bundle sizes:
+
+- The Node service boot graph is 1,948,993 bytes, 700 over the 1,948,293 base and 1,993 over the
+  1,947,000 ceiling. The bytes are the lazy route's registration. The service and routes load on the
+  first request.
+- The desktop renderer's startup scripts are 1,013,051 bytes, 248 over phase 3's 1,012,803, under the
+  1,030,000 ceiling. The picker and the settings section load lazily.
+- The terminal client's startup closure is 805,544 bytes, 176 over phase 3's 805,368, under the
+  820,000 ceiling.
+- No stylesheet changed.
+
+For later phases:
+
+- A launch path that creates a task and starts a run must keep naming its definition by explicit ID.
+  `startById` with a bare name resolves a database row, and a `repo:` name would load the cloned
+  repository's file.
+- `StartFromItemHost` passes a file's bare ID to `startWorkflow`, which resolves it as a database row.
+  That is outside this phase and wasn't changed.
+
 
 ## Goal
 

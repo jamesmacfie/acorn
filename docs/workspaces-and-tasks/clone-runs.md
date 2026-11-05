@@ -13,7 +13,8 @@ A clone runs in the background, because a large repository takes longer than one
 and a restart loses every run. Both routes accept only a device token, so an agent with a task token
 can't fetch code onto the Node. `cloneOutcome` in `@acorn/protocol/api.ts` is the client side. A
 project this route clones starts [untrusted](./projects.md#untrusted-projects). A plugin's
-`core.projects.clone` and the importers that use it write a trusted project.
+`core.projects.clone` and the importers that use it write a trusted project, unless the plugin
+passes `trusted: false`, as the workflows plugin's [run after a clone](../workflows/starting-runs.md#after-a-clone) does.
 
 The URL is untrusted input. The Node accepts `https://host/path`, `ssh://[user@]host[:port]/path`, and
 `user@host:path`. It refuses every other scheme, including `http`, `file`, `git`, and `ext::`, a
@@ -70,6 +71,10 @@ While the clone runs, the form shows "Cloning <name>… 1m 12s". That is time si
 the clone carries on. The project appears in the list when the Node finishes it. On success the host
 opens the new project, and the form says it's untrusted until you trust it in its settings. On failure
 the form shows the Node's message and keeps the fields, so a retry is one press.
+
+With the workflows plugin on, **Then run** under the folder name picks a workflow to start on the
+clone, and **Clone** becomes **Clone and run**. [Starting runs](../workflows/starting-runs.md#after-a-clone)
+owns that contract.
 
 The importer has no `requires`, because the host doesn't advertise core routes. A Node from before
 clone runs answers **Clone** with 404, and the form says to update the Node.

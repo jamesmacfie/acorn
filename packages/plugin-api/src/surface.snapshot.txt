@@ -8,11 +8,14 @@ client: AttentionItem
 client: AttentionSourceContribution
 client: BindingCandidate
 client: BindingOrigin
+client: CLONE_FOLLOW_UP
 client: COMMAND_CLOSED
 client: ChangeRequestLines
 client: CheckedDiagnostic
 client: ClientPlugin
 client: ClientScheduleContribution
+client: CloneFollowUpChoice
+client: CloneFollowUpPickerProps
 client: CommandContribution
 client: CommandExecutionContext
 client: CommandOutcome
