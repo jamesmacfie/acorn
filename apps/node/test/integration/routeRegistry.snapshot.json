@@ -374,6 +374,8 @@
     "POST /v1/core/projects",
     "POST /v1/core/projects/:id/detect",
     "POST /v1/core/projects/:id/mcp/starter",
+    "POST /v1/core/projects/:id/trust",
+    "POST /v1/core/projects/:id/trust",
     "POST /v1/core/projects/clone-runs",
     "POST /v1/core/projects/clone-runs",
     "POST /v1/core/queries/:operation",
