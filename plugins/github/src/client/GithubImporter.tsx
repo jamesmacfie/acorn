@@ -1,4 +1,4 @@
-import { createEffect, createSignal, For, on, Show } from 'solid-js'
+import { createEffect, createSignal, For, on, onCleanup, Show } from 'solid-js'
 import { createQuery, useQueryClient } from '@tanstack/solid-query'
 import {
   activeNodeId,
@@ -27,7 +27,13 @@ import {
   Text,
 } from '@acorn/plugin-api/ui'
 import { NodePathForm } from '@acorn/plugin-api/ui/host'
-import type { IntegrationsResponse } from '@acorn/protocol/api.ts'
+import {
+  CLONE_RUN_WAIT_MS,
+  cloneOutcome,
+  projectCloneRunRoute,
+  type CloneRun,
+  type IntegrationsResponse,
+} from '@acorn/protocol/api.ts'
 import {
   githubImportRoute,
   reposKey,
@@ -38,6 +44,11 @@ import {
   type Repo,
 } from '../shared/api'
 import { reposOptions } from './queries'
+
+type CloneState = 'cloning' | 'cloned' | { error: string }
+const cloneLabel = (state: CloneState | undefined) =>
+  state === 'cloning' ? ['Cloning…'] : state === 'cloned' ? ['Cloned'] : []
+const cloneError = (state: CloneState | undefined) => (typeof state === 'object' ? state.error : undefined)
 
 const connectedGithub = (integrations: IntegrationsResponse) =>
   integrations.integrations.some(
@@ -60,10 +71,16 @@ export default function GithubImporter(props: ProjectImporterProps) {
   const integrations = createQuery(() => integrationsOptions(true))
   const githubReady = () => !!integrations.data && connectedGithub(integrations.data)
   const repos = createQuery(() => reposOptions(githubReady()))
-  // The row AND the action, so the spinner lands on the button that was pressed. One import at a
-  // time: each of these asks for a folder and shells out to git.
+  // The row AND the action, so the spinner lands on the button that was pressed. One request at a
+  // time, because each asks for a folder.
   const [running, setRunning] = createSignal<{ repoId: number; action: GithubImportAction } | null>(null)
   const busy = (repo: Repo, action: GithubImportAction) => running()?.repoId === repo.id && running()?.action === action
+  // Each clone's state, by repository. The Node clones in the background, so several can run while
+  // the screen follows them. Closing the screen stops following, and the clones carry on.
+  const [clones, setClones] = createSignal<ReadonlyMap<number, CloneState>>(new Map())
+  const cloneOf = (repo: Repo) => clones().get(repo.id)
+  const following = new AbortController()
+  onCleanup(() => following.abort())
   const [error, setError] = createSignal('')
   const [filter, setFilter] = createSignal('')
   // Forced, because the Node serves its own copy of the list until it goes stale, so a plain refetch
@@ -160,15 +177,10 @@ export default function GithubImporter(props: ProjectImporterProps) {
         return false
       }
       setTyping(null)
-      if (action === 'clone') setCloneDir(path)
-      await Promise.all([
-        queryClient.invalidateQueries({ queryKey: projectsKey }),
-        queryClient.invalidateQueries({ queryKey: workspacesKey }),
-        queryClient.invalidateQueries({ queryKey: reposKey }),
-      ])
-      // Name the project rather than leaving the host to infer it: a map onto an existing path-less
-      // project repairs that row instead of adding one, and a before/after diff would miss it.
-      props.onImported(result.projectId ? [result.projectId] : [])
+      if (result.cloneId) {
+        setCloneDir(path)
+        void follow(repo, result.cloneId, nodeId)
+      } else await imported(result.projectId)
       return true
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : String(cause))
@@ -176,6 +188,32 @@ export default function GithubImporter(props: ProjectImporterProps) {
     } finally {
       setRunning(null)
     }
+  }
+
+  const follow = async (repo: Repo, cloneId: string, nodeId: string | null) => {
+    const setClone = (state: CloneState) => setClones((current) => new Map(current).set(repo.id, state))
+    setClone('cloning')
+    const result = await cloneOutcome(() =>
+      readJson<CloneRun>(`${projectCloneRunRoute(cloneId)}?waitMs=${CLONE_RUN_WAIT_MS}`, {
+        nodeId,
+        signal: following.signal,
+        long: true,
+      }),
+    ).catch((cause: unknown) => ({ ok: false as const, error: cause instanceof Error ? cause.message : String(cause) }))
+    if (following.signal.aborted) return
+    setClone(result.ok ? 'cloned' : { error: result.error })
+    if (result.ok) await imported(result.projectId)
+  }
+
+  const imported = async (projectId: string | undefined) => {
+    await Promise.all([
+      queryClient.invalidateQueries({ queryKey: projectsKey }),
+      queryClient.invalidateQueries({ queryKey: workspacesKey }),
+      queryClient.invalidateQueries({ queryKey: reposKey }),
+    ])
+    // Name the project rather than leaving the host to infer it: a map onto an existing path-less
+    // project repairs that row instead of adding one, and a before/after diff would miss it.
+    props.onImported(projectId ? [projectId] : [])
   }
 
   // The frame is the host's when it draws no close control, as the first-run wizard does: a titled
@@ -243,9 +281,10 @@ export default function GithubImporter(props: ProjectImporterProps) {
                     description={[
                       repo.private ? 'Private' : 'Public',
                       ...(projectFor(repo) ? [`Added as ${projectFor(repo)!.name}`] : []),
+                      ...cloneLabel(cloneOf(repo)),
                     ].join(' · ')}
                     layout={typingIn(repo) ? 'stacked' : 'inline'}
-                    error={typingIn(repo) ? error() || undefined : undefined}
+                    error={typingIn(repo) ? error() || undefined : cloneError(cloneOf(repo))}
                   >
                     <Stack gap="row">
                       <Inline gap="row">
@@ -253,7 +292,7 @@ export default function GithubImporter(props: ProjectImporterProps) {
                           variant="ghost"
                           size="sm"
                           busy={busy(repo, 'clone')}
-                          disabled={!!running()}
+                          disabled={!!running() || cloneOf(repo) === 'cloning'}
                           onPress={() => void importOne(repo, 'clone')}
                         >
                           Clone

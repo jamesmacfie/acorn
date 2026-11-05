@@ -28,8 +28,10 @@ export type GitlabImportResult = {
   path: string
   action: 'map' | 'clone'
   ok: boolean
-  /** The acorn project it became. */
+  /** The acorn project it became, for Link folder. */
   acornProjectId?: string
+  /** A clone's run, which the client follows for the project (docs/workspaces-and-tasks/clone-runs.md). */
+  cloneId?: string
   error?: string
 }
 

@@ -1,87 +1,91 @@
 # Phase 4: the importers clone through core
 
-Date: November 6, 2026. Status: proposed. Depends on phase 1.
+Date: November 6, 2026. Status: landed, except the checkpoint. Depends on phase 1.
 
-## Goal
+## Completion note
 
-The GitHub, GitLab, and Bitbucket importers stop running `git clone` themselves. Each one hands its
-clone to phase 1's service, so every clone gets the same URL checks, the hidden-folder cleanup, the
-30-minute limit instead of 30 seconds, and progress a client can follow. Importer clones stay trusted.
+November 6, 2026. The GitHub, GitLab, and Bitbucket importers no longer run `git clone` themselves.
+Each hands its clone to phase 1's service, and its screen follows the run. [Clone a Git
+URL](../../workspaces-and-tasks/clone-runs.md#importer-clones) owns the contract.
+[GitHub integration](../../github-integration.md#importing-projects), [Projects and
+workspaces](../../workspaces-and-tasks/projects.md#add-a-project), and the GitLab and Bitbucket
+integration pages point at it.
 
-## Starting point
+What landed:
 
-Each route in `plugins/github/src/server/routes/repos/import.ts`,
-`plugins/gitlab/src/server/routes/import.ts`, and `plugins/bitbucket/src/server/routes/import.ts`
-takes up to 100 items. For each **Clone** item it:
+- The three import routes keep their mirror lookup, their path grammar check, and the placeholder
+  lookup, then call `core.projects.clone` with the URL, `parentDir`, the folder name, and
+  `fillProjectId`. GitHub passes `fields: { githubRepoId }` and GitLab passes
+  `fields: { repositoryExternalId }`. A **Clone** item answers `{ ok: true, action: 'clone', cloneId }`.
+  A **Link folder** item is unchanged. The parent folder check and `gitOrThrow` left the plugins, so
+  no plugin calls `gitOrThrow(['clone'` any more. The routes now take `Pick<CoreServices, 'projects'>`.
+- `cloneId?: string` on `GithubImportResult`, `GitlabImportResult`, and `BitbucketImportResult`.
+- Each screen follows a clone with `cloneOutcome` from `@acorn/protocol/api.ts`, against the Node it
+  was started on. The row's description says **Cloning…** or **Cloned**, and a failure shows as the
+  row's error. **Clone** is disabled on a row while it clones, and other rows stay usable, so several
+  clones run at once. A finished clone invalidates the lists and calls `onImported([projectId])`.
+  Closing the importer aborts the reads, and the clones carry on.
+- `apps/node/test/integration/plugins/importerClones.test.ts` mounts the three real routes on real
+  core services. Git's `insteadOf`, passed through the `GIT_*` allowlist, sends each `https` address to
+  a local bare repository. For each provider it fills a placeholder and checks the provider and ID on
+  the row, then clones again and checks that the second checkout gets its own row.
+- GitLab and Bitbucket gained a `./testkit` entry point for that test, and GitHub's testkit exports
+  `githubImport`.
 
-1. Looks up the repository in the plugin's own mirror.
-2. Checks the parent folder.
-3. Runs `git clone` inside the request, with the 30-second default timeout.
-4. Finds a placeholder project with no folder (`core.projects.byGithub` or `byRepository`), or creates
-   a row.
-5. Stamps the row with `path` and the provider's ID (`githubRepoId` or `repositoryExternalId`).
+Decisions and deviations:
 
-It answers with one result per item. The client screens are
-`plugins/github/src/client/GithubImporter.tsx`, `plugins/gitlab/src/client/GitlabImporter.tsx`, and
-`plugins/bitbucket/src/client/BitbucketImporter.tsx`. Each waits for the whole answer.
+- **The integration test is its own file**, not part of `codeHosts.test.ts`. That file boots a loaded
+  fixture plugin. This one mounts the built-in routes, and it has to add `file` to `CLONE_PROTOCOLS`
+  with a module mock, which shouldn't leak into the code host tests.
+- **The test checks the provider ID only on the filled placeholder.** `git remote get-url` applies
+  `insteadOf`, so a row the clone creates sees the local `file://` remote and gets no repository. In
+  production it sees the real `https` remote. Neither phase 1's tests nor this one check `fields` on a
+  created row against a real remote.
+- **A created row takes the folder's name.** GitLab and Bitbucket used to name it after the
+  repository's display name, such as "API Gateway" rather than `api-gateway`. `ProjectCloneInput` has
+  one `name` for both. Adding a second one would change the published plugin surface, and a project
+  can be renamed.
+- **Bitbucket passes no `fields`.** It never wrote an external ID, and this phase doesn't add one.
+- **No `allowHttp`.** Phase 1 found that GitLab connections accept only `https` server addresses.
+- **No shared client helper.** Following a run is one `cloneOutcome` call, and the three screens were
+  already deliberate copies of each other. A shared hook's home would be `@acorn/plugin-api/client`,
+  which loads at desktop startup, and phase 3 measured 2,514 bytes for moving clone code there. On the
+  Node side, the shared part is the single `core.projects.clone` call.
+- **One request at a time is kept.** Each request still asks for a folder first. It now answers in
+  milliseconds, so it no longer blocks other rows while git runs.
+- **A refused folder now reads as core words it**, such as "/x doesn't exist on this Node.", not the
+  route's old "That folder doesn't exist on this Node."
 
-**Link folder** (`map`) items don't clone and stay as they are.
+Verify before building: phase 1 answered it. GitLab connections can't have an `http://` origin
+(`gitlabOrigin` in `plugins/gitlab/src/server/serverAddress.ts`), so there's no `allowHttp`.
 
-## Design
+Bundle sizes:
 
-### The routes
+- The Node service's boot graph is 1,948,293 bytes, 137 bytes under the 1,948,430 that phase 3
+  recorded. It's still 1,293 bytes over the 1,947,000-byte ceiling.
+- Client startup bundles weren't measured. The three importer screens load lazily
+  (`lazy(() => import('./GithubImporter'))` and its peers), the plugins' client entry points didn't
+  change, and the only new import is `@acorn/protocol/api.ts`, which startup already loads.
 
-For a **Clone** item, a route keeps steps 1 and 4, then calls `core.projects.clone` with:
+For later phases:
 
-- the URL it builds today,
-- `parentDir` and the folder name it works out today, after its own path grammar check,
-- `trusted: true`,
-- `fillProjectId` when step 4 found a placeholder,
-- `fields` with the provider's ID, so the row is linked when it first appears,
-- `allowHttp` only in GitLab, and only when the connection's origin is `http://`.
+- Phase 5 doesn't touch the importers. An importer clone stays trusted and starts no workflow.
+- The integration test's `insteadOf` setup is a pattern for phase 5's end-to-end check, with the same
+  `get-url` limit.
 
-The item's result becomes `{ ok: true, action: 'clone', cloneId }` instead of a project ID. A **Link
-folder** item still answers with its project ID. The parent folder check and the `gitOrThrow` call
-leave the plugins, and so does the GitHub route's missing `--`.
+## What's left
 
-Phase 1's queue runs at most three clones at once, so an import of 100 repositories doesn't start 100
-`git` processes.
+- **Checkpoint, skipped.** It needs `pnpm dev:agent`, which stops while the Node build is over its boot
+  budget. Once the ceiling is raised, import three GitHub repositories at once from the desktop, one of
+  them a few hundred megabytes. Confirm that all three finish and each row shows its state while they
+  run. Record the date here.
 
-The response shape changes, so the shared types in each plugin's `src/shared/api.ts` change with it.
-These are first-party plugins that ship with their client, so no older client reads the new shape.
+## Risks still open
 
-### The screens
-
-Each screen follows its clone IDs with phase 1's client helper and marks each row **Cloning…**,
-**Cloned**, or the error. When every run in the batch has finished, it calls
-`onImported(projectIds)` with the IDs the runs reported. Closing the importer stops following, and the
-clones carry on.
-
-## Steps
-
-1. Change the three routes and their shared types.
-2. Change the three screens to follow clone runs.
-3. Update their tests and `apps/node/test/integration/plugins/codeHosts.test.ts`.
-4. Update [GitHub integration](../../github-integration.md) and
-   [Projects and workspaces](../../workspaces-and-tasks/projects.md#add-a-project).
-
-## Acceptance
-
-- The integration test clones from a local bare repository through each importer's route, with the
-  test-only `file` protocol, and checks the provider ID on the new row.
-- A placeholder project is filled, not duplicated, for each of the three providers.
-- No plugin under `plugins/` calls `gitOrThrow(['clone'` any more. A grep in review is enough.
-- Checkpoint: import three GitHub repositories at once from the desktop, one of them a few hundred
-  megabytes, and confirm all three finish and each row shows its state while they run.
-
-## Risks
-
+- **Two clones of one repository can race for one placeholder.** The placeholder is filled when a
+  clone finishes, not when it starts. If two clones of the same repository start before either
+  finishes, both target the same placeholder. The second one moves the row to its folder, and the
+  first folder is left without a row. The screen disables **Clone** on a row while it clones, which
+  covers the usual way this happens.
 - **A row can briefly show Cloning… after the project exists.** The screen learns the outcome on its
   next `GET`. That gap is at most the 20-second wait, and normally under a second.
-- **The plugin facet change touches the published plugin surface.** Update
-  `tools/arch/publishedPluginSurface.snapshot.txt` in phase 1, not here.
-
-## Verify before building
-
-- Whether a GitLab connection can have a plain `http://` origin at all. If it can't, drop `allowHttp`
-  from phase 1.

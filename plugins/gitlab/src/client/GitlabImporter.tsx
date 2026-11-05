@@ -1,4 +1,4 @@
-import { createEffect, createSignal, For, on, Show } from 'solid-js'
+import { createEffect, createSignal, For, on, onCleanup, Show } from 'solid-js'
 import { createQuery, useQueryClient } from '@tanstack/solid-query'
 import {
   activeNodeId,
@@ -27,6 +27,7 @@ import {
   Text,
 } from '@acorn/plugin-api/ui'
 import { NodePathForm } from '@acorn/plugin-api/ui/host'
+import { CLONE_RUN_WAIT_MS, cloneOutcome, projectCloneRunRoute, type CloneRun } from '@acorn/protocol/api.ts'
 import {
   importRoute,
   projectsRoute,
@@ -37,6 +38,11 @@ import {
 } from '../shared/api'
 import { projectAddress, samePath } from '../shared/mergeRequestRef'
 import { projectsOptions } from './queries'
+
+type CloneState = 'cloning' | 'cloned' | { error: string }
+const cloneLabel = (state: CloneState | undefined) =>
+  state === 'cloning' ? ['Cloning…'] : state === 'cloned' ? ['Cloned'] : []
+const cloneError = (state: CloneState | undefined) => (typeof state === 'object' ? state.error : undefined)
 
 // The person's GitLab projects on every connected server, each with Clone and Link folder, the
 // importer GitHub's is (plugins/github/src/client/GithubImporter.tsx). A project is listed by its
@@ -58,6 +64,11 @@ export default function GitlabImporter(props: ProjectImporterProps) {
         samePath(candidate.repository.path, project.path),
     )
   const [running, setRunning] = createSignal<{ project: GitlabProject; action: 'map' | 'clone' } | null>(null)
+  // Each clone's state, by address, followed as GithubImporter's are.
+  const [clones, setClones] = createSignal<ReadonlyMap<string, CloneState>>(new Map())
+  const cloneOf = (project: GitlabProject) => clones().get(projectAddress(project.host, project.path))
+  const following = new AbortController()
+  onCleanup(() => following.abort())
   const [error, setError] = createSignal('')
   const [filter, setFilter] = createSignal('')
   // Forced, because the Node serves its own copy of the list until it goes stale, so a plain refetch
@@ -148,13 +159,10 @@ export default function GitlabImporter(props: ProjectImporterProps) {
         return false
       }
       setTyping(null)
-      if (action === 'clone') setCloneDir(folder)
-      await Promise.all([
-        queryClient.invalidateQueries({ queryKey: projectsKey }),
-        queryClient.invalidateQueries({ queryKey: workspacesKey }),
-        queryClient.invalidateQueries({ queryKey: gitlabProjectsKey }),
-      ])
-      props.onImported(result.acornProjectId ? [result.acornProjectId] : [])
+      if (result.cloneId) {
+        setCloneDir(folder)
+        void follow(project, result.cloneId, nodeId)
+      } else await imported(result.acornProjectId)
       return true
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : String(cause))
@@ -162,6 +170,31 @@ export default function GitlabImporter(props: ProjectImporterProps) {
     } finally {
       setRunning(null)
     }
+  }
+
+  const follow = async (project: GitlabProject, cloneId: string, nodeId: string | null) => {
+    const setClone = (state: CloneState) =>
+      setClones((current) => new Map(current).set(projectAddress(project.host, project.path), state))
+    setClone('cloning')
+    const result = await cloneOutcome(() =>
+      readJson<CloneRun>(`${projectCloneRunRoute(cloneId)}?waitMs=${CLONE_RUN_WAIT_MS}`, {
+        nodeId,
+        signal: following.signal,
+        long: true,
+      }),
+    ).catch((cause: unknown) => ({ ok: false as const, error: cause instanceof Error ? cause.message : String(cause) }))
+    if (following.signal.aborted) return
+    setClone(result.ok ? 'cloned' : { error: result.error })
+    if (result.ok) await imported(result.projectId)
+  }
+
+  const imported = async (acornProjectId: string | undefined) => {
+    await Promise.all([
+      queryClient.invalidateQueries({ queryKey: projectsKey }),
+      queryClient.invalidateQueries({ queryKey: workspacesKey }),
+      queryClient.invalidateQueries({ queryKey: gitlabProjectsKey }),
+    ])
+    props.onImported(acornProjectId ? [acornProjectId] : [])
   }
 
   const body = () => (
@@ -228,9 +261,10 @@ export default function GitlabImporter(props: ProjectImporterProps) {
                       description={[
                         project.private ? 'Private' : 'Public',
                         ...(added(project) ? [`Added as ${added(project)!.name}`] : []),
+                        ...cloneLabel(cloneOf(project)),
                       ].join(' · ')}
                       layout={typingIn(project) ? 'stacked' : 'inline'}
-                      error={typingIn(project) ? error() || undefined : undefined}
+                      error={typingIn(project) ? error() || undefined : cloneError(cloneOf(project))}
                     >
                       <Stack gap="row">
                         <Inline gap="row">
@@ -240,7 +274,7 @@ export default function GitlabImporter(props: ProjectImporterProps) {
                                 variant="ghost"
                                 size="sm"
                                 busy={running()?.project === project && running()?.action === action}
-                                disabled={!!running()}
+                                disabled={!!running() || (action === 'clone' && cloneOf(project) === 'cloning')}
                                 onPress={() => void importOne(project, action)}
                               >
                                 {action === 'clone' ? 'Clone' : 'Link folder'}

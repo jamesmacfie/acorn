@@ -1,5 +1,4 @@
-import { stat } from 'node:fs/promises'
-import { isAbsolute, join } from 'node:path'
+import { isAbsolute } from 'node:path'
 import { and, eq } from 'drizzle-orm'
 import { Hono } from 'hono'
 import { z } from 'zod'
@@ -31,7 +30,7 @@ const requestSchema = z.union([
     .transform((repositories) => ({ repositories })),
 ])
 
-type ImportCore = Pick<CoreServices, 'projects' | 'git'>
+type ImportCore = Pick<CoreServices, 'projects'>
 
 const MISSING_PROJECT = 'Project disappeared while importing.'
 
@@ -68,43 +67,31 @@ export const githubImport = (db: PluginDatabase, core: ImportCore) =>
       }
 
       try {
-        let path: string
-        if (item.action === 'map') {
-          if (!isAbsolute(item.path)) throw new Error('Checkout path must be absolute.')
-          path = item.path
-        } else {
-          if (!isAbsolute(item.parentDir)) throw new Error('Clone parent directory must be absolute.')
-          // Checked first, because git would fail with "spawn git ENOENT" for a missing working folder.
-          if (
-            !(await stat(item.parentDir).then(
-              (found) => found.isDirectory(),
-              () => false,
-            ))
-          )
-            throw new Error("That folder doesn't exist on this Node.")
-          await core.git.gitOrThrow(['clone', `https://github.com/${repo.owner}/${repo.name}.git`, repo.name], {
-            cwd: item.parentDir,
-            env: { GIT_TERMINAL_PROMPT: '0' },
-          })
-          path = join(item.parentDir, repo.name)
-        }
-
         // Fills a deferred project, which has a GitHub facet and no path yet, rather than adding a
         // rival row (docs/github-integration.md § Importing projects).
         const placeholder = await core.projects.byGithub(repo.owner, repo.name)
-        const existingId = placeholder && placeholder.path === null ? placeholder.id : null
-        const projectId = existingId ?? (await core.projects.create({ name: repo.name, path })).id
-        const stamped = await core.projects.update(projectId, { path, githubRepoId: repo.id })
-        if (!stamped) throw new Error(MISSING_PROJECT)
+        const fillProjectId = placeholder && placeholder.path === null ? placeholder.id : undefined
+        const imported = { repoId: repo.id, owner: repo.owner, name: repo.name, action: item.action, ok: true }
 
-        results.push({
-          repoId: repo.id,
-          owner: repo.owner,
-          name: repo.name,
-          action: item.action,
-          ok: true,
-          projectId: stamped.id,
-        })
+        if (item.action === 'clone') {
+          // Core clones in the background and links the row when it has its folder
+          // (docs/workspaces-and-tasks/clone-runs.md).
+          const { cloneId } = await core.projects.clone({
+            url: `https://github.com/${repo.owner}/${repo.name}.git`,
+            parentDir: item.parentDir,
+            name: repo.name,
+            fillProjectId,
+            fields: { githubRepoId: repo.id },
+          })
+          results.push({ ...imported, cloneId })
+          continue
+        }
+
+        if (!isAbsolute(item.path)) throw new Error('Checkout path must be absolute.')
+        const projectId = fillProjectId ?? (await core.projects.create({ name: repo.name, path: item.path })).id
+        const stamped = await core.projects.update(projectId, { path: item.path, githubRepoId: repo.id })
+        if (!stamped) throw new Error(MISSING_PROJECT)
+        results.push({ ...imported, projectId: stamped.id })
       } catch (error) {
         results.push(failed(item, repo.owner, repo.name, error))
       }

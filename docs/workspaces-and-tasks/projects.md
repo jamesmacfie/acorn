@@ -29,8 +29,8 @@ For a remote Node, enter an absolute folder path on that Node. The native folder
 path on the desktop machine and is unavailable for remote project creation. The GitHub, GitLab, and
 Bitbucket importers follow the same rule. On a Node the picker can't browse, **Clone** and **Link
 folder** open a folder field in the repository's row instead of the dialog, so no desktop path
-reaches the Node. **Clone** starts with the last folder typed for **Clone** in the open importer.
-Changing the active Node closes the field.
+reaches the Node. **Clone** starts with the last folder typed for it, and runs in the background
+([importer clones](./clone-runs.md#importer-clones)). Changing the active Node closes the field.
 
 The Node detects a checkout's GitHub identity from its `origin` remote. It accepts HTTPS, SSH,
 and scp forms, including `git@github.com:Owner/repo` and `git@github.com:/Owner/repo`, with an

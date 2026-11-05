@@ -35,6 +35,20 @@ The project row is created as `project add` creates one, with the same workspace
 invalidations. A plugin can instead give the clone to a project with no folder yet with
 `fillProjectId`, and write a provider's ID with `fields`.
 
+## Importer clones
+
+The GitHub, GitLab, and Bitbucket importers clone through `core.projects.clone`, so their clones get
+the same URL checks, folder checks, queue, and 30 minutes. Each import route looks up the repository
+in its mirror, checks the path against its host's grammar, and finds a project for the repository with
+no folder yet. It passes that project as `fillProjectId`, and GitHub and GitLab pass the repository's
+ID in `fields`. A **Clone** item answers `{ ok: true, action: 'clone', cloneId }`, and a **Link
+folder** item still answers with its project ID. The project takes the folder's name, which is the
+repository's last path segment. Importer clones stay trusted.
+
+The importer screen follows each `cloneId` with `cloneOutcome` and marks its row **Cloning…**,
+**Cloned**, or the error. A finished clone reports its project to the host through `onImported`.
+Closing the importer stops following, and the clones carry on.
+
 ## Clone from URL
 
 **Clone from URL** sits beside **Add folder…** and the code host importers on the empty Node screen

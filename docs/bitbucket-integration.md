@@ -97,7 +97,8 @@ without a tab after it.
 The `bitbucket` rail source lists a repository's pull requests and draws one, and the `bitbucket-pr`
 pane draws a task's, both from the shared views (`plugins/bitbucket/src/client/`). The pane's chord is
 ⌘⇧K. **Open pull request** under the Changes tab opens bitbucket.org's own form for the branch. The
-importer lists the person's repositories, with **Clone** and **Link folder**.
+importer lists the person's repositories, with **Clone** and **Link folder**. A clone runs in the
+background ([importer clones](./workspaces-and-tasks/clone-runs.md#importer-clones)).
 
 The review offers a comment, **Approve**, and **Request changes**. Merging offers a merge commit,
 squash, or fast-forward. Reviewers come from the workspace's members, and the plugin writes the whole

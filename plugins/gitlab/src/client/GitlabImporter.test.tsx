@@ -11,13 +11,20 @@ const seams = vi.hoisted(() => ({
   local: true,
   pickNodeFolder: vi.fn<() => Promise<string | null>>(),
   writeJson: vi.fn(),
+  cloneRun: vi.fn(),
 }))
-vi.mock('@acorn/plugin-api/client', async (original) => ({
-  ...(await original<typeof import('@acorn/plugin-api/client')>()),
-  canAddProjectFromFolder: () => seams.local,
-  pickNodeFolder: seams.pickNodeFolder,
-  writeJson: seams.writeJson,
-}))
+vi.mock('@acorn/plugin-api/client', async (original) => {
+  const actual = await original<typeof import('@acorn/plugin-api/client')>()
+  return {
+    ...actual,
+    canAddProjectFromFolder: () => seams.local,
+    pickNodeFolder: seams.pickNodeFolder,
+    writeJson: seams.writeJson,
+    // Only the clone run's reads; the lists' refetches go through as they would.
+    readJson: (url: string, options?: Parameters<typeof actual.readJson>[1]) =>
+      url.startsWith('/v1/core/projects/clone-runs/') ? seams.cloneRun(url, options) : actual.readJson(url, options),
+  }
+})
 
 import GitlabImporter from './GitlabImporter'
 
@@ -32,6 +39,7 @@ beforeEach(() => {
   seams.local = true
   seams.pickNodeFolder.mockReset()
   seams.writeJson.mockReset().mockResolvedValue({ results: [{ ok: true, acornProjectId: 'p1' }] })
+  seams.cloneRun.mockReset()
   onImported.mockReset()
   const client = new QueryClient({ defaultOptions: { queries: { staleTime: Infinity, retry: false } } })
   client.setQueryData(integrationsKey, {
@@ -77,10 +85,18 @@ const field = () => row().querySelector<HTMLInputElement>('form input')
 const sent = () => JSON.parse(seams.writeJson.mock.calls.at(-1)![1].body).projects
 
 describe('GitLab importer folders', () => {
-  it('asks the folder dialog on a Node it can browse', async () => {
+  // The row follows the clone run, as GithubImporter.test.tsx checks in full.
+  it('asks the folder dialog on a Node it can browse, and follows the clone', async () => {
+    let finish!: (run: unknown) => void
+    seams.cloneRun.mockReturnValueOnce(new Promise((resolve) => (finish = resolve)))
+    seams.writeJson.mockResolvedValue({ results: [{ ok: true, action: 'clone', cloneId: 'run-1' }] })
     seams.pickNodeFolder.mockResolvedValue('/Users/james/src')
     press('Clone')
+    await vi.waitFor(() => expect(row().textContent).toContain('Cloning…'))
+    expect(seams.cloneRun.mock.calls[0]![0]).toBe('/v1/core/projects/clone-runs/run-1?waitMs=20000')
+    finish({ state: 'finished', result: { ok: true, projectId: 'p1' } })
     await vi.waitFor(() => expect(onImported).toHaveBeenCalledWith(['p1']))
+    expect(row().textContent).toContain('Cloned')
     expect(sent()).toEqual([{ host: 'gitlab.com', projectId: 7, action: 'clone', parentDir: '/Users/james/src' }])
     expect(field()).toBeNull()
   })

@@ -5,6 +5,7 @@
 //   apps/node/test/integration/taskContext.test.ts             mirror tables, changeRequestRoutes
 //   apps/node/test/integration/auth/internalPrincipal.test.ts  githubToken
 //   apps/node/test/helpers/registerProviders.ts                githubProvider
+//   apps/node/test/integration/plugins/importerClones.test.ts  githubImport
 //
 // `seedGithubIntegration` keeps its own file; this package's own route tests import it relatively.
 export { githubProvider } from '../server/provider'
@@ -12,6 +13,7 @@ export { githubToken } from '../server/githubToken'
 export { checks, prFiles, pullRequests, repos } from '../node/schema'
 export { seedGithubIntegration } from './githubToken'
 export { changeRequestRoutes } from '../server/routes/changeRequests'
+export { githubImport } from '../server/routes/repos/import'
 // Node source composition test in apps/node/test/integration/githubDataSource.test.ts.
 export { createPullSourceHandler } from '../server/data/pullSourceHandler'
 export { pullSource } from '../shared/pullSource'

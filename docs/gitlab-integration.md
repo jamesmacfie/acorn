@@ -112,7 +112,8 @@ The `gitlab` rail source lists a project's merge requests and draws one, and the
 task's, both from the shared views (`plugins/gitlab/src/client/`). A job's log is split into its
 `section_start` sections as steps (`jobLog.ts`). **Open merge request** under the Changes tab opens
 the server's own form for the branch. The importer lists every server's projects by address, with
-**Clone** and **Link folder**.
+**Clone** and **Link folder**. A clone runs in the background
+([importer clones](./workspaces-and-tasks/clone-runs.md#importer-clones)).
 
 The plugin opens `gitlab:diff-line`, `gitlab:summary-badges`, and `gitlab:review-panel`, with the key shape every code host
 uses, and registers the data sources `merge-requests`, `review-comments`, `pipeline-jobs` with

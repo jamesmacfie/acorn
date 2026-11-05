@@ -43,17 +43,17 @@ project and can clone into an owner-selected folder. Task and service credential
 This gate does not change the authority of other GitHub provider routes.
 
 Projects → Import from GitHub discovers repositories from the plugin's disposable mirror. A
-repository is either linked to an existing folder (**Link folder**, the `map` action) or cloned with
-non-interactive Git. Both ask for the folder before anything is written, so cancelling the dialog
-cancels the import. Where the dialog can't browse the Node's disk, both open a folder field in the
-row ([Projects](./workspaces-and-tasks/projects.md)), and the route refuses a missing clone folder by
-name. There is no third "defer" action: skipping the repository is what deferring meant.
+repository is either linked to an existing folder (**Link folder**, the `map` action) or cloned in
+the background by core's [clone runs](./workspaces-and-tasks/clone-runs.md#importer-clones), and the
+row shows the clone's state. Both ask for the folder before anything is written, so cancelling the
+dialog cancels the import. Where the dialog can't browse the Node's disk, both open a folder field
+in the row ([Projects](./workspaces-and-tasks/projects.md)). There is no "defer" action.
 
 An import that finds a path-null project for the repository fills that one in rather than adding a
 second. A project that already has a path is a real checkout, and two clones of one repository stay
 legal (`projects_github_idx` is deliberately non-unique).
 
-The importer returns an individual result for every repository, so a failed clone does not hide
+The importer returns an individual result for every repository, so a refused clone does not hide
 successful imports. The mirror remains disposable candidate data; project identity, checkout paths, and
 default branches come from core project facets and services.
 

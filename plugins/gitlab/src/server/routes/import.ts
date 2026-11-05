@@ -1,5 +1,4 @@
-import { stat } from 'node:fs/promises'
-import { isAbsolute, join } from 'node:path'
+import { isAbsolute } from 'node:path'
 import { and, eq } from 'drizzle-orm'
 import { Hono } from 'hono'
 import { z } from 'zod'
@@ -36,11 +35,7 @@ const failed = (entry: GitlabImportItem, path: string, error: unknown): GitlabIm
   error: error instanceof Error ? error.message : String(error),
 })
 
-export const gitlabImport = (
-  db: PluginDatabase,
-  core: Pick<CoreServices, 'projects' | 'git'>,
-  servers: GitlabServers,
-) =>
+export const gitlabImport = (db: PluginDatabase, core: Pick<CoreServices, 'projects'>, servers: GitlabServers) =>
   new Hono<AppEnv>().post('/', requireDevice, async (c) => {
     const parsed = body.safeParse(await c.req.json().catch(() => null))
     if (!parsed.success)
@@ -65,37 +60,33 @@ export const gitlabImport = (
         continue
       }
       try {
-        let path: string
-        if (entry.action === 'map') {
-          if (!isAbsolute(entry.path)) throw new Error('Checkout path must be absolute.')
-          path = entry.path
-        } else {
-          if (!isAbsolute(entry.parentDir)) throw new Error('Clone parent directory must be absolute.')
-          // Checked first, because git would fail with "spawn git ENOENT" for a missing working folder.
-          if (
-            !(await stat(entry.parentDir).then(
-              (found) => found.isDirectory(),
-              () => false,
-            ))
-          )
-            throw new Error("That folder doesn't exist on this Node.")
+        // Fills a project that names this repository and has no folder yet, rather than adding a rival.
+        const placeholder = await core.projects.byRepository(GITLAB_PROVIDER, project.path.toLowerCase())
+        const fillProjectId = placeholder && placeholder.path === null ? placeholder.id : undefined
+        const repositoryExternalId = String(project.id)
+
+        if (entry.action === 'clone') {
           // The path comes from the server, which may be any host a person typed, so it's held to
           // GitLab's own path grammar before it names a folder or reaches git's arguments.
           if (!project.path.split('/').every((segment) => GITLAB_PATH_SEGMENT.test(segment)))
             throw new Error(`GitLab sent a project path acorn won't clone into a folder: ${project.path}`)
-          // The folder is the project's last path segment, as `git clone` would name it.
-          const folder = project.path.split('/').pop()!
-          await core.git.gitOrThrow(['clone', '--', `${server.origin}/${project.path}.git`, folder], {
-            cwd: entry.parentDir,
-            env: { GIT_TERMINAL_PROMPT: '0' },
+          // Core clones in the background and links the row when it has its folder
+          // (docs/workspaces-and-tasks/clone-runs.md). The folder is the project's last path segment,
+          // as `git clone` would name it.
+          const { cloneId } = await core.projects.clone({
+            url: `${server.origin}/${project.path}.git`,
+            parentDir: entry.parentDir,
+            name: project.path.split('/').pop()!,
+            fillProjectId,
+            fields: { repositoryExternalId },
           })
-          path = join(entry.parentDir, folder)
+          results.push({ projectId: project.id, path: project.path, action: entry.action, ok: true, cloneId })
+          continue
         }
-        // Fills a project that names this repository and has no folder yet, rather than adding a rival.
-        const placeholder = await core.projects.byRepository(GITLAB_PROVIDER, project.path.toLowerCase())
-        const existingId = placeholder && placeholder.path === null ? placeholder.id : null
-        const projectId = existingId ?? (await core.projects.create({ name: project.name, path })).id
-        const stamped = await core.projects.update(projectId, { path, repositoryExternalId: String(project.id) })
+
+        if (!isAbsolute(entry.path)) throw new Error('Checkout path must be absolute.')
+        const projectId = fillProjectId ?? (await core.projects.create({ name: project.name, path: entry.path })).id
+        const stamped = await core.projects.update(projectId, { path: entry.path, repositoryExternalId })
         if (!stamped) throw new Error('Project disappeared while importing.')
         results.push({
           projectId: project.id,
