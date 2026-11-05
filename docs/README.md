@@ -488,6 +488,15 @@ Each plugin landing page above has topic pages in a folder of the same name:
 - [What's left for the mobile web app](./future/mobile.md): real-device checks, small fixes on a phone,
   the hosted steps for plugins and Preview on the phone, and later work.
 
+## Clone with workflow proposal
+
+- [Clone a project from a Git URL and run a workflow on it](./future/clone-with-workflow/README.md),
+  with phases for [clone runs](./future/clone-with-workflow/01-clone-runs.md), [untrusted
+  projects](./future/clone-with-workflow/02-project-trust.md), [the Clone from URL
+  form](./future/clone-with-workflow/03-clone-from-url.md), [the
+  importers](./future/clone-with-workflow/04-importers.md), and [running a workflow after a
+  clone](./future/clone-with-workflow/05-run-after-clone.md).
+
 ## Node for other machines proposal
 
 - [Run a Node for clients on other machines](./future/node-tray/README.md), with phases for
