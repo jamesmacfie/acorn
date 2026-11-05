@@ -240,6 +240,7 @@ export class ManagedAgentRuntime {
         session: (sessionId) => this.store.getSession(sessionId),
         turn: (turnId) => this.store.turn(turnId),
         taskRoot: (taskId) => this.core.tasks.requireRoot(taskId),
+        recentToolCalls: (sessionId, limit) => this.store.recentToolCalls(sessionId, limit),
         live: (sessionId) => this.engine.currentSession(sessionId),
         materialize: (sessionId, turnId, event) => this.engine.materialize(sessionId, turnId, event),
         accept: (pending) => this.engine.acceptProviderEvent(pending),

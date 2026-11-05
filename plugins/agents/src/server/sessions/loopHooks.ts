@@ -11,7 +11,9 @@ import type {
   AgentCapability,
   AgentNormalizedEvent,
   AgentProviderDescriptor,
+  AgentRequestOrigin,
   AgentSession,
+  AgentToolCall,
   AgentTurn,
 } from '../../contract/wire.ts'
 import { BEFORE_PERMISSION_HOOK } from '../../contract/permissionHook.ts'
@@ -31,6 +33,7 @@ import { claudeHookOutput, claudeToolSubject } from '../drivers/claudeLoopHook'
 import type { PendingAgentEvent } from './durableEventBuffer'
 import type { ProviderGeneration } from './providerSessionLifecycle'
 import { AUTONOMOUS_REQUEST_MESSAGE, persistedAttendance, sessionAttendance } from './attendance'
+import { commandOrigin, ORIGIN_RECENT_CALLS } from './commandOrigin'
 
 const log = createLogger('agents', 'agents')
 
@@ -44,6 +47,8 @@ export type LoopHookPorts = {
   session(sessionId: string): Promise<AgentSession | null>
   turn(turnId: string): Promise<AgentTurn | null>
   taskRoot(taskId: string): Promise<string>
+  /** The session's latest tool calls, newest first. */
+  recentToolCalls(sessionId: string, limit: number): Promise<AgentToolCall[]>
   live(sessionId: string): { generation: ProviderGeneration; activeTurnId: string | null } | null
   materialize(sessionId: string, turnId: string | null, event: AgentNormalizedEvent): Promise<AgentNormalizedEvent[]>
   accept(pending: PendingAgentEvent): Promise<void>
@@ -119,7 +124,8 @@ export async function answerLoopHook(
       return reply(claudeHookOutput('PreToolUse', { deny: AUTONOMOUS_REQUEST_MESSAGE }))
     }
     const { by, reason } = verdict.ask
-    const answer = await holdAsk(ports, session.id, { title: before.title, by, reason })
+    const origin = await originOf(ports, before)
+    const answer = await holdAsk(ports, session.id, { title: before.title, by, reason, origin })
     // An approval is no decision, so the harness's own checks still run. Never an allow.
     if (answer === 'allowed') return reply('')
     return reply(
@@ -136,12 +142,23 @@ export async function answerLoopHook(
   }
 }
 
+// Display only, so a failed read is a card without the line.
+async function originOf(ports: LoopHookPorts, before: AgentBeforeToolPayload): Promise<AgentRequestOrigin | undefined> {
+  try {
+    const recent = await ports.recentToolCalls(before.sessionId, ORIGIN_RECENT_CALLS)
+    return commandOrigin(before.command, before.toolCallId, recent)
+  } catch (error) {
+    log.warn(`a bridge ask's command origin was skipped: ${describeError(error).message}`)
+    return undefined
+  }
+}
+
 // An ordinary permission card that names the plugin, recorded on the asking turn. The bridge call
 // waits here, not in the harness's own permission flow, which runs afterward on an approval.
 async function holdAsk(
   ports: LoopHookPorts,
   sessionId: string,
-  question: { title: string; by: string; reason: string },
+  question: { title: string; by: string; reason: string; origin: AgentRequestOrigin | undefined },
 ): Promise<LoopAskAnswer> {
   const live = ports.live(sessionId)
   if (!live) return 'expired'
@@ -167,6 +184,7 @@ async function holdAsk(
       { id: 'allow', label: 'Allow', kind: 'allow_once' },
       { id: 'reject', label: 'Reject', kind: 'reject_once' },
     ],
+    ...(question.origin ? { origin: question.origin } : {}),
   }
   for (const event of await ports.materialize(sessionId, turnId, request))
     await ports.accept({ sessionId, turnId, event, generation })

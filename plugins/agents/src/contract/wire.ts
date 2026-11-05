@@ -244,6 +244,10 @@ export type AgentAppApproval = {
  *  host stamped on the verdict, never a value the handler chose. `reason` is capped display text. */
 export type AgentRequestBlocked = { by: string; reason: string }
 
+/** The earlier web fetch, web search, or MCP result a permission request's command repeats `match`
+ *  from, `callsAgo` tool calls before it. Display only (`commandOrigin`). */
+export type AgentRequestOrigin = { toolCallId: string; toolTitle: string; match: string; callsAgo: number }
+
 export type AgentQuestion = {
   id: string
   header?: string
@@ -418,6 +422,7 @@ export type AgentNormalizedEvent =
       questions?: AgentQuestion[]
       approval?: AgentAppApproval
       blocked?: AgentRequestBlocked
+      origin?: AgentRequestOrigin
     }
   | { type: 'request_resolved'; requestId: string; resolution: unknown }
   | {

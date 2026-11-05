@@ -1,5 +1,51 @@
 # Known key values and command origins in agent sessions
 
+## Phase 1 completion note
+
+November 6, 2026. Phase 1, the origin line, landed. Phases 2 and 3 aren't started.
+
+What landed:
+
+- `plugins/agents/src/server/sessions/commandOrigin.ts`: `commandOrigin(command, ownToolCallId, recent)`
+  is pure. It extracts URLs, hosts, pipe-to-shell lines, and package names after `npx`, `uvx`,
+  `pnpm dlx`, `npm install`, `pip install`, `go install`, and `cargo install`. A source is a tool call
+  with `web` set or an MCP `name`, read from its `output` and its `web.results`. A full URL, a pipe
+  line, or a package wins over a host alone, across all sources, newest first.
+- `AgentStore.recentToolCalls(sessionId, limit)`, backed by `readRecentToolCalls` in
+  `toolCallRead.ts`. It reads the session's latest 200 calls by start order through the
+  `agent_events_session_tool_idx` expressions and folds each with `mergeToolCall`.
+- `AgentRequestOrigin` and the optional `origin` field on the `request` event in `wire.ts`. The store
+  also writes it into the request row's `payloadJson`, beside `approval`, because the waiting card
+  reads the row and not the event.
+- The two call sites. `settlePermissionRequest` and `holdAsk` each get a `recentToolCalls` port. Both
+  fail open: a read that throws logs a warning and the card has no line.
+- The card line in `AgentRequestCard` (waiting) and in `AgentEventCard` (the record left in the thread,
+  including a refused request). The terminal client draws the same components.
+- A section in `docs/managed-agents/permission-policy.md`.
+
+Decisions and deviations:
+
+- The extraction is my own small set of patterns. Stroq's word parser, encoded atoms, and wrapped-line
+  handling are left out, as the plan says.
+- The line reads "`<match>` appears in the result of "`<tool title>`", N calls earlier." The plan's
+  example says "in a web fetch of …", but only the title is stored, so the line quotes the title.
+- `callsAgo` counts every earlier tool call, not only sources, and skips the call being asked about.
+- Only the result side of a source counts, not its input. The URL an agent chose to fetch is the
+  agent's own text.
+- The caps (200 for `match`, 500 for `toolTitle`) live in `commandOrigin`. `boundProviderEvent` doesn't
+  repeat them, because only acorn's own code sets `origin`.
+- The terminal fixture shows the line only behind `ACORN_FIXTURE_REQUEST_ORIGIN`. Without the flag,
+  the extra row pushed the response's Copy menu off a 40-row screen in another test.
+
+For later phases:
+
+- The Node service size check is already over its ceiling on the base commit: 1,945,205 bytes against
+  1,944,000. This phase adds 276 bytes, for 1,945,481. I didn't raise the ceiling.
+- Phase 2's tool card warning can reuse the `requestOrigin.ts` pattern on the client: a reader for a
+  stored payload and one function for the sentence.
+- "Later, once the line has been used" in Part 2 can call `commandOrigin` directly. It needs only the
+  command, the call's ID, and `recentToolCalls`.
+
 Date: November 6, 2026. Status: proposed. Nothing on this page is built.
 
 This page covers two checks on what an agent runs. The first notices when a tool call carries the

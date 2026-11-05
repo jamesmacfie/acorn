@@ -36,3 +36,26 @@ export function readToolCall(tx: Transaction, sessionId: string, toolId: string)
   const status = tool.status && commandStatus(tool, turn && mapAgentTurn(turn), mapAgentSession(session))
   return { tool: status ? { ...tool, status } : tool, turnId, taskId: session.taskId, seq: own.at(-1)!.seq }
 }
+
+/**
+ * A session's latest `limit` tool calls, newest first by when each started, each folded as
+ * `readToolCall` folds one. The inner read repeats the expressions of `agent_events_session_tool_idx`.
+ */
+export function readRecentToolCalls(tx: Transaction, sessionId: string, limit: number): AgentToolCall[] {
+  const rows = tx.all<{ eventJson: string }>(sql`
+    SELECT event_json AS eventJson FROM agent_events
+    WHERE session_id = ${sessionId} AND event_json ->> '$.type' = 'tool' AND event_json ->> '$.tool.id' IN (
+      SELECT event_json ->> '$.tool.id' FROM agent_events
+      WHERE session_id = ${sessionId} AND event_json ->> '$.type' = 'tool'
+      GROUP BY event_json ->> '$.tool.id' ORDER BY MIN(seq) DESC LIMIT ${limit}
+    )
+    ORDER BY seq
+  `)
+  const calls = new Map<string, AgentToolCall>()
+  for (const row of rows) {
+    const { tool } = JSON.parse(row.eventJson) as { tool: AgentToolCall }
+    const previous = calls.get(tool.id)
+    calls.set(tool.id, previous ? mergeToolCall(previous, tool) : tool)
+  }
+  return [...calls.values()].reverse()
+}

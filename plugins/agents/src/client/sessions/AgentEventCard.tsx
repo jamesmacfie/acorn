@@ -60,6 +60,7 @@ import { senderLabel } from './turnSender'
 import { eventTime } from './eventTime'
 import { patchFiles } from './patchFiles'
 import { managedAgentApi } from './managedClient'
+import { originLine } from './requestOrigin'
 import type { CodexPlanHandoffState } from '../../shared/codexPlanHandoff'
 import type { CheckResults } from '../../shared/delegationSchemas'
 
@@ -647,6 +648,13 @@ export default function AgentEventCard(props: {
                   <Heading level={3} eyebrow={asked().kind}>
                     {asked().title}
                   </Heading>
+                  <Show when={asked().origin}>
+                    {(origin) => (
+                      <Text emphasis="muted" wrap>
+                        {originLine(origin())}
+                      </Text>
+                    )}
+                  </Show>
                   {/* Which app the answer was about, by the identifier it is keyed on, and for a saved
                     grant who holds it. A row stored without an approval draws no app line. */}
                   <Show when={appApprovalOf(asked().approval)}>

@@ -906,6 +906,7 @@ export class ManagedAgentEngine {
             hooks: this.hooks,
             session: () => this.store.requireSession(sessionId),
             taskRoot: (taskId) => this.core.tasks.requireRoot(taskId),
+            recentToolCalls: (limit) => this.store.recentToolCalls(sessionId, limit),
             materialize: (request) => this.eventMaterializer.map(sessionId, turnId, request),
             owned: () => this.processes.owns(generation),
             accept: (recorded) => this.providerEvents.accept({ sessionId, turnId, event: recorded, generation }),

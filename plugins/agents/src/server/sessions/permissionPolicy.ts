@@ -9,7 +9,9 @@ import type {
   AgentNormalizedEvent,
   AgentPermissionOption,
   AgentRequestBlocked,
+  AgentRequestOrigin,
   AgentSession,
+  AgentToolCall,
 } from '../../contract/wire.ts'
 import {
   BEFORE_PERMISSION_HOOK,
@@ -18,6 +20,7 @@ import {
 } from '../../contract/permissionHook.ts'
 import type { AgentDriverPermissionRequest } from '../drivers/types'
 import type { Attendance } from './attendance'
+import { commandOrigin, ORIGIN_RECENT_CALLS } from './commandOrigin'
 
 const log = createLogger('agents', 'agents')
 
@@ -27,6 +30,8 @@ export type PermissionRequestPorts = {
   session(): Promise<AgentSession>
   attendance: Attendance
   taskRoot(taskId: string): Promise<string>
+  /** The session's latest tool calls, newest first. */
+  recentToolCalls(limit: number): Promise<AgentToolCall[]>
   /** The materializer's bounding, which also drops everything driver-only. */
   materialize(event: AgentNormalizedEvent): Promise<AgentNormalizedEvent[]>
   /** False once the generation that asked was stopped or replaced. */
@@ -51,8 +56,13 @@ export async function settlePermissionRequest(
   event: AgentDriverPermissionRequest,
 ): Promise<void> {
   const blocked = await askPolicy(ports, event)
+  const origin = await originOf(ports, event.subject)
   if (!ports.owned()) return
-  const [request] = await ports.materialize(blocked ? { ...event.request, blocked } : event.request)
+  const [request] = await ports.materialize({
+    ...event.request,
+    ...(blocked ? { blocked } : {}),
+    ...(origin ? { origin } : {}),
+  })
   if (!request || !ports.owned()) return
   if (blocked) {
     try {
@@ -94,6 +104,19 @@ async function askPolicy(
   } catch (error) {
     log.warn(`before-permission was skipped: ${describeError(error).message}`)
     return null
+  }
+}
+
+// Display only, so a failed read is a card without the line.
+async function originOf(
+  ports: PermissionRequestPorts,
+  subject: AgentPermissionSubject,
+): Promise<AgentRequestOrigin | undefined> {
+  try {
+    return commandOrigin(subject.command, subject.toolCallId, await ports.recentToolCalls(ORIGIN_RECENT_CALLS))
+  } catch (error) {
+    log.warn(`a permission request's command origin was skipped: ${describeError(error).message}`)
+    return undefined
   }
 }
 

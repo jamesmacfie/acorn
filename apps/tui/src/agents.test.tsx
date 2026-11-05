@@ -142,16 +142,19 @@ describe('running an agent from a terminal', () => {
     }
   }, 180_000)
 
-  it('answers what the run is blocked on', async () => {
+  it('answers what the run is blocked on, under where its command came from', async () => {
+    process.env.ACORN_FIXTURE_REQUEST_ORIGIN = '1'
     const screen = await renderFixture({ pane: 'agents', width: 120, height: 40 })
     try {
       await openFirstSession(screen)
       await enterDetail(screen)
+      expect(await screen.until('appears in the result of')).toContain('docs.example appears in the result of')
       await stopSaying(screen, 'Allow')
       await screen.press('RETURN')
       expect(posts()).toEqual(['/v1/p/agents/sessions/session-1/requests/request-1/resolve'])
     } finally {
       screen.done()
+      delete process.env.ACORN_FIXTURE_REQUEST_ORIGIN
     }
   }, 180_000)
 
