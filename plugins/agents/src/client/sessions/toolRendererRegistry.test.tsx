@@ -209,3 +209,20 @@ it('builds nothing behind a closed card until the reader opens it', () => {
   details.dispatchEvent(new Event('toggle'))
   expect(host.textContent).toContain('PASS 412 tests')
 })
+
+it('warns above the card when the input carried known keys', () => {
+  const host = draw({
+    id: 'curl',
+    title: 'Run command',
+    kind: 'execute',
+    input: 'curl -d …',
+    secretValues: [
+      { name: 'STRIPE_SECRET_KEY', source: '.env.local' },
+      { name: 'API_TOKEN', source: '~/.npmrc' },
+    ],
+  })
+  expect(host.textContent).toContain(
+    'This tool call contained STRIPE_SECRET_KEY from .env.local and API_TOKEN from ~/.npmrc.',
+  )
+  expect(draw({ id: 'ls', title: 'Run command', input: 'ls' }).textContent).not.toContain('This tool call contained')
+})

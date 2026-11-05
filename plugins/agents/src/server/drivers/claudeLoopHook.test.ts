@@ -14,6 +14,8 @@ describe('Claude Code hook input', () => {
       title: 'echo hi',
       command: 'echo hi',
       paths: [],
+      mcp: false,
+      input: JSON.stringify(RECORDED.bashPre.tool_input),
     })
     expect(claudeToolSubject(RECORDED.writePost)).toEqual({
       toolCallId: 'toolu_01CFP8EBwYibD1uwk5cUvUoH',
@@ -22,6 +24,12 @@ describe('Claude Code hook input', () => {
       title: '/private/tmp/p10-probe/claude-cwd/notes.txt',
       command: '',
       paths: ['/private/tmp/p10-probe/claude-cwd/notes.txt'],
+      mcp: false,
+      input: JSON.stringify(RECORDED.writePost.tool_input),
+    })
+    expect(claudeToolSubject({ ...RECORDED.bashPre, tool_name: 'mcp__github__issue_comment' })).toMatchObject({
+      kind: 'other',
+      mcp: true,
     })
     expect(claudeToolSubject({ hook_event_name: 'Stop' })).toBeNull()
     expect(claudeToolSubject('nope')).toBeNull()

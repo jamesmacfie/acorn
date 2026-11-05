@@ -14,6 +14,8 @@ records:
 - config-trust acknowledgements;
 - publication blocked by a secret check, and one operation allowed
   ([secret checks](./secret-publication.md#audit));
+- an agent tool call that carried a known key's value, by key name
+  ([known key values](./known-key-values.md#what-you-see));
 - secrets created, replaced, and deleted;
 - plugin toggles, installs, updates, uninstalls, reloads, and review decisions;
 - the owner's answer to an agent's plugin request;

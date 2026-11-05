@@ -31,6 +31,7 @@ import type {
   AgentSessionList,
   AgentSessionSnapshot,
   AgentSubagent,
+  AgentToolCall,
   AgentToolCallRead,
   AgentTurn,
   AgentWaitCondition,
@@ -370,6 +371,7 @@ export class AgentStore {
             options: event.options ?? [],
             questions: event.questions ?? [],
             ...(event.approval ? { approval: event.approval } : {}),
+            ...(event.origin ? { origin: event.origin } : {}),
           }),
           createdAt: timestamp,
         })
@@ -1340,6 +1342,12 @@ export class AgentStore {
   async toolCall(sessionId: string, toolId: string): Promise<AgentToolCallRead | null> {
     const { readToolCall } = await import('./toolCallRead')
     return this.db.transaction((tx) => readToolCall(tx, sessionId, toolId))
+  }
+
+  /** The session's latest `limit` tool calls, newest first (`readRecentToolCalls`). */
+  async recentToolCalls(sessionId: string, limit: number): Promise<AgentToolCall[]> {
+    const { readRecentToolCalls } = await import('./toolCallRead')
+    return this.db.transaction((tx) => readRecentToolCalls(tx, sessionId, limit))
   }
 
   /** The task's background commands still running, across its sessions (`runningBackgroundCommands`). */

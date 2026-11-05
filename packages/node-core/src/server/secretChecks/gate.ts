@@ -150,7 +150,9 @@ export function describeSecretRefusal(
   const shown = report.findings
     .filter((finding) => finding.confidence === 'high')
     .slice(0, 3)
-    .map((finding) => `${finding.rule} at ${finding.location}:${finding.line}`)
+    .map(
+      (finding) => `${finding.rule}${finding.name ? ` (${finding.name})` : ''} at ${finding.location}:${finding.line}`,
+    )
   const what =
     refusal.reason === 'findings'
       ? `${report.counts.high} likely secret${report.counts.high === 1 ? '' : 's'} (${shown.join(', ')}${report.counts.high > shown.length ? ', …' : ''})`

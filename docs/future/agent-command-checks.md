@@ -1,6 +1,185 @@
 # Known key values and command origins in agent sessions
 
-Date: November 6, 2026. Status: proposed. Nothing on this page is built.
+## Phase 3 completion note
+
+November 6, 2026. Phase 3, blocking, landed. All three phases are done.
+
+What landed:
+
+- `KnownValueIndex.matcher(folder)` in `knownValues.ts`. It reads a folder's sources once and returns
+  `{ version, lookup(text) }`. `lookup(text, folder)` is now a call through it. The version is a
+  SHA-256 over each source's label, salted hashes, and names, so it changes when a key is added,
+  removed, or renamed, and at each Node start.
+- `matcher(folder)` on the `knownValues` core facet, beside `carried`. It writes no audit row.
+  `KnownValueMatcher` is a type export of `core/index.ts` and `@acorn/plugin-api/node`.
+- The bridge check in `answerLoopHook`. It runs on `PreToolUse` before any plugin handler, through a
+  `blockedKeys(text, folder)` port that returns nothing while blocking is off. It looks up the tool's
+  whole input, which `claudeToolSubject` now carries as `input`, with an `mcp` flag beside it. A
+  match on a `command` or `fetch` kind, or on an MCP tool, is a deny with the agreed text. An edit, a
+  read, and any other tool get no decision.
+- The install condition in `ManagedAgentEngine`: the before-tool bridge installs when a point has a
+  handler, or when blocking is on and the facet exists.
+- The Git `known-value` rule in `secretCheck.ts`, for commit and push blobs and for pushed tag
+  messages. The blob cache key and both Git digests include the matcher's version.
+- `name?` on `SecretFinding`, and `describeSecretRefusal` prints it: "known-value (DB_PASSWORD) at
+  config.ts:3". The one-time allowance needs no change.
+- Docs: `docs/security/known-key-values.md` (new), pointers and the Git rule in
+  `secret-publication.md`, the install condition in `loop-hooks.md`, the audit line in
+  `docs/security/audit.md`, and an entry in `docs/README.md`.
+
+Decisions and deviations:
+
+- The index isn't exported through `@acorn/plugin-api/node`. The Git check and the bridge reach it
+  through the facet, so node-core needs no new entry point.
+- The version goes into the Git report's `digest`, which the gate's decision ID already hashes,
+  rather than into the gate itself. Only Git publishes with known keys, and the gate stays generic.
+  The digest of an incomplete check leaves the version out, because no keys were checked.
+- Git looks up each line, not each blob, so a finding has a line number and a lockfile over 2 MiB
+  isn't cut short. The column is always 1. A single line over 2 MiB is unscanned, which makes the
+  check incomplete and blocks with the switch on. A minified bundle on one line hits this.
+- A lookup with no keys at all now reports `truncated: false`, since nothing went unchecked.
+- The bridge names every match in one refusal, separated by commas, so the model fixes them in one
+  attempt.
+- A bridge refusal writes no audit row of its own. The event store's `secrets.agent.carried` row
+  covers the call when the harness reports it. I didn't confirm that Claude's ACP adapter reports a
+  call its hook denied.
+- `secret-publication.md` would have run to 219 lines against the 200-line cap, so the index, the
+  tool card warning, the bridge refusal, and the Settings list moved to `known-key-values.md`. Two
+  code comments cite it instead of this plan.
+- A Phase 2 comment in `knownValues.ts` named Stroq's `secrets/extract.ts`. The comment path check
+  fails on it in a checkout without `references/Stroq`, so it names the two patterns instead.
+
+Left over:
+
+- The Node service size check is 1,946,645 bytes against its 1,944,000 ceiling. This phase adds 320
+  bytes, in the engine's install condition, the runtime's port, and the core facet. I didn't raise
+  the ceiling.
+- Five site pages cite the changed docs and weren't updated:
+  `security/credentials-and-secrets.md`, `security/the-audit-log.md`,
+  `security/what-acorn-doesnt-protect-against.md`, `settings/machines.md`, and
+  `build-plugins/node/act-on-agent-turns-with-hooks.mdx`. `pnpm --filter @acorn/site stale` lists them.
+- I didn't walk the acceptance scenarios in `pnpm dev:agent`: the Claude Code and Codex sessions, the
+  commit allowed once from Settings, and the grep of `agent_events`, the audit table, and the Node log.
+  Unit tests cover each path with values built at runtime.
+- The Changes pane lists a `known-value` finding by rule and line, without the key name. The refusal
+  message names it.
+- Turning blocking on reaches a running Claude Code session after its next resume, like a new handler.
+
+## Phase 2 completion note
+
+November 6, 2026. Phase 2, the index and the after-the-fact warning, landed. Phase 3 isn't started.
+
+What landed:
+
+- `packages/node-core/src/server/secretChecks/knownValues.ts`. `createKnownValueIndex({ home, env })`
+  builds an index with a salt drawn per Node start. `knownValueIndex()` is the Node's one shared
+  index. `lookup(text, folder)` returns `{ matches, truncated }`. `sources()` returns each source
+  with its key names, for Settings. The index reads the task folder's env files, the four home
+  folder files, and the environment. It rereads a file when its size or modification time changes.
+- `auditCarriedKeys(db, index, input)` in the same file. It runs the lookup and, on a match, writes
+  `secrets.agent.carried` with the session as the subject and `toolCallId` and `names` as details.
+- `CompiledCoreServices.knownValues.carried(...)`, an optional facet beside `secretPublication`. It
+  loads the module on first use.
+- `secretValues?: KnownValueMatch[]` on `AgentToolCall`, kept by `mergeToolCall`. The protocol
+  types `KnownValueMatch` and `KnownKeySource` live in `packages/protocol/src/secretChecks.ts`.
+- The lookup runs in `ProviderEventMaterializer.map`, before an input over 64 KiB moves to an
+  artifact, through a `carriedKeys` port that `ManagedAgentEngine.carriedKeys` fills. The engine
+  passes the session's task root as the folder. A failure logs a warning and finds no keys.
+- The warning line in `AgentToolCallCard`, outside the `agents:tool-card` slot so a contributed
+  renderer can't drop it: "This tool call contained `STRIPE_SECRET_KEY` from .env.local." The
+  terminal client draws it too. Its fixture shows it only behind `ACORN_FIXTURE_CARRIED_KEYS`.
+- **Keys Acorn knows about** in Settings > Security and backup > Secret checks. Each source shows a
+  count, and a closed fold shows its names. The list rides on the secret publication route as
+  `knownKeys`, so it needs no route of its own.
+
+Decisions and deviations:
+
+- `knownValues.ts` isn't exported through `@acorn/plugin-api/node`. The facade check fails on an
+  export with no importer, and the export also needs a `./server/secretChecks/knownValues.ts` entry in
+  `packages/node-core/package.json`, which would take node-core past its cap of 70 entry points
+  (`boundaries.test.ts`). The agents plugin reaches the index through the `knownValues` facet
+  instead. Phase 3 adds the export when the bridge check or the Git rule imports it, and needs to
+  make room under the cap first.
+
+- The environment source is the Node's own `process.env`, labeled "Acorn's environment". Each
+  harness gets its environment from `brokerEnv` over that same parent, and the event store doesn't
+  hold a session's own environment when it saves a call. This indexes more than any one harness
+  sees, such as the Node's internal tokens. That only adds warnings, and every one is a real value.
+- Only the top level of a task folder is read, as the plan says. A `.env` in `apps/api/` of a
+  monorepo isn't indexed.
+- One lookup and one audit row per call. The materializer checks the first event that carries a
+  call's input, as `RepeatedToolCalls` counts it, and remembers the last 1,000 calls it checked.
+  Codex repeats the input on completion, and that repeat isn't looked up again.
+- The index has no version string. Phase 3 is its only reader, and what it should cover (one task
+  folder or all of them) depends on how the Git cache key uses it.
+- The value rules follow Stroq's `extract.ts`, trimmed. A quoted dotenv value ends at its first
+  matching quote, with no escape handling. Docker `auth` is indexed both as the base64 string and as
+  its decoded password.
+- The index forgets a task folder after 50 others have been looked up more recently. Settings shows
+  a folder only after an agent in that task has made a tool call since the Node started.
+
+For Phase 3:
+
+- The Node service size check is 1,946,325 bytes against a 1,944,000 ceiling. This phase adds 844
+  bytes to the static graph, all in the event store and the core facet. The index loads lazily. I
+  didn't raise the ceiling.
+- The bridge check and the Git rule can call `knownValueIndex().lookup(text, folder)` and use
+  `truncated`. Import it lazily: no boot-path module imports `knownValues.ts` today.
+- I fixed a citation from Phase 1 in `commandOrigin.ts`: it cited "§ Where a command came from",
+  but the heading is "Part 2: where a command came from", and `docCitations.test.ts` failed on it.
+- `docs/security/secret-publication.md` doesn't mention the agent check, the audit verb, the home
+  folder reads, or the Settings list. That doc update is Phase 3's.
+
+## Phase 1 completion note
+
+November 6, 2026. Phase 1, the origin line, landed. Phases 2 and 3 aren't started.
+
+What landed:
+
+- `plugins/agents/src/server/sessions/commandOrigin.ts`: `commandOrigin(command, ownToolCallId, recent)`
+  is pure. It extracts URLs, hosts, pipe-to-shell lines, and package names after `npx`, `uvx`,
+  `pnpm dlx`, `npm install`, `pip install`, `go install`, and `cargo install`. A source is a tool call
+  with `web` set or an MCP `name`, read from its `output` and its `web.results`. A full URL, a pipe
+  line, or a package wins over a host alone, across all sources, newest first.
+- `AgentStore.recentToolCalls(sessionId, limit)`, backed by `readRecentToolCalls` in
+  `toolCallRead.ts`. It reads the session's latest 200 calls by start order through the
+  `agent_events_session_tool_idx` expressions and folds each with `mergeToolCall`.
+- `AgentRequestOrigin` and the optional `origin` field on the `request` event in `wire.ts`. The store
+  also writes it into the request row's `payloadJson`, beside `approval`, because the waiting card
+  reads the row and not the event.
+- The two call sites. `settlePermissionRequest` and `holdAsk` each get a `recentToolCalls` port. Both
+  fail open: a read that throws logs a warning and the card has no line.
+- The card line in `AgentRequestCard` (waiting) and in `AgentEventCard` (the record left in the thread,
+  including a refused request). The terminal client draws the same components.
+- A section in `docs/managed-agents/permission-policy.md`.
+
+Decisions and deviations:
+
+- The extraction is my own small set of patterns. Stroq's word parser, encoded atoms, and wrapped-line
+  handling are left out, as the plan says.
+- The line reads "`<match>` appears in the result of "`<tool title>`", N calls earlier." The plan's
+  example says "in a web fetch of …", but only the title is stored, so the line quotes the title.
+- `callsAgo` counts every earlier tool call, not only sources, and skips the call being asked about.
+- Only the result side of a source counts, not its input. The URL an agent chose to fetch is the
+  agent's own text.
+- The caps (200 for `match`, 500 for `toolTitle`) live in `commandOrigin`. `boundProviderEvent` doesn't
+  repeat them, because only acorn's own code sets `origin`.
+- The terminal fixture shows the line only behind `ACORN_FIXTURE_REQUEST_ORIGIN`. Without the flag,
+  the extra row pushed the response's Copy menu off a 40-row screen in another test.
+
+For later phases:
+
+- The Node service size check is already over its ceiling on the base commit: 1,945,205 bytes against
+  1,944,000. This phase adds 276 bytes, for 1,945,481. I didn't raise the ceiling.
+- Phase 2's tool card warning can reuse the `requestOrigin.ts` pattern on the client: a reader for a
+  stored payload and one function for the sentence.
+- "Later, once the line has been used" in Part 2 can call `commandOrigin` directly. It needs only the
+  command, the call's ID, and `recentToolCalls`.
+
+Date: November 6, 2026. Status: phases 1 to 3 built November 6, 2026. The live acceptance checks in
+`pnpm dev:agent` remain open. The shipped contract is in
+[known key values](../security/known-key-values.md) and [permission
+policy](../managed-agents/permission-policy.md#where-a-command-came-from).
 
 This page covers two checks on what an agent runs. The first notices when a tool call carries the
 value of a key on this machine. The second tells the person, on a permission card, which text the

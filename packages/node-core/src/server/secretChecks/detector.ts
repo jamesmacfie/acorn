@@ -69,10 +69,11 @@ const RULES: readonly Rule[] = [
 
 // Narrow content rules for documented placeholders, never whole directories: AWS's own EXAMPLE keys,
 // runs of one character, and template slots. A fixture that looks real is reported, which is the point.
-const PLACEHOLDER = /EXAMPLE|(.)\1{7,}|^(?:your|my|<|\$\{|\{\{|%\()|changeme|placeholder|redacted/i
+export const PLACEHOLDER = /EXAMPLE|(.)\1{7,}|^(?:your|my|<|\$\{|\{\{|%\()|changeme|placeholder|redacted/i
 
-// Bits per character, for the assignment heuristic only. A long readable word is not a secret.
-function entropy(value: string): number {
+// Bits per character, for the assignment heuristic and the known key index. A long readable word is
+// not a secret.
+export function entropy(value: string): number {
   const counts = new Map<string, number>()
   for (const char of value) counts.set(char, (counts.get(char) ?? 0) + 1)
   let bits = 0

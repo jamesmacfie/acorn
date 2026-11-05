@@ -27,6 +27,7 @@ import type {
   AgentInputPart,
   AgentNormalizedEvent,
   AgentSession,
+  AgentToolCall,
   AgentTurn,
 } from '../../contract/wire.ts'
 import type { EnqueueAgentTurnInput } from '../../shared/schemas'
@@ -331,18 +332,21 @@ export class ManagedAgentEngine {
             lastTold: session.config.skillIndex,
           }),
         skillsDelivered: (sessionId, report) => this.skillsDelivered(sessionId, report),
-        // Only the points somebody handles, read at every start and resume like the skills.
+        // Only the points somebody handles, read at every start and resume like the skills. The
+        // before-tool point also carries the known key check while blocking is on.
         loopHooks: async () => {
           const bridge = acornLoopHook()
-          if (!bridge || !this.hooks) return null
-          const [before, after] = await Promise.all(
-            [BEFORE_TOOL_HOOK.id, AFTER_TOOL_HOOK.id].map((id) => this.hooks!.handlers(id)),
-          )
-          if (!before!.length && !after!.length) return null
+          if (!bridge) return null
+          const [before, after] = this.hooks
+            ? await Promise.all([BEFORE_TOOL_HOOK.id, AFTER_TOOL_HOOK.id].map((id) => this.hooks!.handlers(id)))
+            : [[], []]
+          const blocking = !!this.core.knownValues && !!(await this.core.secretPublication?.enabled())
+          const beforeTool = before!.length > 0 || blocking
+          if (!beforeTool && !after!.length) return null
           return {
             command: bridge.command,
             args: [...bridge.args, LOOP_HOOK_ROUTE, LOOP_HOOK_VERSION],
-            beforeTool: before!.length > 0,
+            beforeTool,
             afterTool: after!.length > 0,
           }
         },
@@ -433,7 +437,9 @@ export class ManagedAgentEngine {
     // The redaction list grows as sessions start, rather than being computed once, because each session
     // mints its own scoped internal token (docs/security/credentials.md § Credential handling). #mintedSecrets
     // accumulates them and the materializer holds a live reference to the same array.
-    this.eventMaterializer = new ProviderEventMaterializer(this.artifacts, this.mintedSecrets)
+    this.eventMaterializer = new ProviderEventMaterializer(this.artifacts, this.mintedSecrets, (sessionId, tool) =>
+      this.carriedKeys(sessionId, tool),
+    )
     this.webhooks = new AgentWebhookService(options.db, options.secrets, options.core)
     this.mcpServers = new AgentMcpServerStore(
       options.db,
@@ -907,6 +913,7 @@ export class ManagedAgentEngine {
             hooks: this.hooks,
             session: () => this.store.requireSession(sessionId),
             taskRoot: (taskId) => this.core.tasks.requireRoot(taskId),
+            recentToolCalls: (limit) => this.store.recentToolCalls(sessionId, limit),
             materialize: (request) => this.eventMaterializer.map(sessionId, turnId, request),
             owned: () => this.processes.owns(generation),
             accept: (recorded) => this.providerEvents.accept({ sessionId, turnId, event: recorded, generation }),
@@ -989,6 +996,21 @@ export class ManagedAgentEngine {
       if (this.repeatedToolCalls) (await this.repeatedToolCalls).forget(sessionId)
       if (turnId) void this.goals.get().then((goals) => goals.check(sessionId, turnId))
       void this.pump()
+    }
+  }
+
+  /** The known key values a tool call's input carried, looked up against its task folder's env files
+   *  (docs/security/known-key-values.md § Where it runs). Advisory, so a failure logs and finds none. */
+  private async carriedKeys(sessionId: string, tool: AgentToolCall) {
+    const knownValues = this.core.knownValues
+    if (!knownValues || !tool.input) return []
+    try {
+      const { taskId } = await this.store.requireSession(sessionId)
+      const folder = await this.core.tasks.requireRoot(taskId).catch(() => null)
+      return await knownValues.carried({ sessionId, toolCallId: tool.id, folder, text: tool.input })
+    } catch (error) {
+      log.warn(`known key check failed: ${describeError(error).message}`)
+      return []
     }
   }
 

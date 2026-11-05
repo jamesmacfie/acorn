@@ -25,6 +25,15 @@ const prose = (text: string): AgentEventRecord => ({
 })
 
 describe('folding tool updates to one record a call', () => {
+  it('keeps the known keys a call carried through later updates', () => {
+    const secretValues = [{ name: 'API_TOKEN', source: '.env' }]
+    const [folded] = foldToolEvents([
+      tool('t1', { id: 'k', input: 'curl', secretValues }),
+      tool('t1', { id: 'k', status: 'completed', output: 'ok' }),
+    ])
+    expect(folded?.event).toMatchObject({ tool: { status: 'completed', secretValues } })
+  })
+
   it('collapses a call onto its first update and says how far it reaches', () => {
     const events = [
       tool('t1', { id: 'a', title: 'Bash', status: 'running', input: 'ls' }),

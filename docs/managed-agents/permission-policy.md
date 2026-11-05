@@ -108,6 +108,20 @@ summary. A handler's own verdict isn't proof: a verdict that arrives after the t
 The explanation itself is a note through `agents:session-messenger`, a separate grant
 ([session messages](./session-messages.md#the-policy-plugins-explanations)).
 
+## Where a command came from
+
+Before a permission card is saved, acorn checks whether its command repeats a URL, a host, a
+pipe-to-shell line, or a package name from one of the session's last 200 tool calls. Only text from
+outside the person's control counts: a web fetch or search, or an MCP tool result, which includes
+acorn's own issue and pull request tools. A file the agent read or a command's output doesn't count.
+A full URL, a pipe-to-shell line, or a package name wins over a host alone.
+
+A match adds `origin: { toolCallId, toolTitle, match, callsAgo }` to the request, and the card draws
+one muted line under its title, such as "`https://get.example.sh` appears in the result of "Fetch
+issue 12", 3 calls earlier." This runs for a harness's own request and for a plugin's ask through a
+[harness bridge](./loop-hooks.md). It changes nothing else: the hook payload doesn't carry it, and it
+blocks nothing. `plugins/agents/src/server/sessions/commandOrigin.ts` holds the match.
+
 ## What it doesn't do
 
 - **It sees only what the harness asks about.** A session in a bypass mode, a tool the harness's own

@@ -240,6 +240,12 @@ export class ManagedAgentRuntime {
         session: (sessionId) => this.store.getSession(sessionId),
         turn: (turnId) => this.store.turn(turnId),
         taskRoot: (taskId) => this.core.tasks.requireRoot(taskId),
+        blockedKeys: async (text, folder) => {
+          const { secretPublication, knownValues } = this.core
+          if (!secretPublication || !knownValues || !(await secretPublication.enabled())) return []
+          return (await knownValues.matcher(folder)).lookup(text).matches
+        },
+        recentToolCalls: (sessionId, limit) => this.store.recentToolCalls(sessionId, limit),
         live: (sessionId) => this.engine.currentSession(sessionId),
         materialize: (sessionId, turnId, event) => this.engine.materialize(sessionId, turnId, event),
         accept: (pending) => this.engine.acceptProviderEvent(pending),

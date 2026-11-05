@@ -16,6 +16,8 @@ import { createProjectService, type CompiledProjectService, type ProjectService 
 import { createTelemetryService, type TelemetryService } from './telemetry'
 import { verifyAgentToolProvenance } from '../agentTools/provenance'
 import type { SecretPublicationGate } from '../secretChecks/gate'
+import type { KnownValueMatch } from '@acorn/protocol/secretChecks.ts'
+import type { KnownValueMatcher } from '../secretChecks/knownValues'
 import { createCheckoutAdmission, registerCheckoutAdmission, type CheckoutAdmission } from './checkoutAdmission'
 import { getProject } from '../projects/projects'
 import type { CapabilityRegistry } from '../pluginHost/capabilities'
@@ -105,6 +107,18 @@ export type CompiledCoreServices = Omit<CoreServices, 'tasks' | 'projects' | 'mo
   nodeKeys: { snapshot(): NodeKeyCustody }
   /** The optional secret publication gate. Loaded plugins receive no grant for it. */
   secretPublication?: SecretPublicationGate
+  /** The Node's index of known key values. Loaded plugins receive no grant for it. */
+  knownValues?: {
+    /** The known keys a tool call's input carried. A match writes the `secrets.agent.carried` audit row. */
+    carried(input: {
+      sessionId: string
+      toolCallId: string
+      folder: string | null
+      text: string
+    }): Promise<KnownValueMatch[]>
+    /** The keys that count for `folder`, for a check that blocks. Writes no audit row. */
+    matcher(folder: string | null): Promise<KnownValueMatcher>
+  }
   checkoutAdmission: CheckoutAdmission
   /** Serializes repository metadata writes with task branch reservations for the same Git object store. */
   repositoryMetadata: {
@@ -202,6 +216,14 @@ export function createCoreServices(options: {
       enabled: async () => (await secretGate()).enabled(),
       admit: async (input) => (await secretGate()).admit(input),
     },
+    // Loaded on the first tool call with input, for the same reason.
+    knownValues: {
+      carried: async (input) => {
+        const { auditCarriedKeys, knownValueIndex } = await import('../secretChecks/knownValues')
+        return auditCarriedKeys(options.db, knownValueIndex(), input)
+      },
+      matcher: async (folder) => (await import('../secretChecks/knownValues')).knownValueIndex().matcher(folder),
+    },
     identity,
     projects,
     telemetry: createTelemetryService(),
@@ -230,3 +252,4 @@ export type { TaskRef } from '../worktrees/taskWorktree'
 
 export type { GenerateTextRequest, ModelService } from './models'
 export type { DataColumn, DataTable } from './data'
+export type { KnownValueMatcher } from '../secretChecks/knownValues'

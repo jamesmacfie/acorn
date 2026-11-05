@@ -9,11 +9,12 @@ import { ownerId } from '../../middleware/requireUser'
 import { respondError } from '../../respond'
 import { SECRET_DETECTOR_VERSION } from '../../secretChecks/detector'
 import { allowSecretPublication, secretPublicationDecisions } from '../../secretChecks/gate'
+import { knownValueIndex } from '../../secretChecks/knownValues'
 
-// Settings → Security and backup: the blocking switch and the refused operations waiting for the
-// owner (docs/security/secret-publication.md § Policy). Mounted lazily under /security in
-// ../../index.ts, so the device-only gate there covers every verb: a task, service, or plugin-frame
-// caller can neither change the policy nor allow an exception.
+// Settings → Security and backup: the blocking switch, the refused operations waiting for the owner,
+// and the keys Acorn knows about (docs/security/secret-publication.md § Policy). Mounted lazily under
+// /security in ../../index.ts, so the device-only gate there covers every verb: a task, service, or
+// plugin-frame caller can neither change the policy nor allow an exception.
 
 const blockBody = z.object({ block: z.boolean() })
 const allowBody = z.object({ decisionId: z.string().regex(/^[a-f0-9]{64}$/) })
@@ -22,6 +23,8 @@ const state = async (db: ReturnType<typeof getDb>, userId: string): Promise<Secr
   block: (await createPrefService(db).read(userId, SECRET_PUBLICATION_PREF_KEY)) === 'true',
   detectorVersion: SECRET_DETECTOR_VERSION,
   decisions: secretPublicationDecisions(),
+  // Names and sources only. The index never hands out a value.
+  knownKeys: await knownValueIndex().sources(),
 })
 
 export async function readSecretPublication(c: Context<AppEnv>): Promise<Response> {

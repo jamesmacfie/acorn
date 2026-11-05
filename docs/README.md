@@ -62,6 +62,7 @@ the whole plugin system in one page.
 | [security/renderer.md](./security/renderer.md) | The renderer CSP, the HTML and markdown sinks, and untrusted provider and authoring input. |
 | [security/webviews.md](./security/webviews.md) | Host-owned webviews, the preview pane's remote refusal, and agent browser tools. |
 | [security/secret-publication.md](./security/secret-publication.md) | The local secret detector, the optional publication gate, one-operation allowances, and coverage limits. |
+| [security/known-key-values.md](./security/known-key-values.md) | The index of key values on this machine, the tool card warning, the Claude Code bridge refusal, and the Git `known-value` rule. |
 | [security/audit.md](./security/audit.md) | The audit trail, plugin audit verbs, on-disk permissions, and backups. |
 | [node-enrollment.md](./node-enrollment.md) | How a provisioned node introduces itself to a control plane, and the versioned protocol it speaks. |
 | [security/node-plugin-security.md](./security/node-plugin-security.md) | The owner of plugin security: the threat model, the containment ladder, and the summary table. |

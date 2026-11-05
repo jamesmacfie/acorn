@@ -1,9 +1,10 @@
 # Secret checks before publication
 
 Acorn checks for credential-shaped text before four operations it owns: a commit, a push, a
-transcript export, and an agent message that carries attachments. This page covers the detector, the
-optional gate, what each check reads, and what it leaves out. Read it before you change one of those
-operations or add another Acorn-owned upload.
+transcript export, and an agent message that carries attachments. It also looks for the values of
+keys stored on this machine in commits, pushes, and agent tool calls. This page covers the detector,
+the known key index, the optional gate, what each check reads, and what it leaves out. Read it before
+you change one of those operations or add another Acorn-owned upload.
 
 Logging redaction does not remove a token from Git history or an exported file. These checks run at
 the operation that publishes the bytes, against the bytes that operation consumes.
@@ -39,6 +40,13 @@ header in the fixtures, has no confidence tiers, and puts the matched value in e
 rule has a fixture in `detector.test.ts`. The fixtures are assembled at runtime, so no token literal
 sits in the repository.
 
+## Known key index
+
+A database password or an internal API key has no documented prefix, so the detector can't see it.
+The known key index finds those by the values stored in this task's env files, a few home folder
+files, and the Node's environment. [Known key values](./known-key-values.md) covers what it reads,
+what it keeps, and where it runs. The Git checks below use it, and so do agent tool calls.
+
 ## Policy
 
 **Check for secrets** in Changes works whether blocking is on or off. It reports and never admits.
@@ -56,7 +64,8 @@ With blocking on, `ctx.core.secretPublication.admit` decides each operation:
 - Heuristic findings alone pass.
 
 A refusal records a decision in core, in memory, for ten minutes. The decision binds the operation,
-its destination, the content digest, and the detector version. The device allows it once through
+its destination, the content digest, and the detector version. A Git digest also binds the known key
+version. The device allows it once through
 `POST /v1/core/security/secret-publication/allow`. The next matching attempt spends the allowance.
 Changed content, a different destination or operation, a new detector version, or expiry each
 needs another decision. Core keeps at most 50 decisions. A restart forgets them, which only asks
@@ -75,8 +84,8 @@ objects, never the disk, and loads only while blocking is on or when you press a
 A commit check reads the blobs the next commit adds over its parent. The parent is HEAD, or HEAD's
 parent for an amend, so an amend covers the whole final tree. Without `-a`, the tree is the index from
 `git write-tree`. With `-a`, Acorn copies the index file, runs `git add -u` against the copy, and reads
-that tree. The real index is untouched. The digest binds the tree, the parent, the branch, and every
-commit option.
+that tree. The real index is untouched. The digest binds the tree, the parent, the branch, every
+commit option, and the known key version.
 
 Acorn serializes its own stage, unstage, discard, and commit calls per worktree. Before the commit,
 it reads the tree again and refuses if it moved. After the commit, it compares the tree Git recorded
@@ -102,8 +111,15 @@ The Git checks have these bounds:
 - Binary blobs are scanned too, so a NUL byte can't hide an ASCII token beside it.
 - Objects are read from `git cat-file --batch` byte for byte and cut at the size in each header, so a
   line in a file that imitates a header can't hide text from the scan.
-- Results are cached by blob ID and detector version, with positions and rule IDs only. The cache
-  holds up to 20,000 blobs.
+- Results are cached by blob ID, detector version, and known key version, with positions, rule IDs,
+  and key names only. The cache holds up to 20,000 blobs. A key added to `.env` changes the version,
+  so blobs already in the cache are checked again.
+
+Both checks also look up each line of every blob, and each tag message, in the known key index for
+the worktree. A line that carries a known value is a high-confidence `known-value` finding that names
+the key, so with blocking on it refuses the commit or push: "`known-value (DB_PASSWORD) at
+config.ts:3`". The one-time allowance in Settings works on it like any other finding. A single line
+longer than 2 MiB is unscanned, which makes the check incomplete.
 
 A Git process outside Acorn can still change the index or move HEAD between the last check and the
 command. Git has no transaction that covers both, so Acorn narrows the window and doesn't close it.
@@ -129,22 +145,35 @@ needs an allowance. A refused turn fails with the reason. After you allow it, us
 The attachment check does not read the message text. Uploading an attachment is not publication, so
 the upload route doesn't check it.
 
+### Known keys in tool calls
+
+Every agent tool call's input is looked up in the known key index when the event store saves it, and
+its tool card warns on a match. With blocking on, a Claude Code command, fetch, or MCP call that
+carries a known value is refused before it runs. See
+[known key values](./known-key-values.md#where-it-runs).
+
 ## Audit
 
 A refusal writes `secrets.publication.blocked` and an allowance writes `secrets.publication.allowed`.
-Their details hold the decision, the counts, the rule IDs, and the decision ID. Remote URLs lose their
+Their details hold the decision, the counts, the rule IDs, and the decision ID. A tool call whose
+input carried a known key writes `secrets.agent.carried`, with the session as the subject and the
+tool call ID and key names as details. Remote URLs lose their
 user and token before core stores or shows a destination. No report, error, log, audit row, or cache
-entry holds a matched value.
+entry holds a matched value. No stored tool call, wire event, or finding holds a known key's value,
+only its name and source.
 
 ## Coverage and limits
 
 The checks cover Acorn's Changes commit and push, the agent transcript export, and agent messages with
-attachments. Any other Acorn-owned upload or share action needs its own admission point and a line in
-this list.
+attachments. Known key values are also looked for in agent tool call input on every harness, and
+refused before the call on Claude Code with blocking on. Any other Acorn-owned upload or share action
+needs its own admission point and a line in this list.
 
 These paths stay outside coverage:
 
-- Git, curl, or uploads run in a terminal or by an agent's own tools.
+- Git, curl, or uploads run in a terminal. An agent's own tools are covered only for known key
+  values, and only by value: the shape rules don't run on tool calls.
+- A known key passed by reference or read by a script.
 - Other MCP servers, browser form uploads, filesystem copies, and other apps.
 - Files an agent reads itself during a turn, and the text of a message.
 - Provider-generated artifacts, until an Acorn-owned action publishes them.

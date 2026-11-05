@@ -394,6 +394,10 @@ const agentSnapshot = () =>
               title: 'Read src/login.ts',
               status: 'completed',
               output: 'export async function signIn(',
+              // Behind a flag for the same reason as the request's origin below.
+              ...(process.env.ACORN_FIXTURE_CARRIED_KEYS
+                ? { secretValues: [{ name: 'STRIPE_SECRET_KEY', source: '.env.local' }] }
+                : {}),
             },
           }),
           ...agentWebActivity(),
@@ -429,6 +433,10 @@ const agentSnapshot = () =>
                 { id: 'allow', label: 'Allow' },
                 { id: 'deny', label: 'Deny' },
               ],
+              // Behind a flag like the web call: one more line on this card pushes a menu off the screen.
+              ...(process.env.ACORN_FIXTURE_REQUEST_ORIGIN
+                ? { origin: { toolCallId: 'tool-2', toolTitle: 'Search web', match: 'docs.example', callsAgo: 2 } }
+                : {}),
             },
             resolution: null,
             expiresAt: null,

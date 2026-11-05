@@ -116,6 +116,7 @@ export type {
   DataColumn,
   DataTable,
   GenerateTextRequest,
+  KnownValueMatcher,
   ProjectRef,
   TaskRef,
 } from '@acorn/node-core/server/core/index.ts'

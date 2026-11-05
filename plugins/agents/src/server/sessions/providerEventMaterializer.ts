@@ -1,10 +1,12 @@
-import type { AgentNormalizedEvent } from '../../contract/wire.ts'
+import type { KnownValueMatch } from '@acorn/protocol/secretChecks.ts'
+import type { AgentNormalizedEvent, AgentToolCall } from '../../contract/wire.ts'
 import type { AgentDriverEvent } from '../drivers/types'
 import type { AgentArtifactStore } from './artifactStore'
 import { boundProviderEvent } from './boundProviderEvent'
 
 const MAX_INLINE_TOOL_BYTES = 64 * 1024
 const MAX_GENERATED_ARTIFACT_BYTES = 16 * 1024 * 1024
+const MAX_CHECKED_CALLS = 1_000
 
 const boundedMediaType = (value: string): string => {
   const mediaType = value.trim().slice(0, 200)
@@ -18,14 +20,20 @@ const boundedMediaType = (value: string): string => {
  */
 export class ProviderEventMaterializer {
   readonly #toolOutputBytes = new Map<string, number>()
+  // Calls whose input was already looked up. Codex repeats a call's input when it completes, and
+  // one lookup and one audit row per call is enough: the fold keeps the first answer.
+  readonly #checkedCalls = new Set<string>()
 
   constructor(
     private readonly artifacts: AgentArtifactStore,
     private readonly secretValues: string[],
+    // The known key values a call's input carried. Advisory: it fails open to none.
+    private readonly carriedKeys: (sessionId: string, tool: AgentToolCall) => Promise<KnownValueMatch[]>,
   ) {}
 
   clear(): void {
     this.#toolOutputBytes.clear()
+    this.#checkedCalls.clear()
   }
 
   async map(
@@ -77,6 +85,14 @@ export class ProviderEventMaterializer {
     )
     if (event.type === 'tool') {
       const key = `${sessionId}:${turnId ?? 'session'}:${event.tool.id}`
+      // Before an oversized input moves to an artifact, so the lookup reads the whole of it.
+      if (event.tool.input && !this.#checkedCalls.has(key)) {
+        this.#checkedCalls.add(key)
+        if (this.#checkedCalls.size > MAX_CHECKED_CALLS)
+          this.#checkedCalls.delete(this.#checkedCalls.values().next().value!)
+        const secretValues = await this.carriedKeys(sessionId, event.tool)
+        if (secretValues.length) event.tool = { ...event.tool, secretValues }
+      }
       if (event.tool.outputAppend && event.tool.output != null) {
         const used = this.#toolOutputBytes.get(key) ?? 0
         const bytes = Buffer.byteLength(event.tool.output, 'utf8')

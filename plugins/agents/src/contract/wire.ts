@@ -1,4 +1,5 @@
 import type { AgentContextSnapshot } from '@acorn/protocol/agentContext.ts'
+import type { KnownValueMatch } from '@acorn/protocol/secretChecks.ts'
 import type { InlineDiffOrigin } from './inlineDiff.ts'
 
 export const AGENT_EVENT_SCHEMA_VERSION = 1
@@ -244,6 +245,10 @@ export type AgentAppApproval = {
  *  host stamped on the verdict, never a value the handler chose. `reason` is capped display text. */
 export type AgentRequestBlocked = { by: string; reason: string }
 
+/** The earlier web fetch, web search, or MCP result a permission request's command repeats `match`
+ *  from, `callsAgo` tool calls before it. Display only (`commandOrigin`). */
+export type AgentRequestOrigin = { toolCallId: string; toolTitle: string; match: string; callsAgo: number }
+
 export type AgentQuestion = {
   id: string
   header?: string
@@ -323,6 +328,9 @@ export type AgentToolCall = {
    *  rather than replacing them: a renderer that has never heard of it still has the request and the
    *  provider's own text to draw. */
   web?: AgentWebActivity
+  /** The keys on this machine whose values the call's input carried, by name and source. The event
+   *  store sets it when it saves the call. Never a value. */
+  secretValues?: KnownValueMatch[]
 }
 
 export type AgentSubagentStatus = 'pending' | 'running' | 'idle' | 'completed' | 'failed'
@@ -418,6 +426,7 @@ export type AgentNormalizedEvent =
       questions?: AgentQuestion[]
       approval?: AgentAppApproval
       blocked?: AgentRequestBlocked
+      origin?: AgentRequestOrigin
     }
   | { type: 'request_resolved'; requestId: string; resolution: unknown }
   | {

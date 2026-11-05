@@ -6,6 +6,7 @@ import { formFactor } from '@acorn/plugin-api/client'
 import { Slot } from '@acorn/plugin-api/ui/host'
 import { managedAgentApi } from './managedClient'
 import { appApprovalOf, approvalScopeNote, approvalTarget } from '../../contract/appApproval.ts'
+import { originLine, requestOriginOf } from './requestOrigin'
 
 // A question the harness is blocked on: a permission, a choice, a form. Drawn in the transcript at the
 // point the agent asked, by the card for its own `request` event (`AgentEventCard`), so that
@@ -81,6 +82,13 @@ export default function AgentRequestCard(props: {
         <Heading level={3} eyebrow={props.request.kind.replace('_', ' ')}>
           {props.request.title}
         </Heading>
+        <Show when={requestOriginOf(payload().origin)}>
+          {(origin) => (
+            <Text emphasis="muted" wrap>
+              {originLine(origin())}
+            </Text>
+          )}
+        </Show>
         <Show when={props.request.status === 'resolving'}>
           <Text emphasis="muted" wrap>
             Response sent; waiting for the provider to acknowledge it…

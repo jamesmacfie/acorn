@@ -81,10 +81,11 @@ export const CHANGES_HOOKS = [
 // host around it, and absent means nobody objects, which is also what an empty chain means.
 //
 // `secretPublication` is core's optional gate (docs/security/secret-publication.md). Absent or off,
-// commit and push run with no check and no added latency.
+// commit and push run with no check and no added latency. `knownValues` is core's index of key values
+// on this machine, which the check also looks for.
 export function localGitBridge(
   core: Pick<CoreServices, 'tasks' | 'models'> &
-    Pick<CompiledCoreServices, 'checkoutAdmission' | 'secretPublication'> &
+    Pick<CompiledCoreServices, 'checkoutAdmission' | 'secretPublication' | 'knownValues'> &
     Partial<Pick<CoreServices, 'prefs' | 'identity'>>,
   /** `ctx.events.worktreeStatus`: a stage, a commit, a discard or a remote verb moved the dirty
    *  markers, or the counts the branch bar draws beside them. */
@@ -172,7 +173,7 @@ export function localGitBridge(
         if (!gate || !(await gate.enabled())) return commitStaged(root, finalMessage, options)
         // Immediately before the commit and after the optional hook, so an allowance cannot outlive a
         // veto. Loaded only while blocking is on.
-        return (await import('./secretCheck')).gatedCommit(root, branch, finalMessage, options, gate)
+        return (await import('./secretCheck')).gatedCommit(root, branch, finalMessage, options, gate, core.knownValues)
       }),
     stageAll: (taskId) => withIndex(taskId, stageAll),
     unstageAll: (taskId) => withIndex(taskId, unstageAll),
@@ -218,11 +219,11 @@ export function localGitBridge(
         if (verdict && !verdict.ok) return { ok: false, reason: `${verdict.by}: ${verdict.reason}` }
         const gate = core.secretPublication
         if (!gate || !(await gate.enabled())) return pushBranch(root, options)
-        return (await import('./secretCheck')).gatedPush(root, branch, options, gate)
+        return (await import('./secretCheck')).gatedPush(root, branch, options, gate, core.knownValues)
       }),
     // The same checks, run on request with blocking off or on. Reports only; nothing is admitted.
     secretCheck: async (taskId, operation) =>
-      (await import('./secretCheck')).manualSecretCheck(await rootOf(taskId), operation),
+      (await import('./secretCheck')).manualSecretCheck(await rootOf(taskId), operation, core.knownValues),
     // Which operation to abort is read off the tree here, not taken from the caller: `merge` and
     // `rebase` are argv, and the panel only offers Abort while its own status read says one is in
     // flight. A request that arrives after somebody finished the rebase in a terminal is refused

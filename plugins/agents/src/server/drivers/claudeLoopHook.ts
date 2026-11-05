@@ -17,7 +17,14 @@ const KINDS: Record<string, AgentPermissionSubject['kind']> = {
   WebSearch: 'fetch',
 }
 
-export type ClaudeToolSubject = AgentPermissionSubject & { toolName: string; title: string }
+export type ClaudeToolSubject = AgentPermissionSubject & {
+  toolName: string
+  title: string
+  /** An MCP server's tool, which Claude names `mcp__<server>__<tool>`. */
+  mcp: boolean
+  /** The tool's whole input as JSON, for the known key check. Never handed to a plugin. */
+  input: string
+}
 
 const text = (value: unknown): string => (typeof value === 'string' ? value : '')
 
@@ -38,6 +45,8 @@ export function claudeToolSubject(input: unknown): ClaudeToolSubject | null {
     title: command || paths[0] || text(tool.url) || toolName,
     command,
     paths,
+    mcp: toolName.startsWith('mcp__'),
+    input: JSON.stringify(tool),
   }
 }
 
