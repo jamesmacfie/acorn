@@ -1,10 +1,10 @@
-// The known key index (docs/future/agent-command-checks.md § The index). It reads the key files on
+// The known key index (docs/security/known-key-values.md § The index). It reads the key files on
 // this machine and keeps a salted hash of each value worth matching, so a lookup can say a text
 // carried the value of `STRIPE_SECRET_KEY` from `.env.local` without the value staying anywhere.
 //
 // In memory, with a salt drawn at each Node start: the Node keeps running, so nothing here needs to
 // outlive it, and a hash on disk would be a guessable copy of a short key. A value lives only inside
-// `keysOf` while it is hashed. The extraction rules follow Stroq's secrets/extract.ts, trimmed.
+// `keysOf` while it is hashed. The extraction rules follow Stroq's `SECRET_NAME` and `EXCLUDED_NAME`, trimmed.
 import { createHash, randomBytes } from 'node:crypto'
 import { readdir, readFile, stat } from 'node:fs/promises'
 import { homedir } from 'node:os'
@@ -70,9 +70,19 @@ type KnownValueLookup = {
   truncated: boolean
 }
 
+/** The keys that count for one folder, as they were when it was made. */
+export type KnownValueMatcher = {
+  /** Changes whenever the keys or their names change, so a cache or an allowance bound to it ends
+   *  when a key is added to `.env`. A hash over salted hashes, so it changes at each Node start too. */
+  version: string
+  lookup(text: string): KnownValueLookup
+}
+
 export type KnownValueIndex = {
-  /** Every known key whose value appears in `text`. `folder` is the task folder whose env files
-   *  count. The home folder files and the environment always count. */
+  /** The keys that count for `folder`: its env files, the home folder files, and the environment.
+   *  Reads each source once, so one matcher can check many texts. */
+  matcher(folder: string | null): Promise<KnownValueMatcher>
+  /** Every known key whose value appears in `text`, for the keys that count for `folder`. */
   lookup(text: string, folder: string | null): Promise<KnownValueLookup>
   /** Every source with a kept key, for Settings: the task folders looked up so far, the home folder
    *  files, and the environment. Names only. */
@@ -227,26 +237,38 @@ export function createKnownValueIndex(options: { home: string; env: NodeJS.Proce
   const environmentSource = () =>
     (environment ??= { source: ENVIRONMENT, folder: null, keys: keysOf(environmentKeys(options.env)) })
 
-  return {
-    async lookup(text, folder) {
-      if (folder) {
-        folders.delete(folder)
-        folders.add(folder)
-        if (folders.size > MAX_FOLDERS) folders.delete(folders.values().next().value!)
-      }
-      const sources = [...(folder ? await folderSources(folder) : []), ...(await homeSources()), environmentSource()]
-      const truncated = text.length > MAX_SCAN_CHARS
-      if (!sources.some((source) => source.keys.size)) return { matches: [], truncated }
-      const matches = new Map<string, KnownValueMatch>()
-      for (const candidate of candidates(text)) {
-        const candidateHash = hash(candidate)
-        for (const { source, keys } of sources) {
-          const name = keys.get(candidateHash)
-          if (name) matches.set(`${name}\n${source}`, { name, source })
+  async function matcher(folder: string | null): Promise<KnownValueMatcher> {
+    if (folder) {
+      folders.delete(folder)
+      folders.add(folder)
+      if (folders.size > MAX_FOLDERS) folders.delete(folders.values().next().value!)
+    }
+    const sources = [...(folder ? await folderSources(folder) : []), ...(await homeSources()), environmentSource()]
+    const entries = sources.map(({ source, keys }) => [source, [...keys].sort(([a], [b]) => (a < b ? -1 : 1))])
+    const version = createHash('sha256').update(JSON.stringify(entries)).digest('hex').slice(0, 32)
+    const empty = !sources.some((source) => source.keys.size)
+    return {
+      version,
+      lookup(text) {
+        // With no keys, nothing past the limit went unchecked.
+        if (empty) return { matches: [], truncated: false }
+        const truncated = text.length > MAX_SCAN_CHARS
+        const matches = new Map<string, KnownValueMatch>()
+        for (const candidate of candidates(text)) {
+          const candidateHash = hash(candidate)
+          for (const { source, keys } of sources) {
+            const name = keys.get(candidateHash)
+            if (name) matches.set(`${name}\n${source}`, { name, source })
+          }
         }
-      }
-      return { matches: [...matches.values()], truncated }
-    },
+        return { matches: [...matches.values()], truncated }
+      },
+    }
+  }
+
+  return {
+    matcher,
+    lookup: async (text, folder) => (await matcher(folder)).lookup(text),
 
     async sources() {
       const project = (await Promise.all([...folders].reverse().map(folderSources))).flat()

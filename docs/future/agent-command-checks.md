@@ -1,5 +1,70 @@
 # Known key values and command origins in agent sessions
 
+## Phase 3 completion note
+
+November 6, 2026. Phase 3, blocking, landed. All three phases are done.
+
+What landed:
+
+- `KnownValueIndex.matcher(folder)` in `knownValues.ts`. It reads a folder's sources once and returns
+  `{ version, lookup(text) }`. `lookup(text, folder)` is now a call through it. The version is a
+  SHA-256 over each source's label, salted hashes, and names, so it changes when a key is added,
+  removed, or renamed, and at each Node start.
+- `matcher(folder)` on the `knownValues` core facet, beside `carried`. It writes no audit row.
+  `KnownValueMatcher` is a type export of `core/index.ts` and `@acorn/plugin-api/node`.
+- The bridge check in `answerLoopHook`. It runs on `PreToolUse` before any plugin handler, through a
+  `blockedKeys(text, folder)` port that returns nothing while blocking is off. It looks up the tool's
+  whole input, which `claudeToolSubject` now carries as `input`, with an `mcp` flag beside it. A
+  match on a `command` or `fetch` kind, or on an MCP tool, is a deny with the agreed text. An edit, a
+  read, and any other tool get no decision.
+- The install condition in `ManagedAgentEngine`: the before-tool bridge installs when a point has a
+  handler, or when blocking is on and the facet exists.
+- The Git `known-value` rule in `secretCheck.ts`, for commit and push blobs and for pushed tag
+  messages. The blob cache key and both Git digests include the matcher's version.
+- `name?` on `SecretFinding`, and `describeSecretRefusal` prints it: "known-value (DB_PASSWORD) at
+  config.ts:3". The one-time allowance needs no change.
+- Docs: `docs/security/known-key-values.md` (new), pointers and the Git rule in
+  `secret-publication.md`, the install condition in `loop-hooks.md`, the audit line in
+  `docs/security/audit.md`, and an entry in `docs/README.md`.
+
+Decisions and deviations:
+
+- The index isn't exported through `@acorn/plugin-api/node`. The Git check and the bridge reach it
+  through the facet, so node-core needs no new entry point.
+- The version goes into the Git report's `digest`, which the gate's decision ID already hashes,
+  rather than into the gate itself. Only Git publishes with known keys, and the gate stays generic.
+  The digest of an incomplete check leaves the version out, because no keys were checked.
+- Git looks up each line, not each blob, so a finding has a line number and a lockfile over 2 MiB
+  isn't cut short. The column is always 1. A single line over 2 MiB is unscanned, which makes the
+  check incomplete and blocks with the switch on. A minified bundle on one line hits this.
+- A lookup with no keys at all now reports `truncated: false`, since nothing went unchecked.
+- The bridge names every match in one refusal, separated by commas, so the model fixes them in one
+  attempt.
+- A bridge refusal writes no audit row of its own. The event store's `secrets.agent.carried` row
+  covers the call when the harness reports it. I didn't confirm that Claude's ACP adapter reports a
+  call its hook denied.
+- `secret-publication.md` would have run to 219 lines against the 200-line cap, so the index, the
+  tool card warning, the bridge refusal, and the Settings list moved to `known-key-values.md`. Two
+  code comments cite it instead of this plan.
+- A Phase 2 comment in `knownValues.ts` named Stroq's `secrets/extract.ts`. The comment path check
+  fails on it in a checkout without `references/Stroq`, so it names the two patterns instead.
+
+Left over:
+
+- The Node service size check is 1,946,645 bytes against its 1,944,000 ceiling. This phase adds 320
+  bytes, in the engine's install condition, the runtime's port, and the core facet. I didn't raise
+  the ceiling.
+- Five site pages cite the changed docs and weren't updated:
+  `security/credentials-and-secrets.md`, `security/the-audit-log.md`,
+  `security/what-acorn-doesnt-protect-against.md`, `settings/machines.md`, and
+  `build-plugins/node/act-on-agent-turns-with-hooks.mdx`. `pnpm --filter @acorn/site stale` lists them.
+- I didn't walk the acceptance scenarios in `pnpm dev:agent`: the Claude Code and Codex sessions, the
+  commit allowed once from Settings, and the grep of `agent_events`, the audit table, and the Node log.
+  Unit tests cover each path with values built at runtime.
+- The Changes pane lists a `known-value` finding by rule and line, without the key name. The refusal
+  message names it.
+- Turning blocking on reaches a running Claude Code session after its next resume, like a new handler.
+
 ## Phase 2 completion note
 
 November 6, 2026. Phase 2, the index and the after-the-fact warning, landed. Phase 3 isn't started.

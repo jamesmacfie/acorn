@@ -1,5 +1,6 @@
 // Secret checks for the two Git operations Changes publishes through (docs/security/secret-publication.md
-// § Git). Git selection lives here; the detector and the gate are core's (@acorn/plugin-api/node).
+// § Git). Git selection lives here; the detector, the known key index, and the gate are core's
+// (@acorn/plugin-api/node, `ctx.core.knownValues`).
 // `localGitBridge` loads this module only while blocking is on, or for a check the owner asked for.
 //
 // Both checks read Git objects, never the disk: a commit takes the index, and a push takes whatever
@@ -17,6 +18,8 @@ import {
   scanSecretText,
   SECRET_DETECTOR_VERSION,
   secretReport,
+  type CompiledCoreServices,
+  type KnownValueMatcher,
   type SecretPublicationGate,
 } from '@acorn/plugin-api/node'
 import type {
@@ -41,14 +44,38 @@ const MAX_TAGS = 200
 
 export type GitSecretCheck = { destination: string; report: SecretCheckReport }
 
-// Per blob id and detector version: positions and rule ids only, never a value or a line. A blob is
-// immutable, so a result never goes stale; the bound keeps the map from growing with history.
+/** Core's index of key values on this machine. Absent in a host without one. */
+type KnownValues = CompiledCoreServices['knownValues']
+
+// Per blob id, detector version, and known key version: positions, rule ids, and key names only,
+// never a value or a line. A blob is immutable, so a result goes stale only when a version changes;
+// the bound keeps the map from growing with history.
 const CACHE_LIMIT = 20_000
-type CachedBlob = { findings: Omit<SecretFinding, 'location'>[] }
+type CachedBlob = { findings: Omit<SecretFinding, 'location'>[]; unscanned?: string }
 const blobCache = new Map<string, CachedBlob>()
-const remember = (id: string, result: CachedBlob) => {
-  blobCache.set(`${SECRET_DETECTOR_VERSION}:${id}`, result)
+const cacheKey = (id: string, keys: KnownValueMatcher | null) =>
+  `${SECRET_DETECTOR_VERSION}:${keys?.version ?? ''}:${id}`
+const remember = (key: string, result: CachedBlob) => {
+  blobCache.set(key, result)
   if (blobCache.size > CACHE_LIMIT) blobCache.delete(blobCache.keys().next().value!)
+}
+
+/** The detector's findings in one text and, with `keys`, a high-confidence `known-value` finding on
+ *  each line that carries a known key's value. Line by line, so the finding has a line and a long
+ *  file isn't cut at what one lookup reads. A single line past that is unscanned. */
+function scanText(body: string, keys: KnownValueMatcher | null): CachedBlob {
+  const findings: CachedBlob['findings'] = scanSecretText(body, '').map(
+    ({ location: _location, ...finding }) => finding,
+  )
+  let unscanned: string | undefined
+  if (keys)
+    body.split('\n').forEach((line, at) => {
+      const { matches, truncated } = keys.lookup(line)
+      if (truncated) unscanned = 'A line too long to check for known keys.'
+      for (const name of new Set(matches.map((match) => match.name)))
+        findings.push({ rule: 'known-value', confidence: 'high', line: at + 1, column: 1, name })
+    })
+  return unscanned ? { findings, unscanned } : { findings }
 }
 
 const sha256 = (value: unknown) => createHash('sha256').update(JSON.stringify(value)).digest('hex')
@@ -76,6 +103,7 @@ type Blob = { id: string; path: string }
 export async function scanBlobs(
   root: string,
   blobs: readonly Blob[],
+  keys: KnownValueMatcher | null,
   signal?: AbortSignal,
 ): Promise<{ findings: SecretFinding[]; unscanned: SecretUnscanned[]; stopped: boolean }> {
   const findings: SecretFinding[] = []
@@ -90,9 +118,10 @@ export async function scanBlobs(
   }
   const record = (blob: Blob, result: CachedBlob) => {
     for (const finding of result.findings) findings.push({ ...finding, location: blob.path })
+    if (result.unscanned) unscanned.push({ location: blob.path, reason: result.unscanned })
   }
   const pending = unique.filter((blob) => {
-    const cached = blobCache.get(`${SECRET_DETECTOR_VERSION}:${blob.id}`)
+    const cached = blobCache.get(cacheKey(blob.id, keys))
     if (cached) record(blob, cached)
     return !cached
   })
@@ -142,10 +171,8 @@ export async function scanBlobs(
       at = end + 1
       // Lossy UTF-8: tokens are ASCII and survive it, in text and binary content alike.
       const body = new TextDecoder().decode(Buffer.from(output.slice(header + 1, end), 'latin1'))
-      const result: CachedBlob = {
-        findings: scanSecretText(body, blob.path).map(({ location: _location, ...finding }) => finding),
-      }
-      remember(blob.id, result)
+      const result = scanText(body, keys)
+      remember(cacheKey(blob.id, keys), result)
       record(blob, result)
     }
     batch = []
@@ -235,6 +262,7 @@ export async function commitSecretCheck(
   root: string,
   branch: string,
   options: CommitOptions,
+  knownValues: KnownValues,
   recorded?: { tree: string; head: string | null },
   signal?: AbortSignal,
 ): Promise<GitSecretCheck & { tree: string | null }> {
@@ -249,6 +277,9 @@ export async function commitSecretCheck(
       ? ((head ? await optional(root, ['rev-parse', '--verify', '-q', `${head}^`]) : null) ?? EMPTY_TREE)
       : (head ?? EMPTY_TREE)
     const final = tree ?? (await commitTree(root, options))
+    const keys = (await knownValues?.matcher(root)) ?? null
+    // The key version binds an allowance to the keys it was checked against, so a key added to
+    // `.env` afterward is a new decision.
     const digest = sha256([
       'commit',
       final,
@@ -258,12 +289,13 @@ export async function commitSecretCheck(
       !!options.signoff,
       !!options.noVerify,
       branch,
+      keys?.version ?? null,
     ])
     const diff = await text(root, ['diff-tree', '-r', '-z', '--no-renames', base, final])
     return {
       destination,
       tree: final,
-      report: finish(digest, await scanBlobs(root, changedBlobs(diff), signal), limits),
+      report: finish(digest, await scanBlobs(root, changedBlobs(diff), keys, signal), limits),
     }
   } catch (error) {
     // Stable for the same tree state and options, so the owner can allow an incomplete check once.
@@ -291,6 +323,7 @@ export async function pushSecretCheck(
   root: string,
   branch: string,
   options: PushOptions,
+  knownValues: KnownValues,
   signal?: AbortSignal,
 ): Promise<GitSecretCheck & { head: string | null }> {
   const target = `refs/heads/${branch}`
@@ -345,7 +378,17 @@ export async function pushSecretCheck(
             .filter(([, id, ref]) => !advertised.some(([remoteId, remoteRef]) => remoteRef === ref && remoteId === id))
         : []
     if (tags.length > MAX_TAGS) throw new Error(`More than ${MAX_TAGS} annotated tags would be pushed.`)
-    const digest = sha256(['push', destination, head, expected, !!options.force, known, tags.map(([, id]) => id)])
+    const keys = (await knownValues?.matcher(root)) ?? null
+    const digest = sha256([
+      'push',
+      destination,
+      head,
+      expected,
+      !!options.force,
+      known,
+      tags.map(([, id]) => id),
+      keys?.version ?? null,
+    ])
     const objects = await text(root, ['rev-list', '--objects', '--stdin'], {
       stdin: [head, ...known.map((id) => `^${id}`)].join('\n') + '\n',
     })
@@ -353,9 +396,12 @@ export async function pushSecretCheck(
       const space = line.indexOf(' ')
       return space > 0 ? [{ id: line.slice(0, space), path: line.slice(space + 1) }] : []
     })
-    const scan = await scanBlobs(root, blobs, signal)
-    for (const [, id, ref] of tags)
-      scan.findings.push(...scanSecretText(await text(root, ['cat-file', 'tag', id]), ref))
+    const scan = await scanBlobs(root, blobs, keys, signal)
+    for (const [, id, ref] of tags) {
+      const tag = scanText(await text(root, ['cat-file', 'tag', id]), keys)
+      scan.findings.push(...tag.findings.map((finding) => ({ ...finding, location: ref })))
+      if (tag.unscanned) scan.unscanned.push({ location: ref, reason: tag.unscanned })
+    }
     return { destination, head, report: finish(digest, scan, limits) }
   } catch (error) {
     return {
@@ -387,8 +433,9 @@ export async function gatedCommit(
   message: string,
   options: CommitOptions,
   gate: SecretPublicationGate,
+  knownValues: KnownValues,
 ): Promise<GitActionResult> {
-  const checked = await commitSecretCheck(root, branch, options)
+  const checked = await commitSecretCheck(root, branch, options, knownValues)
   const refusal = await gate.admit({ operation: 'commit', destination: checked.destination, report: checked.report })
   if (refusal) return refused(refusal)
   if (checked.tree && checked.tree !== (await commitTree(root, options).catch(() => null))) {
@@ -403,7 +450,9 @@ export async function gatedCommit(
   const after = await headOf(root)
   const recorded = after ? await gitText(['rev-parse', `${after}^{tree}`], { cwd: root }).catch(() => null) : null
   if (recorded === checked.tree) return result
-  const final = recorded ? await commitSecretCheck(root, branch, options, { tree: recorded, head: before }) : null
+  const final = recorded
+    ? await commitSecretCheck(root, branch, options, knownValues, { tree: recorded, head: before })
+    : null
   const late = final
     ? await gate.admit({ operation: 'commit', destination: final.destination, report: final.report })
     : null
@@ -425,8 +474,9 @@ export async function gatedPush(
   branch: string,
   options: PushOptions,
   gate: SecretPublicationGate,
+  knownValues: KnownValues,
 ): Promise<GitActionResult> {
-  const checked = await pushSecretCheck(root, branch, options)
+  const checked = await pushSecretCheck(root, branch, options, knownValues)
   const refusal = await gate.admit({ operation: 'push', destination: checked.destination, report: checked.report })
   if (refusal) return refused(refusal)
   if (checked.head && checked.head !== (await headOf(root)))
@@ -436,13 +486,17 @@ export async function gatedPush(
 
 /** The check a commit or push would run, on request. The commit check follows the button: Commit
  *  staged when something is staged, Commit tracked otherwise. */
-export async function manualSecretCheck(root: string, operation: 'commit' | 'push'): Promise<GitSecretCheckResult> {
+export async function manualSecretCheck(
+  root: string,
+  operation: 'commit' | 'push',
+  knownValues: KnownValues,
+): Promise<GitSecretCheckResult> {
   const branch = await branchOf(root)
   const staged = (await git(['diff', '--cached', '--quiet'], { cwd: root, timeoutMs: 15_000 })).code === 1
   const { destination, report } =
     operation === 'commit'
-      ? await commitSecretCheck(root, branch, { all: !staged })
-      : await pushSecretCheck(root, branch, {})
+      ? await commitSecretCheck(root, branch, { all: !staged }, knownValues)
+      : await pushSecretCheck(root, branch, {}, knownValues)
   return { operation, destination, report }
 }
 

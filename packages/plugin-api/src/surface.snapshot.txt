@@ -272,6 +272,7 @@ node: HarnessRegistry
 node: HeadlessOpts
 node: HeadlessResult
 node: InternalEnvFactory
+node: KnownValueMatcher
 node: Launcher
 node: LayoutRecipe
 node: Logger

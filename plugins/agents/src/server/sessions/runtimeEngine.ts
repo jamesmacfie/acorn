@@ -332,18 +332,21 @@ export class ManagedAgentEngine {
             lastTold: session.config.skillIndex,
           }),
         skillsDelivered: (sessionId, report) => this.skillsDelivered(sessionId, report),
-        // Only the points somebody handles, read at every start and resume like the skills.
+        // Only the points somebody handles, read at every start and resume like the skills. The
+        // before-tool point also carries the known key check while blocking is on.
         loopHooks: async () => {
           const bridge = acornLoopHook()
-          if (!bridge || !this.hooks) return null
-          const [before, after] = await Promise.all(
-            [BEFORE_TOOL_HOOK.id, AFTER_TOOL_HOOK.id].map((id) => this.hooks!.handlers(id)),
-          )
-          if (!before!.length && !after!.length) return null
+          if (!bridge) return null
+          const [before, after] = this.hooks
+            ? await Promise.all([BEFORE_TOOL_HOOK.id, AFTER_TOOL_HOOK.id].map((id) => this.hooks!.handlers(id)))
+            : [[], []]
+          const blocking = !!this.core.knownValues && !!(await this.core.secretPublication?.enabled())
+          const beforeTool = before!.length > 0 || blocking
+          if (!beforeTool && !after!.length) return null
           return {
             command: bridge.command,
             args: [...bridge.args, LOOP_HOOK_ROUTE, LOOP_HOOK_VERSION],
-            beforeTool: before!.length > 0,
+            beforeTool,
             afterTool: after!.length > 0,
           }
         },
@@ -996,7 +999,7 @@ export class ManagedAgentEngine {
   }
 
   /** The known key values a tool call's input carried, looked up against its task folder's env files
-   *  (docs/future/agent-command-checks.md § Where it runs). Advisory, so a failure logs and finds none. */
+   *  (docs/security/known-key-values.md § Where it runs). Advisory, so a failure logs and finds none. */
   private async carriedKeys(sessionId: string, tool: AgentToolCall) {
     const knownValues = this.core.knownValues
     if (!knownValues || !tool.input) return []

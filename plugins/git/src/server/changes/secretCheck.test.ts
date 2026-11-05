@@ -12,12 +12,17 @@ import { changedBlobs } from './secretCheck'
 // The token is assembled at runtime and was never issued.
 const TOKEN = 'npm' + '_' + 'Q7r8S9t0U1v2W3x4Y5z6A7b8C9d0E1f2G3h4'
 const CLEAN = 'export const answer = 42\n'
+// A key with no provider prefix, which only the known key index can see.
+const KEY = ['Zq81Xw0p', 'Lm3Nk7Rt', 'Vb5Hc2Jd'].join('')
 
 let dir: string
 let origin: string
 let enabled: boolean
 let allowed: Set<string>
 let admitted: Array<{ operation: string; destination: string; report: SecretCheckReport }>
+// What the stand-in index knows: the key, or nothing, under a version the test moves.
+let knownKey: string | null
+let keyVersion: string
 
 // The gate's own rules are covered by core's gate tests.
 // This one refuses what the real gate refuses and allows a digest the test names.
@@ -40,6 +45,16 @@ const bridge = () =>
     models: {} as never,
     checkoutAdmission: {} as never,
     secretPublication: gate,
+    knownValues: {
+      carried: async () => [],
+      matcher: async () => ({
+        version: keyVersion,
+        lookup: (text: string) => ({
+          matches: knownKey && text.includes(knownKey) ? [{ name: 'STRIPE_SECRET_KEY', source: '.env.local' }] : [],
+          truncated: false,
+        }),
+      }),
+    },
   })
 const git = (...args: string[]) => execFileSync('git', args, { cwd: dir, encoding: 'utf8' }).trim()
 const write = (name: string, text: string) => writeFileSync(join(dir, name), text)
@@ -48,6 +63,8 @@ beforeEach(() => {
   enabled = true
   allowed = new Set()
   admitted = []
+  knownKey = KEY
+  keyVersion = 'v1'
   origin = mkdtempSync(join(tmpdir(), 'acorn-secret-origin-'))
   execFileSync('git', ['init', '-q', '--bare', '-b', 'main'], { cwd: origin })
   dir = mkdtempSync(join(tmpdir(), 'acorn-secret-work-'))
@@ -215,6 +232,48 @@ describe('manual check', () => {
     const report = await bridge().secretCheck('t', 'commit')
     expect(report.report.counts.high).toBe(1)
     expect(admitted).toEqual([])
+  })
+})
+
+describe('known key values', () => {
+  it('refuses a value the shape rules miss, names the key, and binds the allowance to the keys', async () => {
+    write('config.ts', `${CLEAN}const stripe = "${KEY}"\n`)
+    git('add', 'config.ts')
+    const refused = await bridge().commit('t', 'add key')
+    expect(refused).toMatchObject({ ok: false, secretCheck: { reason: 'findings' } })
+    expect(refused.reason).toContain('known-value (STRIPE_SECRET_KEY) at config.ts:2')
+    expect(JSON.stringify(refused)).not.toContain(KEY.slice(4))
+    const first = admitted.at(-1)!.report.digest
+
+    // An allowance made against other keys doesn't carry over.
+    allowed.add(first)
+    keyVersion = 'v2'
+    expect((await bridge().commit('t', 'add key')).ok).toBe(false)
+    expect(admitted.at(-1)!.report.digest).not.toBe(first)
+    allowed.add(admitted.at(-1)!.report.digest)
+    expect(await bridge().commit('t', 'add key')).toEqual({ ok: true })
+  })
+
+  it('checks a cached blob again when the keys change', async () => {
+    knownKey = null
+    keyVersion = 'none'
+    write('config.ts', `const stripe = "${KEY}"\n`)
+    git('add', 'config.ts')
+    expect((await bridge().secretCheck('t', 'commit')).report.counts.high).toBe(0)
+    knownKey = KEY
+    keyVersion = 'v1'
+    expect((await bridge().secretCheck('t', 'commit')).report.findings).toEqual([
+      { rule: 'known-value', confidence: 'high', location: 'config.ts', line: 1, column: 1, name: 'STRIPE_SECRET_KEY' },
+    ])
+  })
+
+  it('finds a key in a pushed tag message', async () => {
+    git('config', 'push.followTags', 'true')
+    write('b.ts', CLEAN)
+    git('add', 'b.ts')
+    git('commit', '-q', '-m', 'clean')
+    git('tag', '-a', 'v1', '-m', `deploy with ${KEY}`)
+    expect((await bridge().push('t')).reason).toMatch(/known-value \(STRIPE_SECRET_KEY\) at refs\/tags\/v1:\d+/)
   })
 })
 

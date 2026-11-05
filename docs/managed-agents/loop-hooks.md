@@ -95,6 +95,12 @@ At each start and resume, the lifecycle asks the hook registry which plugins han
 handler, so a session with no handler installs nothing and pays no process per tool call. A handler
 registered while a session runs reaches it after the session's next resume.
 
+The before-tool point is also installed while **Block publication with secret findings** is on, with
+or without a handler. Before any handler runs, the bridge looks up the tool's input in the known key
+index and denies a command, a fetch, or an MCP call that carries a key's value
+([known key values](../security/known-key-values.md#where-it-runs)). Like a handler,
+turning the switch on reaches a running session after its next resume.
+
 ### Claude Code
 
 Acorn adds command hooks to the flag settings it already sends in `claudeCode.options.settings`, beside

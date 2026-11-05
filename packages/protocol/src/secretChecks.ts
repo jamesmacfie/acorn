@@ -13,6 +13,8 @@ export type SecretFinding = {
   location: string
   line: number
   column: number
+  /** For a `known-value` finding, the name of the key whose value is there. Never the value. */
+  name?: string
 }
 
 /** Input the check could not read: a binary attachment, a blob over its size limit, a range Git

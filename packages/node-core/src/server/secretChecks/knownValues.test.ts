@@ -145,6 +145,23 @@ describe('createKnownValueIndex lookup', () => {
     expect(await known.lookup(`${pad(2 * 1024 * 1024)} ${A}`, task)).toEqual({ matches: [], truncated: true })
   })
 
+  it('says nothing went unchecked when it knows no keys', async () => {
+    expect(await index().lookup(`${' '.repeat(2 * 1024 * 1024)} ${A}`, null)).toEqual({ matches: [], truncated: false })
+  })
+
+  it('gives a matcher whose version changes with the keys and nothing else', async () => {
+    const known = index()
+    const first = await known.matcher(task)
+    expect(first.lookup(`echo ${A}`).matches).toEqual([{ name: 'STRIPE_SECRET_KEY', source: '.env.local' }])
+    expect((await known.matcher(task)).version).toBe(first.version)
+    write(task, 'notes.txt', `API_KEY=${C}`)
+    expect((await known.matcher(task)).version).toBe(first.version)
+    write(task, '.env', `API_KEY=${C}`)
+    expect((await known.matcher(task)).version).not.toBe(first.version)
+    expect((await known.matcher(null)).version).not.toBe(first.version)
+    expect(first.version).not.toContain(A.slice(4, 20))
+  })
+
   it('lists sources with names and never a value', async () => {
     const known = index({ API_TOKEN: F })
     await known.lookup('', task)

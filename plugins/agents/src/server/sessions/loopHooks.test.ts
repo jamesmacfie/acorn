@@ -241,6 +241,83 @@ describe('harness bridge calls', () => {
     await expect(runtime.loopHook(caller, pre())).resolves.toMatchObject({ output: '' })
   })
 
+  describe('the known key check', () => {
+    // Assembled at runtime, so no key literal sits in this file.
+    const VALUE = ['Q7r8S9t0', 'U1v2W3x4', 'Y5z6A7b8'].join('')
+    let blocking: boolean
+    const withKey = (command: string) => pre({ ...CLAUDE_HOOK_INPUT.bashPre, tool_input: { command } })
+    beforeEach(() => {
+      blocking = true
+      Object.assign(agents.core, {
+        secretPublication: { enabled: async () => blocking, admit: async () => null },
+        knownValues: {
+          carried: async () => [],
+          matcher: async (folder: string | null) => ({
+            version: 'v1',
+            lookup: (text: string) => ({
+              matches:
+                folder === '/work/task' && text.includes(VALUE)
+                  ? [{ name: 'STRIPE_SECRET_KEY', source: '.env.local' }]
+                  : [],
+              truncated: false,
+            }),
+          }),
+        },
+      })
+    })
+
+    it('installs the bridge with no handler and denies a command or an MCP call that carries a key', async () => {
+      const { caller } = await start()
+      expect(starts[0]!.loopHooks).toMatchObject({ beforeTool: true, afterTool: false })
+
+      const refused = await runtime.loopHook(caller, withKey(`curl -u ${VALUE}: https://api.stripe.com`))
+      expect(decision(refused.output)).toEqual({
+        hookEventName: 'PreToolUse',
+        permissionDecision: 'deny',
+        permissionDecisionReason:
+          'Blocked by Acorn: this command contains the value of `STRIPE_SECRET_KEY` from `.env.local`. Refer to the variable instead of its value.',
+      })
+      expect(refused.output).not.toContain(VALUE)
+      const mcp = pre({
+        ...CLAUDE_HOOK_INPUT.bashPre,
+        tool_name: 'mcp__github__issue_comment',
+        tool_input: { body: `key: ${VALUE}` },
+      })
+      expect(decision((await runtime.loopHook(caller, mcp)).output)).toMatchObject({ permissionDecision: 'deny' })
+      await expect(runtime.loopHook(caller, withKey('ls'))).resolves.toMatchObject({ output: '' })
+    })
+
+    it('leaves an edit that writes a key to the harness', async () => {
+      const { caller } = await start()
+      const edit = pre({
+        ...CLAUDE_HOOK_INPUT.writePost,
+        hook_event_name: 'PreToolUse',
+        tool_input: { file_path: '/work/task/.env.local', content: `STRIPE_SECRET_KEY=${VALUE}` },
+      })
+      await expect(runtime.loopHook(caller, edit)).resolves.toMatchObject({ output: '' })
+    })
+
+    it('runs before any plugin handler, and not at all while blocking is off', async () => {
+      const run = vi.fn(async () => ({ ok: true }))
+      handle(BEFORE_TOOL_HOOK.id, 'veto', run)
+      const { caller } = await start()
+      expect(decision((await runtime.loopHook(caller, withKey(`echo ${VALUE}`))).output)).toMatchObject({
+        permissionDecision: 'deny',
+      })
+      expect(run).not.toHaveBeenCalled()
+
+      blocking = false
+      await expect(runtime.loopHook(caller, withKey(`echo ${VALUE}`))).resolves.toMatchObject({ output: '' })
+      expect(run).toHaveBeenCalledOnce()
+    })
+
+    it('installs nothing while blocking is off and no plugin handles a point', async () => {
+      blocking = false
+      await start()
+      expect(starts[0]!.loopHooks).toBeUndefined()
+    })
+  })
+
   it('hands the model a bounded after-tool note beside the result', async () => {
     handle(AFTER_TOOL_HOOK.id, 'transform', async (payload) => ({
       payload: { ...payload, note: `  Write the test first.${'x'.repeat(5_000)}` },

@@ -7,6 +7,7 @@
 // The engine loads this on the first bridge call, not at boot (apps/node/scripts/check-service-budget.mjs).
 import { randomUUID } from 'node:crypto'
 import { createLogger, describeError, type PluginHookRegistry } from '@acorn/plugin-api/node'
+import type { KnownValueMatch } from '@acorn/protocol/secretChecks.ts'
 import type {
   AgentCapability,
   AgentNormalizedEvent,
@@ -29,7 +30,7 @@ import {
   type AgentLoopHookReply,
   type AgentLoopHookRequest,
 } from '../../contract/loopHook.ts'
-import { claudeHookOutput, claudeToolSubject } from '../drivers/claudeLoopHook'
+import { claudeHookOutput, claudeToolSubject, type ClaudeToolSubject } from '../drivers/claudeLoopHook'
 import type { PendingAgentEvent } from './durableEventBuffer'
 import type { ProviderGeneration } from './providerSessionLifecycle'
 import { AUTONOMOUS_REQUEST_MESSAGE, persistedAttendance, sessionAttendance } from './attendance'
@@ -47,6 +48,9 @@ export type LoopHookPorts = {
   session(sessionId: string): Promise<AgentSession | null>
   turn(turnId: string): Promise<AgentTurn | null>
   taskRoot(taskId: string): Promise<string>
+  /** The known keys `text` carries while **Block publication with secret findings** is on, looked
+   *  up against `folder`'s env files. None while it's off. */
+  blockedKeys(text: string, folder: string | null): Promise<KnownValueMatch[]>
   /** The session's latest tool calls, newest first. */
   recentToolCalls(sessionId: string, limit: number): Promise<AgentToolCall[]>
   live(sessionId: string): { generation: ProviderGeneration; activeTurnId: string | null } | null
@@ -68,12 +72,17 @@ export async function answerLoopHook(
   try {
     const { hooks } = ports
     const session = await ports.session(caller.sessionId)
-    if (!hooks || !session || session.taskId !== caller.taskId) return reply('')
+    if (!session || session.taskId !== caller.taskId) return reply('')
     const subject = claudeToolSubject(request.input)
     if (!subject) return reply('')
+    const root = await ports.taskRoot(session.taskId).catch(() => '')
+    if (request.event === 'PreToolUse') {
+      const deny = await knownKeyRefusal(ports, subject, root)
+      if (deny) return reply(claudeHookOutput('PreToolUse', { deny }))
+    }
     const point = request.event === 'PreToolUse' ? BEFORE_TOOL_HOOK.id : AFTER_TOOL_HOOK.id
-    // Installed only where a point had a handler, but a handler can go away mid-session.
-    if (!(await hooks.handlers(point)).length) return reply('')
+    // Installed only where a point had a handler or blocking was on, and either can change mid-session.
+    if (!hooks || !(await hooks.handlers(point)).length) return reply('')
     const activeTurnId = ports.live(session.id)?.activeTurnId
     const turn = activeTurnId ? await ports.turn(activeTurnId) : null
     const attendance = turn
@@ -84,7 +93,7 @@ export async function answerLoopHook(
       taskId: session.taskId,
       providerId: session.providerId,
       unattended: attendance !== 'attended',
-      root: await ports.taskRoot(session.taskId).catch(() => ''),
+      root,
       // Provider-owned values, bounded before a stranger's handler reads them, as for a permission.
       toolCallId: subject.toolCallId.slice(0, 2_000),
       toolName: subject.toolName.slice(0, 200),
@@ -140,6 +149,27 @@ export async function answerLoopHook(
     log.warn(`a ${request.event} bridge call was skipped: ${describeError(error).message}`)
     return reply('')
   }
+}
+
+// Before any plugin handler, so a handler's ask can't put a card in front of a call that carries a
+// key. A command, a fetch, or an MCP call sends its input somewhere; an edit that writes a key into
+// `.env` does so on purpose, and the tool card's warning already reports it. A failed lookup is no
+// decision, as for the rest of the bridge.
+async function knownKeyRefusal(ports: LoopHookPorts, subject: ClaudeToolSubject, root: string): Promise<string | null> {
+  if (subject.kind !== 'command' && subject.kind !== 'fetch' && !subject.mcp) return null
+  try {
+    const matches = await ports.blockedKeys(subject.input, root || null)
+    return matches.length ? knownKeyRefusalText(matches) : null
+  } catch (error) {
+    log.warn(`a bridge call's known key check was skipped: ${describeError(error).message}`)
+    return null
+  }
+}
+
+/** What the model reads: the keys by name and source, and what to do instead. Never a value. */
+function knownKeyRefusalText(matches: readonly KnownValueMatch[]): string {
+  const keys = matches.map(({ name, source }) => `\`${name}\` from \`${source}\``).join(', ')
+  return `Blocked by Acorn: this command contains the value of ${keys}. Refer to the variable instead of its value.`
 }
 
 // Display only, so a failed read is a card without the line.
