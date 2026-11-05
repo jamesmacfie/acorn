@@ -176,7 +176,10 @@ For later phases:
 - "Later, once the line has been used" in Part 2 can call `commandOrigin` directly. It needs only the
   command, the call's ID, and `recentToolCalls`.
 
-Date: November 6, 2026. Status: proposed. Nothing on this page is built.
+Date: November 6, 2026. Status: phases 1 to 3 built November 6, 2026. The live acceptance checks in
+`pnpm dev:agent` remain open. The shipped contract is in
+[known key values](../security/known-key-values.md) and [permission
+policy](../managed-agents/permission-policy.md#where-a-command-came-from).
 
 This page covers two checks on what an agent runs. The first notices when a tool call carries the
 value of a key on this machine. The second tells the person, on a permission card, which text the
