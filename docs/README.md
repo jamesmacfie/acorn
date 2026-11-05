@@ -477,6 +477,11 @@ Each plugin landing page above has topic pages in a folder of the same name:
   pane](./first-party-plugins/review-guide/pane.md), [First-party plugins in the
   terminal](./first-party-plugins/terminal.md).
 
+## Agent command checks proposal
+
+- [Known key values and command origins in agent sessions](./future/agent-command-checks.md): warn
+  when a tool call carries a key from this machine, and show which text a command repeats.
+
 ## Mobile web app proposal
 
 - [What's left for the mobile web app](./future/mobile.md): real-device checks, small fixes on a phone,

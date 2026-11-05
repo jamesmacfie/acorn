@@ -21,6 +21,7 @@ Dated delivery evidence belongs in `docs/testing/` or the dated security reviews
 
 | File | Developer handoff | Status |
 | --- | --- | --- |
+| [agent-command-checks.md](./agent-command-checks.md) | Warn when an agent's tool call carries the value of a key on this machine, optionally refuse it on Claude Code and in commits and pushes, and show on a permission card which web page or MCP result a command repeats. Ideas from Stroq. | Proposed November 6, 2026. Implementation not started. |
 | [apps-pane-layout.md](./apps-pane-layout.md) | Keep each Apps pane list row to two lines, with the full description in a tooltip and the change time beside the version, and draw a row `Stack` of only `Card`s as equal, top-aligned columns with the kit's `Inline even`. | Proposed October 29, 2026. Implementation not started. |
 | [bundle.md](./bundle.md) | Container coordination, desktop TUI embedding, and macOS signing. Platform archives, Windows operation support, and the installer belong to [node-tray/](./node-tray/README.md). | Standalone CLI/TUI staging and certificate generation implemented. Release delivery remains proposed. |
 | [compiled-tier.md](./compiled-tier.md) | Assess plugin migration candidates, reproduce retained cleanup reports, and finish loaded-package acceptance. | Standing assessment refreshed October 8, 2026. No migration scheduled. |
