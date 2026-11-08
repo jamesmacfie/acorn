@@ -69,6 +69,13 @@ const RULES: readonly RouteRule[] = [
   { path: shape(`/v1/core/tasks/${SEG}/context`), scopes: { GET: 'core.tasks:read' } },
   { path: shape(`/v1/core/tasks/${SEG}/archive`), scopes: { POST: 'core.tasks:write' } },
   {
+    path: shape(`/v1/core/tasks/${SEG}/archive-run`),
+    scopes: { GET: 'core.tasks:write', POST: 'core.tasks:write' },
+    note:
+      'The archive above, started and then waited on. GET takes the write scope because it answers ' +
+      'with what POST /archive would have, teardown output included.',
+  },
+  {
     path: shape(`/v1/core/tasks/${SEG}/restore`),
     scopes: {},
     note:
