@@ -74,6 +74,7 @@ A capability key lives with whichever side would otherwise have to import the ot
 almost always the provider. `WORKFLOW_CONTROL` is the exception: agents declares it, workflows
 provides it, and the id still names the provider, because agents draws the control and workflows
 already imports agents. Core declares a key that core consumes and a plugin provides, because core
-can't import a plugin. `AGENT_ASK` and `AGENT_PROMPT_SCHEDULES`, which a kept dashboard panel reads,
-are the two. Put the key where it doesn't recreate the import you were avoiding, and say which in its
+can't import a plugin. There are three. A kept dashboard panel reads `AGENT_ASK` and
+`AGENT_PROMPT_SCHEDULES`. **Create a plugin** reads `AGENT_SESSION_STARTER`, which lists the agents a
+person can start and starts one with a draft left unsent ([agent installs](./agent-install.md#teaching-the-agent)). Put the key where it doesn't recreate the import you were avoiding, and say which in its
 file.

@@ -181,8 +181,8 @@ approves equal to the inputs the code reads.
 3. Add a panel, pick **Release readiness**, and choose an account for each input.
 
 An agent can do the writing. **Settings › Plugins › Create a plugin › Build a data source from your
-connections** asks the two questions and drafts a prompt for the open task's agent that names the
-template, the inputs, and the testing helpers.
+connections** asks the two questions, writes this starter into a new folder, and opens an agent there
+with a prompt that names the inputs ([agent installs](../plugins/agent-install.md#teaching-the-agent)).
 
 ## What the SDK answers for you
 

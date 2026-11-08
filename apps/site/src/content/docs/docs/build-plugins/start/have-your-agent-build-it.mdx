@@ -1,12 +1,13 @@
 ---
 title: Have your agent build it
-description: Ask an agent in an acorn task to write a plugin, approve it once, and let it iterate in development mode.
+description: Have acorn set up a project for a new plugin, let an agent write it, approve it once, and let it iterate in development mode.
 sources:
   - docs/plugins/agent-install.md
   - docs/agent-tools/plugin-tools.md
   - docs/plugin-authoring/installing-a-hand-written-package.md
   - packages/client-core/src/features/settings/plugins/PluginsSettings.tsx
-checked: dfb0bd69b
+  - packages/client-core/src/features/settings/plugins/CreatePluginDialog.tsx
+checked: '14343c48b'
 ---
 
 An agent in an acorn task can write a plugin for you. acorn teaches it the plugin contract of the Node
@@ -15,22 +16,35 @@ describe a plugin than write one.
 
 ## Start the agent
 
-1. Open a task and start a Claude Code or Codex session in it
-   ([Agent sessions](/docs/agents/agent-sessions/)).
-2. Open **Settings** > **Plugins** > **Installed**, and under **Create a plugin**, click **Ask an agent**
-   beside **Ask an agent to write one**. acorn drafts a prompt into the session's message box. It
-   doesn't send it.
-3. Finish the draft's last line, **What it should do:**, with what you want, such as "a pane that lists
+1. Open **Settings** > **Plugins** > **Installed**, and under **Create a plugin**, click **Ask an agent**
+   beside **Ask an agent to write one**.
+2. Fill in the form:
+   - **Project name**, such as "Hello". acorn fills in **Plugin ID** from it. The ID can't change later.
+   - **Folder**, a full path to a new or empty folder on the Node's computer, such as
+     `/Users/you/plugins/hello`. On this computer's Node, **Choose…** picks one.
+   - **Kind**: **Pane** for a view you look at, or **Trigger** for a plugin that notices events.
+   - **Workspace**, when workspaces are on. **New workspace…** makes one.
+   - **Agent**, when more than one is installed and signed in.
+   - **Make it a git repository**, on by default, so the task's changes show what the agent edits.
+3. Click **Start**. acorn writes the starter files into the folder, adds it as a project, and opens a
+   new task there with an agent session. The prompt waits in the session's message box. It isn't sent.
+4. Finish the prompt's last line, **What it should do:**, with what you want, such as "a pane that lists
    this task's TODO comments". Then send it.
 
-The draft tells the agent three things, and you can write them yourself in any session instead:
+If a step fails, the form says which one. Fix it and click **Try again**, which picks up where it
+stopped. A folder that already has files in it is refused, so nothing of yours is overwritten.
+
+**Build a data source from your connections**, beside it, opens the same form. Instead of **Kind**, it
+asks what one row should be and which of your data it reads.
+
+The prompt tells the agent three things, and you can write them yourself in any session instead:
 
 1. **Call `plugin_authoring` first.** It's an agent tool that answers with the authoring contract and
    this Node's own manifest vocabulary: every contribution, field, limit, action verb, and extension
    point, read from the Node's own schemas. An answer from the agent's memory is out of date by
    design ([Agent tools and the MCP server](/docs/agents/agent-tools-and-the-mcp-server/)).
-2. **Write the package in a folder.** The same files [Build your first plugin](/docs/build-plugins/start/build-your-first-plugin/)
-   starts from.
+2. **Write the package in the folder.** acorn has already put the same files there that
+   [Build your first plugin](/docs/build-plugins/start/build-your-first-plugin/) starts from.
 3. **Ask with `plugin_request`, using `dev: true`.** The agent can't install anything itself.
 
 ## Approve it

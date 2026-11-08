@@ -10,10 +10,11 @@ sources:
   - packages/client-core/src/features/settings/plugins/PluginPage.tsx
   - packages/client-core/src/features/settings/plugins/ModelGrantSection.tsx
   - packages/client-core/src/features/settings/plugins/RailSurfacesSettings.tsx
+  - packages/client-core/src/features/settings/plugins/CreatePluginDialog.tsx
 covers:
   - plugins
   - rail-surfaces
-checked: 'ec0e73ca1'
+checked: '14343c48b'
 ---
 
 This page lists every setting in **Settings** > **Plugins**. **Installed** is stored on the Node, and its
@@ -40,8 +41,11 @@ device** filter the list. **Install…** adds one
 | **Development mode** | Trusts new versions of the plugin from this Node without asking. | This device | Off |
 | **Uninstall, keep its data**, **Uninstall and delete its data** | Removes the plugin from the Node. A plugin on this device alone has **Remove from this device**. | Node | |
 
-**Create a plugin** starts a prompt in the open task's agent: **Ask an agent** to write a plugin, or
-**Start** a data source built from your connections. You decide whether to install what it writes.
+**Create a plugin** writes a starter plugin into a folder of its own and opens an agent there: **Ask
+an agent** to write a plugin, or **Start** a data source built from your connections. You pick the
+folder, the name, the agent, and the workspace, and the prompt waits in the agent's message box for you
+to finish. You decide whether to install what it writes
+([Have your agent build it](/docs/build-plugins/start/have-your-agent-build-it/)).
 
 ## Rail and surfaces
 

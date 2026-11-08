@@ -107,11 +107,58 @@ The process half is prose: write the folder, ask with
 with the same arguments to collect the answer, then iterate with `action: 'update'` and `dev: true`,
 so approval ends in a reload.
 
-**Settings > Plugins > Installed > Create a plugin** drafts that starting prompt into the current
-task's agent composer through `sendReferenceToAgent`, the seam the Editor pane and the Changes tab use. It's
-a draft, not a send. It doesn't open a new task, because `TaskSeed` has no prompt field and Settings
-has no project in scope. **Build a data source from your connections** beside it asks what one row is
-and which of the Node's sources it reads, then drafts `dataSourceStarterPrompt` the same way. That
-prompt names the `--data-source` template, each input by id, and the testing helpers, and has the
-agent read each input's fields with `data_source_describe`
+**Settings > Plugins > Installed > Create a plugin** sets up a new project for the plugin, with two
+buttons: **Ask an agent** and **Build a data source from your connections**. Both open
+`CreatePluginDialog`, which asks for the following:
+
+- A project name, and a plugin ID filled in from it.
+- A folder on the Node's machine, typed. **Choose…** appears only for a local Node.
+- For **Ask an agent**, the kind: **Pane** or **Trigger**.
+- For the data source button, what one row is and which of the Node's sources it reads.
+- A workspace, when workspaces are on, with **New workspace…**.
+- Which agent to use, when there's more than one.
+- **Make it a git repository**, checked by default.
+
+**Start** writes the starter files with the scaffold route below, makes the folder a project, opens a
+project-folder task in it, and starts a session on the chosen agent. The session has the starter
+prompt from `starterPrompts.ts` in its composer, unsent. The prompt ends on an open line, "What it
+should do:" or "The rules for each row:", for the person to finish. If a step fails, **Start** becomes
+**Try again**, which resumes after the last step that finished, so the scaffold is written once.
+
+The dialog starts the session through `AGENT_SESSION_STARTER`, a key core declares and the agents
+plugin provides ([collaboration](./collaboration.md#where-a-key-lives)). Without the agents plugin,
+**Start** is disabled.
+
+The data source prompt names each input by ID and the testing helpers, and has the agent read each
+input's fields with `data_source_describe`
 ([derived sources](../plugin-authoring/derived-sources.md)).
+
+### The scaffold route
+
+`POST /v1/core/plugins/scaffold` writes a plugin's starter files from `create-acorn-plugin` into a
+folder on the Node, so the folder can become a project. It sits beside `/install` in
+`routes/plugins/plugins.ts`, and the writer is `server/plugins/scaffold.ts`, which the route loads on
+first use. It needs an `Idempotency-Key`.
+
+| Field | Meaning |
+| --- | --- |
+| `folder` | An absolute path on the Node. It must be missing or an empty directory. |
+| `pluginId` | The manifest ID. It's refused if `toPluginId` would change it. |
+| `name` | The display name for the manifest. |
+| `kind` | `pane`, `trigger`, or `data-source`. |
+| `dataSource` | Only for `data-source`: `{ row, inputs }`. The first input must be required. |
+| `git` | Whether to run `git init` and commit the starter files. |
+
+The answer is one of these:
+
+- `200 { result: 'written', git }`. `git` is `committed`, `off`, or `{ skipped: <reason> }`.
+- `409` with the code `not-empty`, when the folder has anything in it. Nothing is overwritten.
+- `400` with the reasons, for a relative path, a bad ID, or a bad data source.
+
+When `git` is set, the route commits as the Node's own git identity, or as `Acorn <acorn@localhost>`
+when the Node has none. If a git step fails, the files stay and `skipped` says why, most often a Node
+with no git installed.
+
+The route is under the device-only `/v1/core/plugins` mount, so a task token gets 403. An agent that
+could call it could write files anywhere on the Node. It writes no audit row, because it installs
+nothing.

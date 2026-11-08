@@ -24,6 +24,7 @@ Every route in this table is device-only.
 | `GET` | `/v1/core/plugins` | The plugin roster, install state, and pending agent install requests |
 | `PUT` | `/v1/core/plugins` | Replace the disabled list with `{ disabled }` |
 | `POST` | `/v1/core/plugins/install` | Install a package from GitHub, npm, a URL, or a folder. Needs `Idempotency-Key` |
+| `POST` | `/v1/core/plugins/scaffold` | Write a plugin's starter files into a missing or empty folder, with an optional git commit ([the scaffold route](../plugins/agent-install.md#the-scaffold-route)). Needs `Idempotency-Key` |
 | `POST` | `/v1/core/plugins/:id/update` | Update an installed package. Needs `Idempotency-Key` |
 | `POST` | `/v1/core/plugins/:id/review` | Approve or remove a package held for review. Needs `Idempotency-Key` |
 | `GET`, `POST`, `DELETE` | `/v1/core/plugins/:id/input-grant` | Read, approve, or revoke what a loaded plugin's derived sources read ([derived sources](../data-sources/derived-sources.md#approve-inputs-for-loaded-plugins)) |
@@ -168,8 +169,7 @@ for the body fields, identity token, reservation rules, and refusal codes.
 `GET /v1/core/projects/:id/worktree-availability` previews a branch without reserving it. Its
 query and response fields are in [task creation and navigation](../workspaces-and-tasks/task-creation.md#branch-names).
 
-Executable repository configuration is hash-gated before use
-([process and path controls](../security/process-and-paths.md)).
+Executable repository configuration is hash-gated before use ([process and path controls](../security/process-and-paths.md)).
 
 ## Task scripts
 
