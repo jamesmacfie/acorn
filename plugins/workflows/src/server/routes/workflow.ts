@@ -86,6 +86,20 @@ export const WORKFLOW_ROUTE = routeCapability<WorkflowBridge>('workflows.route')
 /** @internal test compatibility; production providers use CapabilityRegistry.provide. */
 export const setWorkflowBridge = (bridge: WorkflowBridge | null): void => setRouteTestCapability(WORKFLOW_ROUTE, bridge)
 
+/** Named values a person typed, each one a bounded JSON value. Which names are allowed is the
+ *  definition's answer, so the runner checks them. */
+export const boundedValues = z.record(
+  z.string(),
+  z.unknown().transform((value, ctx) => {
+    try {
+      return parseDataValue(value, DATA_LIMITS.selectionBytes)
+    } catch {
+      ctx.addIssue({ code: 'custom', message: 'Expected a bounded JSON value' })
+      return z.NEVER
+    }
+  }),
+)
+
 // start executes an agent CLI, gate resumes one; both get validated bodies (the privileged-boundary
 // contract). The def shape is validated structurally (name + steps[]); the runner re-checks the
 // rest.
@@ -100,19 +114,7 @@ const startBody = z
     launchId: z.uuid().optional(),
     // Values for the definition's declared inputs. Which names are allowed and which are required is
     // the runner's answer, because only the definition knows.
-    inputs: z
-      .record(
-        z.string(),
-        z.unknown().transform((value, ctx) => {
-          try {
-            return parseDataValue(value, DATA_LIMITS.selectionBytes)
-          } catch {
-            ctx.addIssue({ code: 'custom', message: 'Expected a bounded JSON value' })
-            return z.NEVER
-          }
-        }),
-      )
-      .optional(),
+    inputs: boundedValues.optional(),
   })
   // One or the other, never both and never neither.
   .refine((body) => !!body.def !== !!body.defId)
@@ -123,19 +125,7 @@ const gateBody = z
   .object({
     stepId: z.string().min(1),
     approved: z.boolean(),
-    values: z
-      .record(
-        z.string(),
-        z.unknown().transform((value, ctx) => {
-          try {
-            return parseDataValue(value, DATA_LIMITS.selectionBytes)
-          } catch {
-            ctx.addIssue({ code: 'custom', message: 'Expected a bounded JSON value' })
-            return z.NEVER
-          }
-        }),
-      )
-      .optional(),
+    values: boundedValues.optional(),
   })
   .refine((body) => body.approved || body.values === undefined)
 const killBody = z.object({ stepId: z.string().min(1) })

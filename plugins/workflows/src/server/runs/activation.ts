@@ -19,6 +19,7 @@ import {
 } from '@acorn/plugin-api/node'
 import { eq } from 'drizzle-orm'
 import { WorkflowDispatcher } from '../dispatch/dispatcher'
+import { authorizeRepoWorkflow } from './authority'
 import { inlinePrompt } from './deps'
 import { WorkflowProcessingStore } from '../processing/store'
 import { WorkflowRunner, type RunnerDeps } from './runner'
@@ -144,12 +145,15 @@ export const createWorkflowExecution = (
         const { cwd } = task ? await core.tasks.resolveCwd(task, undefined) : { cwd: homedir() }
         const project = task?.projectId ? await core.projects.byId(task.projectId) : null
         const profile = requireProfile(opts.profileId)
+        const untrusted = project?.trusted === false ? await import('./untrustedHeadless') : null
         // A command line takes one prompt, so the context goes into it as headed sections.
-        const oneShot = { ...opts, prompt: inlinePrompt(opts.prompt, opts.context) }
-        const argv =
+        const prompt = inlinePrompt(opts.prompt, opts.context)
+        const oneShot = { ...opts, prompt: untrusted ? untrusted.untrustedPrompt(prompt) : prompt }
+        const built =
           opts.mode === 'ai'
             ? profile.aiArgv?.(resolveCommand(profile), oneShot)
             : buildHeadlessArgv(profile.id, resolveCommand(profile), oneShot)
+        const argv = built && untrusted ? untrusted.untrustedArgv(profile, built) : built
         if (!argv) {
           return {
             status: 'error',
@@ -292,12 +296,12 @@ export const createWorkflowExecution = (
       selectWorkflowRecords: (request, signal) =>
         new WorkflowProcessingStore(store, dispatch()).dispatch(request, signal),
       childChanged: (event) => ctx.events.send({ channel: pluginChannel('workflows', 'child-changed'), ...event }),
-      authorizeRepoConfig: (taskId) => core.projects.assertConfigTrusted(taskId),
+      authorizeRepoConfig: (taskId) => authorizeRepoWorkflow(core, taskId),
     },
     ctx.extensionPoints,
   )
   connectedDispatcher = new WorkflowDispatcher(store, runner, core.tasks, {
-    authorizeRepoConfig: (taskId) => core.projects.assertConfigTrusted(taskId),
+    authorizeRepoConfig: (taskId) => authorizeRepoWorkflow(core, taskId),
   })
   return { runner, dispatcher: dispatch() }
 }

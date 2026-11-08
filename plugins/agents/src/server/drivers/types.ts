@@ -167,8 +167,13 @@ export type AgentDriverStartOptions = {
   /** For a driver with `accounts`: the config folder of the account the session is pinned to. Absent
    *  means the CLI's own default login. */
   accountHome?: string
-  /** For a driver with `readBlock`, when the person switched the block on. Absent means unconfined. */
+  /** For a driver with `readBlock`, when the person switched the block on or the project is untrusted.
+   *  Absent means unconfined. */
   readBlock?: AgentDriverReadBlock
+  /** For a driver with `untrusted`, when the task's project is untrusted: ignore the checkout's own
+   *  settings, hooks, MCP servers, and instruction files (docs/workspaces-and-tasks/projects.md §
+   *  Untrusted projects). */
+  untrusted?: true
   noProviderExecutionHistory: boolean
   onEvent(event: AgentDriverEvent): void | Promise<void>
   onClosed(error?: Error): void | Promise<void>
@@ -229,6 +234,9 @@ export interface AgentDriver {
   /** The harness can keep its agent out of the data root, so the lifecycle passes `readBlock` when the
    *  person switched it on. */
   readonly readBlock?: boolean
+  /** The harness can ignore a repository's own settings, so it may start in an untrusted project. The
+   *  lifecycle refuses a driver without it there. */
+  readonly untrusted?: boolean
   /** The harness can run more than one login, one config folder each, so a session may be pinned to
    *  an account and the lifecycle passes its folder as `accountHome`. */
   readonly accounts?: HarnessAccounts

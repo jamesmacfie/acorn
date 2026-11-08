@@ -1,7 +1,16 @@
 import { isAbsolute } from 'node:path'
 import { slugifyBranch } from '@acorn/protocol/branch.ts'
-import type { Project, Task, Workspace } from '@acorn/protocol/api.ts'
+import {
+  CLONE_RUN_WAIT_MS,
+  cloneOutcome,
+  type CloneRun,
+  type CloneRunStart,
+  type Project,
+  type Task,
+  type Workspace,
+} from '@acorn/protocol/api.ts'
 import type { ParsedArgs } from './args'
+import { cloneAndRun } from './workflowCommands'
 import { CliError } from './error'
 import { readJsonFile, rejectDoubleStdin, requestKey, requireOption, typedId, operationKey } from './input'
 import type { CliNode } from './node'
@@ -178,6 +187,26 @@ export async function runCoreWrite(node: CliNode, args: ParsedArgs): Promise<unk
         key,
       )
       return projectResource(node.nodeId, response.project)
+    }
+    if (verb === 'clone') {
+      if (!rawId) throw new CliError('usage', 'project clone needs a Git URL.', 2)
+      rejectDoubleStdin([o.workspace, o['inputs-file']])
+      const workspaceId = o.workspace ? await typedId(o.workspace, 'Workspace', node, 'workspace') : undefined
+      const parentDir = requireOption(o, 'into')
+      if (!isAbsolute(parentDir)) throw new CliError('usage', '--into must be absolute on the selected Node host.', 2)
+      const clone = {
+        url: rawId,
+        parentDir,
+        ...(workspaceId ? { workspaceId } : {}),
+        ...(o.name ? { name: o.name } : {}),
+      }
+      if (o.workflow) return cloneAndRun(node, clone, o.workflow, o['inputs-file'], key)
+      if (o['inputs-file']) throw new CliError('usage', '--inputs-file needs --workflow.', 2)
+      const started = await mutation<CloneRunStart>(node, 'POST', '/v1/core/projects/clone-runs', clone, key)
+      const runPath = `${pathFor('/v1/core/projects/clone-runs', started.cloneId)}?waitMs=${CLONE_RUN_WAIT_MS}`
+      const result = await cloneOutcome(async () => (await node.get(runPath)) as CloneRun)
+      if (!result.ok) throw new CliError('clone_failed', result.error, 4, key)
+      return projectResource(node.nodeId, (await node.get(pathFor('/v1/core/projects', result.projectId))) as Project)
     }
     if (verb === 'config') {
       const action = rawId

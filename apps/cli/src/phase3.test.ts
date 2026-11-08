@@ -436,3 +436,78 @@ describe('Phase 3 managed agents', () => {
     ).rejects.toMatchObject({ exitCode: 2 })
   })
 })
+
+describe('project clone', () => {
+  const runPath = '/v1/core/projects/clone-runs/clone-one?waitMs=20000'
+  const project = { id: 'project-one', name: 'web', workspaceId: 'w', path: '/srv/web', hidden: false }
+
+  it('starts a keyed clone, waits for it, and prints the new project', async () => {
+    const waits = [
+      { state: 'running', elapsedMs: 20_000 },
+      { state: 'finished', result: { ok: true, projectId: 'project-one' } },
+    ]
+    const { node, calls } = fakeNode({}, () => ({ cloneId: 'clone-one', state: 'running' }))
+    node.get = async (path) => {
+      if (path === runPath) return waits.shift()
+      if (path === '/v1/core/projects/project-one') return project
+      throw new Error(`Unexpected read ${path}`)
+    }
+    const result = await runCommand(
+      node,
+      parseCliArgs(['project', 'clone', 'git@github.com:acme/web.git', '--into', '/srv', '--request-id', requestId]),
+    )
+    expect(result).toMatchObject({ kind: 'Project', id: 'project-one', path: '/srv/web' })
+    expect(waits).toEqual([])
+    expect(calls).toEqual([
+      {
+        method: 'POST',
+        path: '/v1/core/projects/clone-runs',
+        body: { url: 'git@github.com:acme/web.git', parentDir: '/srv' },
+        key: requestId,
+      },
+    ])
+  })
+
+  it('exits 4 with the reason when the clone fails', async () => {
+    const { node } = fakeNode(
+      { [runPath]: { state: 'finished', result: { ok: false, error: 'git exited 128: no such repository' } } },
+      () => ({ cloneId: 'clone-one', state: 'running' }),
+    )
+    await expect(
+      runCommand(node, parseCliArgs(['project', 'clone', 'https://github.com/acme/web', '--into', '/srv'])),
+    ).rejects.toMatchObject({ code: 'clone_failed', exitCode: 4, message: 'git exited 128: no such repository' })
+  })
+
+  it('with --workflow, launches through the workflows plugin and prints the task and run', async () => {
+    const launchPath = `/v1/p/workflows/clone-launches/${requestId}?waitMs=20000`
+    const { node, calls } = fakeNode(
+      { [launchPath]: { launchId: requestId, stage: 'started', projectId: 'p1', taskId: 't1', runId: 'r1' } },
+      () => ({ launchId: requestId, stage: 'cloning' }),
+    )
+    const inputs = jsonFile({ focus: 'secrets' })
+    const args = ['project', 'clone', 'https://github.com/acme/web', '--into', '/srv', '--workflow', 'user:scan']
+    const result = await runCommand(node, parseCliArgs([...args, '--inputs-file', inputs, '--request-id', requestId]))
+    expect(result).toMatchObject({ kind: 'WorkflowCloneLaunch', projectId: 'p1', taskId: 't1', runId: 'r1' })
+    expect(calls).toEqual([
+      {
+        method: 'POST',
+        path: '/v1/p/workflows/clone-launches',
+        body: {
+          clone: { url: 'https://github.com/acme/web', parentDir: '/srv' },
+          defId: 'user:scan',
+          inputs: { focus: 'secrets' },
+          launchId: requestId,
+        },
+        key: expect.not.stringMatching(requestId),
+      },
+    ])
+  })
+
+  it('needs an absolute parent folder before it calls the Node', async () => {
+    const { node, calls } = fakeNode({}, () => ({}))
+    await expect(
+      runCommand(node, parseCliArgs(['project', 'clone', 'https://github.com/acme/web', '--into', 'srv'])),
+    ).rejects.toMatchObject({ exitCode: 2 })
+    expect(calls).toEqual([])
+  })
+})

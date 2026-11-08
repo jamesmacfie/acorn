@@ -31,6 +31,22 @@ leaves them out unless `--include-hidden` is set. Paths belong to the Node's hos
 CLI is remote. Removing a project deletes its task rows and links and leaves the folder and worktrees on
 disk. With workspaces off, removal also deletes the project's workspace, links, and datasets.
 
+`project clone URL --into ABSOLUTE` clones a Git URL into a new folder under `--into` on the Node's
+host, then adds it as a project and writes the project. The folder is `--name`, or the URL's last
+path segment without `.git`. The CLI starts the clone in one request and waits for it in requests of
+up to 20 seconds each, so a clone can run for as long as it needs, up to the Node's 30-minute limit.
+A failed clone exits 4 with Git's reason. The Node accepts only HTTPS, SSH, and `user@host:path`
+URLs. [Clone a Git URL](../workspaces-and-tasks/clone-runs.md) has the rules.
+
+With `--workflow ID`, the CLI asks the workflows plugin to clone and then start that workflow as the
+project's first task, and prints the project, task, and run IDs. `ID` is `user:<file>` for a file in
+`~/.acorn/workflows`, or a saved definition's ID, which needs `--workspace`. A committed `repo:` one is
+refused. `--inputs-file FILE|-` gives the inputs as a JSON object, as `workflow start` takes them. A
+clone that fails exits 4 with `clone_failed`, and a start that fails exits 4 with
+`workflow_start_refused` and keeps the project and task. Run it again with the same `--request-id` to
+retry the start without cloning again. [Starting runs](../workflows/starting-runs.md#after-a-clone)
+has the rules.
+
 `agent list --project ID` and `run list --project ID` resolve the project's workspace and use the
 workspace-filtered routes. Each conflicts with `--workspace`; the agent filter also conflicts with
 `--task`.

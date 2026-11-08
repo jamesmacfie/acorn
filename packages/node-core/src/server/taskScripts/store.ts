@@ -26,7 +26,10 @@ const rerunnableSetup = (setup: TaskScriptSnapshot): boolean =>
 
 export type ManualSetup =
   | { script: string }
-  | { code: 'archiving' | 'no_worktree' | 'not_configured' | 'already_running' | 'not_needed'; message: string }
+  | {
+      code: 'archiving' | 'no_worktree' | 'untrusted' | 'not_configured' | 'already_running' | 'not_needed'
+      message: string
+    }
 const snapshots = (row: Row): TaskScriptSnapshot => taskScriptSnapshotSchema.parse(row)
 
 /** Synchronous SQLite operations keep process evidence ordered, including immediate exits. */
@@ -105,6 +108,8 @@ export class TaskScriptStore {
       return { code: 'no_worktree', message: 'This task has no worktree.' }
     // The project row, not the repo's `.acorn/config.toml`, the same source automatic setup reads.
     const project = this.db.select().from(schema.projects).where(eq(schema.projects.id, task.projectId)).get()
+    if (project?.trusted === false)
+      return { code: 'untrusted', message: 'Trust this project before you run its setup script.' }
     if (!project?.setupScript?.trim()) return { code: 'not_configured', message: 'This task has no setup script.' }
     const setup = this.select(taskId, 'setup')
     if (active.includes(setup.state)) return { code: 'already_running', message: 'Setup is already running.' }

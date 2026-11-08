@@ -87,6 +87,8 @@ export type ProviderLifecyclePorts = {
   accountHome(session: AgentSession): Promise<string | null>
   /** Whether the person switched the read block on, read at every start. */
   readBlockOn(): Promise<boolean>
+  /** Whether the task's project is untrusted, read at every start like the read block. */
+  untrusted(taskId: string): Promise<boolean>
   /** The read block for a start of a driver with `readBlock`, once `readBlockOn` said yes. */
   readBlock(input: {
     sessionId: string
@@ -334,7 +336,7 @@ export class ProviderSessionLifecycle {
       // Read at every start, like the hooks, so switching it applies from the next start. Decided before
       // the token is minted, because every execute tool runs outside the harness's sandbox, so a
       // sandboxed session's token stops at write tools (docs/managed-agents/read-block.md).
-      const [cwd, workspaceId, hasHistory, sandboxed, accountHome, skills, loopHooks] = await settleAll([
+      const [cwd, workspaceId, hasHistory, blockOn, accountHome, skills, loopHooks, untrusted] = await settleAll([
         prepare('task.root', () => read(() => this.ports.taskRoot(session.taskId))),
         live.workspaceId
           ? Promise.resolve(live.workspaceId)
@@ -351,7 +353,12 @@ export class ProviderSessionLifecycle {
           return skills
         }),
         live.driver.loopHooks ? read(() => this.ports.loopHooks(session)) : Promise.resolve(null),
+        read(() => this.ports.untrusted(session.taskId)),
       ])
+      // An untrusted project's session starts locked down and kept out of the data folder, or not at all
+      // (docs/workspaces-and-tasks/projects.md § Untrusted projects).
+      const untrustedLine = untrusted ? (await import('../untrusted')).lockedDownInstructions(live.driver) : null
+      const sandboxed = live.driver.readBlock === true && (untrusted || blockOn)
       live.workspaceId = workspaceId
       const noProviderExecutionHistory = !hasHistory
       const env = this.ports.scopedEnvironment(session, sandboxed)
@@ -374,7 +381,8 @@ export class ProviderSessionLifecycle {
       // A warning write is durable work. Join it even if stop aborts the following driver start.
       if (mcp.unavailable.length) await this.ports.mcpUnavailable(session.id, mcp.unavailable)
       const { attendanceInstructions } = await import('./attendanceInstructions')
-      const instructions = attendanceInstructions(sessionAttendance(session))
+      const instructions =
+        [untrustedLine, attendanceInstructions(sessionAttendance(session))].filter(Boolean).join('\n\n') || undefined
       signal.throwIfAborted()
       const launch = (measureStartup?: MeasureAgentStartup) =>
         live.driver.start({
@@ -385,6 +393,7 @@ export class ProviderSessionLifecycle {
           skillPlugins: skills.plugins,
           ...(loopHooks ? { loopHooks } : {}),
           ...(readBlock ? { readBlock } : {}),
+          ...(untrusted ? { untrusted: true as const } : {}),
           ...(accountHome ? { accountHome } : {}),
           noProviderExecutionHistory,
           signal,

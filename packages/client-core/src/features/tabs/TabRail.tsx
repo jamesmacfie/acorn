@@ -527,6 +527,7 @@ export default function TabRail() {
           // Core's own states plus whatever plugins publish for this task. RailTab orders them,
           // picks a free corner for each, and legends the lot in the hover tooltip, so the icons
           // and the words cannot drift.
+          const project = () => projects.data?.find((candidate) => candidate.id === w.projectId)
           const markers = () => [
             ...railStatusMarkers({
               unread: !!unreadForTask(w.id),
@@ -538,12 +539,12 @@ export default function TabRail() {
                 scripts.freshness() === 'live' &&
                 ['starting', 'running'].includes(scripts.query.data?.[w.id]?.setup.state ?? ''),
               pinned: pinnedTasks().has(w.id),
+              untrusted: project()?.trusted === false,
             }),
             ...markersFor({ kind: 'task', id: w.id }),
           ]
           // Project identity owns the optional 3px accent. The task's projectId is the stable join;
           // workspace membership only scopes which task rows are visible.
-          const project = () => projects.data?.find((candidate) => candidate.id === w.projectId)
           const accent = () => resolveProjectColor(project()?.color) ?? undefined
           const group = () => workflowGroups().get(w.id)
           return (

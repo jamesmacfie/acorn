@@ -324,7 +324,8 @@ Each feature landing page above has topic pages in a folder of the same name:
 
 - [workspaces-and-tasks.md](./workspaces-and-tasks.md): [Archive and
   restore](./workspaces-and-tasks/archive.md), [Archive in the
-  background](./workspaces-and-tasks/background-archive.md), [Project
+  background](./workspaces-and-tasks/background-archive.md), [Clone a Git
+  URL](./workspaces-and-tasks/clone-runs.md), [Project
   configuration](./workspaces-and-tasks/project-config.md), [Projects and
   workspaces](./workspaces-and-tasks/projects.md), [Task creation and
   navigation](./workspaces-and-tasks/task-creation.md), [Task script

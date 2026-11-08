@@ -19,6 +19,12 @@ describe('the claude-code profile', () => {
     })
   })
 
+  // Put first on every launch in an untrusted project (docs/workspaces-and-tasks/projects.md §
+  // Untrusted projects), so a dropped flag would let the checkout configure the agent.
+  it('locks a launch in an untrusted project down to the user settings and the given MCP servers', () => {
+    expect(claudeCodeProfile.untrustedArgs).toEqual(['--setting-sources', 'user', '--strict-mcp-config'])
+  })
+
   // Asserts the whole array, not `toContain` per flag. A per-flag check misses a dropped `-p`, which
   // leaves the headless runner waiting forever on a prompt, and a dropped `--verbose`, which
   // `-p --output-format stream-json` requires. It also lets an inserted

@@ -20,9 +20,17 @@ export type RailStatusInputs = {
   archiving: boolean // guarded teardown in flight for this task
   settingUp: boolean // the project's setup script is still running in this task's new worktree
   pinned: boolean // held at the top of the rail
+  untrusted?: boolean // the task's project is untrusted, so setup and the repository's agent settings are off
 }
 
-export function railStatusMarkers({ unread, status, archiving, settingUp, pinned }: RailStatusInputs): RailMarker[] {
+export function railStatusMarkers({
+  unread,
+  status,
+  archiving,
+  settingUp,
+  pinned,
+  untrusted,
+}: RailStatusInputs): RailMarker[] {
   const markers: RailMarker[] = []
   // Teardown owns the slot under the task's glyph on its own. Anything it outranks stays in the
   // tooltip rather than vanishing.
@@ -66,6 +74,15 @@ export function railStatusMarkers({ unread, status, archiving, settingUp, pinned
       tone: 'danger',
       placements: ['bottom-end', 'bottom-start'],
       priority: 260,
+    })
+  if (untrusted)
+    markers.push({
+      id: 'untrusted',
+      label: "Untrusted project — setup and the repository's own agent settings are off",
+      icon: 'shield',
+      tone: 'warn',
+      placements: ['bottom-end', 'top-start'],
+      priority: 250,
     })
   if (pinned)
     markers.push({

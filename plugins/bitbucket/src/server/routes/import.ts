@@ -1,5 +1,4 @@
-import { stat } from 'node:fs/promises'
-import { isAbsolute, join } from 'node:path'
+import { isAbsolute } from 'node:path'
 import { Hono } from 'hono'
 import { z } from 'zod'
 import {
@@ -33,11 +32,7 @@ const failed = (entry: BitbucketImportItem, error: unknown): BitbucketImportResu
   error: error instanceof Error ? error.message : String(error),
 })
 
-export const bitbucketImport = (
-  db: PluginDatabase,
-  core: Pick<CoreServices, 'projects' | 'git'>,
-  account: BitbucketAccount,
-) =>
+export const bitbucketImport = (db: PluginDatabase, core: Pick<CoreServices, 'projects'>, account: BitbucketAccount) =>
   new Hono<AppEnv>().post('/', requireDevice, async (c) => {
     const parsed = body.safeParse(await c.req.json().catch(() => null))
     if (!parsed.success)
@@ -57,37 +52,31 @@ export const bitbucketImport = (
         continue
       }
       try {
-        let path: string
-        if (entry.action === 'map') {
-          if (!isAbsolute(entry.path)) throw new Error('Checkout path must be absolute.')
-          path = entry.path
-        } else {
-          if (!isAbsolute(entry.parentDir)) throw new Error('Clone parent directory must be absolute.')
-          // Checked first, because git would fail with "spawn git ENOENT" for a missing working folder.
-          if (
-            !(await stat(entry.parentDir).then(
-              (found) => found.isDirectory(),
-              () => false,
-            ))
-          )
-            throw new Error("That folder doesn't exist on this Node.")
+        // Fills a project that names this repository and has no folder yet, rather than adding a rival.
+        const placeholder = await core.projects.byRepository(BITBUCKET_PROVIDER, found.repo)
+        const fillProjectId = placeholder && placeholder.path === null ? placeholder.id : undefined
+
+        if (entry.action === 'clone') {
           // The full name names a folder and reaches git's arguments, so it's held to the repository
           // path grammar first.
           if (!isValidRepositoryPath(found.repo))
             throw new Error(`Bitbucket sent a repository name acorn won't clone into a folder: ${found.path}`)
-          // The folder is the repository's slug, as `git clone` would name it.
-          const folder = found.repo.split('/').pop()!
-          await core.git.gitOrThrow(['clone', '--', `https://${BITBUCKET_HOST}/${found.repo}.git`, folder], {
-            cwd: entry.parentDir,
-            env: { GIT_TERMINAL_PROMPT: '0' },
+          // Core clones in the background and links the row when it has its folder
+          // (docs/workspaces-and-tasks/clone-runs.md). The folder is the repository's slug, as
+          // `git clone` would name it.
+          const { cloneId } = await core.projects.clone({
+            url: `https://${BITBUCKET_HOST}/${found.repo}.git`,
+            parentDir: entry.parentDir,
+            name: found.repo.split('/').pop()!,
+            fillProjectId,
           })
-          path = join(entry.parentDir, folder)
+          results.push({ repository: found.repo, action: entry.action, ok: true, cloneId })
+          continue
         }
-        // Fills a project that names this repository and has no folder yet, rather than adding a rival.
-        const placeholder = await core.projects.byRepository(BITBUCKET_PROVIDER, found.repo)
-        const existingId = placeholder && placeholder.path === null ? placeholder.id : null
-        const projectId = existingId ?? (await core.projects.create({ name: found.name, path })).id
-        const stamped = await core.projects.update(projectId, { path })
+
+        if (!isAbsolute(entry.path)) throw new Error('Checkout path must be absolute.')
+        const projectId = fillProjectId ?? (await core.projects.create({ name: found.name, path: entry.path })).id
+        const stamped = await core.projects.update(projectId, { path: entry.path })
         if (!stamped) throw new Error('Project disappeared while importing.')
         results.push({ repository: found.repo, action: entry.action, ok: true, acornProjectId: stamped.id })
       } catch (error) {

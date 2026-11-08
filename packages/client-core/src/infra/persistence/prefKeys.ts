@@ -55,6 +55,10 @@ export const PrefKeys = {
   // anything about the node the session ran on.
   agentToolFold: 'agent_tool_fold',
   dockerPrefs: 'docker_prefs',
+  // The workflow a clone form fills in to run after the clone, as a definition ID
+  // (plugins/workflows/src/client/CloneLaunchPicker.tsx). The node's, because the ID names a definition
+  // on that Node.
+  workflowsCloneDefault: 'workflows_clone_default',
   // How the Changes pane draws its file list: list or tree, the sort inside a flat list, and what the
   // rows are grouped by (plugins/git/src/client/changes/changesPrefs.ts). One JSON blob in one key, like
   // `docker_prefs`, because the list reads all three together.

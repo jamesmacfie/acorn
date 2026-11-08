@@ -53,7 +53,10 @@ vi.mock('../../infra/platform', async (importOriginal) => ({
   ...(await importOriginal<typeof import('../../infra/platform')>()),
   canPickFolder: () => false,
 }))
-vi.mock('../../host/registries/sources/projectImporters', () => ({ projectImporterContributions: () => [] }))
+vi.mock('../../host/registries/sources/projectImporters', () => ({
+  projectImporterRegistry: { register: () => ({ dispose() {} }) },
+  projectImporterContributions: () => [],
+}))
 
 import WorkspaceProjectAssignments from './WorkspaceProjectAssignments'
 

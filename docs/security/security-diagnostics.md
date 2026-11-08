@@ -58,7 +58,9 @@ The plugin host reports counts of active executable grants, enabled development 
 approved and unapproved skills, and pending changed packages. It does not expose package names or
 declarations.
 The `agents.read-block` finding says whether **Keep agents out of Acorn's data folder** is on, which
-harnesses enforce it ([read block](../managed-agents/read-block.md)).
+harnesses enforce it ([read block](../managed-agents/read-block.md)). The `projects.untrusted` finding
+counts the [untrusted projects](../workspaces-and-tasks/projects.md#untrusted-projects) and names the
+harnesses that can start in them.
 The `host.keys` finding says whether the desktop app delivered the Node's keys sealed, or the Node read
 them from files or its environment, and names any plain key file still in the data root. A standalone
 Node, or a plain file left behind, is a warning, because agents on the Node can read it

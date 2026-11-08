@@ -39,6 +39,10 @@ export class AcpDriver implements AgentDriver {
     return this.spec.readBlock === true
   }
 
+  get untrusted(): boolean {
+    return this.spec.untrusted === true
+  }
+
   get accounts(): HarnessLaunchSpec['accounts'] {
     return this.spec.accounts
   }

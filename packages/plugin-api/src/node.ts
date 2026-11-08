@@ -174,6 +174,12 @@ export { lineDelimitedJsonAdapter, textAdapter } from '@acorn/node-core/server/a
 // interactive ones live in a plugin.
 export { AGENT_TOOL_PASSTHROUGH } from '@acorn/node-core/server/agentProfiles'
 export type { AgentProfileContribution } from '@acorn/node-core/server/agentProfiles/types.ts'
+// Agent launches in an untrusted project. Import these from a module the plugin loads on first use.
+export {
+  UNTRUSTED_REPOSITORY_PROMPT,
+  untrustedHarnessRefusal,
+  untrustedLaunchArgs,
+} from '@acorn/node-core/server/agentProfiles'
 export { buildHeadlessArgv, HEADLESS_TIMEOUT_MS, runHeadless } from '@acorn/node-core/server/headless.ts'
 export type { HeadlessOpts, HeadlessResult, StreamEvent } from '@acorn/node-core/server/headless.ts'
 // A profile as a `ModelBackend` with its live model list, for a plugin that offers harness choices in a

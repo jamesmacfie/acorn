@@ -142,7 +142,10 @@ async function taskDataSources(core: DataCore, taskId: string) {
   const root = await core.tasks.root(taskId)
   const project = task.projectId ? await core.projects.byId(task.projectId) : null
   const config = task.projectId ? await core.projects.config(task.projectId) : null
-  const repo = loadRepoConfig(root ?? project?.path ?? null, homedir(), { dbUrlScript: config?.config.dbUrlScript })
+  // An untrusted project's committed layer is left out (docs/workspaces-and-tasks/projects.md § Untrusted
+  // projects), so only the project row's script can run.
+  const repoDir = project?.trusted === false ? null : (root ?? project?.path ?? null)
+  const repo = loadRepoConfig(repoDir, homedir(), { dbUrlScript: config?.config.dbUrlScript })
   return { root, repo, script: repo.dbUrlScript?.trim() }
 }
 

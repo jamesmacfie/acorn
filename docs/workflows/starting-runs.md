@@ -74,6 +74,59 @@ inputs but refuses the run. An uncertain start keeps its launch ID across dismis
 After a run is opened, the launch is complete, so selecting **Start workflow here** again begins a
 new task and run at the same commit.
 
+## After a clone
+
+[Clone from URL](../workspaces-and-tasks/clone-runs.md#clone-from-url) can start a workflow as the
+new project's first task. The Node does the whole launch, so the run starts whether or not a client
+is still open. The motivating case is a security scan of a repository you don't own, so the rules
+assume the repository is hostile.
+
+The clone form shows **Then run** under the folder name when the workflows plugin is on. It offers
+**None**, the files in `~/.acorn/workflows`, and the published rows of the target workspace that
+belong to no project, without definitions with problems. It never offers a file committed in a
+repository: a repository's ID beats a user's ([definitions](./definitions.md#database-definitions)),
+so a hostile repository could otherwise replace your scan. The target workspace is the one the form
+names, or Default on a Node that groups projects. A Node with workspaces off gives each new project a
+new workspace, so only files are offered there. The selected workflow's inputs appear under it, and
+**Clone** becomes **Clone and run**. Client-core owns the capability key, `CLONE_FOLLOW_UP` in
+`packages/client-core/src/features/workspaces/cloneFollowUp.ts`, and the workflows client provides the
+picker, so core never imports the plugin.
+
+Settings → Workflows → **After a clone** sets the default the form fills in. It stores a definition
+ID in the Node preference `workflows_clone_default`. A default that no longer resolves shows as
+missing there and isn't filled in. The section says the warning that matters: a workflow can still
+run the repository's code. A command step that runs `npm install` or `make` runs whatever the
+repository put there, so pick a workflow that only reads it.
+
+`POST /v1/p/workflows/clone-launches` takes `{ clone: { url, parentDir, name?, workspaceId? }, defId,
+inputs?, launchId }` and answers 202 with the launch. Before it clones anything, it refuses a `repo:`
+definition, a saved definition with no named workspace, one from another workspace, and one bound to
+a project. It resolves the definition and checks the inputs against it, so a missing input fails
+before a long clone. Core's URL and folder checks run then too. Each refusal is a 400 with the reason.
+Then, in the background, the Node clones the URL as an [untrusted](../workspaces-and-tasks/projects.md#untrusted-projects)
+project, creates the root task `<workflow name> · first run` with origin `workflows:clone`, and starts
+the run with `launchId` as its launch ID.
+
+`GET /v1/p/workflows/clone-launches/:launchId?waitMs=20000` holds for up to 20 seconds and answers
+`{ launchId, stage, projectId?, taskId?, runId?, failedAt?, error? }`. `stage` is `cloning`,
+`starting`, `started`, or `failed`, and `failedAt` says which stage failed. A 404 means the Node holds
+no record: a wrong ID, a restart since, or a launch that settled more than 10 minutes ago.
+`GET /v1/p/workflows/clone-launches/workflows?workspaceId=` lists what the form may offer. All three
+routes are device only, as core's clone routes are. The code is
+`plugins/workflows/src/server/runs/cloneLaunch.ts`, loaded on the first request.
+
+A second `POST` with the same `launchId` and the same body joins the launch. A different body gets a
+409. For a failed launch it retries from the stage that failed: a failed clone clones again, and a
+failed start reuses the project and the task the launch made, so a clone that finished is never
+cloned again. On **Clone and run**, the client opens the task on the run pane. On a failure after the
+clone, the form shows the message and **Retry**, which posts the same launch again. A Node restart
+mid-launch loses the record. The project or the task may already exist, and the run can start from
+the task the usual way.
+
+The CLI's `acorn project clone URL --into ABSOLUTE --workflow ID [--inputs-file FILE|-]` does the
+same and prints the project, task, and run IDs. Its `--request-id` is the launch ID, so running it
+again with the same one retries a failed start.
+
 ## From the command palette
 
 Three rows at the palette root, all registered by this plugin's client half

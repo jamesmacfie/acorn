@@ -6,8 +6,8 @@ provider projects from Linear and Rollbar map onto them. The data model is in
 
 ## Add a project
 
-You add folders from Settings → Projects, import repositories through the GitHub plugin, or add them
-in the first-run wizard. When the active Node is local and the host has a folder picker,
+You add folders from Settings → Projects, import repositories through the GitHub plugin, clone a Git
+URL with [Clone from URL](./clone-runs.md#clone-from-url), or add them in the first-run wizard. When the active Node is local and the host has a folder picker,
 **Add project…** at the foot of the topbar's workspace switcher and **Add project** in the palette
 pick a folder and add it to the active workspace (`addProjectFromFolder`). The topbar reaches it
 through the `addProject` verb, gated by `canAddProject`, so a replacement topbar can offer the same
@@ -29,8 +29,8 @@ For a remote Node, enter an absolute folder path on that Node. The native folder
 path on the desktop machine and is unavailable for remote project creation. The GitHub, GitLab, and
 Bitbucket importers follow the same rule. On a Node the picker can't browse, **Clone** and **Link
 folder** open a folder field in the repository's row instead of the dialog, so no desktop path
-reaches the Node. **Clone** starts with the last folder typed for **Clone** in the open importer.
-Changing the active Node closes the field.
+reaches the Node. **Clone** starts with the last folder typed for it, and runs in the background
+([importer clones](./clone-runs.md#importer-clones)). Changing the active Node closes the field.
 
 The Node detects a checkout's GitHub identity from its `origin` remote. It accepts HTTPS, SSH,
 and scp forms, including `git@github.com:Owner/repo` and `git@github.com:/Owner/repo`, with an
@@ -41,8 +41,44 @@ machine. Core compares the resolved path with registered project paths, so a sym
 reuses the project ID it finds. The row keeps the path as first registered.
 [Command-line client](../cli.md) has the commands.
 
+The Node can also clone a Git URL into a new folder and add that folder as a project. [Clone a Git URL](./clone-runs.md)
+covers the checks and the background run, and [Starting runs](../workflows/starting-runs.md#after-a-clone) a workflow after one.
+
 `path` is nullable, and the model reads a project with no path, but nothing creates one. Give an old
 path-less row a folder in Settings → Overview to repair it.
+
+## Untrusted projects
+
+Each project is trusted or untrusted (`projects.trusted`). A project cloned from a URL you pasted
+starts untrusted. Folder adds, `acorn project add`, and importer clones stay trusted, and so does
+every project that existed before the column. Until you trust a project, nothing its repository
+ships runs on the Node. An agent can still read the code.
+
+| Path | In an untrusted project |
+| --- | --- |
+| Task setup | Never runs. The Node records it as `skipped` with the reason `disabled`, because an older client's parse refuses a reason it doesn't know. A run by hand is refused with `untrusted`. The task's rail row shows a shield. |
+| Committed `.acorn/config.toml` | Left out of the merge, so its run targets, layouts, `copy` list, preview, and database script don't exist for this project. The project row and `~/.acorn/config.toml` still apply ([project configuration](./project-config.md#trust)). |
+| Committed workflows | Refused with `WorkflowAuthorityError('untrusted')` at every start. The task's workflow list leaves them out and shows one row saying why. |
+| Agents | Start locked down, or are refused. See below. |
+| Terminal shells | Unchanged. A shell, or a command line you type, is your own. |
+
+The Node reads trust each time a session or terminal starts. Claude Code is the only harness that
+can lock down. A locked-down Claude session loads only your user settings and the MCP servers Acorn
+passes it: `settingSources: ['user']` and `strictMcpConfig` for a managed session, and
+`--setting-sources user --strict-mcp-config` for a terminal, a headless step, a one-shot step, and a
+terminal handoff. The checkout's `.claude/` settings and hooks, its `.mcp.json`, and its `CLAUDE.md`
+don't load. Every locked-down managed session is also kept out of Acorn's data folder
+([read block](../managed-agents/read-block.md)), and its instructions start with a line telling it
+to treat the repository's files as data. That line helps against prompt injection. It doesn't
+prevent it. Codex and contributed harnesses are refused with "This harness can't ignore a
+repository's own settings, so it can't run in an untrusted project."
+
+The project table in Settings → Overview and the header of the project's settings page mark an
+untrusted project **Untrusted**. To trust it, open its settings page and choose **Trust this
+project** under **Untrusted**.
+That calls `POST /v1/core/projects/:id/trust`, which only a device can call. Trust is one-way.
+Sessions and tasks that started before keep how they started, and the next ones load the
+repository's settings and run setup.
 
 ## Arrange projects
 

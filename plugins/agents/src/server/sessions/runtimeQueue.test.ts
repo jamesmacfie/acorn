@@ -160,7 +160,7 @@ describe('durable queue admission', () => {
       },
     }
     const item = await session()
-    vi.spyOn(ctx.core.tasks, 'load').mockResolvedValue({ id: item.taskId } as never)
+    vi.spyOn(ctx.core.tasks, 'load').mockResolvedValue({ id: item.taskId, projectId: 'project-1' } as never)
     // Assembled at runtime and never issued.
     const token = 'npm' + '_' + 'Q7r8S9t0U1v2W3x4Y5z6A7b8C9d0E1f2G3h4'
     const send = async (filename: string, mediaType: string, bytes: Uint8Array) => {

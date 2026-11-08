@@ -120,6 +120,20 @@ describe('repo config trust', () => {
     )
   })
 
+  it("leaves an untrusted project's committed run targets out, and keeps its own", async () => {
+    await testDb.db.update(schema.tasks).set({ branch: null })
+    await testDb.db
+      .update(schema.projects)
+      .set({ trusted: false, runTargets: JSON.stringify([{ id: 'test', command: 'pnpm test' }]) })
+    writeFileSync(join(repo, '.acorn', 'config.toml'), '[scripts.run.dev]\ncommand = "committed-command"\n')
+    expect(await taskRunConfig(testDb.db, 'task1')).toMatchObject({
+      targets: [{ id: 'test', command: 'pnpm test' }],
+      repoTargetIds: [],
+    })
+    await testDb.db.update(schema.projects).set({ trusted: true })
+    expect(await taskRunConfig(testDb.db, 'task1')).toMatchObject({ repoTargetIds: ['dev'] })
+  })
+
   it('returns a configuration error and refuses trust for special snapshot files', async () => {
     await testDb.db.update(schema.tasks).set({ branch: null })
     execFileSync('mkfifo', [join(repo, '.acorn', 'workflows', 'special.toml')])

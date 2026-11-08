@@ -31,6 +31,12 @@ describe('railStatusMarkers', () => {
     expect(railStatusMarkers(inputs())).toEqual([])
   })
 
+  it("says when the task's project is untrusted", () => {
+    expect(railStatusMarkers(inputs({ untrusted: true }))).toEqual([
+      expect.objectContaining({ id: 'untrusted', label: expect.stringContaining('Untrusted project') }),
+    ])
+  })
+
   it('gives every marker a meaning and exactly one representation', () => {
     const markers = railStatusMarkers(
       inputs({ unread: true, pinned: true, status: status({ dirty: true, dirtyCount: 3 }) }),

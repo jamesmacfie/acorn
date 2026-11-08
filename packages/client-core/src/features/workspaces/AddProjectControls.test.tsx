@@ -31,6 +31,7 @@ vi.mock('../../infra/node/activeNode', async () => {
   return { activeNodeId: node }
 })
 vi.mock('../../host/registries/sources/projectImporters', () => ({
+  projectImporterRegistry: { register: () => ({ dispose() {} }) },
   projectImporterContributions: () => [
     {
       id: 'remote-safe',

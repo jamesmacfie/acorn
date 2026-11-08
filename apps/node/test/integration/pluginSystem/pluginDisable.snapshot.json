@@ -72,6 +72,7 @@
       "trellis",
       "workflows",
       "workflows",
+      "workflows/clone-launches",
       "workflows/data/runs",
       "workflows/workflows/invocation",
       "workflows/workflows/schedules",
@@ -402,6 +403,7 @@
       "routes": [
         "workflows",
         "workflows",
+        "workflows/clone-launches",
         "workflows/data/runs",
         "workflows/workflows/invocation",
         "workflows/workflows/schedules",

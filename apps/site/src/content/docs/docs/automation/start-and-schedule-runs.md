@@ -3,13 +3,14 @@ title: Start and schedule runs
 description: Start a workflow from the editor, the command palette, a pull request or issue, a commit, the command line, or an agent, and run one on a schedule or when records change.
 sources:
   - docs/workflows/starting-runs.md
+  - plugins/workflows/src/client/CloneLaunchPicker.tsx
   - docs/workflows/triggers.md
   - docs/schedules/user-schedules.md
   - docs/cli/agents-and-workflows.md
   - plugins/workflows/src/client/triggers/TriggerDialog.tsx
   - plugins/workflows/src/client/triggers/triggerModel.ts
   - plugins/git/src/client/launchWorkflow.ts
-checked: '5773c873c'
+checked: 'a95744e3c'
 ---
 
 A run always belongs to a task. This page covers each way to start one, and how to run a workflow on a
@@ -50,6 +51,25 @@ acorn workflow run wait "$RUN_ID" --until finished --check
 
 `workflow run show` and `workflow run steps` read a run, and `workflow run list --task` lists a task's
 runs. [The command line](/docs/automation/the-command-line/#agents-and-workflows) has more.
+
+## Run a workflow after a clone
+
+**Clone from URL** can start a workflow on the new project. Pick it under **Then run**, fill in its
+inputs, and press **Clone and run**. The Node clones the repository, makes the project's first task,
+and starts the run there, even if you close the form. The task opens on its run when it starts. If the
+start fails after the clone, **Retry** starts it on the same task without cloning again.
+
+**Then run** offers your own workflows, from `~/.acorn/workflows` or made in the app. It never offers
+one the repository ships, because the repository is one you haven't reviewed. Set the workflow it
+starts with in **Settings** > **Workflows** > **After a clone**. A workflow can still run the
+repository's code, for example with `npm install`, so pick one that only reads it.
+
+From the command line:
+
+```sh
+acorn project clone https://github.com/owner/repository.git --into /absolute/parent \
+  --workflow user:security-scan --inputs-file inputs.json
+```
 
 ## Let agents start a workflow
 

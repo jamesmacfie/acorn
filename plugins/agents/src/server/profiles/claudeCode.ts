@@ -20,6 +20,10 @@ export const claudeCodeProfile: AgentProfileContribution = {
       .filter(Boolean)
       .join('\n\n'),
   ],
+  // The user's own settings only, so the checkout's `.claude/` settings, hooks, skills, and `CLAUDE.md`
+  // don't load, and only the MCP servers given on the command line. A terminal therefore starts without
+  // acorn's own server, which is registered in the user's config.
+  untrustedArgs: ['--setting-sources', 'user', '--strict-mcp-config'],
   // `auto` rather than `dontAsk`. `dontAsk` does not mean "do not prompt", it means "deny anything not
   // already in a `permissions.allow` rule", and acorn writes no such rules, so every tool acorn projects
   // (task_context, notes_read, memory_search, issue_detail) would be denied in a workflow step. `auto`

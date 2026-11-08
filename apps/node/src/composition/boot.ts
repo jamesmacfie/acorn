@@ -200,8 +200,11 @@ export async function bootNode(options: BootNodeOptions): Promise<BootedNode> {
       env: runtime,
     })
     // Open task script waits are aborted, and a pending setup attempt is recorded as interrupted by
-    // `shutdown` rather than by `restart` on the next boot.
-    drain.listener = async () => core.taskScripts.close()
+    // `shutdown` rather than by `restart` on the next boot. Clones a plugin started stop too.
+    drain.listener = async () => {
+      core.taskScripts.close()
+      await core.projects.stopClones()
+    }
     // Before the plugins, so one that declares the `telemetry` token can subscribe from its own
     // `init` and see the boot it was loaded during. The preference is read on the collector's own
     // timer rather than here: `PUT /v1/core/prefs` writes the table directly and cannot notify, so a
@@ -280,6 +283,7 @@ export async function bootNode(options: BootNodeOptions): Promise<BootedNode> {
     const listener = await startListener(runtime, root, mark)
     drain.listener = async () => {
       core.taskScripts.close()
+      await core.projects.stopClones()
       await closeListener(listener.server)
     }
     apiUrl = listener.endpoint.origin

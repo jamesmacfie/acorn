@@ -1,6 +1,8 @@
 # Clone a project from a Git URL and run a workflow on it
 
-Date: November 6, 2026. Status: proposed. No phase is started.
+Date: November 6, 2026. Status: landed, except the checkpoints. [Phase 1](./01-clone-runs.md),
+[phase 2](./02-project-trust.md), [phase 3](./03-clone-from-url.md), [phase 4](./04-importers.md), and
+[phase 5](./05-run-after-clone.md) landed November 6, 2026.
 
 ## What this is
 

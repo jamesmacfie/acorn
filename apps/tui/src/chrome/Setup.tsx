@@ -1,5 +1,6 @@
 /** @jsxImportSource @acorn/tui/jsx */
 import { createEffect, createResource, createSignal, For, onCleanup, Show } from 'solid-js'
+import { Dynamic } from 'solid-js/web'
 import { createQuery, useQueryClient } from '@tanstack/solid-query'
 import {
   integrationsKey,
@@ -14,6 +15,9 @@ import {
 } from '@acorn/client-core/infra/queries.ts'
 import { createCredentialForm, createDeviceFlow } from '@acorn/client-core/features/integrations'
 import { createProject, createWorkspace } from '@acorn/client-core/features/workspaces'
+import { createCloneRun, lastCloneParent } from '@acorn/client-core/features/workspaces/cloneRun.ts'
+import { CLONE_FOLLOW_UP, type CloneFollowUpChoice } from '@acorn/client-core/features/workspaces/cloneFollowUp.ts'
+import { clientCapability } from '@acorn/client-core/infra/node'
 import { savePref } from '@acorn/client-core/features/settings/savePref.ts'
 import { activeNodeId } from '@acorn/client-core/infra/node/activeNode.ts'
 import { WORKSPACES_PREF_KEY, workspacesMode, type WorkspacesMode } from '@acorn/protocol/workspacesMode.ts'
@@ -22,6 +26,7 @@ import { projectPath } from '@acorn/client-core/host/registries/commands'
 import { activateTaskSignals, pathForTask } from '@acorn/client-core/features/tasks/activate.ts'
 import { defaultBranchForTask } from '@acorn/client-core/features/tasks'
 import { isValidBranch, slugifyBranch } from '@acorn/protocol/branch.ts'
+import { checkCloneUrl, cloneFolderProblem } from '@acorn/protocol/api.ts'
 import { Alert } from '../kit/showing'
 import { Button, Checkbox, Input, Select } from '../kit/asking'
 import { Line } from '../kit/cells'
@@ -31,7 +36,7 @@ import { useNavigate } from '../kit/router'
 import { focusRegion } from '../keys/regions'
 import { PANES, TASKS } from './topology'
 
-export type SetupStep = 'mode' | 'workspace' | 'project' | 'task' | 'provider' | 'done'
+export type SetupStep = 'mode' | 'workspace' | 'project' | 'clone' | 'task' | 'provider' | 'done'
 
 /** The first-run and return-to-setup route. All writes go through the same client mutations as the
  * desktop. The only host choice here is asking for an absolute path instead of an OS folder picker. */
@@ -63,6 +68,14 @@ export function Setup(props: { model: ShellModel; nodeId: string; initialStep?: 
   const [projectId, setProjectId] = createSignal('')
   const [workspaceName, setWorkspaceName] = createSignal('')
   const [path, setPath] = createSignal('')
+  const [cloneUrl, setCloneUrl] = createSignal('')
+  const [cloneParent, setCloneParent] = createSignal(lastCloneParent(nodeId))
+  // Null until edited, so the folder name follows the URL until then.
+  const [typedCloneName, setTypedCloneName] = createSignal<string | null>(null)
+  const clone = createCloneRun()
+  // A workflow to run after the clone, when the workflows plugin offers one.
+  const followUp = () => clientCapability(CLONE_FOLLOW_UP)
+  const [thenRun, setThenRun] = createSignal<CloneFollowUpChoice | null>(null)
   const [title, setTitle] = createSignal('')
   const [branch, setBranch] = createSignal('')
   const [branchEdited, setBranchEdited] = createSignal(false)
@@ -208,6 +221,54 @@ export function Setup(props: { model: ShellModel; nodeId: string; initialStep?: 
       setStep('task')
     })
 
+  const checkedCloneUrl = () => checkCloneUrl(cloneUrl().trim())
+  const cloneUrlProblem = () => {
+    const checked = checkedCloneUrl()
+    return cloneUrl().trim() && 'error' in checked ? checked.error : ''
+  }
+  const cloneName = () => {
+    const checked = checkedCloneUrl()
+    return typedCloneName() ?? ('folder' in checked ? checked.folder : '')
+  }
+  const cloneReady = () =>
+    (thenRun()?.ready ?? true) &&
+    'folder' in checkedCloneUrl() &&
+    !!cloneParent().trim() &&
+    !cloneFolderProblem(cloneName().trim())
+
+  // As the desktop's Clone from URL, except that a grouped Node files the clone in the chosen
+  // workspace, as this screen's folder add does.
+  const cloneFromUrl = () =>
+    void run(async () => {
+      if (!cloneReady()) return
+      if (mode() === 'on' && !workspaceId()) throw new Error('Choose or create a workspace first.')
+      const name = cloneName().trim()
+      const request = {
+        url: cloneUrl().trim(),
+        parentDir: cloneParent().trim(),
+        name,
+        ...(mode() === 'on' ? { workspaceId: workspaceId() } : {}),
+      }
+      const then = thenRun()
+      const result = then ? await then.start(request) : await clone.start(nodeId, request)
+      if (!result || !stillHere()) return
+      if (!result.ok) throw new Error(result.error)
+      await Promise.all([
+        client.invalidateQueries({ queryKey: projectsKey }),
+        client.invalidateQueries({ queryKey: workspacesKey }),
+        client.invalidateQueries({ queryKey: tasksKey }),
+      ])
+      if (!stillHere()) return
+      // The follow-up opened the run's task, which is where the reader wants to be.
+      if (then) return props.onClose()
+      setCreatedProjectId(result.projectId)
+      setProjectId(result.projectId)
+      setCloneUrl('')
+      setTypedCloneName(null)
+      setResult(`Cloned ${name}. It's untrusted until you trust it in its settings.`)
+      setStep('task')
+    })
+
   const addTask = () =>
     void run(async () => {
       const name = title().trim()
@@ -338,6 +399,14 @@ export function Setup(props: { model: ShellModel; nodeId: string; initialStep?: 
             <Button disabled={busy() || !path().trim()} onPress={addProject}>
               Add folder
             </Button>
+            <Button
+              onPress={() => {
+                setStep('clone')
+                setResult('')
+              }}
+            >
+              Clone from URL…
+            </Button>
             <Show when={mode() === 'on'}>
               <Button variant="bare" onPress={() => setStep('workspace')}>
                 Back to workspaces
@@ -348,6 +417,43 @@ export function Setup(props: { model: ShellModel; nodeId: string; initialStep?: 
                 Set up a provider
               </Button>
             </Show>
+          </Show>
+          <Show when={step() === 'clone'}>
+            <Line role="strong">Clone a Git URL into a folder on the node</Line>
+            <Input placeholder="https://github.com/owner/repository.git" value={cloneUrl()} onInput={setCloneUrl} />
+            <Show when={cloneUrlProblem()}>
+              <Line tone="danger">{cloneUrlProblem()}</Line>
+            </Show>
+            <Input placeholder="/absolute/parent/folder" value={cloneParent()} onInput={setCloneParent} />
+            <Input placeholder="Folder name" value={cloneName()} onInput={setTypedCloneName} onSubmit={cloneFromUrl} />
+            <Show when={followUp()}>
+              {(offer) => (
+                <Dynamic
+                  component={offer().Picker}
+                  nodeId={nodeId}
+                  workspaceId={mode() === 'on' ? workspaceId() || undefined : undefined}
+                  disabled={busy()}
+                  onChange={setThenRun}
+                />
+              )}
+            </Show>
+            <Show
+              when={clone.elapsed()}
+              fallback={
+                <Button disabled={busy() || !cloneReady()} onPress={cloneFromUrl}>
+                  {thenRun()?.label ?? 'Clone'}
+                </Button>
+              }
+            >
+              {(elapsed) => (
+                <Line role="muted">
+                  Cloning {cloneName().trim()}… {elapsed()}
+                </Line>
+              )}
+            </Show>
+            <Button variant="bare" onPress={() => setStep('project')}>
+              Back to projects
+            </Button>
           </Show>
           <Show when={step() === 'task'}>
             <Line role="strong">

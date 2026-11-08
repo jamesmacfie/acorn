@@ -1,6 +1,7 @@
 import { createComponent, lazy } from 'solid-js'
 import {
   AGENT_PROMPT_SCHEDULES,
+  CLONE_FOLLOW_UP,
   contextMenuRegistry,
   openPane,
   projectSurfaceRegistry,
@@ -23,12 +24,15 @@ const WorkflowsSettings = lazy(() => import('./WorkflowsSettings'))
 const StartFromItemHost = lazy(() => import('./StartFromItemHost'))
 const GitLaunchDialog = lazy(() => import('./GitLaunchDialog'))
 const GitLaunchHost = lazy(() => import('./GitLaunchHost'))
+const CloneLaunchPicker = lazy(() => import('./CloneLaunchPicker'))
 const WorkflowToolCard = lazy(async () => ({ default: (await import('./WorkflowToolCard')).WorkflowToolCard }))
 
 export const workflowsClientPlugin: ClientPlugin = {
   name: 'workflows',
   init: (ctx) => {
     ctx.capabilities.provide(WORKFLOW_GIT_LAUNCH, { open: openWorkflowGitLaunch, Dialog: GitLaunchDialog })
+    // **Then run** in core's clone forms, which can't import this plugin.
+    ctx.capabilities.provide(CLONE_FOLLOW_UP, { Picker: CloneLaunchPicker })
     ctx.slots.register({
       id: 'workflows.git-launch',
       slot: 'overlay',
@@ -169,10 +173,13 @@ export const workflowsClientPlugin: ClientPlugin = {
       icon: 'workflow',
       order: 30,
       requires: { plugin: 'workflows' },
-      // The page's one section, for search (`WorkflowsSettings` draws it). Its rows are the loaded
-      // definitions, which are per task, so there are no row labels to declare.
+      // The page's sections, for search (`WorkflowsSettings` draws them). The loaded definitions are
+      // per task, so there are no row labels to declare for them.
       keywords: ['definitions', 'toml', 'parse errors', 'rescan'],
-      sections: [{ id: 'loaded', label: 'Loaded workflows', keywords: ['.acorn/workflows'] }],
+      sections: [
+        { id: 'after-clone', label: 'After a clone', keywords: ['clone', 'then run', 'default'], rows: ['Then run'] },
+        { id: 'loaded', label: 'Loaded workflows', keywords: ['.acorn/workflows'] },
+      ],
       component: WorkflowsSettings,
     })
   },

@@ -14,7 +14,7 @@ covers:
   - datasets
   - runs
   - workflows
-checked: '357778522'
+checked: 'a95744e3c'
 ---
 
 This page lists every setting in **Settings** > **Automation**. Every page here is stored on the Node,
@@ -60,8 +60,11 @@ known. **Refresh** reads it again. Nothing to set.
 
 ## Workflows
 
-The Workflows plugin's page. **Loaded workflows** lists the workflows the open task can run, and any
-that failed to load. **Rescan** reads the task's `.acorn/workflows/` folder again. Nothing to set.
+The Workflows plugin's page. **After a clone** sets the workflow **Clone from URL** fills in under
+**Then run**, or **None**. It offers your own workflows only, never one a repository ships
+([after a clone](/docs/automation/start-and-schedule-runs/#run-a-workflow-after-a-clone)).
+**Loaded workflows** lists the workflows the open task can run, and any that failed to load.
+**Rescan** reads the task's `.acorn/workflows/` folder again.
 
 ## In the terminal
 

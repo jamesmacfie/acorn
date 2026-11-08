@@ -737,12 +737,18 @@ async function spawnOne(
   // Profile launchArgs apply only to the profile's own binary; a command override is a different
   // program. meta.command stays the bare line the UI shows, and the args are launch-only.
   const context = !opts.command && profile.launchContextArgs ? ((await engine.launchText?.(opts.taskId)) ?? null) : null
+  // An agent in an untrusted project starts locked down or not at all. A shell, or a command line the
+  // owner typed, is the owner's own (docs/workspaces-and-tasks/projects.md § Untrusted projects).
+  const untrusted =
+    !opts.command && profile.kind === 'agent' && project?.trusted === false ? await import('./untrustedLaunch') : null
   assertOwner(engine)
   const launchArgs = opts.command
     ? []
-    : profile.launchContextArgs
-      ? profile.launchContextArgs(context)
-      : (profile.launchArgs ?? [])
+    : untrusted
+      ? untrusted.untrustedTerminalArgs(profile, context)
+      : profile.launchContextArgs
+        ? profile.launchContextArgs(context)
+        : (profile.launchArgs ?? [])
 
   let pty: IPty | undefined
   let session: Session | undefined

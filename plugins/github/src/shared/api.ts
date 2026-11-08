@@ -31,6 +31,8 @@ export type GithubImportResult = {
   action: GithubImportAction
   ok: boolean
   projectId?: string
+  /** A clone's run, which the client follows for the project (docs/workspaces-and-tasks/clone-runs.md). */
+  cloneId?: string
   error?: string
 }
 export type GithubImportResponse = { results: GithubImportResult[] }

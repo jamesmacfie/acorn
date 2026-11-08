@@ -94,6 +94,18 @@ Both drivers send a context part as an `<acorn-context>` block (`contextBlock.ts
 source are escaped, and a closing tag inside the content is broken, so a plugin label or a pull
 request body can't end the block early and pass as your message.
 
+### In an untrusted project
+
+A harness starts in an [untrusted project](../workspaces-and-tasks/projects.md#untrusted-projects)
+only when it can ignore the checkout's own settings. A driver says so with `untrusted`, from
+`HarnessLaunchSpec.untrusted`, and the lifecycle passes `untrusted: true` to its start. A terminal
+profile says so with `untrustedArgs`, which goes first on its interactive, headless, and one-shot
+launches. Claude Code has both. Codex has neither: its project config and `AGENTS.md` load from
+Codex's own trust list, which Acorn can't point at a worktree with certainty, so it's refused.
+Contributed harnesses are refused too. A terminal started this way runs without Acorn's own MCP
+server, because Acorn registers that server in Claude's user config and `--strict-mcp-config` drops
+it. Managed sessions and terminal handoffs pass Acorn's server on the command line and keep it.
+
 ## Contributed harnesses
 
 A manifest's `harnesses` entries reach the Node like schedules do. The composition root carries them

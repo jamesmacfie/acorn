@@ -1,5 +1,3 @@
-import { tmpdir } from 'node:os'
-import { join } from 'node:path'
 import { Hono } from 'hono'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { Env } from '@acorn/plugin-api/testkit'
@@ -25,14 +23,13 @@ const ref = (id: string, path: string | null = null, github: ProjectRef['github'
 })
 
 describe('GitHub project importer', () => {
-  // A clone needs a folder that's really there; the clone itself is mocked.
-  const parentDir = tmpdir()
+  const parentDir = '/checkouts'
   let plugin: TestPluginDb
   let app: Hono<AppEnv>
   const create = vi.fn()
   const update = vi.fn()
   const byGithub = vi.fn()
-  const gitOrThrow = vi.fn()
+  const clone = vi.fn()
 
   beforeEach(async () => {
     plugin = makeTestPluginDb('github')
@@ -71,12 +68,12 @@ describe('GitHub project importer', () => {
     create.mockReset()
     update.mockReset()
     byGithub.mockReset()
-    gitOrThrow.mockReset()
+    clone.mockReset()
     create.mockImplementation(async ({ name, path }: { name: string; path: string }) => ref(`${name}-${path}`, path))
     update.mockImplementation(async (id: string, patch: { path?: string }) => ref(id, patch.path ?? null))
     byGithub.mockResolvedValue(null)
-    gitOrThrow.mockResolvedValue({ code: 0, stdout: '', stderr: '' })
-    const core = { projects: { create, update, byGithub }, git: { gitOrThrow } } as never
+    clone.mockResolvedValue({ cloneId: 'clone-1' })
+    const core = { projects: { create, update, byGithub, clone } } as never
     app = new Hono<AppEnv>().use('/api/*', ...testGate(principal)).route('/api', githubImport(plugin.db, core))
   })
 
@@ -105,29 +102,28 @@ describe('GitHub project importer', () => {
     expect(update).toHaveBeenCalledWith('map-me-/checkouts/map-me', { path: '/checkouts/map-me', githubRepoId: 101 })
   })
 
-  it('clones through core.git with terminal prompts disabled and stamps the project', async () => {
+  // Core checks the folder, clones in the background, and links the row once it has its folder.
+  it('hands a clone to core with the repository id and answers with the run', async () => {
     const response = await post({ repositories: [{ repoId: 102, action: 'clone', parentDir }] })
     expect(response.status).toBe(200)
-    expect((await response.json()).results[0]).toMatchObject({ repoId: 102, action: 'clone', ok: true })
-    expect(gitOrThrow).toHaveBeenCalledWith(['clone', 'https://github.com/acme/clone-me.git', 'clone-me'], {
-      cwd: parentDir,
-      env: { GIT_TERMINAL_PROMPT: '0' },
+    expect((await response.json()).results).toEqual([
+      { repoId: 102, owner: 'acme', name: 'clone-me', action: 'clone', ok: true, cloneId: 'clone-1' },
+    ])
+    expect(clone).toHaveBeenCalledWith({
+      url: 'https://github.com/acme/clone-me.git',
+      parentDir,
+      name: 'clone-me',
+      fillProjectId: undefined,
+      fields: { githubRepoId: 102 },
     })
-    expect(create).toHaveBeenCalledWith({ name: 'clone-me', path: join(parentDir, 'clone-me') })
-    expect(update).toHaveBeenCalledWith(expect.any(String), { path: join(parentDir, 'clone-me'), githubRepoId: 102 })
+    expect(create).not.toHaveBeenCalled()
+    expect(update).not.toHaveBeenCalled()
   })
 
-  // A typed folder from a remote Node can name nothing; git would report that as a missing git.
-  it('fails a clone into a folder that does not exist before running git', async () => {
-    const response = await post({
-      repositories: [{ repoId: 102, action: 'clone', parentDir: join(parentDir, 'acorn-no-such-folder') }],
-    })
-    expect((await response.json()).results[0]).toMatchObject({
-      ok: false,
-      error: "That folder doesn't exist on this Node.",
-    })
-    expect(gitOrThrow).not.toHaveBeenCalled()
-    expect(create).not.toHaveBeenCalled()
+  it('gives a clone to a path-less project for the same repository', async () => {
+    byGithub.mockResolvedValue(ref('placeholder-id', null))
+    await post({ repositories: [{ repoId: 103, action: 'clone', parentDir }] })
+    expect(clone).toHaveBeenCalledWith(expect.objectContaining({ fillProjectId: 'placeholder-id' }))
   })
 
   // The duplicate this closes: a deferred project already names the repository with no path, and
@@ -148,8 +144,8 @@ describe('GitHub project importer', () => {
     expect(create).toHaveBeenCalledWith({ name: 'map-me', path: '/checkouts/map-me' })
   })
 
-  it('fails a clone without prompting and continues returning a repository result', async () => {
-    gitOrThrow.mockRejectedValueOnce(new Error('authentication required'))
+  it('reports a clone core refused and carries on with the next repository', async () => {
+    clone.mockRejectedValueOnce(new Error("/checkouts doesn't exist on this Node."))
     const response = await post({
       repositories: [
         { repoId: 102, action: 'clone', parentDir },
@@ -158,7 +154,14 @@ describe('GitHub project importer', () => {
     })
     const body = await response.json()
     expect(body.results).toEqual([
-      { repoId: 102, owner: 'acme', name: 'clone-me', action: 'clone', ok: false, error: 'authentication required' },
+      {
+        repoId: 102,
+        owner: 'acme',
+        name: 'clone-me',
+        action: 'clone',
+        ok: false,
+        error: "/checkouts doesn't exist on this Node.",
+      },
       { repoId: 101, owner: 'acme', name: 'map-me', action: 'map', ok: true, projectId: 'map-me-/checkouts/map-me' },
     ])
   })
@@ -190,7 +193,7 @@ describe('GitHub project importer', () => {
     const select = vi.spyOn(plugin.db, 'select')
     const denied = new Hono<AppEnv>()
       .use('/api/*', ...testGate(caller))
-      .route('/api', githubImport(plugin.db, { projects: { create, update, byGithub }, git: { gitOrThrow } } as never))
+      .route('/api', githubImport(plugin.db, { projects: { create, update, byGithub, clone } } as never))
     for (const body of [
       '{malformed',
       JSON.stringify({
@@ -211,6 +214,6 @@ describe('GitHub project importer', () => {
       expect(request.bodyUsed).toBe(false)
     }
     expect(select).not.toHaveBeenCalled()
-    for (const call of [create, update, byGithub, gitOrThrow]) expect(call).not.toHaveBeenCalled()
+    for (const call of [create, update, byGithub, clone]) expect(call).not.toHaveBeenCalled()
   })
 })

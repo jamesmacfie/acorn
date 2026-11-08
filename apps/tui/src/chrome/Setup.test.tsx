@@ -313,6 +313,46 @@ describe('terminal setup route', () => {
     }
   }, 30_000)
 
+  it('clones a Git URL from the project step, and every control is in reach at 80 by 24', async () => {
+    const screen = await renderFixture({
+      cache: (client) => {
+        client.setQueryData(prefsKey, { 'core.workspaces': 'off' })
+        client.setQueryData(projectsKey, [])
+      },
+    })
+    const start = intercept('POST', '/v1/core/projects/clone-runs', async () =>
+      reply({ cloneId: 'c1', state: 'running' }, 202),
+    )
+    const wait = intercept('GET', '/v1/core/projects/clone-runs/c1?waitMs=20000', async () =>
+      reply({ state: 'finished', result: { ok: true, projectId: 'cloned' } }),
+    )
+    try {
+      await screen.until('Choose a project')
+      expect(await screen.reach('Clone from URL…')).toBe(true)
+      await screen.press('RETURN')
+      await screen.until('Clone a Git URL')
+      expect(await screen.reach('https://github.com/owner/repository.git')).toBe(true)
+      await screen.press('https://github.com/acme/web.git')
+      expect(await screen.reach('/absolute/parent/folder')).toBe(true)
+      await screen.press('/tmp')
+      expect(await screen.reach('web')).toBe(true)
+      expect(await screen.reach('Back to projects')).toBe(true)
+      expect(await screen.reach('Clone')).toBe(true)
+      await screen.press('RETURN')
+      await screen.until("Cloned web. It's untrusted")
+      expect(sentJson(start.calls[0]!)).toEqual({
+        url: 'https://github.com/acme/web.git',
+        parentDir: '/tmp',
+        name: 'web',
+      })
+      expect(wait.calls).toHaveLength(1)
+    } finally {
+      wait.restore()
+      start.restore()
+      screen.done()
+    }
+  }, 30_000)
+
   it.each(['switch', 'dispose'] as const)(
     'ignores a late grouping save after %s',
     async (ending) => {

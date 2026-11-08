@@ -42,6 +42,9 @@ export type ProjectRepository = { provider: string | null; host: string; path: s
 // folder has neither, a git checkout without a remote has only `vcs`, and `path` is null for a project
 // imported from a code host but not yet cloned. `github` is `repository` read as GitHub's owner and
 // name, present only for a `github.com` remote. `repository` is absent from a Node older than it.
+// `trusted` is false for a project nothing of its repository may run in yet
+// (docs/workspaces-and-tasks/projects.md § Untrusted projects). An older Node never sends it, and a
+// client reads that as trusted.
 export type Project = {
   id: string
   name: string
@@ -56,6 +59,7 @@ export type Project = {
   remoteUrl: string | null
   repository?: ProjectRepository | null
   github: { owner: string; name: string; repoId: number | null } | null
+  trusted?: boolean
 }
 export type ProjectSeed = { path: string; workspaceId?: string; name?: string }
 export type ProjectPatch = Partial<{
@@ -214,6 +218,7 @@ export const projectsRoute = '/v1/core/projects'
 export const projectRoute = (id: string) => `${projectsRoute}/${encodeURIComponent(id)}`
 export const projectDetectRoute = (id: string) => `${projectRoute(id)}/detect`
 export const projectConfigRoute = (id: string) => `${projectRoute(id)}/config`
+export const projectTrustRoute = (id: string) => `${projectRoute(id)}/trust`
 export const projectRunTargetsRoute = (id: string) => `${projectRoute(id)}/run-targets`
 // Linked git worktrees of the project's checkout that no active task uses yet, for the new-task
 // dialog's "Existing worktree" tab.

@@ -581,6 +581,8 @@ acorn-plugin-types: member CoreProjectService.byId
 acorn-plugin-types: member CoreProjectService.byRepository
 acorn-plugin-types: member CoreProjectService.byWorkspace
 acorn-plugin-types: member CoreProjectService.checkouts
+acorn-plugin-types: member CoreProjectService.clone
+acorn-plugin-types: member CoreProjectService.cloneRun
 acorn-plugin-types: member CoreProjectService.config
 acorn-plugin-types: member CoreProjectService.create
 acorn-plugin-types: member CoreProjectService.externalProjects
@@ -1086,6 +1088,19 @@ acorn-plugin-types: member ProcSpec.priority
 acorn-plugin-types: member ProcSpec.signal
 acorn-plugin-types: member ProcSpec.stdin
 acorn-plugin-types: member ProcSpec.timeoutMs
+acorn-plugin-types: member ProjectCloneInput.fields
+acorn-plugin-types: member ProjectCloneInput.fillProjectId
+acorn-plugin-types: member ProjectCloneInput.name
+acorn-plugin-types: member ProjectCloneInput.parentDir
+acorn-plugin-types: member ProjectCloneInput.trusted
+acorn-plugin-types: member ProjectCloneInput.url
+acorn-plugin-types: member ProjectCloneInput.workspaceId
+acorn-plugin-types: member ProjectCloneResult.error
+acorn-plugin-types: member ProjectCloneResult.ok
+acorn-plugin-types: member ProjectCloneResult.projectId
+acorn-plugin-types: member ProjectCloneRun.elapsedMs
+acorn-plugin-types: member ProjectCloneRun.result
+acorn-plugin-types: member ProjectCloneRun.state
 acorn-plugin-types: member ProjectConfig.branchPrefix
 acorn-plugin-types: member ProjectConfig.dbSchemaMode
 acorn-plugin-types: member ProjectConfig.dbSchemaNotes
@@ -1121,6 +1136,7 @@ acorn-plugin-types: member ProjectRef.id
 acorn-plugin-types: member ProjectRef.name
 acorn-plugin-types: member ProjectRef.path
 acorn-plugin-types: member ProjectRef.repository
+acorn-plugin-types: member ProjectRef.trusted
 acorn-plugin-types: member ProjectRef.workspaceId
 acorn-plugin-types: member ProjectRepository.externalId
 acorn-plugin-types: member ProjectRepository.host
@@ -1430,6 +1446,9 @@ acorn-plugin-types: type PreviewMode
 acorn-plugin-types: type Principal
 acorn-plugin-types: type ProcResult
 acorn-plugin-types: type ProcSpec
+acorn-plugin-types: type ProjectCloneInput
+acorn-plugin-types: type ProjectCloneResult
+acorn-plugin-types: type ProjectCloneRun
 acorn-plugin-types: type ProjectConfig
 acorn-plugin-types: type ProjectConfigResponse
 acorn-plugin-types: type ProjectCreateRefInput

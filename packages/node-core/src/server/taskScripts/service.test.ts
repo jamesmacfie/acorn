@@ -201,6 +201,14 @@ describe('setup by hand', () => {
       'not_configured',
     ],
     [
+      'an untrusted project',
+      () => {
+        db.db.update(schema.projects).set({ trusted: false }).run()
+        scripts.admit('task', 'setup', 'disabled')
+      },
+      'untrusted',
+    ],
+    [
       'a task without a worktree',
       () => {
         db.db.update(schema.tasks).set({ worktreePath: null }).run()

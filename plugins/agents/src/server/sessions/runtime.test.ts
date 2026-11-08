@@ -726,6 +726,81 @@ describe('managed agent runtime conformance', () => {
     )
   })
 
+  it("starts an untrusted project's session locked down and kept out of the data folder, whatever the switch says", async () => {
+    class LockingDriver extends DeferredStartDriver {
+      readonly readBlock = true
+      readonly untrusted = true
+      options: AgentDriverStartOptions | null = null
+      override async start(options: AgentDriverStartOptions): Promise<AgentDriverSession> {
+        this.options = options
+        return super.start(options)
+      }
+    }
+    const seed = await seedTask(testDb, dataDir)
+    await testDb.db.update(schema.projects).set({ trusted: false })
+    configureAcornMcp('acorn-dev', { command: '/app/node', args: ['/app/helper/mcp.js'], env: {} })
+    const registry = new AgentDriverRegistry()
+    const driver = new LockingDriver()
+    registry.registerNative(driver.providerId, () => driver)
+    runtime = new ManagedAgentRuntime({
+      db: pluginDb.db,
+      dataDir,
+      core,
+      internalEnv: () => ({}),
+      secrets: SECRETS,
+      currentUserId: () => 'owner',
+      registry,
+    })
+
+    await runtime.acceptSession({
+      taskId: seed.taskId,
+      providerId: driver.providerId,
+      profileId: driver.profileId,
+      kind: 'interactive',
+      config: {},
+    })
+    await driver.entered
+    driver.release()
+
+    expect(driver.options).toMatchObject({
+      untrusted: true,
+      readBlock: { fileGuard: { command: '/app/node' } },
+      attendanceInstructions: expect.stringContaining('This repository is untrusted.'),
+    })
+  })
+
+  it("refuses a harness that can't lock down in an untrusted project", async () => {
+    const seed = await seedTask(testDb, dataDir)
+    await testDb.db.update(schema.projects).set({ trusted: false })
+    const registry = new AgentDriverRegistry()
+    const driver = new DeferredStartDriver()
+    registry.registerNative(driver.providerId, () => driver)
+    runtime = new ManagedAgentRuntime({
+      db: pluginDb.db,
+      dataDir,
+      core,
+      internalEnv: () => ({}),
+      secrets: SECRETS,
+      currentUserId: () => null,
+      registry,
+    })
+
+    const accepted = await runtime.acceptSession({
+      taskId: seed.taskId,
+      providerId: driver.providerId,
+      profileId: driver.profileId,
+      kind: 'interactive',
+      config: {},
+    })
+    const failed = await runtime.wait(accepted.id, 0, 'stopped', 2_000)
+
+    expect(failed.session.runtimeState).toBe('failed')
+    expect(driver.stops).toBe(0)
+    expect(
+      failed.events.some((record) => record.event.type === 'error' && record.event.code === 'provider_start_failed'),
+    ).toBe(true)
+  })
+
   it('does not miss a condition committed between the initial wait snapshot and subscription', async () => {
     const seed = await seedTask(testDb, dataDir)
     runtime = new ManagedAgentRuntime({

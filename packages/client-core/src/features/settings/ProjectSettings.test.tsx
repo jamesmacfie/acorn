@@ -80,11 +80,11 @@ afterEach(() => {
   for (const disposable of held.splice(0)) disposable.dispose()
 })
 
-const mount = () => {
+const mount = (project = PROJECT) => {
   dispose = render(
     () => (
       <>
-        <ProjectSettings project={PROJECT} context={context} />
+        <ProjectSettings project={project} context={context} />
         <WillConfirmationHost />
       </>
     ),
@@ -122,6 +122,19 @@ describe('ProjectSettings', () => {
     expect(dialog.textContent).toContain('datasets are removed')
     expect(dialog.textContent).toContain('Nothing on disk is removed')
   })
+  it('offers to trust an untrusted project and says what that turns on', () => {
+    mount()
+    expect(rowNamed('Trust this project')).toBeUndefined()
+    dispose?.()
+    mount({ ...PROJECT, trusted: false })
+    rowNamed('Trust this project')!.querySelector('button')!.click()
+    const dialog = document.querySelector('[role="alertdialog"]')!
+    expect(dialog.textContent).toContain(
+      'setup scripts, its .acorn/config.toml, its committed workflows, and its agent settings and hooks',
+    )
+    expect(dialog.textContent).toContain("You can't mark it untrusted again.")
+  })
+
   it("makes a value the repo sets read-only, names the file, and keeps this machine's value in view", async () => {
     mocks.response = {
       projectId: 'p-1',

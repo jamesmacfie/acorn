@@ -124,6 +124,9 @@ export const projects = sqliteTable(
     workspaceId: text('workspace_id').notNull(), // → workspaces.id; a project lives in exactly one workspace
     sort: integer('sort').notNull().default(0),
     hidden: integer('hidden', { mode: 'boolean' }).notNull().default(false),
+    // False until the owner trusts the project: nothing its repository ships runs on the Node
+    // (docs/workspaces-and-tasks/projects.md § Untrusted projects). Only a URL clone starts false.
+    trusted: integer('trusted', { mode: 'boolean' }).notNull().default(true),
     color: text('color'), // optional task-tab accent: preset key or 6-hex; null = no project accent
     // VCS facet: 'git' when a .git entry was detected at `path`, null for a plain folder.
     vcs: text('vcs'),

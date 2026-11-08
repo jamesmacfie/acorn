@@ -6,7 +6,7 @@ import { projectsKey, tasksKey, tasksOptions, workspacesKey, workspacesOptions }
 import { activeNodeId } from '../../infra/node/activeNode'
 import { canPickNodeFolder, pickNodeFolder } from '../workspaces/addProject'
 import { NodePathForm } from '../workspaces/NodePathForm'
-import { deleteProject, patchProject } from '../workspaces/workspaceMutations'
+import { deleteProject, patchProject, trustProject } from '../workspaces/workspaceMutations'
 import { ProjectColorInput } from '../workspaces/ProjectColorInput'
 import {
   settingsDetailTabs,
@@ -162,7 +162,18 @@ function GeneralTab(props: { project: Project; store: ProjectConfigStore; contex
   const workspace = createSettingSave()
   const visibility = createSettingSave()
   const removal = createSettingSave()
+  const trust = createSettingSave()
   const [busy, setBusy] = createSignal(false)
+
+  const trustThis = async () => {
+    const confirmed = await confirmAction({
+      title: 'Trust this project',
+      actionLabel: 'Trust project',
+      goes: `Acorn turns on what ${props.project.name}'s repository ships: setup scripts, its .acorn/config.toml, its committed workflows, and its agent settings and hooks. Agents started from now on load them.`,
+      stays: "You can't mark it untrusted again. Agents already running keep how they started.",
+    })
+    if (confirmed) await trust.run(() => trustProject(props.project.id).then(refresh))
+  }
 
   const changeFolder = async () => {
     const nodeId = activeNodeId()
@@ -204,6 +215,17 @@ function GeneralTab(props: { project: Project; store: ProjectConfigStore; contex
 
   return (
     <>
+      <Show when={props.project.trusted === false}>
+        <SettingsSection id="trust" label="Untrusted" tone="danger">
+          <SettingRow
+            label="Trust this project"
+            description="Acorn cloned it from a URL. Until you trust it, nothing its repository ships runs here, and agents ignore its own settings, hooks, and instruction files."
+            error={trust.error()}
+          >
+            <Button onPress={() => void trustThis()}>Trust this project…</Button>
+          </SettingRow>
+        </SettingsSection>
+      </Show>
       <SettingsSection id="general" label="General">
         <SettingRow label="Name" savedAt={name.savedAt()} error={name.error()}>
           <Input

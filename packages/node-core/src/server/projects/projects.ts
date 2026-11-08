@@ -51,6 +51,7 @@ export type ProjectRef = {
   workspaceId: string
   repository: ProjectRepository | null
   github: { owner: string; name: string; repoId: number | null } | null
+  trusted?: boolean
 }
 
 export type ProjectCreateRefInput = {
@@ -76,6 +77,7 @@ export function toProjectRef(row: ProjectRow): ProjectRef {
     workspaceId: row.workspaceId,
     repository,
     github: githubFacet(repository),
+    trusted: row.trusted,
   }
 }
 
@@ -285,7 +287,7 @@ class WorkspacesOffError extends Error {
 
 export async function createProject(
   db: AppDatabase,
-  input: { path: string; workspaceId?: string; name?: string },
+  input: { path: string; workspaceId?: string; name?: string; trusted?: boolean },
   ownerId = '',
 ): Promise<CreateProjectResult> {
   if (input.workspaceId !== undefined && nodeWorkspacesMode(db, ownerId) === 'off') {
@@ -303,6 +305,7 @@ export async function createProject(
   const project: NewProject = {
     name: input.name?.trim() || repository?.path.split('/').pop() || basename(input.path),
     path: input.path,
+    trusted: input.trusted,
     ...facets,
     ...repositoryColumns(repository),
   }

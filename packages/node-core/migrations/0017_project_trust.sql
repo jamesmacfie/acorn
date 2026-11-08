@@ -1,0 +1,1 @@
+ALTER TABLE `projects` ADD `trusted` integer DEFAULT true NOT NULL;

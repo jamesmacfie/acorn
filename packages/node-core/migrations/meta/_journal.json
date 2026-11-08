@@ -120,6 +120,13 @@
       "when": 1792652588001,
       "tag": "0016_device_kind",
       "breakpoints": true
+    },
+    {
+      "idx": 17,
+      "version": "6",
+      "when": 1793913261614,
+      "tag": "0017_project_trust",
+      "breakpoints": true
     }
   ]
 }

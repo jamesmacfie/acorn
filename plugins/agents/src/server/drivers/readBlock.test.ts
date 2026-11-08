@@ -312,6 +312,18 @@ describe('the read block in Claude Code', () => {
     })
   })
 
+  it('loads only the user settings and the MCP servers acorn passes in an untrusted project', () => {
+    const options = (meta: Record<string, unknown>) => (meta.claudeCode as { options: Record<string, unknown> }).options
+    const skills = { folders: [], plugins: [] }
+    expect(
+      options(claudeHarness.acpSessionMeta!(session, skills, undefined, undefined, undefined, true)),
+    ).toMatchObject({
+      settingSources: ['user'],
+      strictMcpConfig: true,
+    })
+    expect(options(claudeHarness.acpSessionMeta!(session, skills))).not.toHaveProperty('settingSources')
+  })
+
   it('leaves a session without the block unconfined', () => {
     expect(settings(claudeHarness.acpSessionMeta!(session, { folders: [], plugins: [] }))).toEqual({
       autoContinueAtUsageLimit: false,

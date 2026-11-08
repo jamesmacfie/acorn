@@ -44,6 +44,8 @@ const CORE = {
     setup: marker('setup'),
     create: marker('create'),
     update: marker('update'),
+    clone: marker('clone'),
+    cloneRun: marker('cloneRun'),
   },
 } as unknown as CoreServices
 
@@ -233,13 +235,17 @@ describe('scopeCore', () => {
     const undo = declareCodeHost('demo', { label: 'Demo', hosts: ['git.demo.test'] }, false)
     const create = vi.fn(async (_input: unknown) => ({}))
     const update = vi.fn(async (_id: string, _patch: unknown, _holder?: string) => ({}))
+    const clone = vi.fn(async (_input: unknown, _holder?: string) => ({ cloneId: 'c' }))
     const { projects } = scoped({ core: ['projects:write'] }, {
       ...CORE,
-      projects: { ...CORE.projects, create, update },
+      projects: { ...CORE.projects, create, update, clone },
     } as unknown as CoreServices)
     try {
       await projects.update('project', { repositoryExternalId: '1' })
       expect(update).toHaveBeenCalledWith('project', { repositoryExternalId: '1' }, 'demo')
+      const input = { url: 'https://git.demo.test/a/b.git', parentDir: '/tmp', fields: { repositoryExternalId: '1' } }
+      await projects.clone(input)
+      expect(clone).toHaveBeenCalledWith(input, 'demo')
       await expect(projects.create({ name: 'x', github: { owner: 'a', name: 'b', repoId: 3 } })).rejects.toThrow(
         /github\.com/,
       )
@@ -260,6 +266,8 @@ describe('scopeCore', () => {
       'byRepository',
       'byWorkspace',
       'checkouts',
+      'clone',
+      'cloneRun',
       'create',
       'externalProjects',
       'update',
