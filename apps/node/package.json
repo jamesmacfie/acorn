@@ -37,6 +37,7 @@
     "@acorn/plugin-workflows": "workspace:*",
     "@acorn/protocol": "workspace:*",
     "@hono/node-server": "^2.0.11",
+    "create-acorn-plugin": "workspace:*",
     "drizzle-orm": "catalog:",
     "hono": "catalog:",
     "playwright-core": "^1.61.1",

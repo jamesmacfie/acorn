@@ -116,6 +116,7 @@ const bridge = (situation: Situation): PluginsBridge => {
     update: async () => ({ id: '', fromVersion: '', toVersion: '', state: 'installed-restart-required' }),
     uninstall: () => ({ restartRequired: true, dataPurged: false }),
     reload: async () => ({ id: '', version: '', state: 'reloaded' }),
+    scaffoldPackage: () => Promise.reject(new Error('not under test')),
     inputGrants: () => ({
       get: (id) => situation.grants?.find((grant) => grant.pluginId === id),
       set: () => {},

@@ -227,6 +227,17 @@ export type PluginInstallSource =
   | { url: string }
   | { path: string }
 
+// POST /v1/core/plugins/scaffold: the starter files `create-acorn-plugin` writes, put into `folder` on
+// the node. `folder` is absolute and must be missing or empty; anything else answers 409 `not-empty`.
+export type PluginScaffoldRequest = { folder: string; pluginId: string; name: string; git: boolean } & (
+  | { kind: 'pane' | 'trigger' }
+  | { kind: 'data-source'; dataSource: { row: string; inputs: { source: string; optional?: boolean }[] } }
+)
+
+// `git` says whether the folder became a repository holding one commit of the starter files. When a
+// git step fails the files stay and `skipped` says why, most often a node with no git installed.
+export type PluginScaffoldResult = { result: 'written'; git: 'committed' | 'off' | { skipped: string } }
+
 // What the node did with a package once it was on disk (docs/plugins/loaded-plugins.md § Loaded plugins).
 // - `started`: running now, in this process. A client-only package counts, since it has nothing to start.
 // - `start-failed`: on disk, but its first start threw. `reason` says why; a restart runs the same code.

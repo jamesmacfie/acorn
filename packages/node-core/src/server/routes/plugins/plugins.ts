@@ -397,6 +397,23 @@ export const plugins = new Hono<AppEnv>()
       return result
     })
   })
+  // A plugin's starter files, written into a missing or empty folder so it can become a project. Behind
+  // the same device gate: a task token that could call it could write files anywhere on the node.
+  .post('/scaffold', async (c) => {
+    const missing = requireIdempotencyKey(c)
+    if (missing) return missing
+    const body: unknown = await c.req.json().catch(() => null)
+    return viaBridge(c, PLUGIN_STATE, async (bridge) => {
+      const { scaffoldRequest, writePluginScaffold } = await import('../../plugins/scaffold')
+      const scaffold = await bridge.scaffoldPackage()
+      const parsed = scaffoldRequest(scaffold).safeParse(body)
+      if (!parsed.success)
+        throw new BridgeError(400, 'bad_request', parsed.error.issues.map((issue) => issue.message).join('\n'))
+      const result = await writePluginScaffold(scaffold, parsed.data)
+      if (result === 'not-empty') throw new BridgeError(409, 'not-empty', 'The folder must be missing or empty.')
+      return result
+    })
+  })
   .post('/:id/update', async (c) => {
     const missing = requireIdempotencyKey(c)
     if (missing) return missing

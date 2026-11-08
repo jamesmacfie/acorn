@@ -9,6 +9,7 @@ import { pluginInputs, type InputGrantsStore } from '../plugins/inputGrants'
 import type { SkillStateStore } from '../plugins/skillState'
 import { pluginSkills } from './skills'
 import type { PluginDevelopment } from '../plugins/development'
+import type { ScaffoldPackage } from '../plugins/scaffold'
 import { registeredDataSource } from '../dataSources/registry'
 import { heldHosts } from './codeHosts'
 import { parseDataSourceInputRef } from '@acorn/protocol/dataSources.ts'
@@ -89,6 +90,9 @@ export type PluginsBridge = {
   // Development mode for folder-installed node plugins: the watch, the reload, the log lines, and the
   // development grant.
   development: PluginDevelopment
+  // `create-acorn-plugin`, loaded on first use. The composition root supplies it because that package's
+  // tests depend on node-core, so node-core depending on it would be a cycle.
+  scaffoldPackage(): Promise<ScaffoldPackage>
 }
 
 export const PLUGIN_STATE = routeCapability<PluginsBridge>('core.pluginStateRoute')

@@ -369,6 +369,7 @@
     "POST /v1/core/plugins/:id/update",
     "POST /v1/core/plugins/install",
     "POST /v1/core/plugins/requests/:requestId",
+    "POST /v1/core/plugins/scaffold",
     "POST /v1/core/projects",
     "POST /v1/core/projects/:id/detect",
     "POST /v1/core/projects/:id/mcp/starter",

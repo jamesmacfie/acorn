@@ -1,5 +1,5 @@
 import { createHash } from 'node:crypto'
-import { mkdtempSync, writeFileSync } from 'node:fs'
+import { existsSync, mkdtempSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { Hono } from 'hono'
@@ -14,6 +14,7 @@ import { _resetPluginRequests, raisePluginRequest } from '../../agentTools/plugi
 import { PLUGIN_STATE } from '../../pluginHost/state'
 import { plugins } from './plugins'
 import { testCliCommandDescriptor } from '../../../testkit/runtimeContributions'
+import { testScaffoldPackage } from '../../../testkit/scaffoldPackage'
 import { memoryIdentityStore } from '../../activeIdentity'
 import { idempotencyStore } from '../../auth/idempotency'
 import { idempotency } from '../../middleware/idempotency'
@@ -195,6 +196,7 @@ const wire = (initial: readonly string[], options: WireOptions = {}) => {
       if (id === 'broken') return { id, version: '1.0.0', state: 'failed', reason: 'init exploded' }
       return { id, version: '1.1.0', state: 'reloaded' }
     },
+    scaffoldPackage: async () => testScaffoldPackage,
   })
   return Object.assign(() => saved, { calls })
 }
@@ -228,6 +230,7 @@ const app = (principal: AppEnv['Variables']['principal']) => {
 }
 
 const asDevice = () => app({ kind: 'device', userId: 'james', deviceId: 'd1' })
+const scaffoldBody = (folder: string) => ({ folder, pluginId: 'weather', name: 'Weather', kind: 'pane', git: false })
 const asTaskAgent = () => app({ kind: 'internal', userId: 'james', scope: 'task', taskId: 't1' })
 
 afterEach(() => setRouteTestCapability(PLUGIN_STATE, null))
@@ -886,6 +889,8 @@ describe('the device gate over /v1/core/plugins', () => {
       // node run again on its own timing, with no bytes arriving to notice.
       at('/sparkline/reload', 'POST', undefined, KEY),
       at('/sparkline/development', 'PUT', { on: true }),
+      // An agent that could scaffold could write files into any empty folder on the node.
+      at('/scaffold', 'POST', scaffoldBody(join(mkdtempSync(join(tmpdir(), 'acorn-scaffold-')), 'p')), KEY),
     ]
     for (const attempt of attempts) expect((await agent.fetch(attempt.clone())).status, attempt.url).toBe(403)
     // And the ungated router would have answered. So the 403 is the gate, not the handler.
@@ -1335,5 +1340,43 @@ describe('a loaded plugin’s skills', () => {
       (await node.request(at('/procedures/skills', 'PUT', { name: 'procedures:other', enabled: false }))).status,
     ).toBe(404)
     expect((await node.request(at('/github/skills', 'GET'))).status).toBe(404)
+  })
+})
+
+describe('POST /scaffold', () => {
+  const folder = () => join(mkdtempSync(join(tmpdir(), 'acorn-scaffold-')), 'weather')
+
+  it('writes the starter files into a new folder', async () => {
+    wire([])
+    const target = folder()
+    const res = await asDevice().fetch(at('/scaffold', 'POST', scaffoldBody(target), KEY))
+    expect(res.status).toBe(200)
+    expect(await res.json()).toEqual({ result: 'written', git: 'off' })
+    expect(existsSync(join(target, 'acorn-plugin.json'))).toBe(true)
+  })
+
+  it('answers not-empty for a folder that has anything in it', async () => {
+    wire([])
+    const target = folder()
+    await asDevice().fetch(at('/scaffold', 'POST', scaffoldBody(target), KEY))
+    const res = await asDevice().fetch(at('/scaffold', 'POST', scaffoldBody(target), KEY))
+    expect(res.status).toBe(409)
+    expect(((await res.json()) as { error: { code: string } }).error.code).toBe('not-empty')
+  })
+
+  it('refuses a relative folder, a bad ID, and a data source with no starter', async () => {
+    wire([])
+    for (const body of [
+      scaffoldBody('weather'),
+      { ...scaffoldBody(folder()), pluginId: 'Weather' },
+      { ...scaffoldBody(folder()), kind: 'data-source' },
+    ]) {
+      expect((await asDevice().fetch(at('/scaffold', 'POST', body, KEY))).status, JSON.stringify(body)).toBe(400)
+    }
+  })
+
+  it('requires an Idempotency-Key', async () => {
+    wire([])
+    expect((await asDevice().fetch(at('/scaffold', 'POST', scaffoldBody(folder())))).status).toBe(400)
   })
 })

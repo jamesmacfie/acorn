@@ -216,6 +216,7 @@ export async function buildPluginStateBridge(input: PluginStateInput): Promise<P
     inputGrants: () => inputGrantsStore(dataDir),
     skillState: () => skillStateStore(dataDir),
     development,
+    scaffoldPackage: () => import('create-acorn-plugin'),
     dispose: development.dispose,
   }
 }
