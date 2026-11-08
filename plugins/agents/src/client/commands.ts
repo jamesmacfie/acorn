@@ -3,7 +3,6 @@ import type { CommandSearchItem } from '@acorn/protocol/commands.ts'
 import {
   COMMAND_CLOSED,
   localSearch,
-  readJson,
   registerCommands,
   type CommandOutcome,
   type ContributedCommand,
@@ -16,12 +15,12 @@ import { managedAgentStore } from './sessions/managedStore'
 import {
   choiceDescription,
   choiceGlyph,
+  choiceId,
   choiceLabel,
   choiceStart,
-  newSessionChoices,
   type NewSessionChoice,
 } from '../contract/newSessionChoices.ts'
-import { customAgentsRoute, type CustomAgent } from '../shared/customAgents'
+import { readNewSessionChoices } from './sessionStarter'
 import { requestSessionGoalEditor } from './sessions/sessionGoalCommand'
 
 // What this plugin puts in the palette: the rail source it owns, a way to start a session in the open
@@ -88,19 +87,11 @@ export const agentsCommands: readonly ContributedCommand[] = [
     // read once when the frame opens and filtered here, because that list does not move while somebody
     // types. Like New, it lists only rows that can start a session.
     ...localSearch(async () => {
-      const [providers, agents] = await Promise.all([
-        managedAgentApi.providers(),
-        // A failed agents read still leaves the harnesses to pick from.
-        readJson<CustomAgent[]>(customAgentsRoute).catch(() => []),
-      ])
+      const choices = await readNewSessionChoices()
       pickedRows.clear()
-      return newSessionChoices(providers, agents).map((choice): CommandSearchItem => {
+      return choices.map((choice): CommandSearchItem => {
         const glyph = choiceGlyph(choice)
-        const id = choice.agent
-          ? `custom-agent:${choice.agent.id}`
-          : choice.account
-            ? `${choice.provider.id}:account:${choice.account}`
-            : choice.provider.id
+        const id = choiceId(choice)
         pickedRows.set(id, choice)
         return {
           id,

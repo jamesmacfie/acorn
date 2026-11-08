@@ -281,6 +281,10 @@ export { clientCapability, clientCapabilityId } from '@acorn/client-core/infra/n
 // consumes them and can't import a plugin.
 export { AGENT_ASK, AGENT_PROMPT_SCHEDULES } from '@acorn/client-core/features/dashboards/refreshCapabilities.ts'
 export type { AgentPromptSchedules } from '@acorn/client-core/features/dashboards/refreshCapabilities.ts'
+// What the Plugins page's Create plugin asks of the agents plugin: the agents to offer, and a session
+// started with a draft the person finishes. Core declares the key for the same reason.
+export { AGENT_SESSION_STARTER } from '@acorn/client-core/features/agent'
+export type { AgentSessionStarter } from '@acorn/client-core/features/agent'
 // Where a code host provides the agent card for lines of its change requests, so a tree that shows them
 // can draw it. Core declares the key for the same reason.
 export { changeRequestLinesId } from '@acorn/client-core/features/diff/changeRequestLines.ts'

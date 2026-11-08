@@ -1,8 +1,10 @@
 # private workspace facade
 client: AGENT_ASK
 client: AGENT_PROMPT_SCHEDULES
+client: AGENT_SESSION_STARTER
 client: AgentMessageTarget
 client: AgentPromptSchedules
+client: AgentSessionStarter
 client: AgentTurnTarget
 client: AttentionItem
 client: AttentionSourceContribution

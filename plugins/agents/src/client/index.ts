@@ -4,7 +4,7 @@
 // the managed-agent runtime is for, and core's task view falls back to a pane list that assumes they
 // exist.
 import { lazy } from 'solid-js'
-import { AGENT_ASK, type ClientPlugin } from '@acorn/plugin-api/client'
+import { AGENT_ASK, AGENT_SESSION_STARTER, type ClientPlugin } from '@acorn/plugin-api/client'
 import {
   AGENT_SESSION_KEY,
   AGENT_TOOL_CARD_POINT,
@@ -33,6 +33,7 @@ import { agentRailMarkerContribution } from './railMarkerContribution'
 import { managedReferenceTarget } from './referenceContribution'
 import { agentCenterSourceContribution } from './sourceContribution'
 import { agentsCommands } from './commands'
+import { agentSessionStarter } from './sessionStarter'
 import { agentCommandsSlotContribution } from './AgentCommands'
 import { harnessTerminalCommands } from './terminalProfileCommands'
 import { agentToolFoldSlice } from './sessions/toolFoldPrefs'
@@ -129,6 +130,8 @@ export const agentsClientPlugin: ClientPlugin = {
         openManagedSession(taskId, session.id)
       },
     })
+    // The Plugins page's Create plugin: the rows of New, and a session on one with a draft left unsent.
+    ctx.capabilities.provide(AGENT_SESSION_STARTER, agentSessionStarter)
     // A read-only tab in the task's terminal drawer for each background command still running
     // (docs/managed-agents/background-commands.md).
     ctx.capabilities.provide(TERMINAL_TAB_SUPPLIER, backgroundCommandTabs)

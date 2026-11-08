@@ -1,7 +1,89 @@
 # Phase 2: the agent session starter
 
-Date: November 9, 2026. Status: proposed. Depends on nothing. Context:
+Date: November 9, 2026. Status: built. Depends on nothing. Context:
 [the programme README](./README.md).
+
+## Completion note
+
+November 9, 2026.
+
+### What landed
+
+- `AGENT_SESSION_STARTER` and its `AgentSessionStarter` type in
+  `packages/client-core/src/features/agent/sessionStarter.ts`. `features/agent/public.ts` and
+  `packages/plugin-api/src/client.ts` export both, beside `AGENT_ASK`. The surface snapshot gained
+  those two lines.
+- The agents plugin provides the key from `plugins/agents/src/client/sessionStarter.ts`, which
+  `client/index.ts` registers next to `AGENT_ASK`.
+- `choiceId(choice)` in `plugins/agents/src/contract/newSessionChoices.ts`. It's the key the palette's
+  **New agent session** rows already used: `custom-agent:<id>`, `<provider>:account:<name>`, or the
+  provider ID. The palette now calls it too.
+- `readNewSessionChoices()` in the plugin's `sessionStarter.ts` reads the providers and custom agents
+  and builds New's rows. The palette and the starter both use it, so they can't list different rows.
+- `managedAgentStore.startSession` takes an optional `title`, so `start()` names the session.
+- Tests: `sessionStarter.test.ts`, four cases. They cover the rows for two harnesses, one harness not
+  installed, and one custom agent. They also cover a start with a choice, a start without one, and an
+  unknown choice.
+
+### Decisions and deviations
+
+- `AgentSessionChoice` isn't exported. Knip fails the lint on an exported type nobody imports. The
+  shape is in `choices()`'s return type, and phase 3 can export it if the dialog needs the name.
+- `choices()` doesn't filter by `providerStartable`. `newSessionChoices` already drops every row that
+  can't start a session, and the filter would only re-check that.
+- `start()` with no choice and no startable agent throws "No agent harness on this Node is installed
+  and signed in.", the same message `AGENT_ASK` uses. An unknown choice throws "That agent isn't
+  available any more. Pick another."
+- The draft goes into the composer before the session opens, so the composer mounts with it.
+
+### Answers to "Verify before building"
+
+- **Row keys.** `NewSessionChoice` has no key field. The palette built one inline, and that key is now
+  `choiceId`. It's made from the custom agent ID, or the provider ID and account name, so it doesn't
+  depend on the row's place in the list.
+- **`startSessionFromPalette`.** Beyond `startSession` and `openManagedSession`, it calls
+  `requestComposerFocus`. `openManagedSession` already asks for that focus through
+  `selectManagedSession`, so `start()` doesn't repeat it.
+
+### Budgets
+
+Measured on this branch against its base, 1e9e138ac:
+
+| Check | Before | After | Ceiling |
+| --- | --- | --- | --- |
+| Desktop renderer startup scripts | 1,013,316 B | 1,013,316 B | 1,030,000 B |
+| Desktop compiled roster | 355,922 B | 356,486 B | 370,000 B |
+| Terminal client startup closure | 805,805 B | 805,805 B | 820,000 B |
+
+client-core's package exports didn't change, because the key goes through the `./features/agent`
+barrel.
+
+### Checkpoint
+
+Run on November 9, 2026, in `pnpm dev:agent -- --vite`. The console steps ran through
+`pnpm dev:agent:ui -- run`. The script imported `clientCapabilities.ts` by its Vite `/@fs/` path,
+which reaches the live registry. A built renderer has no such handle, so `--vite` is needed.
+
+- The registry listed `agents.sessionStarter`. `choices()` answered
+  `[{ id: 'claude', label: 'Claude Code' }, { id: 'codex', label: 'Codex' }]`.
+- In a new project-folder task, `start({ choiceId: 'codex', title: 'Build Weather', draft })` opened
+  a Codex session named "Build Weather". The agent pane showed it with the draft in the composer
+  and "This session is ready for its first turn." The Node's snapshot had `queuedTurns: 0` and three
+  `session` events, with no turn.
+- `start()` with `choiceId: 'gone'` threw "That agent isn't available any more. Pick another."
+
+The composer also showed the "Task context attached" chip. Every new session gets it, so phase 3
+inherits it.
+
+### For later phases
+
+- Phase 3 reads the key with `clientCapability(AGENT_SESSION_STARTER)` at call time. It's absent when
+  the agents plugin isn't running.
+- Pass `choiceId` back unchanged. Hide the select when `choices()` answers one row.
+- `start()` selects the session and shows the agent pane in the layout of the task it's given. It
+  doesn't switch tasks, so the sequence must activate the new task itself.
+- The client capabilities page, [collaboration](../../plugins/collaboration.md), lists `AGENT_ASK`.
+  Phase 4 adds this key there.
 
 ## Goal
 

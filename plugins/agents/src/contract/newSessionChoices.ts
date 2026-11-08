@@ -67,6 +67,15 @@ export const choiceStart = (choice: NewSessionChoice): { customAgentId?: string;
   ...(choice.account ? { account: choice.account } : {}),
 })
 
+/** The row's key, which names the same row in a later read: the custom agent, the harness account, or
+ *  the harness alone. */
+export const choiceId = (choice: NewSessionChoice): string =>
+  choice.agent
+    ? `custom-agent:${choice.agent.id}`
+    : choice.account
+      ? `${choice.provider.id}:account:${choice.account}`
+      : choice.provider.id
+
 export const choiceLabel = (choice: NewSessionChoice): string =>
   choice.agent?.name ??
   (choice.account

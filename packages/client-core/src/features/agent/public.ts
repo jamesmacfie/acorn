@@ -1,3 +1,5 @@
 export { contextSnapshot } from './contextSnapshot.ts'
 export { composeForAgent, formatFileReference, sendReferenceToAgent } from './reference.ts'
 export type { ReferenceTargetContribution } from './reference.ts'
+export { AGENT_SESSION_STARTER } from './sessionStarter.ts'
+export type { AgentSessionStarter } from './sessionStarter.ts'

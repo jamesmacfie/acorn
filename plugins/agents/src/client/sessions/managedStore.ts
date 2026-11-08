@@ -569,7 +569,7 @@ export const managedAgentStore = {
   async startSession(
     taskId: string,
     provider: { id: string; profileId: string },
-    { customAgentId, account }: { customAgentId?: string; account?: string } = {},
+    { customAgentId, account, title }: { customAgentId?: string; account?: string; title?: string } = {},
   ): Promise<AgentSession> {
     const owner = captureRead()
     const session = await managedAgentApi.createSession(
@@ -580,6 +580,7 @@ export const managedAgentStore = {
         kind: 'interactive',
         ...(customAgentId ? { customAgentId } : {}),
         ...(account ? { account } : {}),
+        ...(title ? { title } : {}),
         config: {},
       },
       undefined,
