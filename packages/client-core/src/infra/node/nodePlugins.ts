@@ -7,6 +7,7 @@ import {
   corePluginModelGrantRoute,
   corePluginReloadRoute,
   corePluginRequestRoute,
+  corePluginScaffoldRoute,
   corePluginReviewRoute,
   corePluginRoute,
   corePluginSkillGrantRoute,
@@ -20,6 +21,8 @@ import {
   type PluginInstallSource,
   type PluginLogs,
   type PluginReloadResult,
+  type PluginScaffoldRequest,
+  type PluginScaffoldResult,
   type PluginSkillState,
   type PluginUninstallResult,
   type PluginUpdateResult,
@@ -100,6 +103,12 @@ export const installNodePlugin = async (
   options: { allowDowngrade?: boolean; reviewRequestId?: string } = {},
   nodeId?: string,
 ): Promise<PluginInstallResult> => await mutate(corePluginInstallRoute, 'POST', { source, ...options }, nodeId)
+
+// A 409 `not-empty` means the folder already holds files, which the route never overwrites.
+export const scaffoldNodePlugin = async (
+  request: PluginScaffoldRequest,
+  nodeId?: string,
+): Promise<PluginScaffoldResult> => await mutate(corePluginScaffoldRoute, 'POST', request, nodeId)
 
 export const updateNodePlugin = async (
   id: string,

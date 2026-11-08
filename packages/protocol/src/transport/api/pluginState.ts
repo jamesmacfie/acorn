@@ -262,6 +262,7 @@ export type PluginReloadResult = { id: string; version: string; state: 'reloaded
 
 export const corePluginsRoute = '/v1/core/plugins'
 export const corePluginInstallRoute = '/v1/core/plugins/install'
+export const corePluginScaffoldRoute = '/v1/core/plugins/scaffold'
 export const corePluginRoute = (id: string) => `/v1/core/plugins/${encodeURIComponent(id)}`
 export const corePluginUpdateRoute = (id: string) => `/v1/core/plugins/${encodeURIComponent(id)}/update`
 export const corePluginReloadRoute = (id: string) => `/v1/core/plugins/${encodeURIComponent(id)}/reload`

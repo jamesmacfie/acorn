@@ -1,7 +1,102 @@
 # Phase 3: the Create plugin modal
 
-Date: November 9, 2026. Status: proposed. Depends on phases 1 and 2. Context:
+Date: November 9, 2026. Status: built. Depends on phases 1 and 2. Context:
 [the programme README](./README.md).
+
+## Completion note
+
+November 9, 2026.
+
+### What landed
+
+- `CreatePluginDialog.tsx` in `features/settings/plugins/`, with `variant: 'plugin' | 'data-source'`.
+  It holds the fields, the step record, and the Start sequence. Both **Create a plugin** buttons open
+  it.
+- `starterPrompts.ts` holds `pluginStarterPrompt` and `dataSourceStarterPrompt`. The
+  `pluginAuthoring.test.ts` text check reads this file now.
+- `scaffoldNodePlugin(request, nodeId)` in `infra/node/nodePlugins.ts`, beside `installNodePlugin`. It
+  mints its own `Idempotency-Key`. `corePluginScaffoldRoute` sits beside `corePluginInstallRoute` in
+  `pluginState.ts`, so no new protocol entry point.
+- Removed: `DataSourcePromptDialog.tsx`, `draftForAgent`, the `sendReferenceToAgent` and
+  `activeTaskId` imports in `PluginsSettings.tsx`, and the "Open a task first" error.
+- Tests: `CreatePluginDialog.test.tsx` has seven cases. They cover the selects and **Choose…**
+  showing and hiding, the ID filled from the name, a relative folder, a full run, **Try again**
+  after a failed task step (the scaffold is written once), a not-empty folder, and the data source
+  draft. `PluginsSettings.test.tsx` checks that each button opens the dialog with its variant.
+
+### Decisions and deviations
+
+- **Settings closes by event, not by navigating.** Settings is a layer over the router in
+  `apps/desktop/src/client/App.tsx`, so `navigate()` alone leaves it open. The dialog emits
+  `presentation:close-settings` after navigating, as the schedule's **Open** in
+  `SchedulesSettings.tsx` does. That's the only "Settings, then open a place" precedent. No other
+  client mounts the settings view.
+- **The step record.** Once the scaffold is written, the fields it used lock, so **Try again** makes
+  the project from the same folder. A created workspace becomes the select's value, so a retry
+  doesn't create a second one. The created task is kept. `createProject` runs on every try, because
+  it's idempotent for a path that's already a project.
+- **"Closed after the scaffold step".** The dialog can't ask the Node whether a non-empty folder holds
+  its own scaffold. A module-level set remembers the folders it wrote this session, and the extra
+  "add the folder as a project" sentence shows only for those. It's marked as a `shortcut:`, because
+  a reload forgets the set.
+- **The agents link** goes to `agent-defaults` (**Harnesses and defaults**), the page where a harness
+  is installed and signed in. A bare `'agents'` literal also fails the "core never names a plugin"
+  boundary check.
+- **One Node for the whole sequence.** A settings page's `scope.nodeId` is always the active Node,
+  and `createWorkspace` and `createProject` reach only the active Node. The dialog passes the page's
+  Node to the scaffold, the catalog, and `createTask`, so all of them agree.
+- **A remote Node.** Only **Choose…** depends on a local Node, through `canAddProjectFromFolder()`.
+  Everything else goes through the Node's API. A relative path is refused in the dialog, and a
+  Windows drive path counts as absolute.
+- **Prompts.** Both prompts tell the agent to run `npm install` first, because the scaffold route
+  writes files but installs nothing. The plugin prompt names the kind ("a starter pane" or "a starter
+  trigger").
+- **Kind** is a `SegmentedControl`, since it has two options.
+- The "Task context attached" chip from phase 2 shows on the new session too. It wasn't changed.
+
+### Budgets
+
+| Check | Before (phase 2) | After | Ceiling |
+| --- | --- | --- | --- |
+| Desktop renderer startup scripts | 1,013,316 B | 1,013,468 B | 1,030,000 B |
+| Desktop compiled roster | 356,486 B | 356,601 B | 370,000 B |
+| Terminal client startup closure | 805,805 B | 805,805 B | 820,000 B |
+
+The startup growth is `scaffoldNodePlugin` and the route constant, which sit in modules already on
+the startup path. The dialog is in the Plugins page's lazy chunk.
+
+### Checkpoint
+
+Run on November 9, 2026, in `pnpm dev:agent -- --session p3-create --workspaces on`, driven with
+`pnpm dev:agent:ui`.
+
+- **Ask an agent**, with `/tmp/acorn-plugin-test/hello`, the name "Hello", **New workspace…**
+  "Plugins", Codex, and git checked. Start landed on the "Hello plugin" task's agent pane with
+  Settings closed. The Codex session "Build Hello" was ready for its first turn. Its composer held the
+  draft unsent, starting "I want to extend acorn with a plugin" with no `@`, and ending "What it
+  should do: ". The top bar read Plugins › Hello › Hello plugin. The folder held `acorn-plugin.json`
+  and one commit, "Start Hello from the plugin scaffold".
+- **Build a data source from your connections**, with `/tmp/acorn-plugin-test/board`, the row "A task
+  with its pull request", and Tasks and GitHub pull requests picked. It landed on "Task board plugin"
+  in the Plugins workspace. The draft listed both inputs by ID and ended "The rules for each row: ".
+  The folder held the data source starter and one commit.
+- **A non-empty folder.** `/tmp/acorn-plugin-test/hello` again gave "That folder has files in it.
+  Pick a new or empty folder. To keep it, add the folder as a project in Settings → Workspaces.",
+  because this session had written it. `/tmp/acorn-plugin-test` gave only the first two sentences.
+  **Start** became **Try again** both times.
+- Not walked by hand: a remote Node, the agents plugin turned off, and no startable agent. The unit
+  tests cover hiding **Choose…** for a remote Node. The other two states have no test.
+
+The client-core suite passed apart from `src/host/frames/sdk.test.ts` › "posts one message per
+verb", which failed once while the desktop build ran alongside it and passed on its own.
+
+### For later phases
+
+- Phase 4: the button descriptions in `PluginsSettings.tsx` changed. "Ask an agent to write one"
+  reads "Writes a starter plugin into a folder of its own and opens an agent there. It writes the
+  plugin, and you decide whether to install it." The site's Plugins settings page should match.
+- `docs/plugins/agent-install.md` § Teaching the agent still describes the old buttons. The comments
+  in `starterPrompts.ts` and `PluginsSettings.tsx` cite it.
 
 ## Goal
 

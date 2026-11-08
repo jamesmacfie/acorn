@@ -287,7 +287,7 @@ describe('the two doors', () => {
     // name fails the first thing a new plugin author's agent does.
     const settings = join(
       dirname(fileURLToPath(import.meta.url)),
-      '../../../../client-core/src/features/settings/plugins/PluginsSettings.tsx',
+      '../../../../client-core/src/features/settings/plugins/starterPrompts.ts',
     )
     expect(readFileSync(settings, 'utf8')).toContain(`\`${PLUGIN_AUTHORING_TOOL}\``)
   })
