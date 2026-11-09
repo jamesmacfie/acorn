@@ -505,6 +505,28 @@ describe('broker WebSocket', () => {
     expect(statuses.at(-1)).toMatchObject({ state: 'offline', error: { code: 'unreachable' } })
   })
 
+  // Offline would stick here: apiClient refuses every request to an offline node, so no later request
+  // could succeed, and the socket never closes, so it never reopens. Only Reconnect got out.
+  it('stays online when one request drops while the socket is open', async () => {
+    const server = createHttpServer((req, res) => (req.url === '/drop' ? req.socket.destroy() : res.end('ok')))
+    servers.push(server)
+    new WebSocketServer({ server, path: WS_PATH })
+    await new Promise<void>((resolve) => server.listen(0, '127.0.0.1', resolve))
+    const broker = makeBroker()
+    broker.upsert({
+      nodeId: 'n1',
+      label: 'local',
+      endpoint: `http://127.0.0.1:${(server.address() as AddressInfo).port}`,
+      local: true,
+      token: 't',
+    })
+    await waitFor(() => statuses.at(-1)?.state === 'online', 'the online transition')
+
+    await expect(broker.fetch('n1', { requestId: 'r-drop', path: '/drop' })).rejects.toThrow()
+    expect(statuses.at(-1)?.state).toBe('online')
+    await expect(broker.fetch('n1', { requestId: 'r-after', path: '/x' })).resolves.toMatchObject({ status: 200 })
+  })
+
   it('authenticates the upgrade with the bearer and forwards frames verbatim', async () => {
     const { origin, server } = await listen(false)
     const upgrades: string[] = []

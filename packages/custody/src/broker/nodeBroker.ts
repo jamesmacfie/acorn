@@ -637,6 +637,11 @@ export class NodeBroker {
 
   private noteHttpFailure(connection: Connection, error: unknown): void {
     const mismatch = isPinMismatch(error)
+    // An open socket that answers pings outweighs one failed request, such as a reused connection the
+    // node had already closed. Going offline here would stick: apiClient sends nothing to an offline
+    // node, so no later request could succeed and bring it back. The heartbeat catches a node that
+    // has really gone.
+    if (!mismatch && connection.ws?.readyState === WebSocket.OPEN) return
     this.setState(connection, 'offline', mismatch ? { code: 'identity_mismatch' } : { code: 'unreachable' })
   }
 
