@@ -57,6 +57,11 @@ there too. Acorn gives each extra account its own folder and points the CLI at i
   first, because the terminal's environment comes from the Node's. The icon opens it through
   `POST /v1/p/agents/providers/:providerId/accounts/:name/terminal`, which is device-only and takes
   the task (`openAccountTerminal` in `server/sessions/runtime.ts`).
+- **Expired logins.** When a turn on an account fails because its login expired, the error card shows a
+  **Sign in** button. It opens the same terminal with `signIn: true` in the body, so the CLI runs its
+  sign-in command, such as `claude auth login`, instead of starting a session. The card spots the failure
+  by the CLI's wording, because Claude's adapter reports it as a plain internal error with no code. The
+  CLI's own login has no folder to open a terminal on, so its failures show no button.
 - **Custom agents.** A custom agent can name an account. Its sessions start there while the Node still
   holds it, and on the default account otherwise ([custom agents](./custom-agents.md)).
 
@@ -107,8 +112,9 @@ When only one row is left, **New** is a button that starts it, drawn with that h
 These lists follow a sign-in without a refresh. The pane reads the harnesses again each time the
 window regains focus, and the Node answers from memory while it re-checks anything older than 30
 seconds. When a re-check changes the answer, the Node sends `agent:providers-changed` and every open
-pane reads again. After the Node opens a terminal on a signed-out account, it checks that account
-every 5 seconds for 5 minutes, so a sign-in there shows within seconds.
+pane reads again. After the Node opens a terminal on a signed-out account, or a sign-in terminal on
+any account, it checks that account every 5 seconds for 5 minutes, so a sign-in there shows within
+seconds.
 
 ## Plan usage
 

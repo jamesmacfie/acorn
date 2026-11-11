@@ -89,8 +89,8 @@ export function managedAgentsBridge(
     setDefaultAccount: (providerId, name) => guarded(() => runtime.setDefaultAccount(providerId, name)),
     setAccountDetails: (providerId, name, change) => guarded(() => runtime.setAccountDetails(providerId, name, change)),
     setAccountDisplay: (show) => guarded(() => runtime.setAccountDisplay(show)),
-    openAccountTerminal: (taskId, providerId, name) =>
-      guarded(() => runtime.openAccountTerminal(taskId, providerId, name)),
+    openAccountTerminal: (taskId, providerId, name, signIn) =>
+      guarded(() => runtime.openAccountTerminal(taskId, providerId, name, signIn)),
     footprint: async () => ({
       ...(await runtime.upkeep.processFootprint()),
       ...(await runtime.upkeep.diskFootprint()),

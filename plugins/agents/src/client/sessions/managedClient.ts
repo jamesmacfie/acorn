@@ -68,12 +68,13 @@ export const managedAgentApi = {
       `${ROOT}/providers/${encodeURIComponent(providerId)}/accounts/${encodeURIComponent(name)}`,
       'DELETE',
     ),
-  // The Agent pane's terminal menu: a task terminal on one account, for the CLI's own setup.
-  openAccountTerminal: (taskId: string, providerId: string, name: string) =>
+  // The Agent pane's terminal menu: a task terminal on one account, for the CLI's own setup. The
+  // error card's sign-in button passes `signIn`, so the terminal runs the CLI's sign-in command.
+  openAccountTerminal: (taskId: string, providerId: string, name: string, signIn?: boolean) =>
     jsonWrite<{ terminalSessionId: string }>(
       `${ROOT}/providers/${encodeURIComponent(providerId)}/accounts/${encodeURIComponent(name)}/terminal`,
       'POST',
-      { taskId },
+      { taskId, ...(signIn ? { signIn } : {}) },
     ),
   // Settings > Storage and memory. At a named node, because the page says which node it shows.
   footprint: (options: { nodeId?: string } = {}) => readJson<AgentFootprint>(`${ROOT}/footprint`, options),

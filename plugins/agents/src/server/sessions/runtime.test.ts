@@ -3325,6 +3325,14 @@ describe('sessions pinned to an extra account', () => {
     await expect(runtime.openAccountTerminal(taskId, 'fake', 'other')).rejects.toThrow(/not found/)
   })
 
+  it("opens a sign-in terminal that runs the CLI's login command on the account's folder", async () => {
+    driver.executable = '/opt/fake'
+    await runtime.addAccount('fake', 'work')
+
+    await runtime.openAccountTerminal(taskId, 'fake', 'work', true)
+    expect(terminals.at(-1)?.command).toBe(`unset FAKE_TOKEN; '/opt/fake' login; exec "\${SHELL:-/bin/sh}" -l`)
+  })
+
   it('notices a sign-in in the terminal it opened on a signed-out account', async () => {
     driver.executable = '/opt/fake'
     await runtime.addAccount('fake', 'work')

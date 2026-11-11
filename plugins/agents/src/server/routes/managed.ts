@@ -75,7 +75,12 @@ export type ManagedAgentsBridge = {
     change: { label?: string | null; icon?: string | null },
   ): Promise<AgentProviderDescriptor[]>
   setAccountDisplay(show: 'name' | 'icon'): Promise<AgentProviderDescriptor[]>
-  openAccountTerminal(taskId: string, providerId: string, name: string): Promise<{ terminalSessionId: string }>
+  openAccountTerminal(
+    taskId: string,
+    providerId: string,
+    name: string,
+    signIn?: boolean,
+  ): Promise<{ terminalSessionId: string }>
   // Settings > Storage and memory. Node-wide, like `runs`.
   footprint(): Promise<AgentFootprint>
   stopIdleNow(): Promise<{ stopped: number }>
@@ -322,10 +327,12 @@ export const managedAgents = new Hono<AppEnv>()
   // Device only, like the terminal's own create: the shell it opens runs commands as the person.
   .post('/providers/:providerId/accounts/:name/terminal', requireDevice, async (c) => {
     const name = c.req.param('name')
-    const parsed = z.object({ taskId: z.string().min(1) }).safeParse(await c.req.json().catch(() => null))
+    const parsed = z
+      .object({ taskId: z.string().min(1), signIn: z.boolean().optional() })
+      .safeParse(await c.req.json().catch(() => null))
     if (!isAccountName(name) || !parsed.success) return respondError(c, 400, 'bad_request')
     return viaBridge(c, MANAGED_AGENTS, (bridge) =>
-      bridge.openAccountTerminal(parsed.data.taskId, c.req.param('providerId'), name),
+      bridge.openAccountTerminal(parsed.data.taskId, c.req.param('providerId'), name, parsed.data.signIn),
     )
   })
   // One choice for every harness's accounts.

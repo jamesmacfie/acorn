@@ -428,8 +428,14 @@ export class ManagedAgentRuntime {
 
   /** Opens a task terminal on one account, for work the CLI does itself, such as `claude mcp add` or a
    *  server's sign-in. It runs the CLI, then the person's own shell once the CLI exits. Both get the
-   *  account's folder, so a command typed after quitting still reaches that account. */
-  async openAccountTerminal(taskId: string, providerId: string, name: string): Promise<{ terminalSessionId: string }> {
+   *  account's folder, so a command typed after quitting still reaches that account. With `signIn` it
+   *  runs the CLI's sign-in command instead, for a session whose login expired. */
+  async openAccountTerminal(
+    taskId: string,
+    providerId: string,
+    name: string,
+    signIn = false,
+  ): Promise<{ terminalSessionId: string }> {
     const accounts = this.registry.create(providerId)?.accounts
     if (!accounts) throw new Error(`'${providerId}' doesn't support a second account.`)
     if (!(await this.engine.accounts.has(providerId, name))) throw new Error(`Account '${name}' not found.`)
@@ -444,10 +450,11 @@ export class ManagedAgentRuntime {
     const terminalSessionId = await this.openTerminal({
       taskId,
       title: `${provider.label} · ${label}`,
-      command: `${unset}${shellQuote(provider.executable)}; exec "\${SHELL:-/bin/sh}" -l`,
+      command: `${unset}${[shellQuote(provider.executable), ...(signIn ? accounts.login : [])].join(' ')}; exec "\${SHELL:-/bin/sh}" -l`,
       env: { [accounts.env]: home },
     })
-    if (provider.accounts?.find((account) => account.name === name)?.authenticated !== true)
+    // A login can expire while its folder still reads as signed in, so a sign-in is always watched.
+    if (signIn || provider.accounts?.find((account) => account.name === name)?.authenticated !== true)
       this.providers.watchSignIn(providerId, name)
     return { terminalSessionId }
   }

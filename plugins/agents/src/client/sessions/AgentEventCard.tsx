@@ -728,7 +728,7 @@ export default function AgentEventCard(props: {
       <Show when={event().type === 'error'}>
         {(_shown) => {
           const error = () => event() as Extract<ReturnType<typeof event>, { type: 'error' }>
-          return <AgentErrorCard error={error()} />
+          return <AgentErrorCard error={error()} taskId={props.taskId} sessionId={props.sessionId} />
         }}
       </Show>
       <Show when={event().type === 'diagnostic'}>
