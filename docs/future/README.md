@@ -34,6 +34,7 @@ Dated delivery evidence belongs in `docs/testing/` or the dated security reviews
 | [remote-node-imports.md](./remote-node-imports.md) | Let the GitHub, GitLab, and Bitbucket importers clone and link on a remote Node through a typed folder field in the row, the projects table's pattern, with `NodePathForm` exported to plugins and a readable error for a missing clone folder. | Implemented October 27, 2026, with unit tests. The live checks on a remote Node remain open. Private clones on a remote Node need that machine's own Git login, a separate change. |
 | [review-guide.md](./review-guide.md) | What's left after review guide v2: walk the terminal client, land on the revealed line from the wide pane, show marks after a push, and decide on posting a note to the code host. | Built October 30 and 31, 2026. The items on the page are open. |
 | [split.md](./split.md) | Extract loaded plugins and the authoring toolkit with packed-artifact compatibility and host seeding. | Published authoring packages implemented. Repository extraction remains proposed. |
+| [trufflehog.md](./trufflehog.md) | A loaded plugin over the TruffleHog secret scanner: scan a task and list findings, triage each one with rotation and ignore steps, show findings in the diff, the editor, the push button, and the archive dialog, give agents masked findings, and scan across the Node on a schedule. Raw secret values are never stored. | Proposed November 11, 2026. The plugin goes in its own repository, `../acorn-trufflehog`. No phase started. |
 
 ## Choose the owning plan
 
