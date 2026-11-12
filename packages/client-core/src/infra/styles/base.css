@@ -2,7 +2,8 @@
  * properties nobody currently declares. Extracted from the old tokens-layout.css.
  */
 * { box-sizing: border-box; }
-html, body, #root { height: 100%; margin: 0; overflow-x: clip; }
+/* clip, not hidden: hidden still lets focus() scroll the page, which shifts the whole app up. */
+html, body, #root { height: 100%; margin: 0; overflow: clip; }
 
 html { color-scheme: var(--color-scheme); }
 
