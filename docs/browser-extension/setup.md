@@ -44,9 +44,14 @@ Run `pnpm --filter @acorn/extension build`. It writes `apps/extension/dist/chrom
 - **Firefox.** Open `about:debugging#/runtime/this-firefox`, click **Load Temporary Add-on**, and
   choose `apps/extension/dist/firefox/manifest.json`. Firefox removes a temporary add-on when it quits,
   so load it again after each restart. Its storage and site grants stay, because the add-on ID is fixed.
+- **Firefox Developer Edition or Nightly, installed.** Run `pnpm --filter @acorn/extension package`.
+  It builds both browsers and writes `apps/extension/dist/acorn-firefox.xpi`. In `about:config`, set
+  `xpinstall.signatures.required` to `false`. Then in `about:addons`, open the gear menu, choose
+  **Install Add-on From File**, and pick the `.xpi`. The add-on stays across restarts. To update it,
+  package again and install the new file over it.
 
-These are development builds. Neither is signed or in a browser store, and Firefox can't keep an
-unsigned add-on installed.
+These are development builds. Neither is signed or in a browser store. Release Firefox refuses an
+unsigned add-on, so there it only runs as a temporary one.
 
 Chrome reads registrations from the profile folder it runs on. Your everyday Chrome reads the
 user-level folder that `acorn browser install` writes. A Chrome started with `--user-data-dir` reads

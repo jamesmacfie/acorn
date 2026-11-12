@@ -6,6 +6,7 @@
   "type": "module",
   "scripts": {
     "build": "vite build --mode chrome && vite build --mode firefox",
+    "package": "pnpm build && web-ext build --source-dir dist/firefox --artifacts-dir dist --filename acorn-firefox.xpi --overwrite-dest",
     "dev": "node scripts/dev/session.mjs",
     "dev:ui": "node scripts/dev/ui.mjs",
     "lint": "tsc --noEmit",
