@@ -4,66 +4,60 @@
    snapshot draws in the app's own theme instead: virtual:acorn-ui.css restates Latte or Mocha on it
    (pictureScopes() in scripts/acornUi.mjs). scripts/contrast.test.mjs checks the pairs below.
 
-   Night is a violet-black ground with near-white ink, one brass signal, the color of an acorn's shell,
-   and one rose verb for the hero. Day is the same page on violet-white, with the brass taken down to
-   bronze so it reads on the light ground.
+   The colors are an oak wood's. Night is the dark under the canopy, a green-black ground with cream
+   ink. Day is the same page on cream with forest ink. The signal is a squirrel's orange, and a leaf
+   green marks what's running. The blaze is the orange as a whole ground, for the page's loudest bands.
 
    `html:root:root` outweighs the app's `:root[data-theme="…"]` blocks whichever sheet loads first
    (docs/site/design.md). */
 
 /* Day: the page in light mode. */
 html:root:root {
-  --bg: oklch(97.5% 0.006 290);
-  --bg-subtle: oklch(95% 0.009 290);
-  --bg-hover: oklch(93% 0.011 290);
-  --bg-selected: oklch(90% 0.013 290);
-  --border: oklch(89.5% 0.012 290);
-  --border-strong: oklch(80% 0.016 290);
-  --badge-border: oklch(80% 0.016 290);
-  --text: oklch(22% 0.03 290);
-  --text-muted: oklch(46% 0.03 290);
-  --text-faint: oklch(62% 0.02 290);
-  --accent: oklch(52% 0.115 62);
-  --focus: oklch(52% 0.115 62);
-  --shadow-popover: oklch(30% 0.03 290 / 0.14);
+  --bg: oklch(96.5% 0.022 95);
+  --bg-subtle: oklch(93.5% 0.028 95);
+  --bg-hover: oklch(91% 0.032 95);
+  --bg-selected: oklch(88% 0.036 95);
+  --border: oklch(87% 0.03 100);
+  --border-strong: oklch(74% 0.035 110);
+  --badge-border: oklch(74% 0.035 110);
+  --text: oklch(21% 0.035 155);
+  --text-muted: oklch(44% 0.035 155);
+  --text-faint: oklch(60% 0.03 150);
+  --accent: oklch(53% 0.16 45);
+  --focus: oklch(53% 0.16 45);
+  --shadow-popover: oklch(25% 0.04 155 / 0.16);
 
-  /* The site's own colors, which a picture of acorn keeps: the accent that marks up a snapshot, and
-     the hero's verb. */
-  --site-accent: oklch(52% 0.115 62);
-  --site-accent-ink: oklch(97.5% 0.006 290);
-  --site-verb: oklch(55% 0.17 15);
+  /* The site's own colors, which a picture of acorn keeps: the accent that marks up a snapshot, the
+     leaf that marks a running agent, and the blaze with the ink that reads on it. */
+  --site-accent: oklch(53% 0.16 45);
+  --site-accent-ink: oklch(96.5% 0.022 95);
+  --site-leaf: oklch(47% 0.13 145);
+  --site-blaze: oklch(74% 0.185 50);
+  --site-blaze-ink: oklch(17% 0.03 155);
+  /* What a window casts on the page under it. */
+  --site-shade: oklch(25% 0.04 155 / 0.22);
 }
 
 /* Night: the page in dark mode, and the stage in either. The stage is the darkest step, `--bg-subtle`,
    and its controls sit a step up on `--bg`. */
 html:root:root[data-color-scheme='dark'],
 html:root .site-dark {
-  --bg: oklch(17.5% 0.026 290);
-  --bg-subtle: oklch(14% 0.024 290);
-  --bg-hover: oklch(21.5% 0.03 290);
-  --bg-selected: oklch(25.5% 0.032 290);
-  --border: oklch(29% 0.03 290);
-  --border-strong: oklch(40% 0.034 290);
-  --badge-border: oklch(40% 0.034 290);
-  --text: oklch(94% 0.012 300);
-  --text-muted: oklch(74% 0.025 295);
-  --text-faint: oklch(58% 0.025 292);
-  --accent: oklch(80% 0.135 68);
-  --focus: oklch(80% 0.135 68);
-  --shadow-popover: oklch(5% 0.02 290 / 0.6);
+  --bg: oklch(17% 0.028 155);
+  --bg-subtle: oklch(13.5% 0.024 155);
+  --bg-hover: oklch(22% 0.034 155);
+  --bg-selected: oklch(26% 0.038 155);
+  --border: oklch(28% 0.034 155);
+  --border-strong: oklch(42% 0.04 155);
+  --badge-border: oklch(42% 0.04 155);
+  --text: oklch(95% 0.025 95);
+  --text-muted: oklch(76% 0.03 110);
+  --text-faint: oklch(60% 0.03 130);
+  --accent: oklch(76% 0.18 50);
+  --focus: oklch(76% 0.18 50);
+  --shadow-popover: oklch(5% 0.02 155 / 0.6);
 
-  --site-accent: oklch(80% 0.135 68);
-  --site-accent-ink: oklch(14% 0.024 290);
-  --site-verb: oklch(74% 0.14 12);
-
-  /* The glyph field over a stage (src/scripts/glyphField.ts): violet steps for leaves and the twig,
-     brass steps for acorns. Each is only a little lighter than the stage, so the field stays behind
-     the words. */
-  --site-glyph-1: oklch(25% 0.035 290);
-  --site-glyph-2: oklch(31% 0.045 291);
-  --site-glyph-3: oklch(39% 0.06 293);
-  --site-glyph-4: oklch(48% 0.075 295);
-  --site-glyph-warm-1: oklch(36% 0.06 62);
-  --site-glyph-warm-2: oklch(50% 0.09 66);
-  --site-glyph-warm-3: oklch(66% 0.12 68);
+  --site-accent: oklch(76% 0.18 50);
+  --site-accent-ink: oklch(13.5% 0.024 155);
+  --site-leaf: oklch(88% 0.2 128);
+  --site-shade: oklch(4% 0.02 155 / 0.7);
 }

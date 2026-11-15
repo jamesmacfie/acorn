@@ -1,0 +1,1514 @@
+/* The landing page's look (src/pages/index.astro). The page reads as a plain column first: every rule
+   outside a `.live` or `.film` block is the finished, still page. src/scripts/landing/film.ts adds
+   `live` to <html> when the visitor allows motion, and `film` when the window is also big enough to
+   pin a scene. A scene carries `--p`, how far the scroll has taken it from 0 to 1, and the rules below
+   work everything else out from that. docs/site/design/motion.md lists what moves. */
+
+/* The widest a scene's content runs, and the header over it. */
+:root {
+  --land-width: 88rem;
+}
+.site-page[data-bleed] {
+  --site-section: clamp(6rem, 3rem + 9vw, 13rem);
+}
+.site-bar > .site-header {
+  max-inline-size: var(--land-width);
+}
+
+.wrap {
+  inline-size: min(100% - 2 * var(--site-gutter), var(--land-width));
+  margin-inline: auto;
+}
+
+/* ── Moves ──
+   Each moving part plays one set of keyframes laid over its scene's whole scroll, 0% to 100%. Where
+   the browser has scroll timelines, each scene's scroll is a timeline called `--scene`, and the
+   compositor plays the moves along it. Any move the page's own thread makes, even one transform, has
+   Chrome sort the whole page into layers again, which took 25 to 41 milliseconds a frame on a phone's
+   speed of processor (motion.md). A pinned scene's 0% to 100% is the stretch it's pinned for, and any
+   other scene's is its trip from the window's foot to its top. A new moving part needs a line in
+   these lists. */
+@supports (animation-timeline: view()) {
+  /* The inset would otherwise follow the page's scroll padding, which leaves room for the header. */
+  .live [data-scene] {
+    view-timeline: --scene block;
+    view-timeline-inset: 0;
+  }
+  .live
+    :where(
+      .open-words,
+      .open-window,
+      .open-flip,
+      .open-note,
+      .marquee-row,
+      .deck-list > li > *,
+      .apart-tilt,
+      .apart-part,
+      .apart-part > span,
+      .away-shot,
+      .fleet-shot,
+      .finale h2,
+      .finale-art .cap
+    ),
+  .live :where(.open-window, .deck-list h3)::before,
+  .live :where(.deck-card, .apart-tilt)::after {
+    animation-timeline: --scene;
+    animation-timing-function: linear;
+    animation-fill-mode: both;
+  }
+  .film :where(.open-words, .open-window, .open-flip, .open-note, .deck-list > li > *, .apart-tilt, .apart-part, .apart-part > span),
+  .film :where(.open-window, .deck-list h3)::before,
+  .film :where(.deck-card, .apart-tilt)::after {
+    animation-range: contain;
+  }
+}
+
+/* Without scroll timelines, film.ts sets `--p` on each scene, and each move is held paused at that
+   point. `--p` is registered so it doesn't inherit: a picture of acorn holds over a thousand elements,
+   and an inherited value that changes on every frame would have the browser restyle every one of
+   them. So each element between a scene and a moving part asks for it by name. */
+@property --p {
+  syntax: '<number>';
+  inherits: false;
+  initial-value: 0;
+}
+@supports not (animation-timeline: view()) {
+  .live
+    :where(
+      .open-stage,
+      .open-words,
+      .open-window,
+      .open-flip,
+      .open-note,
+      .marquee-row,
+      .deck-stage,
+      .deck-list,
+      .deck-list > li,
+      .deck-list > li > *,
+      .apart-stage,
+      .apart-view,
+      .apart-tilt,
+      .apart-part,
+      .apart-part > span,
+      .away-floor,
+      .away-shot,
+      .nodes-fleet,
+      .fleet-shot,
+      .finale > .wrap,
+      .finale h2,
+      .finale-row,
+      .finale-art,
+      .finale-art .cap
+    ),
+  .live :where(.open-window, .deck-list h3)::before,
+  .live :where(.deck-card, .apart-tilt)::after {
+    --p: inherit;
+    animation-timing-function: linear;
+    animation-fill-mode: both;
+    animation-duration: 1s;
+    animation-play-state: paused;
+    animation-delay: calc(var(--p) * -1s);
+  }
+}
+
+/* A window that's off the screen isn't painted. Moving any part of a scene has the browser sort the
+   whole page's painted content into layers again, and with every window painted that took 17
+   milliseconds a frame, a whole frame's time. The windows here are all 1440 by 900, and the frame
+   states that shape so it keeps its size while it's skipped. */
+.site-page[data-bleed] .snapshot[data-host='desktop'] {
+  aspect-ratio: 1440 / 900;
+  content-visibility: auto;
+}
+
+/* A block that rises in the first time it's reached. `--i` staggers a row of them. */
+.live [data-reveal] {
+  transition:
+    opacity 700ms var(--ease-out),
+    translate 700ms var(--ease-out),
+    scale 700ms var(--ease-out);
+  transition-delay: calc(var(--i, 0) * 45ms);
+}
+.live [data-reveal]:not(.seen) {
+  opacity: 0;
+  translate: 0 2.5rem;
+}
+
+/* ── Chapters ──
+   Each opens on a heading set as wide and heavy as the face goes, with its paragraph hung to the right
+   of it on a wide screen. */
+.chapter {
+  display: grid;
+  gap: clamp(2.5rem, 1rem + 5vw, 6rem);
+  padding-block-start: var(--site-section);
+}
+.chapter > * {
+  min-inline-size: 0;
+}
+.head {
+  display: grid;
+  gap: var(--space-10);
+}
+.head > * {
+  margin: 0;
+  min-inline-size: 0;
+}
+.head h2,
+.faq-head h2,
+.finale h2 {
+  font-size: var(--site-fs-display);
+  font-weight: var(--site-wght-display);
+  font-stretch: calc(var(--site-wdth-display) * 1%);
+  letter-spacing: var(--site-track-display);
+  line-height: 0.92;
+  overflow-wrap: break-word;
+}
+.head h2 {
+  max-inline-size: 14ch;
+}
+.head .lede {
+  max-inline-size: 44ch;
+}
+.chapter h3,
+.deck h3 {
+  margin: 0;
+  font-size: var(--site-fs-h2);
+  line-height: 1.05;
+}
+@media (min-width: 64rem) {
+  .chapter > .head {
+    grid-template-columns: repeat(12, minmax(0, 1fr));
+  }
+  .chapter > .head h2 {
+    grid-column: 1 / -1;
+  }
+  .chapter > .head .lede {
+    grid-column: 7 / -1;
+  }
+}
+
+/* ── The opening ──
+   The headline fills the stage: two quiet lines, then the last two words as large as the stage is
+   wide, each letter at its own width (film.ts). The pitch and the actions hang beside the quiet lines.
+   Under them lies the task's window. As a film, the stage pins: the window tips up to face the visitor,
+   then turns over to show the same task in the terminal client on its back. */
+.open {
+  /* The stage starts under the floating bar. */
+  margin-block-start: calc(-1 * var(--site-bar-h));
+  color: var(--text);
+  background: var(--bg-subtle);
+}
+.open-stage {
+  position: relative;
+  display: grid;
+  gap: clamp(2rem, 1rem + 4vw, 5rem);
+  padding-block: calc(var(--site-bar-h) + clamp(1rem, 4vh, 3.5rem)) var(--site-section);
+  overflow: clip;
+}
+.open-stage > * {
+  min-inline-size: 0;
+}
+.open-words {
+  position: relative;
+  container-type: inline-size;
+}
+.open h1 {
+  margin: 0;
+  font-weight: 700;
+  line-height: 0.9;
+  letter-spacing: -0.02em;
+}
+.open-lead {
+  display: block;
+  max-inline-size: 9ch;
+  font-size: clamp(2.5rem, 7.6cqi, 7.5rem);
+  font-stretch: 100%;
+}
+.open-nuts {
+  display: block;
+  margin-block-start: 0.13em;
+  /* Sized so the two words, at the width film.ts keeps them averaging, run the stage's width. */
+  font-size: 22.6cqi;
+  font-weight: 900;
+  line-height: 0.82;
+  letter-spacing: -0.035em;
+  white-space: nowrap;
+  color: var(--accent);
+}
+.open-nuts > span {
+  font-stretch: calc(var(--w, 96) * 1%);
+}
+.open-pitch {
+  display: grid;
+  gap: var(--space-10);
+  margin-block-start: var(--space-11);
+}
+.open-pitch > * {
+  margin: 0;
+}
+.open-pitch p {
+  max-inline-size: 36ch;
+  font-size: clamp(1.125rem, 1.75cqi, 1.5rem);
+  line-height: 1.35;
+  letter-spacing: var(--site-track-lede);
+}
+@media (min-width: 60rem) {
+  .open-pitch {
+    position: absolute;
+    inset-block-start: 0.5cqi;
+    inset-inline-end: 0;
+    inline-size: min(34rem, 46%);
+    margin: 0;
+  }
+}
+.open-window {
+  inline-size: min(100% - 2 * var(--site-gutter), var(--land-width));
+  margin-inline: auto;
+}
+.open-flip {
+  display: grid;
+  gap: var(--space-11);
+}
+/* The terminal client's screen, on the pane color it draws on, filling the window's own shape. */
+.open-back .snapshot {
+  display: grid;
+  align-items: center;
+  block-size: 100%;
+  background: var(--bg);
+}
+.open-note {
+  inline-size: min(100% - 2 * var(--site-gutter), 44rem);
+  margin: 0 auto;
+  font-size: var(--site-fs-lede);
+  line-height: 1.3;
+  text-align: center;
+}
+.open-note + .open-note {
+  margin-block-start: calc(-1 * var(--space-8));
+}
+
+/* The opening comes in once, as the page loads. The headline is the largest thing on the first
+   screen, and a browser counts the page as drawn once it shows, so the words only rise, never fade.
+   It's the words and the window's faces that come in, because the scroll moves the parts that hold
+   them. */
+.live .open-words > * {
+  animation: site-rise 900ms var(--ease-out) both;
+}
+.live .open-face {
+  animation: site-enter 1100ms 150ms var(--ease-out) both;
+}
+
+.film .open {
+  block-size: 440vh;
+}
+.film .open-stage {
+  position: sticky;
+  inset-block-start: 0;
+  display: block;
+  block-size: 100vh;
+  padding-block-end: 0;
+  perspective: 1500px;
+  perspective-origin: 50% 35%;
+}
+/* The words leave as the window starts up. */
+.film .open-words {
+  animation-name: open-leave;
+}
+@keyframes open-leave {
+  0% {
+    opacity: 1;
+    transform: translateY(0);
+  }
+  14%,
+  100% {
+    opacity: 0;
+    transform: translateY(-14vh);
+  }
+}
+/* The window lies back under the words, then rises to stand in the middle of the stage. It's as large
+   as leaves room under it for the note. A move eased at both ends uses cubic-bezier(1/3, 0, 2/3, 1),
+   which is exactly smoothstep, the curve the film eases with. The window is flat, so the turn inside
+   it is drawn without perspective and the window never swings out toward the visitor. */
+.film .open-window {
+  position: absolute;
+  inset-block-start: calc(var(--site-bar-h) + 2vh);
+  inset-inline: 0;
+  inline-size: min(92vw, (100vh - var(--site-bar-h) - 11vh) * 1.6);
+  animation-name: open-rise;
+}
+@keyframes open-rise {
+  0%,
+  3% {
+    transform: translate3d(0, 54vh, 0) rotateX(60deg) scale(1.18);
+    animation-timing-function: cubic-bezier(0.33, 0, 0.67, 1);
+  }
+  40%,
+  100% {
+    transform: translate3d(0, 0, 0) rotateX(0deg) scale(1);
+  }
+}
+/* The light it stands in: the accent, thinned, spreading from behind it. */
+.film .open-window::before {
+  content: '';
+  position: absolute;
+  inset: -18%;
+  z-index: -1;
+  background: radial-gradient(closest-side, color-mix(in oklch, var(--accent) 34%, transparent), transparent);
+  animation-name: open-glow;
+}
+@keyframes open-glow {
+  0%,
+  3% {
+    opacity: 0.35;
+    animation-timing-function: cubic-bezier(0.33, 0, 0.67, 1);
+  }
+  40%,
+  100% {
+    opacity: 1;
+  }
+}
+.film .open-flip {
+  display: block;
+  aspect-ratio: 1440 / 900;
+  transform-style: preserve-3d;
+  animation-name: open-turn;
+}
+@keyframes open-turn {
+  0%,
+  60% {
+    transform: rotateY(0deg);
+    animation-timing-function: cubic-bezier(0.33, 0, 0.67, 1);
+  }
+  82%,
+  100% {
+    transform: rotateY(-180deg);
+  }
+}
+.film .open-face {
+  position: absolute;
+  inset: 0;
+  backface-visibility: hidden;
+}
+.film .open-back {
+  transform: rotateY(180deg);
+}
+.film .open-note {
+  position: absolute;
+  inset-block-end: 3.2vh;
+  inset-inline: 0;
+  margin-block: 0;
+}
+/* Each note shows while its side of the window faces the visitor. */
+.film .open-note[data-beat='desk'] {
+  animation-name: open-desk;
+}
+.film .open-note[data-beat='term'] {
+  animation-name: open-term;
+}
+@keyframes open-desk {
+  0%,
+  38%,
+  62%,
+  100% {
+    opacity: 0;
+  }
+  43%,
+  58% {
+    opacity: 1;
+  }
+}
+@keyframes open-term {
+  0%,
+  80% {
+    opacity: 0;
+  }
+  85%,
+  100% {
+    opacity: 1;
+  }
+}
+
+/* ── Who it works with ──
+   Two bands of running type on the blaze. The scroll pushes one left and the other right. */
+.marquee {
+  display: grid;
+  gap: var(--space-6);
+  padding-block: clamp(1.5rem, 1rem + 2vw, 3rem);
+  overflow: clip;
+  color: var(--site-blaze-ink);
+  background: var(--site-blaze);
+}
+.marquee-row {
+  display: flex;
+  inline-size: max-content;
+  margin: 0;
+  font-family: var(--site-font-display);
+  font-size: clamp(2.25rem, 1rem + 5.5vw, 6.5rem);
+  font-weight: 900;
+  font-stretch: 125%;
+  line-height: 1;
+  letter-spacing: -0.03em;
+  white-space: nowrap;
+}
+.marquee-row > span::after {
+  content: '/';
+  margin-inline: 0.35em;
+  font-weight: 300;
+  font-stretch: 100%;
+}
+/* The second band is drawn in outline. */
+.marquee-row + .marquee-row {
+  color: transparent;
+  -webkit-text-stroke: 0.025em var(--site-blaze-ink);
+}
+.marquee-row {
+  translate: -12% 0;
+}
+.live .marquee-row {
+  animation-name: marquee-left;
+}
+.live .marquee-row + .marquee-row {
+  animation-name: marquee-right;
+}
+@keyframes marquee-left {
+  from {
+    translate: -4% 0;
+  }
+  to {
+    translate: -26% 0;
+  }
+}
+@keyframes marquee-right {
+  from {
+    translate: -26% 0;
+  }
+  to {
+    translate: -4% 0;
+  }
+}
+
+/* ── The lanes ──
+   A board for the project: main down the left, and a branch off it for each task, with the agent on it
+   and a feed of what that agent is doing (film.ts). */
+.board {
+  --trunk: 0.5rem;
+  --elbow: clamp(1.5rem, 0.5rem + 3vw, 4rem);
+  --head: 1rem;
+  margin: 0;
+  padding: clamp(1.5rem, 1rem + 2vw, 3.5rem);
+  font-family: var(--font-mono);
+  font-size: clamp(0.9375rem, 0.8rem + 0.4vw, 1.1875rem);
+  background: var(--bg-subtle);
+  border: var(--bw) solid var(--border);
+  border-radius: 2rem;
+}
+.board-main {
+  display: flex;
+  align-items: center;
+  gap: var(--space-6);
+  margin: 0;
+  font-weight: var(--fw-bold);
+}
+.board-main code {
+  font-size: clamp(1.125rem, 0.9rem + 0.9vw, 1.75rem);
+}
+.board-main::before,
+.lane-branch::before {
+  content: '';
+  flex: none;
+  inline-size: var(--head);
+  block-size: var(--head);
+  border: 3px solid var(--accent);
+  border-radius: 50%;
+}
+.board-main::before {
+  margin-inline-start: calc(var(--trunk) - var(--head) / 2 + 1.5px);
+}
+.board ol {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.lane {
+  position: relative;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  align-items: center;
+  gap: var(--space-4) var(--space-10);
+  padding-block: var(--space-10);
+  padding-inline-start: calc(var(--trunk) + var(--elbow));
+}
+.lane > * {
+  min-inline-size: 0;
+}
+/* The trunk past this lane, and this lane's curve off it. */
+.lane::before,
+.lane:not(:last-child)::after {
+  content: '';
+  position: absolute;
+  inset-inline-start: var(--trunk);
+  border-inline-start: 3px solid var(--border-strong);
+}
+.lane::before {
+  inset-block-start: 0;
+  block-size: calc(var(--space-10) + 0.85em);
+  inline-size: calc(var(--elbow) - var(--head) / 2);
+  border-block-end: 3px solid var(--border-strong);
+  border-end-start-radius: 1.25rem;
+}
+.lane:not(:last-child)::after {
+  inset-block: 0;
+}
+.lane-branch {
+  display: flex;
+  align-items: center;
+  gap: var(--space-6);
+  margin-inline-start: calc(-1 * var(--head) / 2);
+  font-size: clamp(1.125rem, 0.9rem + 0.9vw, 1.75rem);
+  font-weight: var(--fw-bold);
+  overflow-wrap: anywhere;
+}
+.lane-branch::before {
+  background: var(--accent);
+}
+.lane-agent {
+  font-weight: var(--fw-bold);
+}
+/* What the agent is doing, in the leaf green of a running thing, behind a prompt. */
+.lane-feed {
+  position: relative;
+  overflow: hidden;
+  color: var(--site-leaf);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.lane-feed::before {
+  content: '› ';
+}
+/* While its agent works, film.ts writes the whole line at once and slides this cover off it a letter
+   at a time, on the compositor, with the cursor on its edge. Writing the line a letter at a time had
+   Chrome sort the whole page into layers again on every letter. */
+.lane[data-working] .lane-feed::after {
+  content: '';
+  position: absolute;
+  inset-block: 0;
+  inset-inline: 2ch -100vw;
+  background: var(--bg-subtle);
+  border-inline-start: 0.375ch solid var(--site-leaf);
+  animation: lane-cursor 1s steps(2) infinite;
+}
+@keyframes lane-cursor {
+  to {
+    border-inline-start-color: transparent;
+  }
+}
+/* While its agent works, a lane holds the place of what it'll wait on. */
+.lane[data-working] .lane-state {
+  visibility: hidden;
+}
+@media (min-width: 64rem) {
+  .lane {
+    grid-template-columns: minmax(0, 6fr) 8rem minmax(0, 5fr) 12rem;
+    min-block-size: 8rem;
+    padding-block: 0;
+  }
+  .lane::before {
+    block-size: 50%;
+  }
+  .lane-state {
+    justify-self: end;
+  }
+}
+
+/* The three steps of a task, side by side on a wide screen, each under a heavy rule. */
+.steps {
+  display: grid;
+  gap: var(--space-11);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.steps > li {
+  display: grid;
+  gap: var(--space-6);
+  align-content: start;
+  justify-items: start;
+  padding-block-start: var(--space-9);
+  border-block-start: 4px solid var(--text);
+}
+.steps > li > * {
+  margin: 0;
+}
+.steps p {
+  max-inline-size: 38ch;
+}
+@media (min-width: 64rem) {
+  .steps {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}
+
+/* ── The deck ──
+   One window for each group of panes, each with its name and what it's for. As a film, the stage pins
+   with the names down the left and the windows stacked on the right, and the scroll deals them: the
+   front window flies off past the visitor and the next one comes up. */
+.deck {
+  padding-block-start: var(--site-section);
+}
+.deck-list {
+  display: grid;
+  gap: clamp(3rem, 2rem + 4vw, 6rem);
+  margin: clamp(2.5rem, 1rem + 5vw, 6rem) 0 0;
+  padding: 0;
+  list-style: none;
+}
+.deck-list > li {
+  display: grid;
+  gap: var(--space-8);
+}
+.deck-list > li > * {
+  min-inline-size: 0;
+}
+.deck-list p {
+  max-inline-size: 60ch;
+  margin: 0;
+}
+
+.film .deck {
+  block-size: calc(100vh + var(--n) * 85vh);
+  padding: 0;
+}
+.film .deck-stage {
+  position: sticky;
+  inset-block-start: 0;
+  display: grid;
+  grid-template-columns: minmax(0, 4fr) minmax(0, 8fr);
+  grid-template-rows: auto repeat(var(--n), auto) minmax(0, 1fr);
+  column-gap: clamp(2rem, 4vw, 5rem);
+  block-size: 100vh;
+  padding-block: calc(var(--site-bar-h) + 4vh) 4vh;
+}
+.film .deck-stage > .head {
+  grid-column: 1;
+  margin-block-end: 4vh;
+}
+.film .deck-stage > .head h2 {
+  font-size: clamp(2rem, 0.5rem + 3.4vw, 4.25rem);
+}
+.film .deck-stage > .head .lede {
+  font-size: var(--site-fs-body);
+}
+.film .deck-list,
+.film .deck-list > li {
+  display: contents;
+}
+/* Each window's moves run over its own stretch of the scene: three windows' turns waiting behind,
+   coming up to the front, its own turn there, and flying off past the visitor. In the keyframes below,
+   75% is when it reaches the front and 93% is when it starts to leave. The stretches overlap, so the
+   scroll deals the windows one after another, and the last one stays. Its words are gone before the
+   next window's come in, so two paragraphs never show in the one place. */
+@supports (animation-timeline: view()) {
+  .film .deck-list > li > *,
+  .film .deck-list h3::before,
+  .film .deck-card::after {
+    animation-range: contain calc((var(--i) - 3) / (var(--n) - 0.3) * 100%) contain
+      calc((var(--i) + 1) / (var(--n) - 0.3) * 100%);
+  }
+}
+@supports not (animation-timeline: view()) {
+  .film .deck-list > li > *,
+  .film .deck-list h3::before,
+  .film .deck-card::after {
+    animation-delay: calc((var(--p) * (var(--n) - 0.3) - var(--i) + 3) / 4 * -1s);
+  }
+}
+.film .deck-list h3 {
+  position: relative;
+  grid-column: 1;
+  grid-row: calc(var(--i) + 2);
+  padding-block: 0.6vh;
+  font-size: clamp(1.5rem, 0.5rem + 2.2vw, 2.75rem);
+  animation-name: deck-name;
+}
+@keyframes deck-name {
+  0%,
+  71.875%,
+  96.125%,
+  100% {
+    opacity: 0.28;
+    transform: translateX(0);
+  }
+  75%,
+  93% {
+    opacity: 1;
+    transform: translateX(1.75rem);
+  }
+}
+/* The mark beside the name of the window in front. */
+.film .deck-list h3::before {
+  content: '';
+  position: absolute;
+  inset-block: 30% 30%;
+  inset-inline-start: -1.75rem;
+  inline-size: 0.75rem;
+  background: var(--accent);
+  border-radius: 100vmax;
+  animation-name: deck-mark;
+}
+@keyframes deck-mark {
+  0%,
+  71.875%,
+  96.125%,
+  100% {
+    transform: scale(0);
+  }
+  75%,
+  93% {
+    transform: scale(1);
+  }
+}
+/* The paragraphs share one place, so only the one in front takes the pointer. That's a move of its
+   own, because the compositor can't run it, and a move it can't run holds back the rest. */
+.film .deck-list p {
+  grid-column: 1;
+  grid-row: calc(var(--n) + 2);
+  align-self: start;
+  margin-block-start: 3vh;
+  animation-name: deck-text, deck-front;
+}
+@keyframes deck-text {
+  0%,
+  71.875%,
+  96.125%,
+  100% {
+    opacity: 0;
+  }
+  75%,
+  93% {
+    opacity: 1;
+  }
+}
+/* It changes halfway through each fade, when no other paragraph shows. */
+@keyframes deck-front {
+  0%,
+  94.5% {
+    pointer-events: none;
+    animation-timing-function: step-end;
+  }
+  73.5% {
+    pointer-events: auto;
+    animation-timing-function: step-end;
+  }
+}
+.film .deck-card {
+  position: relative;
+  grid-column: 2;
+  grid-row: 1 / -1;
+  align-self: center;
+  z-index: calc(20 - var(--i));
+  animation-name: deck-deal;
+}
+@keyframes deck-deal {
+  0% {
+    transform: perspective(1500px) translate3d(6.6vw, -15vh, -720px) rotateY(-13deg) rotateX(3deg);
+  }
+  75%,
+  93% {
+    opacity: 1;
+    transform: perspective(1500px) translate3d(0, 0, 0) rotateY(-13deg) rotateX(3deg);
+  }
+  100% {
+    opacity: 0;
+    transform: perspective(1500px) translate3d(26vw, -18vh, 520px) rotateY(-37deg) rotateX(3deg);
+  }
+}
+/* A waiting window sits in the shade of the ones in front. */
+.film .deck-card::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: var(--bg);
+  border-radius: var(--site-radius-window);
+  pointer-events: none;
+  animation-name: deck-shade;
+}
+@keyframes deck-shade {
+  0% {
+    opacity: 0.9;
+  }
+  75%,
+  100% {
+    opacity: 0;
+  }
+}
+
+/* ── Plugins ──
+   The opening's window again, on the night stage. As a film, the stage pins, the window lies down at
+   an angle, and each part a plugin draws lifts off it under its plugin's name (film.ts builds the
+   parts). */
+.apart {
+  margin-block-start: var(--site-section);
+  padding-block: var(--site-section);
+  color: var(--text);
+  background: var(--bg-subtle);
+}
+.apart-stage {
+  display: grid;
+  gap: clamp(2.5rem, 1rem + 5vw, 6rem);
+}
+.apart-stage > * {
+  min-inline-size: 0;
+}
+.apart-tilt {
+  position: relative;
+}
+.apart-part {
+  display: none;
+}
+
+.film .apart {
+  block-size: 400vh;
+  padding: 0;
+}
+/* More than a screen away, the picture isn't drawn (film.ts marks the view). Its six windows made every
+   later re-sort of the page into layers cost as much as the deck's five, wherever the visitor was.
+   `content-visibility` would skip it too, but when the scene comes back Chrome runs its moves on the
+   page's own thread for a while. The caption is all a screen reader reads, and it stays. */
+.film .apart-view[data-far] .apart-tilt {
+  visibility: hidden;
+}
+.film .apart-view[data-far] figcaption {
+  visibility: visible;
+}
+.film .apart-stage {
+  position: sticky;
+  inset-block-start: 0;
+  grid-template-columns: minmax(0, 4fr) minmax(0, 8fr);
+  align-items: center;
+  block-size: 100vh;
+  padding-block-start: var(--site-bar-h);
+}
+.film .apart-stage .head h2 {
+  font-size: clamp(2.5rem, 0.5rem + 5vw, 6rem);
+}
+.film .apart-stage .head .lede {
+  font-size: var(--site-fs-body);
+}
+.film .apart-view {
+  perspective: 2400px;
+}
+/* Lying down takes the first third of the scene, and the parts lift through the middle of it. */
+.film .apart-tilt {
+  transform-style: preserve-3d;
+  animation-name: apart-lie;
+}
+@keyframes apart-lie {
+  0% {
+    transform: translate3d(0, 0, 0) rotateX(0deg) rotateZ(0deg) scale(1);
+    animation-timing-function: cubic-bezier(0.33, 0, 0.67, 1);
+  }
+  32%,
+  100% {
+    transform: translate3d(-3vw, 5vh, 0) rotateX(57deg) rotateZ(-36deg) scale(0.8);
+  }
+}
+/* The window under the parts falls into shade as they leave it. */
+.film .apart-tilt::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: var(--bg-subtle);
+  border-radius: var(--site-radius-window);
+  animation-name: apart-shade;
+}
+@keyframes apart-shade {
+  0%,
+  26% {
+    opacity: 0;
+  }
+  72%,
+  100% {
+    opacity: 0.62;
+  }
+}
+.film .apart-part {
+  position: absolute;
+  inset-block-start: calc(var(--y) * 100%);
+  inset-inline-start: calc(var(--x) * 100%);
+  display: block;
+  inline-size: calc(var(--w) * 100%);
+  block-size: calc(var(--h) * 100%);
+  outline: 2px solid var(--site-accent);
+  box-shadow: 0 0 3rem var(--site-shade);
+  animation-name: apart-lift;
+}
+@keyframes apart-lift {
+  0%,
+  26% {
+    transform: translateZ(0);
+  }
+  72%,
+  100% {
+    transform: translateZ(calc(var(--lift) * 3.4rem));
+  }
+}
+/* The part's box cuts the copy of the window down to this part, and the copy sits where the window
+   does, so the part shows what's under it. */
+.film .apart-part > div {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+}
+.film .apart-part figure {
+  position: absolute;
+  inset-block-start: calc(-100% * var(--y) / var(--h));
+  inset-inline-start: calc(-100% * var(--x) / var(--w));
+  inline-size: calc(100% / var(--w));
+  block-size: calc(100% / var(--h));
+  border-radius: 0;
+  box-shadow: none;
+}
+/* The part's plugin, named on a tab that stands a little above it. */
+.film .apart-part > span {
+  position: absolute;
+  inset-block-end: 100%;
+  inset-inline-start: -2px;
+  padding: 0.2em 0.6em;
+  font-family: var(--font-mono);
+  font-size: clamp(0.875rem, 0.5rem + 0.9vw, 1.375rem);
+  font-weight: var(--fw-bold);
+  line-height: 1.2;
+  white-space: nowrap;
+  color: var(--site-accent-ink);
+  background: var(--site-accent);
+  animation-name: apart-name;
+}
+@keyframes apart-name {
+  0%,
+  26% {
+    opacity: 0;
+  }
+  72%,
+  100% {
+    opacity: 1;
+  }
+}
+
+/* ── What ships ──
+   A tile for every plugin acorn ships, and one more for the visitor's own. */
+.wall-scene {
+  padding-block-start: var(--site-section);
+}
+.wall-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--space-4) var(--space-10);
+}
+.wall {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(min(12rem, 45%), 1fr));
+  gap: var(--space-4);
+  margin: calc(-1 * var(--space-11)) 0 0;
+  padding: 0;
+  list-style: none;
+}
+.wall > li {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: var(--space-6);
+  padding: var(--space-8) var(--space-9);
+  font-weight: var(--fw-semibold);
+  line-height: var(--lh-tight);
+  background: var(--bg-subtle);
+  border: var(--bw) solid var(--border);
+  border-radius: 1rem;
+}
+.live .wall > li {
+  transition-delay: calc(var(--i) * 16ms);
+}
+.live .wall > li:not(.seen) {
+  scale: 0.8;
+  translate: 0 1rem;
+}
+.wall a {
+  text-decoration: none;
+}
+/* The whole tile is its link. */
+.wall a::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+}
+.wall > li:hover,
+.wall > li:has(a:focus-visible) {
+  border-color: var(--accent);
+  translate: 0 -3px;
+}
+.wall-icon {
+  display: block;
+  flex: none;
+  inline-size: 1.25rem;
+  block-size: 1.25rem;
+  color: var(--accent);
+}
+.wall-icon svg {
+  display: block;
+  inline-size: 100%;
+  block-size: 100%;
+}
+.wall > .wall-yours {
+  color: var(--site-blaze-ink);
+  background: var(--site-blaze);
+  border-color: var(--site-blaze);
+}
+.wall-yours a,
+.wall-yours .wall-icon {
+  color: var(--site-blaze-ink);
+}
+
+/* Asking an agent for a plugin: the words beside the agent's turn that wrote one. */
+.build {
+  display: grid;
+  gap: var(--space-11) clamp(3rem, 6vw, 7rem);
+  align-items: center;
+  margin-block-start: clamp(2rem, 4vw, 5rem);
+}
+.build > * {
+  min-inline-size: 0;
+}
+.build-text {
+  display: grid;
+  gap: var(--space-8);
+  justify-items: start;
+}
+.build-text > * {
+  margin: 0;
+}
+.chapter .build-text h3 {
+  font-size: clamp(2rem, 1rem + 3vw, 4rem);
+  font-stretch: 120%;
+  line-height: 0.95;
+}
+.build-text ul {
+  flex-direction: column;
+  gap: var(--space-4);
+}
+@media (min-width: 64rem) {
+  .build {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+/* ── Away from the desk ──
+   The browser's panel and two phone screens stand in a row. As a film they turn and drift at their
+   own speeds as the row scrolls by, so they read as three things in a room, not three pictures. */
+.away-floor {
+  display: grid;
+  justify-content: center;
+  justify-items: center;
+  gap: var(--space-11) clamp(1.5rem, 4vw, 5rem);
+}
+.away-shot {
+  inline-size: min(100%, 22.5rem);
+}
+.away-phone {
+  inline-size: min(100%, 18.75rem);
+}
+/* The box draws the panel's edge, so the panel's own side rules would only thicken it. */
+.away-shot .panel.acorn-ui {
+  border-inline: 0;
+}
+.away-shot .panel .snapshot-sidebar {
+  min-block-size: 649px;
+}
+/* A phone's screen in the shape of a phone: round corners and a bezel. */
+.away-phone .frame {
+  border: 0.5rem solid var(--border-strong);
+  border-radius: 2.75rem;
+}
+.phone-screen img {
+  display: block;
+  inline-size: 100%;
+  block-size: auto;
+}
+/* Each screen was captured in both of the site's themes. The page's light or dark switch picks one. */
+html[data-color-scheme='dark'] .phone-screen img[data-scheme='light'],
+html:not([data-color-scheme='dark']) .phone-screen img[data-scheme='dark'] {
+  display: none;
+}
+@media (min-width: 64rem) {
+  .away-floor {
+    grid-template-columns: repeat(3, auto);
+    align-items: center;
+  }
+}
+.film .away-floor {
+  perspective: 1800px;
+}
+.film .away-panel {
+  animation-name: away-panel;
+}
+.film .away-phone {
+  animation-name: away-phone;
+}
+@keyframes away-panel {
+  from {
+    transform: translate3d(0, 7vh, 0) rotateY(34deg);
+  }
+  to {
+    transform: translate3d(0, -7vh, 0) rotateY(-10deg);
+  }
+}
+@keyframes away-phone {
+  from {
+    transform: translate3d(0, calc(15vh + var(--i) * 13vh), 0) rotateY(calc(-23deg - var(--i) * 14deg))
+      rotateZ(calc((var(--i) - 0.5) * 5deg));
+  }
+  to {
+    transform: translate3d(0, calc(-15vh - var(--i) * 13vh), 0) rotateY(calc(7deg - var(--i) * 14deg))
+      rotateZ(calc((var(--i) - 0.5) * 5deg));
+  }
+}
+
+/* The two ways to answer an agent away from the desk, side by side. */
+.pair {
+  display: grid;
+  gap: var(--space-11) clamp(3rem, 6vw, 7rem);
+}
+.pair > div {
+  display: grid;
+  gap: var(--space-6);
+  align-content: start;
+  justify-items: start;
+  padding-block-start: var(--space-9);
+  border-block-start: 4px solid var(--text);
+}
+.pair > div > * {
+  margin: 0;
+}
+.pair p {
+  max-inline-size: 48ch;
+}
+@media (min-width: 64rem) {
+  .pair {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+/* ── Nodes ──
+   The server's terminal typing out the pairing (film.ts), and Fleet home. */
+.nodes-pairing,
+.nodes-fleet {
+  display: grid;
+  gap: var(--space-11) clamp(3rem, 6vw, 7rem);
+  align-items: center;
+}
+.nodes-pairing > *,
+.nodes-fleet > * {
+  min-inline-size: 0;
+}
+.nodes-text {
+  display: grid;
+  gap: var(--space-6);
+  justify-items: start;
+}
+.nodes-text > * {
+  margin: 0;
+}
+.nodes-text p {
+  max-inline-size: 44ch;
+}
+.pairing {
+  margin: 0;
+  padding: clamp(1.25rem, 3vw, 2.5rem);
+  font-family: var(--font-mono);
+  font-size: var(--fs-lg);
+  line-height: 1.8;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+.film .fleet-shot {
+  transform-origin: 0 50%;
+  animation-name: fleet-turn;
+}
+@keyframes fleet-turn {
+  from {
+    transform: perspective(1600px) rotateY(-22deg) rotateX(3deg);
+  }
+  to {
+    transform: perspective(1600px) rotateY(0deg) rotateX(3deg);
+  }
+}
+@media (min-width: 64rem) {
+  .nodes-pairing {
+    grid-template-columns: minmax(0, 7fr) minmax(0, 5fr);
+  }
+  .nodes-fleet {
+    grid-template-columns: minmax(0, 4fr) minmax(0, 8fr);
+  }
+}
+/* On a phone the output steps down a size, so its columns of names and values wrap less. */
+@media (max-width: 47.99rem) {
+  .pairing {
+    font-size: var(--fs-sm);
+  }
+}
+
+/* ── Questions ──
+   Each question is a row with a plus that turns to a cross as its answer opens. Where the browser can
+   animate to a height, the answer slides open. */
+.faq-head {
+  display: grid;
+  gap: var(--space-8);
+  justify-items: start;
+  align-content: start;
+}
+.faq-head > * {
+  margin: 0;
+}
+.faq-head h2 {
+  font-size: clamp(2.5rem, 1rem + 4.2vw, 5.5rem);
+}
+.faq details {
+  border-block-start: var(--bw-strong) solid var(--text);
+}
+.faq details:last-child {
+  border-block-end: var(--bw-strong) solid var(--text);
+}
+.faq summary {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-10);
+  padding-block: var(--space-9);
+  font-family: var(--site-font-display);
+  font-size: clamp(1.25rem, 1rem + 1vw, 1.875rem);
+  font-weight: 700;
+  font-stretch: 110%;
+  line-height: 1.1;
+  cursor: pointer;
+  list-style: none;
+}
+.faq summary::-webkit-details-marker {
+  display: none;
+}
+.faq summary::after {
+  content: '+';
+  flex: none;
+  font-family: var(--font-mono);
+  font-size: 2rem;
+  font-weight: var(--fw-normal);
+  line-height: 1;
+  color: var(--accent);
+  transition: rotate var(--dur-med) var(--ease-out);
+}
+.faq details[open] summary::after {
+  rotate: 45deg;
+}
+.faq summary:hover {
+  color: var(--accent);
+}
+.faq details::details-content {
+  block-size: 0;
+  overflow: clip;
+  transition:
+    block-size var(--dur-long) var(--ease-out),
+    content-visibility var(--dur-long) allow-discrete;
+}
+.faq details[open]::details-content {
+  block-size: auto;
+}
+.faq details p {
+  max-inline-size: var(--site-measure);
+  margin: 0;
+  padding-block-end: var(--space-10);
+}
+@media (min-width: 64rem) {
+  .faq {
+    grid-template-columns: minmax(0, 5fr) minmax(0, 7fr);
+    column-gap: clamp(3rem, 6vw, 7rem);
+  }
+}
+
+/* ── Get acorn ──
+   The page ends on the blaze: the last line as wide as the band, the install block and the actions
+   under it, and the acorn, which pops its cap as the band comes up. */
+.finale {
+  margin-block-start: var(--site-section);
+  padding-block: var(--site-section);
+  overflow: clip;
+  color: var(--site-blaze-ink);
+  background: var(--site-blaze);
+}
+.finale h2 {
+  margin: 0;
+  color: inherit;
+  /* One line, sized to run the band's width at the face's full stretch. */
+  font-size: clamp(2.75rem, 6.7vw, 7.4rem);
+  font-weight: 900;
+  font-stretch: 150%;
+  line-height: 0.9;
+}
+@media (min-width: 40rem) {
+  .finale h2 {
+    white-space: nowrap;
+  }
+  /* The line starts squeezed and stretches out to its full width as the band scrolls up. */
+  .live .finale h2 {
+    animation-name: finale-stretch;
+  }
+  @keyframes finale-stretch {
+    0% {
+      font-stretch: 50%;
+    }
+    38.46%,
+    100% {
+      font-stretch: 150%;
+    }
+  }
+}
+.finale-row {
+  display: grid;
+  gap: var(--space-11);
+  align-items: center;
+  margin-block-start: clamp(2.5rem, 5vw, 6rem);
+}
+.finale-text {
+  display: grid;
+  gap: var(--space-10);
+  justify-items: start;
+  min-inline-size: 0;
+}
+.finale-text > * {
+  margin: 0;
+}
+.finale-text > .site-dark {
+  justify-self: stretch;
+}
+/* On the blaze, everything is drawn in its ink: links, the focus ring, and the buttons, the main one
+   filled with it. */
+.finale a:not(.button) {
+  color: var(--site-blaze-ink);
+  text-decoration-color: var(--site-blaze-ink);
+}
+.finale :is(a, button):focus-visible {
+  outline-color: var(--site-blaze-ink);
+}
+.finale .actions .button {
+  color: var(--site-blaze-ink);
+  background: transparent;
+  border-color: var(--site-blaze-ink);
+}
+.finale .actions .button[data-variant='primary'] {
+  color: var(--site-blaze);
+  background: var(--site-blaze-ink);
+}
+/* Where acorn runs and its license: a row of three links, which wraps on a phone. */
+.finale-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-3) var(--space-10);
+  padding: 0;
+  list-style: none;
+  font-weight: var(--fw-semibold);
+}
+.finale-art {
+  justify-self: center;
+  margin: 0;
+  font-family: var(--font-mono);
+  font-size: clamp(1.75rem, 1rem + 2.4vw, 3.5rem);
+  font-weight: var(--fw-bold);
+  line-height: 1;
+}
+.finale-art .cap {
+  display: inline-block;
+  transform-origin: 85% 100%;
+}
+.live .finale-art .cap {
+  animation-name: finale-cap;
+}
+@keyframes finale-cap {
+  0%,
+  30% {
+    translate: 0 0;
+    rotate: 0deg;
+  }
+  60%,
+  100% {
+    translate: 0 -0.6em;
+    rotate: -16deg;
+  }
+}
+@media (min-width: 64rem) {
+  .finale-row {
+    grid-template-columns: minmax(0, 3fr) minmax(0, 2fr);
+  }
+}
+@media (max-width: 63.99rem) {
+  .finale-art {
+    display: none;
+  }
+}
+/* The blaze runs straight into the footer. */
+.site-page[data-bleed] + .site-foot {
+  border-block-start: 0;
+}
+
+/* ── The rail ──
+   The page's chapters down the window's right edge, the one in view marked. Only the film has it: a
+   plain page is short enough to scroll. */
+.rail {
+  display: none;
+}
+@media (min-width: 80rem) {
+  .film .rail {
+    position: fixed;
+    inset-block-start: 50%;
+    inset-inline-end: var(--space-8);
+    z-index: 15;
+    display: block;
+    translate: 0 -50%;
+  }
+}
+.rail ol {
+  display: grid;
+  gap: var(--space-2);
+  justify-items: end;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+/* Each chapter is a short stroke, longer and in the accent for the one in view. The names show
+   under the pointer or the keyboard, on a ground of their own, so they read over any scene. */
+.rail a {
+  display: flex;
+  align-items: center;
+  gap: var(--space-5);
+  padding: var(--space-2) var(--space-5);
+  font-size: var(--fs);
+  font-weight: var(--fw-semibold);
+  line-height: 1.2;
+  text-decoration: none;
+  color: var(--text);
+  border-radius: 100vmax;
+}
+.rail a::after {
+  content: '';
+  inline-size: 0.875rem;
+  block-size: 3px;
+  background: var(--border-strong);
+  border-radius: 100vmax;
+}
+.rail a[aria-current]::after {
+  inline-size: 1.5rem;
+  background: var(--accent);
+}
+.rail:is(:hover, :focus-within) a {
+  background: var(--bg);
+}
+.rail:not(:hover, :focus-within) a {
+  font-size: 0;
+}

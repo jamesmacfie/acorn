@@ -13,8 +13,9 @@ removes. Keep a new joke about the product, and keep the claim under it one a re
 A landing page heading is a whole sentence and keeps its period. A label is fine where it names a
 group, such as the two over the plugin guides, in sentence case.
 
-The hero sets its closing verb apart, "go nuts.", in rose over a drawn rule. No other heading on the
-site does: a chapter heading is one color, and its words carry the joke on their own.
+The hero sets its closing words apart: "go nuts." fills the stage in the accent, each letter at its own
+width. No other heading on the site does: a chapter heading is one color, and its words carry the joke
+on their own.
 
 ## What the pages leave out
 
@@ -24,9 +25,8 @@ These are the marks people list for a page a model wrote, and none of them is on
   "The whole X, in one Y".
 - A caps label above every heading, and numbers on steps or sections that a list already orders.
 - "Not just X, it's Y", groups of three by habit, and words such as seamless, powerful, and unlock.
-- A gradient wash, a glow, a pill badge over the headline, and a row of identical cards with an icon on
-  top. The oak sprig behind a hero is drawn in glyphs, with a task branch from the site's fixture along
-  its twig, and it fades where the words are.
+- A gradient wash, a pill badge over the headline, and a row of identical cards with an icon on top.
+  The one glow on the site is the light behind the opening's window.
 - Meta joined with middle dots, such as "macOS · Windows · MIT", and an arrow glued to a button's
   label.
 

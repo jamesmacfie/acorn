@@ -1,16 +1,18 @@
 ---
-// The landing page, one idea a screen: what a task is, the panes it opens, the plugins they're made of,
-// answering agents from the browser and the phone, and Nodes on other machines. Every claim links to the
-// page that owns it. Every picture is a capture of acorn, or a drawing made from the site fixture's facts.
+// The landing page: a film you scroll through, with acorn's own windows as its cast. The headline
+// stretches under the pointer, the task's window tips up and turns over into the terminal client, the
+// panes fly past, the window comes apart into its plugins, and the page ends on the blaze. Every claim
+// links to the page that owns it. Every picture is a capture of acorn, or a drawing made from the site
+// fixture's facts. The look is in src/styles/landing.css and the motion in src/scripts/landing/film.ts.
+// Without script, under reduced motion, or on a small screen, it's a plain page with every picture flat.
+import '../styles/landing.css'
 import Badge from '../components/Badge.astro'
-import Hero from '../components/Hero.astro'
 import InstallBlock from '../components/InstallBlock.astro'
 import SidebarPicture from '../components/SidebarPicture.astro'
 import Snapshot from '../components/Snapshot.astro'
 import SnapshotFrame from '../components/SnapshotFrame.astro'
 import SoftwareApplication from '../components/SoftwareApplication.astro'
 import Specimen from '../components/Specimen.astro'
-import Tour from '../components/Tour.astro'
 import { PLUGINS } from '../data/plugins.ts'
 import Marketing from '../layouts/Marketing.astro'
 import { installMethods } from '../install'
@@ -57,23 +59,42 @@ export const meta = {
   checked: '574139413',
 } satisfies PageMeta
 
-// The site fixture's three tasks on billing-api, each on its own branch, with the agent working in it and
-// what that agent waits on. The phone's Needs you below lists the same three.
+// The headline's last words, a letter at a time, so each letter can take its own width.
+const NUTS = 'go nuts.'
+
+// What acorn works with, for the two bands of running type under the opening.
+const company = ['Claude Code', 'Codex', 'GitHub', 'Linear', 'Rollbar', 'Docker', 'PostgreSQL', 'Chrome', 'Firefox']
+
+// The site fixture's three tasks on billing-api, each on its own branch, with the agent working in it,
+// what that agent does there, and what it ends up waiting on. The phone's Needs you below lists the
+// same three. The feed lines are a drawing: the tools an agent calls on the fixture's own files.
 const lanes = [
   {
     branch: 'retry-failed-webhooks',
-    title: 'Retry failed webhooks',
     agent: 'Claude Code',
     state: 'Finished its turn',
     tone: 'neutral',
+    feed: [
+      'Read billing/webhooks/deliver.py',
+      'Write billing/webhooks/backoff.py',
+      'Edit billing/webhooks/deliver.py +21 -4',
+      'Bash pytest tests/test_deliver.py',
+      '14 passed in 0.62s',
+    ],
   },
-  { branch: 'add-eu-vat', title: 'Add VAT to EU invoices', agent: 'Codex', state: 'Wants permission', tone: 'warn' },
+  {
+    branch: 'add-eu-vat',
+    agent: 'Codex',
+    state: 'Wants permission',
+    tone: 'warn',
+    feed: ['Read billing/invoices/vat.py', 'Edit billing/invoices/vat.py', 'Write tests/test_vat.py', 'Bash psql -f billing.sql'],
+  },
   {
     branch: 'speed-up-the-overdue-invoices-query',
-    title: 'Speed up the overdue invoices query',
     agent: 'Claude Code',
     state: 'Asked a question',
     tone: 'warn',
+    feed: ['Read overdue.sql', 'Bash psql -c "EXPLAIN ANALYZE"', 'Seq Scan on invoices', 'Add an index on due_date?'],
   },
 ] as const
 
@@ -98,11 +119,10 @@ const steps = [
   },
 ]
 
-// One tab per feature group, in features.ts's order, leaving out what the chapters below cover: plugins,
-// the browser, and Nodes.
-const tour: { id: string; label: string; snapshot: SnapshotId; text: string; href: string; link: string }[] = [
+// One window per feature group, in features.ts's order, leaving out what the chapters below cover:
+// plugins, the browser, and Nodes.
+const deck: { label: string; snapshot: SnapshotId; text: string; href: string; link: string }[] = [
   {
-    id: 'tasks',
     label: 'Tasks',
     snapshot: 'palette',
     text: 'Start a task from a pull request, a Linear issue, a Rollbar error, or from scratch. ⌘K opens the command palette.',
@@ -110,7 +130,6 @@ const tour: { id: string; label: string; snapshot: SnapshotId; text: string; hre
     link: 'More about tasks',
   },
   {
-    id: 'agents',
     label: 'Agents',
     snapshot: 'context',
     text: "Claude Code and Codex run in the task's worktree. Each new agent starts with the pull request, the linked issues, and your notes, and the Context pane is where you pick what goes in.",
@@ -118,7 +137,6 @@ const tour: { id: string; label: string; snapshot: SnapshotId; text: string; hre
     link: 'More about agents',
   },
   {
-    id: 'review',
     label: 'Review',
     snapshot: 'review',
     text: 'The pull request pane shows the checks, the review comments, and the diff, unified or split. You merge from there too.',
@@ -126,7 +144,6 @@ const tour: { id: string; label: string; snapshot: SnapshotId; text: string; hre
     link: 'More about review',
   },
   {
-    id: 'task-tools',
     label: 'Task tools',
     snapshot: 'database',
     text: 'A code editor, a PostgreSQL client, an HTTP client, Docker, and a browser preview, each one a pane in the task.',
@@ -134,7 +151,6 @@ const tour: { id: string; label: string; snapshot: SnapshotId; text: string; hre
     link: 'More about task tools',
   },
   {
-    id: 'automation',
     label: 'Workflows',
     snapshot: 'workflow',
     text: 'A workflow chains agent runs, terminal commands, and checks, and can stop to wait for your approval. Run one on a schedule or from a script.',
@@ -155,15 +171,11 @@ const plugins = Object.values(PLUGINS)
 // them against the code. Add a phone scene to scripts/capture-shell.mjs when they need a refresh.
 const phone = [
   {
-    id: 'phone-waiting',
-    label: 'Needs you',
     file: 'tasks',
     caption: "The workspace's tasks on a phone, under the three agents waiting on you.",
     alt: "Needs you lists three agents: one wants permission, one asked a question, and one finished its turn. The workspace's three tasks follow.",
   },
   {
-    id: 'phone-agent',
-    label: 'The agent',
     file: 'agent',
     caption: "The webhooks task's agent on a phone, with the task's panes along the bottom.",
     alt: "The agent's last answer in the Retry failed webhooks task, the message box under it, and a bar of the task's panes: Agent, Git, Notes, Context, Editor, and Terminal.",
@@ -238,48 +250,92 @@ const getAcorn = release ? 'Download' : 'Get acorn'
 const art = ACORN_ART.split('\n')
 const cap = art.slice(0, 4).join('\n')
 const nut = art.slice(4).join('\n')
+
+// The page's chapters, for the rail that follows the scroll down the window's edge.
+const chapters = [
+  ['top', 'Go nuts'],
+  ['branches', 'Branches'],
+  ['window', 'Panes'],
+  ['plugins', 'Plugins'],
+  ['away', 'Away'],
+  ['nodes', 'Nodes'],
+  ['questions', 'Questions'],
+  ['get-acorn', 'Get acorn'],
+]
 ---
 
-<Marketing title="A workspace for working with coding agents" meta={meta} mono>
+<Marketing title="A workspace for working with coding agents" meta={meta} bleed>
   <SoftwareApplication slot="head" release={release} />
-  <Hero slot="hero" title="Let your agents go nuts." highlight="go nuts." split>
-    <p>
-      Run Claude Code and Codex on several pieces of work at once, each on its own branch and worktree, so they don't
-      trip over each other.
-    </p>
-    <Fragment slot="actions">
-      <a class="button" data-variant="primary" data-size="lg" href="/download/">{getAcorn}</a>
-      <a class="button" data-size="lg" href="/docs/">Read the docs</a>
-    </Fragment>
-    <div slot="picture" class="hero-shot">
-      <div class="tabs segmented" role="tablist" aria-label="Client" data-tabs hidden>
-        <button type="button" role="tab" aria-controls="hero-shot-desktop">Desktop</button>
-        <button type="button" role="tab" aria-controls="hero-shot-terminal">Terminal</button>
-      </div>
-      <div id="hero-shot-desktop" role="tabpanel" aria-label="Desktop"><Snapshot id="hero" /></div>
-      <div id="hero-shot-terminal" role="tabpanel" aria-label="Terminal"><Snapshot id="hero-terminal" /></div>
-    </div>
-  </Hero>
 
-  <section class="section chapter" aria-labelledby="loop">
-    <header class="chapter-head">
-      <h2 id="loop">Every mess gets its own branch.</h2>
+  <section slot="hero" class="open site-dark" data-scene="pin" aria-labelledby="top">
+    <div class="open-stage">
+      <div class="open-words wrap">
+        <h1 id="top">
+          <span class="open-lead">Let your agents</span>
+          <span class="sr-only">{NUTS}</span>
+          <span class="open-nuts" data-kinetic aria-hidden="true">
+            {[...NUTS].map((letter) => (letter === ' ' ? <span class="gap"> </span> : <span>{letter}</span>))}
+          </span>
+        </h1>
+        <div class="open-pitch">
+          <p>
+            Run Claude Code and Codex on several pieces of work at once, each on its own branch and worktree, so they
+            don't trip over each other.
+          </p>
+          <div class="actions">
+            <a class="button" data-variant="primary" data-size="lg" href="/download/">{getAcorn}</a>
+            <a class="button" data-size="lg" href="/docs/">Read the docs</a>
+          </div>
+        </div>
+      </div>
+      <div class="open-window">
+        <div class="open-flip">
+          <div class="open-face"><Snapshot id="hero" /></div>
+          <div class="open-face open-back"><Snapshot id="hero-terminal" /></div>
+        </div>
+      </div>
+      <p class="open-note" data-beat="desk">
+        One task in one window: its branch, its agent, its changes, and its terminal.
+      </p>
+      <p class="open-note" data-beat="term">
+        The same task in the terminal client, drawn from the same code. <a href="/features/desktop-and-terminal/"
+          >Desktop and terminal</a
+        >
+      </p>
+    </div>
+  </section>
+
+  <div class="marquee" data-scene>
+    <p class="sr-only">acorn works with {company.join(', ')}.</p>
+    {
+      [0, 1].map(() => (
+        <p class="marquee-row" aria-hidden="true">
+          {[0, 1, 2].map(() => company.map((name) => <span>{name}</span>))}
+        </p>
+      ))
+    }
+  </div>
+
+  <section class="chapter wrap" data-scene aria-labelledby="branches">
+    <header class="head">
+      <h2 id="branches">Every mess gets its own branch.</h2>
       <p class="lede">
         In acorn, each piece of work is a task, like a bug fix or a new feature. A task's agents work in their own
         copy of the repo, so several tasks can run at once without touching each other's files.
       </p>
     </header>
-    <figure class="lanes box">
-      <p class="legend">billing-api</p>
-      <p class="lanes-main"><code>main</code></p>
+    <figure class="board">
+      <p class="board-main"><code>main</code><span>billing-api</span></p>
       <ol>
         {
-          lanes.map((lane) => (
-            <li class="lane">
+          lanes.map((lane, index) => (
+            <li class="lane" style={`--i: ${index}`} data-reveal>
               <code class="lane-branch">{lane.branch}</code>
-              <span class="lane-title">{lane.title}</span>
-              <span class="lane-agent">
-                {lane.agent}
+              <span class="lane-agent">{lane.agent}</span>
+              <span class="lane-feed" aria-hidden="true" data-feed={JSON.stringify(lane.feed)}>
+                {lane.feed.at(-1)}
+              </span>
+              <span class="lane-state">
                 <Badge tone={lane.tone}>{lane.state}</Badge>
               </span>
             </li>
@@ -291,10 +347,10 @@ const nut = art.slice(4).join('\n')
         that agent is waiting on.
       </figcaption>
     </figure>
-    <ol class="loop">
+    <ol class="steps">
       {
-        steps.map((step) => (
-          <li>
+        steps.map((step, index) => (
+          <li style={`--i: ${index}`} data-reveal>
             <h3>{step.title}</h3>
             <p>{step.text}</p>
             <a href={step.href}>{step.link}</a>
@@ -304,48 +360,65 @@ const nut = art.slice(4).join('\n')
     </ol>
   </section>
 
-  <section class="section chapter" aria-labelledby="window">
-    <header class="chapter-head">
-      <h2 id="window">You can close a few windows now.</h2>
-      <p class="lede">A task's pull request, terminals, and other tools open as panes in the same window.</p>
-    </header>
-    <Tour tabs={tour}>
-      {tour.map((tab) => <Snapshot slot={tab.id} id={tab.snapshot} />)}
-    </Tour>
+  <section class="deck" data-scene="pin" aria-labelledby="window" style={`--n: ${deck.length}`}>
+    <div class="deck-stage wrap">
+      <header class="head">
+        <h2 id="window">You can close a few windows now.</h2>
+        <p class="lede">A task's pull request, terminals, and other tools open as panes in the same window.</p>
+      </header>
+      <ol class="deck-list">
+        {
+          deck.map((card, index) => (
+            <li style={`--i: ${index}`}>
+              <h3>{card.label}</h3>
+              <p>
+                {card.text} <a href={card.href}>{card.link}</a>
+              </p>
+              <div class="deck-card">
+                <Snapshot id={card.snapshot} />
+              </div>
+            </li>
+          ))
+        }
+      </ol>
+    </div>
   </section>
 
-  <section class="section chapter band" aria-labelledby="plugins">
-    <header class="chapter-head">
-      <h2 id="plugins">Take it apart.</h2>
-      <p class="lede">
-        Every pane in that window is a plugin, and so are the terminal and most of the icons down its sides. Plugins you
-        write or install are built the same way, and work in both the desktop app and the terminal app.{' '}
-        <a href="/features/plugins/">More about plugins</a>
-      </p>
-    </header>
-
-    <div class="xray">
-      <Snapshot
-        id="hero"
-        instance="plugins"
-        caption="The task from the top of the page, with every part a plugin draws outlined: the Git and Agent panes, the terminal, five icons down the left side, and every pane's button on the right."
-      />
+  <section class="apart site-dark" data-scene="pin" aria-labelledby="plugins">
+    <div class="apart-stage wrap">
+      <header class="head">
+        <h2 id="plugins">Take it apart.</h2>
+        <p class="lede">
+          Every pane in that window is a plugin, and so are the terminal and most of the icons down its sides. Plugins
+          you write or install are built the same way, and work in both the desktop app and the terminal app.{' '}
+          <a href="/features/plugins/">More about plugins</a>
+        </p>
+      </header>
+      <div class="apart-view" data-explode>
+        <Snapshot
+          id="hero"
+          instance="plugins"
+          caption="The task from the top of the page, pulled apart into what plugins draw: the Git and Agent panes, the terminal, the icons down the left side, and every pane's button on the right."
+        />
+      </div>
     </div>
+  </section>
 
+  <section class="chapter wrap wall-scene" aria-labelledby="ships">
     <div class="wall-head">
-      <h3>What ships with acorn</h3>
+      <h3 id="ships">What ships with acorn</h3>
       <a href="/plugins/">See what each one adds</a>
     </div>
-    <ul class="wall box">
+    <ul class="wall">
       {
-        plugins.map((plugin) => (
-          <li>
+        plugins.map((plugin, index) => (
+          <li style={`--i: ${index}`} data-reveal>
             <span class="wall-icon" aria-hidden="true" set:html={lucideIcon(plugin.icon)} />
             <a href={plugin.docs}>{plugin.name}</a>
           </li>
         ))
       }
-      <li class="wall-yours">
+      <li class="wall-yours" style={`--i: ${plugins.length}`} data-reveal>
         <span class="wall-icon" aria-hidden="true" set:html={lucideIcon('plus')} />
         <a href="/docs/build-plugins/start/build-your-first-plugin/">Yours</a>
       </li>
@@ -372,27 +445,39 @@ const nut = art.slice(4).join('\n')
     </div>
   </section>
 
-  <section class="section chapter" aria-labelledby="away">
-    <header class="chapter-head">
+  <section class="chapter wrap away" data-scene aria-labelledby="away">
+    <header class="head">
       <h2 id="away">Step away from the desk.</h2>
       <p class="lede">
         The browser extension and the phone app open the same tasks, so you can answer an agent from wherever you are.
       </p>
     </header>
-    <div class="away">
-      <div class="away-item">
-        <div class="away-shot">
-          <div class="tabs segmented" role="tablist" aria-label="Browser panel" data-tabs hidden>
-            <button type="button" role="tab" aria-controls="browser-task">On the issue</button>
-            <button type="button" role="tab" aria-controls="browser-chat">In a chat</button>
+    <div class="away-floor">
+      <div class="away-shot away-panel"><SidebarPicture id="sidebar-issue-task" /></div>
+      {
+        phone.map((screen, index) => (
+          <div class="away-shot away-phone" style={`--i: ${index}`}>
+            <SnapshotFrame host="phone" caption={screen.caption}>
+              <div class="phone-screen">
+                {(['light', 'dark'] as const).map((scheme) => (
+                  <img
+                    src={`/phone/${screen.file}-${scheme}.webp`}
+                    data-scheme={scheme}
+                    width="390"
+                    height="844"
+                    alt={screen.alt}
+                    loading="lazy"
+                    decoding="async"
+                  />
+                ))}
+              </div>
+            </SnapshotFrame>
           </div>
-          <div id="browser-task" role="tabpanel" aria-label="On the issue">
-            <SidebarPicture id="sidebar-issue-task" />
-          </div>
-          <div id="browser-chat" role="tabpanel" aria-label="In a chat">
-            <SidebarPicture id="sidebar-issue-conversation" />
-          </div>
-        </div>
+        ))
+      }
+    </div>
+    <div class="pair">
+      <div>
         <h3>In the browser</h3>
         <p>
           Open a Linear issue, and the extension's side panel shows its task: the agents, what they're waiting on, and a
@@ -400,39 +485,7 @@ const nut = art.slice(4).join('\n')
         </p>
         <a href="/features/browser/">More about the browser extension</a>
       </div>
-      <div class="away-item">
-        <div class="away-shot">
-          <div class="tabs segmented" role="tablist" aria-label="Phone screen" data-tabs hidden>
-            {
-              phone.map((screen) => (
-                <button type="button" role="tab" aria-controls={screen.id}>
-                  {screen.label}
-                </button>
-              ))
-            }
-          </div>
-          {
-            phone.map((screen) => (
-              <div id={screen.id} role="tabpanel" aria-label={screen.label}>
-                <SnapshotFrame host="phone" caption={screen.caption}>
-                  <div class="phone-screen">
-                    {(['light', 'dark'] as const).map((scheme) => (
-                      <img
-                        src={`/phone/${screen.file}-${scheme}.webp`}
-                        data-scheme={scheme}
-                        width="390"
-                        height="844"
-                        alt={screen.alt}
-                        loading="lazy"
-                        decoding="async"
-                      />
-                    ))}
-                  </div>
-                </SnapshotFrame>
-              </div>
-            ))
-          }
-        </div>
+      <div>
         <h3>On your phone</h3>
         <p>
           Turn on remote access, then pair your phone by matching three words with a device you've already paired. Its
@@ -443,46 +496,45 @@ const nut = art.slice(4).join('\n')
     </div>
   </section>
 
-  <section class="section chapter" aria-labelledby="nodes">
-    <header class="chapter-head">
+  <section class="chapter wrap nodes" data-scene aria-labelledby="nodes">
+    <header class="head">
       <h2 id="nodes">Put the agents on a bigger machine.</h2>
       <p class="lede">
         Your agents run inside a Node, a background service the desktop app starts on your computer. Run a Node on a
         server too, and its agents keep working while your laptop sleeps.
       </p>
     </header>
-    <div class="nodes">
+    <div class="nodes-pairing">
       <SnapshotFrame
         host="terminal"
         caption="A standalone Node on a server, made reachable by its name, then opening a pairing window for a laptop."
       >
-        <pre class="pairing">{pairing}</pre>
+        <pre class="pairing" data-typed>{pairing}</pre>
       </SnapshotFrame>
       <div class="nodes-text">
-        <dl>
-          <div>
-            <dt>Pair from any client</dt>
-            <dd>
-              Check that the six words match on both screens, then enter the code. From then on, your app trusts that
-              Node and nothing pretending to be it.
-            </dd>
-          </div>
-          <div>
-            <dt>Every Node in one place</dt>
-            <dd>Fleet home lists every Node you've paired, its tasks, and the agents waiting on you there.</dd>
-          </div>
-        </dl>
+        <h3>Pair from any client</h3>
+        <p>
+          Check that the six words match on both screens, then enter the code. From then on, your app trusts that Node
+          and nothing pretending to be it.
+        </p>
+      </div>
+    </div>
+    <div class="nodes-fleet">
+      <div class="nodes-text">
+        <h3>Every Node in one place</h3>
+        <p>Fleet home lists every Node you've paired, its tasks, and the agents waiting on you there.</p>
         <a href="/features/nodes/">More about Nodes</a>
       </div>
+      <div class="fleet-shot"><Snapshot id="fleet" /></div>
     </div>
   </section>
 
-  <section class="section faq" aria-labelledby="questions">
+  <section class="chapter wrap faq" aria-labelledby="questions">
     <div class="faq-head">
       <h2 id="questions">Questions</h2>
       <a href="/docs/help/faq/">More in the FAQ</a>
     </div>
-    <div class="faq-list box">
+    <div class="faq-list">
       {
         faq.map((item) => (
           <details>
@@ -496,744 +548,40 @@ const nut = art.slice(4).join('\n')
     </div>
   </section>
 
-  <section class="section finale closing stage site-dark" aria-labelledby="get-acorn">
-    <div class="finale-text">
+  <section class="finale" data-scene aria-labelledby="get-acorn">
+    <div class="wrap">
       <h2 id="get-acorn">Give them a task.</h2>
-      <InstallBlock id="footer-install" methods={installMethods} />
-      <div class="actions">
-        <a class="button" data-variant="primary" data-size="lg" href="/download/">{getAcorn}</a>
-        <a class="button" data-size="lg" href="/docs/">Read the docs</a>
+      <div class="finale-row">
+        <div class="finale-text">
+          <div class="site-dark"><InstallBlock id="footer-install" methods={installMethods} /></div>
+          <div class="actions">
+            <a class="button" data-variant="primary" data-size="lg" href="/download/">{getAcorn}</a>
+            <a class="button" data-size="lg" href="/docs/">Read the docs</a>
+          </div>
+          <ul class="finale-meta">
+            <li><a href="/docs/start/install/">macOS and Windows</a></li>
+            <li><a href="/docs/start/desktop-and-terminal/">Terminal client</a></li>
+            <li><a href={`${GITHUB}/blob/main/LICENSE`}>MIT license</a></li>
+          </ul>
+        </div>
+        <pre class="finale-art" aria-hidden="true"><span class="cap">{cap}</span>{'\n'}{nut}</pre>
       </div>
-      <ul class="finale-meta">
-        <li><a href="/docs/start/install/">macOS and Windows</a></li>
-        <li><a href="/docs/start/desktop-and-terminal/">Terminal client</a></li>
-        <li><a href={`${GITHUB}/blob/main/LICENSE`}>MIT license</a></li>
-      </ul>
     </div>
-    <pre class="finale-art" aria-hidden="true"><span class="cap">{cap}</span>{'\n'}{nut}</pre>
   </section>
+
+  <nav class="rail" aria-label="Chapters">
+    <ol>
+      {
+        chapters.map(([id, label]) => (
+          <li>
+            <a href={`#${id}`}>{label}</a>
+          </li>
+        ))
+      }
+    </ol>
+  </nav>
 </Marketing>
 
 <script>
-  import '../scripts/tabs'
+  import '../scripts/landing/film'
 </script>
-
-<style>
-  /* ── The page's look ──
-     A compact, technical sheet: every word in mono at a smaller size, every window and list in a square
-     box with a hard ink edge, and folder tabs on the windows they switch. These rules ship with this
-     page only, so the other marketing pages keep the site's look until they take it up. */
-  :global(.site-page) {
-    --site-fs-hero: clamp(2.25rem, 1.5rem + 2.2vw, 3.25rem);
-    --site-fs-display: clamp(1.75rem, 1.3rem + 1.4vw, 2.5rem);
-    --site-fs-lede: clamp(1rem, 0.94rem + 0.25vw, 1.125rem);
-    --site-fs-body: 1rem;
-    --site-section: clamp(4rem, 2.5rem + 4vw, 6.5rem);
-    /* The ink a box is drawn in. A picture restates --text in the app's theme, so the page's --text is
-       copied here for the picture to inherit. The stage copies its own. */
-    --ink: var(--text);
-  }
-  :global(.site-page .site-dark) {
-    --ink: var(--text);
-  }
-
-  .box,
-  :global(.site-page .frame) {
-    position: relative;
-    background-color: var(--bg);
-    border: var(--bw-strong) solid var(--ink);
-    border-radius: 0;
-    box-shadow: none;
-  }
-  /* A picture keeps the app's own background. */
-  :global(.site-page .frame) {
-    background-color: var(--pane-bg);
-  }
-
-  /* A box's title, set into its top edge. */
-  .legend {
-    position: absolute;
-    inset-block-start: 0;
-    inset-inline-start: var(--space-9);
-    translate: 0 -50%;
-    margin: 0;
-    padding-inline: var(--space-4);
-    font-family: var(--font-mono);
-    font-size: var(--fs-lg);
-    font-weight: var(--fw-bold);
-    line-height: 1;
-    background: var(--bg);
-  }
-
-  /* Square, to match the boxes. */
-  :global(.site-page .button) {
-    border-radius: 0;
-  }
-
-  .hero-shot {
-    display: grid;
-  }
-  .hero-shot > * {
-    margin: 0;
-    min-inline-size: 0;
-  }
-
-  /* ── Chapters ──
-     Each opens with a display heading and a lede. There's no label above the heading, because a caps
-     label over every heading is a mark of a generated page. */
-  .chapter-head {
-    display: grid;
-    gap: var(--space-8);
-    justify-items: start;
-  }
-  .chapter-head > * {
-    margin: 0;
-  }
-  .chapter h2,
-  .finale h2,
-  .faq-head h2 {
-    max-inline-size: 28ch;
-    font-size: var(--site-fs-display);
-    font-weight: var(--fw-bold);
-    letter-spacing: var(--site-track-display);
-    word-spacing: var(--site-words-display);
-    line-height: 1.02;
-    overflow-wrap: break-word;
-    min-inline-size: 0;
-  }
-  .chapter h3 {
-    margin: 0;
-    font-size: var(--fs-xl);
-  }
-
-  /* A chapter on its own band runs the subtle background to the window's edges, as the stage does. */
-  .band {
-    margin-block-start: var(--site-section);
-    padding-block: var(--site-section);
-    background: var(--bg-subtle);
-    border-image: conic-gradient(var(--bg-subtle) 0 0) fill 0 / / 0 100vmax;
-  }
-
-  /* ── The lanes ──
-     main down the left, and a branch off it for each task, as `git log --graph` draws one turned on its
-     side: each lane's rule leaves the trunk in a curve and ends at its branch's head. The rules only
-     draw the shape. The words carry it, so the trunk is a grey rule and each head a brass dot. */
-  .lanes {
-    --trunk: 0.375rem;
-    --elbow: clamp(2.5rem, 1rem + 4vw, 5rem);
-    --head: 0.75rem;
-    margin: 0;
-    padding: var(--space-11) var(--space-10) var(--space-4);
-    font-family: var(--font-mono);
-    font-size: var(--fs-lg);
-  }
-  .lanes-main {
-    display: flex;
-    align-items: center;
-    gap: var(--space-5);
-    margin: 0;
-    font-weight: var(--fw-bold);
-  }
-  .lanes-main code {
-    font-size: var(--site-fs-body);
-  }
-  .lanes-main::before,
-  .lane-branch::before {
-    content: '';
-    flex: none;
-    inline-size: var(--head);
-    block-size: var(--head);
-    border: var(--bw-strong) solid var(--accent);
-    border-radius: 50%;
-  }
-  .lanes-main::before {
-    margin-inline-start: calc(var(--trunk) - var(--head) / 2 + var(--bw-strong) / 2);
-    background: var(--bg);
-  }
-  .lanes ol {
-    margin: 0;
-    padding: 0;
-    list-style: none;
-  }
-  /* A hairline under each lane, from its branch's head to the edge, so the row reads across. */
-  .lane {
-    position: relative;
-    display: grid;
-    grid-template-columns: minmax(0, 1.3fr) minmax(0, 1.2fr) minmax(0, 1fr);
-    align-items: center;
-    gap: var(--space-3) var(--space-11);
-    min-block-size: 5rem;
-    padding-inline-start: calc(var(--trunk) + var(--elbow));
-    background: linear-gradient(var(--border), var(--border)) no-repeat right bottom /
-      calc(100% - var(--trunk) - var(--elbow)) var(--bw);
-  }
-  .lane:last-child {
-    background: none;
-  }
-  .lane > * {
-    min-inline-size: 0;
-  }
-  /* The trunk past this lane, and this lane's curve off it. */
-  .lane::before,
-  .lane:not(:last-child)::after {
-    content: '';
-    position: absolute;
-    inset-inline-start: var(--trunk);
-    border-inline-start: var(--bw-strong) solid var(--border-strong);
-  }
-  .lane::before {
-    inset-block: 0 50%;
-    inline-size: calc(var(--elbow) - var(--head) / 2);
-    border-block-end: var(--bw-strong) solid var(--border-strong);
-    border-end-start-radius: var(--radius-xl);
-  }
-  .lane:not(:last-child)::after {
-    inset-block: 0;
-  }
-  .lane-branch {
-    display: flex;
-    align-items: center;
-    gap: var(--space-5);
-    margin-inline-start: calc(-1 * var(--head) / 2);
-    font-size: var(--site-fs-body);
-    font-weight: var(--fw-bold);
-    overflow-wrap: anywhere;
-  }
-  .lane-branch::before {
-    background: var(--accent);
-  }
-  .lane-title,
-  .lane-agent {
-    font-size: var(--fs-lg);
-  }
-  .lane-agent {
-    display: flex;
-    flex-wrap: wrap;
-    align-items: center;
-    justify-content: space-between;
-    gap: var(--space-4) var(--space-8);
-  }
-  /* Stacked, a lane's curve meets its branch's name on the first line, not the middle of the lane. */
-  @media (max-width: 63.99rem) {
-    .lane {
-      grid-template-columns: minmax(0, 1fr);
-      padding-block: var(--space-8);
-    }
-    .lane::before {
-      inset-block-end: auto;
-      block-size: calc(var(--space-8) + 1rem);
-    }
-    .lane-agent {
-      justify-content: start;
-    }
-  }
-
-  /* ── The loop ──
-     The three steps side by side on a wide screen, each under a length of track. The accent fills the
-     track left to right as the steps scroll through the window: one task moving from open to merged. */
-  .loop {
-    display: grid;
-    gap: var(--space-11);
-    margin: var(--space-11) 0 0;
-    padding: 0;
-    list-style: none;
-  }
-  .loop > li {
-    position: relative;
-    display: grid;
-    gap: var(--space-5);
-    align-content: start;
-    justify-items: start;
-    padding-block-start: var(--space-9);
-    view-timeline-name: --step;
-  }
-  .loop > li > * {
-    margin: 0;
-    min-inline-size: 0;
-  }
-  .loop > li::before,
-  .loop > li::after {
-    content: '';
-    position: absolute;
-    inset: 0 0 auto;
-    border-block-start: var(--bw-strong) solid var(--border-strong);
-  }
-  .loop > li::after {
-    border-color: var(--accent);
-    transform-origin: left;
-  }
-  /* Side by side, the steps share their rows, so the titles and the links line up across them. The
-     steps carry no numbers, because the list and the track already give the order. */
-  @media (min-width: 64rem) {
-    .loop {
-      grid-template-columns: repeat(3, minmax(0, 1fr));
-      row-gap: var(--space-5);
-    }
-    .loop > li {
-      grid-row: span 3;
-      grid-template-rows: subgrid;
-    }
-  }
-  @media (prefers-reduced-motion: no-preference) {
-    @supports (animation-timeline: view()) {
-      /* Each length of track fills while its step's top rises through the window, the next a little
-         after the one before, so side by side they fill left to right. */
-      .loop > li::after {
-        animation: fill-track linear both;
-        animation-timeline: --step;
-        animation-timing-function: var(--ease-out);
-      }
-      .loop > li:nth-child(1)::after {
-        animation-range: cover 5vh cover 35vh;
-      }
-      .loop > li:nth-child(2)::after {
-        animation-range: cover 20vh cover 50vh;
-      }
-      .loop > li:nth-child(3)::after {
-        animation-range: cover 35vh cover 65vh;
-      }
-      /* The lanes and this page's other new blocks rise in as they scroll into view, as the chapter heads
-         do (src/styles/site.css). */
-      :is(.lane, .away-item, .nodes > *) {
-        animation: site-enter linear both;
-        animation-timeline: view();
-        animation-range: entry 0% entry 30%;
-      }
-    }
-  }
-  @keyframes fill-track {
-    from {
-      scale: 0 1;
-    }
-  }
-
-  /* ── Plugins ──
-     The hero's window again, with each part a plugin draws outlined in the site's accent, which a
-     snapshot keeps while the window itself draws in the app's theme. The selectors name each part by
-     what the capture itself calls it, such as the Git pane's "Git list", so a new capture keeps them.
-     The rail's Home and Archive aren't plugins, so they stay plain. */
-  /* How far the outlines and names have come in, from 0 to 1. Registered, so it animates, and it starts
-     at 1, so without the animation everything shows. */
-  @property --xray {
-    syntax: '<number>';
-    inherits: true;
-    initial-value: 1;
-  }
-  .xray
-    :global(
-      :is(
-          .pane:has(> [aria-label='Git list']),
-          .pane:has(> [aria-label='Agent list']),
-          .ui-drawer,
-          [data-source-id='git'],
-          [data-source-id='docker'],
-          [data-source-id='workflows'],
-          [data-source-id='agents'],
-          [data-source-id='memory'],
-          .pane-switcher .tabrail-tab:not(.tabrail-bottom)
-        )
-    ) {
-    outline: calc(var(--xray) * var(--bw-strong)) dashed var(--site-accent);
-    outline-offset: calc(-1 * var(--bw-strong));
-  }
-  /* The three big parts carry their plugin's name. The window draws at 1440 pixels and scales down, so
-     the name is set large enough to read once it has. */
-  .xray :global(.pane) {
-    position: relative;
-  }
-  .xray :global(:is(.pane:has(> [aria-label='Git list']), .pane:has(> [aria-label='Agent list']), .ui-drawer))::after {
-    position: absolute;
-    inset: auto var(--space-6) var(--space-6) auto;
-    z-index: 1;
-    padding: var(--space-3) var(--space-5);
-    font-family: var(--font-mono);
-    font-size: 1.25rem;
-    font-weight: var(--fw-bold);
-    line-height: 1;
-    color: var(--site-accent-ink);
-    background: var(--site-accent);
-    opacity: var(--xray);
-  }
-  .xray :global(.pane:has(> [aria-label='Git list']))::after {
-    content: 'git';
-  }
-  .xray :global(.pane:has(> [aria-label='Agent list']))::after {
-    content: 'agents';
-  }
-  .xray :global(.ui-drawer)::after {
-    content: 'terminal';
-  }
-  /* On a phone the window is a quarter of its size, too small for the names, so the caption says it. */
-  @media (max-width: 49.99rem) {
-    .xray :global(.window *)::after {
-      display: none;
-    }
-  }
-  @media (prefers-reduced-motion: no-preference) {
-    @supports (animation-timeline: view()) {
-      .xray {
-        view-timeline-name: --xray-view;
-      }
-      .xray :global(.window) {
-        animation: show-plugins linear both;
-        animation-timeline: --xray-view;
-        /* While the window's top rises from near the bottom of the screen to near the top. */
-        animation-range: cover 15vh cover 60vh;
-      }
-    }
-  }
-  @keyframes show-plugins {
-    from {
-      --xray: 0;
-    }
-  }
-
-  .wall-head {
-    display: flex;
-    flex-wrap: wrap;
-    align-items: baseline;
-    justify-content: space-between;
-    gap: var(--space-4) var(--space-10);
-    margin-block-start: var(--space-11);
-  }
-  /* A hairline grid in a box: each cell draws its own end and bottom rules, so a short last row just
-     stops. The box's edge is an outline laid over the outer cells' rules, so it's one weight all round. */
-  .wall {
-    display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(min(13rem, 50%), 1fr));
-    max-inline-size: none;
-    margin: 0;
-    padding: 0;
-    list-style: none;
-    border: 0;
-    outline: var(--bw-strong) solid var(--ink);
-    outline-offset: calc(-1 * var(--bw));
-  }
-  .wall > li {
-    position: relative;
-    display: flex;
-    align-items: center;
-    gap: var(--space-5);
-    padding: var(--space-6) var(--space-7);
-    font-size: var(--fs-lg);
-    line-height: var(--lh-tight);
-    border-inline-end: var(--divider);
-    border-block-end: var(--divider);
-  }
-  .wall a {
-    text-decoration: none;
-  }
-  /* The whole cell is its link. */
-  .wall a::after {
-    content: '';
-    position: absolute;
-    inset: 0;
-  }
-  .wall > li:hover,
-  .wall > li:has(a:focus-visible) {
-    background: var(--bg-subtle);
-    box-shadow: inset var(--stripe-w) 0 var(--accent);
-  }
-  .wall-icon {
-    display: block;
-    flex: none;
-    inline-size: 1.125rem;
-    block-size: 1.125rem;
-    color: var(--accent);
-  }
-  .wall-icon :global(svg) {
-    display: block;
-    inline-size: 100%;
-    block-size: 100%;
-  }
-  .wall-yours {
-    font-weight: var(--fw-semibold);
-    background: var(--bg-subtle);
-    outline: var(--bw-strong) dashed var(--accent);
-    outline-offset: calc(-1 * var(--bw-strong));
-  }
-
-  /* Asking an agent for a plugin: the words beside the agent's turn that wrote one, both starting on the
-     same line. */
-  .build {
-    display: grid;
-    gap: var(--space-11) calc(2 * var(--space-11));
-    align-items: start;
-    margin-block-start: calc(2 * var(--space-11));
-  }
-  .build > * {
-    min-inline-size: 0;
-  }
-  .build-text {
-    display: grid;
-    gap: var(--space-8);
-    justify-items: start;
-  }
-  .build-text > * {
-    margin: 0;
-  }
-  .chapter .build-text h3 {
-    font-size: var(--site-fs-h2);
-  }
-  .build-text ul {
-    flex-direction: column;
-    gap: var(--space-4);
-  }
-  @media (min-width: 64rem) {
-    .build {
-      grid-template-columns: repeat(2, minmax(0, 1fr));
-    }
-  }
-
-  /* ── Away from the desk ──
-     The browser panel and the phone side by side at one height, each over its own words, with a switch
-     between two of its screens. Side by side, the two share their rows, so the pictures, the headings,
-     and the links line up across them. */
-  .away {
-    display: grid;
-    gap: var(--site-section) calc(2 * var(--space-11));
-  }
-  .away-item {
-    display: grid;
-    gap: var(--space-8);
-    align-content: start;
-    justify-items: center;
-    min-inline-size: 0;
-  }
-  .away-item > * {
-    inline-size: min(100%, 26rem);
-    margin: 0;
-  }
-  /* Each shot hugs its picture: the panel at the width a browser gives it, the phone a little narrower,
-     both at one height. The panel runs to that height with its rail at the foot, as in a browser. */
-  .away-item > .away-shot {
-    display: grid;
-    align-content: start;
-    inline-size: min(100%, calc(360px + 2 * var(--bw-strong)));
-    margin-block-end: var(--space-8);
-  }
-  .away-item > .away-shot:has([data-host='phone']) {
-    inline-size: min(100%, calc(300px + 2 * var(--bw-strong)));
-  }
-  /* The box draws the panel's edge, so the panel's own side rules would only thicken it. */
-  .away-shot :global(.panel.acorn-ui) {
-    border-inline: 0;
-  }
-  .away-shot :global(.panel .snapshot-sidebar) {
-    min-block-size: 649px;
-  }
-  .phone-screen img {
-    display: block;
-    inline-size: 100%;
-    block-size: auto;
-  }
-  /* Each screen was captured in both of the site's themes. The page's light or dark switch picks one. */
-  :global(html[data-color-scheme='dark']) .phone-screen img[data-scheme='light'],
-  :global(html:not([data-color-scheme='dark'])) .phone-screen img[data-scheme='dark'] {
-    display: none;
-  }
-  @media (min-width: 64rem) {
-    .away {
-      grid-template-columns: repeat(2, minmax(0, 1fr));
-      row-gap: var(--space-8);
-    }
-    .away-item {
-      grid-template-rows: subgrid;
-      grid-row: span 4;
-    }
-  }
-
-  /* ── Nodes ──
-     The server's terminal beside the two things it means for you, centered on each other. */
-  .nodes {
-    display: grid;
-    gap: var(--space-11) calc(2 * var(--space-11));
-    align-items: center;
-  }
-  .nodes > * {
-    min-inline-size: 0;
-  }
-  .nodes-text {
-    display: grid;
-    gap: var(--space-10);
-    justify-items: start;
-  }
-  .nodes-text > * {
-    margin: 0;
-  }
-  .nodes dl {
-    display: grid;
-    gap: var(--space-10);
-    margin: 0;
-  }
-  .nodes dl > div {
-    display: grid;
-    gap: var(--space-4);
-    padding-block-start: var(--space-8);
-    border-block-start: var(--divider);
-  }
-  .nodes dt {
-    font-family: var(--font-mono);
-    font-weight: var(--fw-bold);
-  }
-  .nodes dd {
-    max-inline-size: 48ch;
-    margin: 0;
-  }
-  .pairing {
-    margin: 0;
-    padding: var(--space-10) var(--space-11);
-    font-family: var(--font-mono);
-    font-size: var(--fs-lg);
-    line-height: 1.8;
-    white-space: pre-wrap;
-    overflow-wrap: anywhere;
-  }
-  @media (min-width: 64rem) {
-    .nodes {
-      grid-template-columns: minmax(0, 7fr) minmax(0, 5fr);
-    }
-  }
-  /* On a phone the output steps down a size, so its columns of names and values wrap less. */
-  @media (max-width: 47.99rem) {
-    .pairing {
-      padding: var(--space-8);
-      font-size: var(--fs-sm);
-    }
-  }
-
-  /* ── Questions ── */
-  .faq {
-    align-items: start;
-  }
-  .faq-head {
-    display: grid;
-    gap: var(--space-6);
-    justify-items: start;
-  }
-  .faq-head > * {
-    margin: 0;
-  }
-  .faq details + details {
-    border-block-start: var(--divider);
-  }
-  .faq details:nth-child(even) {
-    background: var(--bg-subtle);
-  }
-  /* Each question is a row with a plus that turns to a cross as its answer opens. Where the browser can
-     animate to a height, the answer slides open. */
-  .faq summary {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    gap: var(--space-10);
-    padding: var(--space-8) var(--space-9);
-    font-family: var(--font-mono);
-    font-weight: var(--fw-semibold);
-    letter-spacing: var(--site-track-heading);
-    word-spacing: var(--site-words-heading);
-    cursor: pointer;
-    list-style: none;
-  }
-  .faq summary::-webkit-details-marker {
-    display: none;
-  }
-  .faq summary::after {
-    content: '+';
-    flex: none;
-    font-size: var(--fs-xl);
-    font-weight: var(--fw-normal);
-    line-height: 1;
-    color: var(--accent);
-    transition: rotate var(--dur-med) var(--ease-out);
-  }
-  .faq details[open] summary::after {
-    rotate: 45deg;
-  }
-  .faq summary:hover {
-    text-decoration: underline;
-    text-decoration-color: var(--accent);
-  }
-  .faq details::details-content {
-    block-size: 0;
-    overflow: clip;
-    transition:
-      block-size var(--dur-long) var(--ease-out),
-      content-visibility var(--dur-long) allow-discrete;
-  }
-  .faq details[open]::details-content {
-    block-size: auto;
-  }
-  .faq details p {
-    max-inline-size: var(--site-measure);
-    margin: 0;
-    padding: 0 var(--space-9) var(--space-8);
-  }
-  @media (min-width: 64rem) {
-    .faq {
-      grid-template-columns: 1fr 2fr;
-    }
-  }
-
-  /* ── Get acorn ── */
-  .finale {
-    align-items: center;
-  }
-  .finale-text {
-    display: grid;
-    gap: var(--space-10);
-    justify-items: start;
-    min-inline-size: 0;
-  }
-  .finale-text > * {
-    margin: 0;
-  }
-  .finale-text > :global(.install) {
-    justify-self: stretch;
-  }
-  /* Where acorn runs and its license: a row of three links, which wraps on a phone. */
-  .finale-meta {
-    display: flex;
-    flex-wrap: wrap;
-    gap: var(--space-3) var(--space-9);
-    padding: 0;
-    list-style: none;
-    font-family: var(--font-mono);
-    font-size: var(--fs-md);
-  }
-  /* The acorn from the header, at the size of a sign. It tips its cap to whoever reaches for the main
-     button. */
-  .finale-art {
-    justify-self: center;
-    margin: 0;
-    font-family: var(--font-mono);
-    font-size: clamp(1.75rem, 1rem + 2vw, 2.75rem);
-    line-height: 1;
-    color: var(--accent);
-  }
-  .finale-art .cap {
-    display: inline-block;
-    transform-origin: 85% 100%;
-  }
-  @media (prefers-reduced-motion: no-preference) {
-    .finale-art .cap {
-      transition:
-        translate var(--dur-med) var(--ease-out),
-        rotate var(--dur-med) var(--ease-out);
-    }
-    .finale:has(.button[data-variant='primary']:is(:hover, :focus-visible)) .finale-art .cap {
-      translate: 0 -0.35em;
-      rotate: -14deg;
-    }
-  }
-  @media (min-width: 64rem) {
-    .finale {
-      grid-template-columns: 3fr 2fr;
-    }
-  }
-  @media (max-width: 63.99rem) {
-    .finale-art {
-      display: none;
-    }
-  }
-</style>

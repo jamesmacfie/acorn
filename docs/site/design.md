@@ -13,10 +13,11 @@ Four topics have pages of their own:
 - [Motion](./design/motion.md): what moves, when, and how reduced motion stops it.
 
 The site is built from acorn's own design tokens, under the app's token names, with colors of its
-own. The page draws in the site's palette: a violet-black night with near-white ink, one brass
-accent, the color of an acorn's shell, and one rose verb in the landing page's headline. By day the
-page turns violet-white and the brass deepens to bronze. A picture of acorn, a specimen or a
-snapshot, draws in the app's own theme instead, Catppuccin Latte or Mocha, so it shows the colors
+own. The page draws in the site's palette, the colors of an oak wood: a green-black night with cream
+ink, a squirrel's orange as the accent, and a leaf green for what's running. By day the page turns
+cream with forest ink, and the orange deepens so it reads on the light ground. The orange is also a
+ground of its own, the _blaze_, for the landing page's loudest bands. A picture of acorn, a specimen
+or a snapshot, draws in the app's own theme instead, Catppuccin Latte or Mocha, so it shows the colors
 acorn draws. The light and dark switch restyles the page and every picture at once. A marketing
 page's header, hero, and footer always draw at night, as the [stage](#the-stage).
 
@@ -53,13 +54,14 @@ rules.
 `--text`, and `--accent`, so `site.css` and Starlight's mapping read them as they always have. Its
 day block sits on `<html>`. Its night block sits on `<html>` in dark mode and on every `.site-dark`
 element. `html:root:root` outweighs the app's `:root[data-theme="…"]` blocks whichever sheet loads
-first. Three more of its tokens are the site's alone:
+first. Four more groups of its tokens are the site's alone:
 
 | Token | What it colors |
 | --- | --- |
-| `--site-accent`, `--site-accent-ink` | Marks the site draws over a picture, such as the outlines on the plugins chapter's window. A picture keeps these when it takes the app's theme. |
-| `--site-verb` | The hero's verb, rose, once, on the landing page. |
-| `--site-glyph-*` | The oak sprig over a stage: four violet steps and three brass ones, each a little lighter than the stage. |
+| `--site-accent`, `--site-accent-ink` | Marks the site draws over a picture, such as the outlines and names on the parts of the plugins scene's window. A picture keeps these when it takes the app's theme. |
+| `--site-leaf` | What an agent is doing, on the landing page's board of lanes. |
+| `--site-blaze`, `--site-blaze-ink` | The blaze and the ink that reads on it: the bands of running type, the plugin wall's own tile, and the closing band. Both are the same by day and by night. |
+| `--site-shade` | The shadow a lifted part of the window casts. |
 
 A picture of acorn is a picture, so it shows acorn's own colors. `pictureScopes()` in
 `apps/site/scripts/acornUi.mjs` restates Catppuccin Latte on every specimen and snapshot on a light
@@ -73,7 +75,8 @@ muted text, tone colors, and hover and selection fills fail contrast as text in 
 For example, `--text-muted` is 2.93:1 in Solarized Light. So the site sets secondary text apart by size,
 shows a callout's or a badge's tone in its border beside a word that names it, and marks the current
 or hovered row with an accent rule. A primary button is the accent, with `--bg` as its ink, which the
-palette pairs at 5.3:1 by day and 9.9:1 by night.
+palette pairs at 5.1:1 by day and 8.0:1 by night. On the blaze, every word is `--site-blaze-ink`, at
+7.6:1.
 
 ## Type sizes
 
@@ -85,14 +88,17 @@ Each kind of text on a marketing page has one size, so two things that do the sa
 | `--site-fs-h2`, `--fs-xl` | A section's heading, and a step's, a card's, or a list's heading. |
 | `--site-fs-lede` | The paragraph under a display heading, the hero's included. |
 | `--site-fs-body` | Paragraphs, and the tour's tabs. |
-| `--fs-lg` | Secondary words in Inter: a card's text and the plugin wall's names. |
-| `--fs-md` | Mono controls and links: the header, buttons, segmented switches, and the footer's links. Mono runs wider than Inter, so it sits a pixel under `--fs-lg`. |
+| `--fs-lg` | A card's text, and the controls and links in the header, the buttons, and the footer. |
+| `--fs-md` | Mono controls: segmented switches and a frame's tabs. |
 | `--fs` | Labels: a footer column's name, a specimen's bar and caption. |
 
-Mono runs wide, and its space is as wide as a letter, so headings pull in. Every heading takes
-`--site-track-heading` and `--site-words-heading`, and a display heading takes the stronger
-`--site-track-display` and `--site-words-display`. A lede in Inter takes `--site-track-lede`. A
-frame's title is semibold in sentence case, as a snapshot's is, not the app's tracked capitals.
+A marketing page's headings draw in Anybody, wide and heavy, and its paragraphs in Hanken Grotesk
+([fonts](./design/fonts.md)). A display heading takes `--site-wdth-display` and `--site-wght-display`
+on the face's width and weight axes, and `--site-track-display`. The rules name the two faces
+themselves and leave the app's font tokens alone, because a picture inside the page reads those
+tokens. A docs page's headings stay mono, which runs wide, so they pull in with `--site-track-heading`
+and `--site-words-heading`. A frame's title is semibold in sentence case, as a snapshot's is, not the
+app's tracked capitals.
 
 ## The mark
 
@@ -132,15 +138,6 @@ declared, so without restating it a dark element would inherit the light page's 
 then gives the element the site's night colors. Specimens and snapshots inside draw in Mocha. Code
 colors follow too, because they're `light-dark()` pairs and `.site-dark` sets `color-scheme: dark`.
 
-Every stage's hero carries an oak sprig drawn in mono glyphs, behind its words
-(`apps/site/src/scripts/glyphField.ts`). Its twig and the leaves' midribs are lines of slashes and
-dashes, the blades are a stipple, and the acorns are shaded in brass with scaly caps. A task branch
-from the site's fixture runs along the twig, and on the landing page it's `retry-failed-webhooks`, the
-task in the hero's window. Each page grows its own sprig from its title. The field fades near the
-words, so they stay clear, and a pointer that brushes the sprig sets it swaying. It stays empty
-without script, holds still under reduced motion, and hides below 48rem, where the words fill the
-stage.
-
 `.stage` paints its own background, and a border image's outset carries the band out to the window's
 edges without widening the page. Keep the background on the element itself: axe reads text contrast
 against an element's background, and it can't see paint from a pseudo-element or a border image. A
@@ -149,21 +146,29 @@ edge onto the page, and whatever follows the hero starts that far down.
 
 ## The landing page's look
 
-The landing page reads as a compact, technical sheet. The other marketing pages keep the site's look.
-The rules sit in the `<style>` block of `apps/site/src/pages/index.astro`, so they ship with that page
-only.
+The landing page is a film the visitor scrolls through, with acorn's own windows as its cast. Its
+markup is `apps/site/src/pages/index.astro`, its look is `apps/site/src/styles/landing.css`, and its
+motion is `apps/site/src/scripts/landing/film.ts`. [Motion](./design/motion.md) lists what moves.
 
-- Every word is JetBrains Mono. The page passes `mono` to `Marketing.astro`, which sets
-  `--site-font-body` to the mono face and skips Inter's preload.
-- The type is smaller. The page sets its own `--site-fs-hero`, `--site-fs-display`, `--site-fs-lede`,
-  `--site-fs-body`, and `--site-section`, so the headline tops out at 52 pixels, not 80.
-- Every window, specimen, and list sits in a _box_: a 2-pixel edge in the page's ink and square
-  corners. Mark an element with `.box`. Every `.frame` on the page is a box already.
-- A box can carry a title on its top edge with `.legend`, as the lanes' `billing-api` does.
-- Buttons have square corners, to match the boxes.
+- The page passes `bleed` to `Marketing.astro`, so its sections run to the window's edges. Each keeps
+  its own width with `.wrap`, up to `--land-width`, and the header lines up with that.
+- The page is a plain column first. Every rule outside a `.live` or `.film` block is the finished,
+  still page: every window flat, and every list in order. That's what a visitor without script, with
+  reduced motion, or on a small screen gets.
+- `film.ts` adds `live` to `<html>` when the visitor allows motion, and `film` when the window is
+  also at least 60rem wide and 36rem tall. Three scenes pin under `film`: the opening, the deck of
+  panes, and the window taken apart.
+- A scene is an element with `data-scene`. Each moving part in it plays one set of `@keyframes` laid
+  over the scene's whole scroll, 0% to 100%. Where the browser has scroll timelines, the scene is a
+  view timeline called `--scene`, and the compositor plays the moves. Elsewhere `film.ts` sets `--p`
+  on the scene, how far the scroll has taken it from 0 to 1, and each move is held paused at that
+  point. A pinned scene (`data-scene="pin"`) is taller than the window and holds a sticky stage.
+- The page reads dark, blaze, page, dark, page, blaze, dark: the opening and the plugins scene are on
+  the night stage, and the running type and the closing band are on the blaze.
 
-A picture restates `--text` in the app's theme, so a box draws its edge in `--ink`, a copy of the
-page's `--text` that the picture inherits. The stage copies its own.
+A new scene needs no script of its own: give it `data-scene`, write its moves as keyframes, and add
+each moving part to the lists under **Moves** in `landing.css`. Keep its still state outside `.live`
+and `.film`, and check it with reduced motion.
 
 ## Starlight's replaced parts
 

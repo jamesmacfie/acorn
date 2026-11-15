@@ -6,24 +6,33 @@ how the site looks.
 
 | Face | Where it comes from | Used by |
 | --- | --- | --- |
-| JetBrains Mono 2.304 | `apps/site/public/fonts/`, regular, bold, and italic, with its license in `OFL.txt` | Every pack's `--font-mono`, and the Terminal pack's `--font-ui`: every heading, label, button, and line of code, and all of a docs page |
-| Inter | The app's own file, through `@acorn/client-core/infra/styles/fonts.css` | A marketing page's paragraphs, as `--site-font-body`, except on the landing page |
+| JetBrains Mono 2.304 | `apps/site/public/fonts/`, regular, bold, and italic, with its license in `OFL.txt` | Every pack's `--font-mono`, and the Terminal pack's `--font-ui`: code, the pictures of acorn, and all of a docs page |
+| Anybody | `apps/site/public/fonts/Anybody-Variable.woff2`, with its license in `Anybody-OFL.txt` | A marketing page's headings, as `--site-font-display` |
+| Hanken Grotesk | `apps/site/public/fonts/HankenGrotesk-Variable.woff2`, with its license in `HankenGrotesk-OFL.txt` | A marketing page's paragraphs, as `--site-font-body`, and the header, the footer, and every button on any page |
 
 `site.css` puts JetBrains Mono first in `--font-mono`, ahead of the app's fallback stack. A marketing
-page reads in Inter beside mono headings, the way the app's Modern pack pairs them. Until Inter loads,
-the page draws in Arial stretched to Inter's measurements (`Inter fallback` in `site.css`), so its lines
-don't move when the face arrives. `fonts.css` also declares Literata and Nunito, for style packs the
-site never sets, and a browser fetches a face only when a rule uses it.
+page reads in Hanken Grotesk under headings in Anybody. Until Hanken Grotesk loads, the page draws in
+Arial at its measurements (`Hanken fallback` in `site.css`), so its lines don't move when the face
+arrives.
+
+Anybody and Hanken Grotesk are variable fonts, each one file for every weight. Anybody also has a
+width axis, from half the regular width to one and a half times it. A display heading sets it wide
+with `font-stretch`, and the landing page's headline moves it letter by letter
+([motion](./motion.md)). Both files are the Latin subsets from the Fontsource packages
+`@fontsource-variable/anybody` and `@fontsource-variable/hanken-grotesk`, version 5.3.0. To update
+one, run `npm pack` on its package and copy `files/anybody-latin-wdth-normal.woff2` or
+`files/hanken-grotesk-latin-wght-normal.woff2` over the file here.
+
+`site.css` also imports the app's `fonts.css`, which declares Inter, Literata, and Nunito for style
+packs the site never sets. A browser fetches a face only when a rule uses it.
 
 The JetBrains Mono files are subsets, about 20 KB each against 90 KB for the release's files, because
 a phone on a slow connection waits for them before it draws the page's text. Each keeps Latin-1, the
 punctuation and symbols the site writes, arrows, the Mac key symbols, and the box-drawing, block, and
 shape ranges the terminal view of a specimen draws. They leave out the programming ligatures, which
 the app doesn't draw either. A character outside the subset falls back to the next face in
-`--font-mono`. `Marketing.astro` preloads the regular and bold faces and Inter, the three the first
-screen uses. Inter's preload reads the file's built URL through the export client-core gives it. A
-page that passes `mono` to `Marketing.astro`, as the landing page does, sets its paragraphs in
-JetBrains Mono too and doesn't preload Inter, so the browser never fetches it.
+`--font-mono`. `Marketing.astro` preloads Anybody and Hanken Grotesk, the two faces the first
+screen's words draw in. JetBrains Mono draws the pictures, which can wait for it.
 
 To rebuild them, take the `.woff2` files from the JetBrains Mono 2.304 release and run this for each of
 `Regular`, `Bold`, and `Italic`:

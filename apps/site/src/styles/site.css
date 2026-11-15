@@ -1,24 +1,13 @@
-/* Hallmark · shape: a product tour, one idea a screen (the landing page), kept elsewhere · genre: atmospheric · theme: lumen (by request: its colors; the type and the mark kept) · redesign: full (the landing page; the system kept), restyle (the other pages)
- * hero: kept (Split, the window hanging off the stage; one sentence) · nav: kept (wordmark, four links, search, the scheme switch, the star) · footer: kept (four link columns over the mark line) · imagery: the product, in shell snapshots, specimens, the extension's sidebar pictures, and phone screenshots in Latte and Mocha · signature: an oak sprig in glyphs over every stage, its twig a branch name from the fixture, its acorns brass, swaying when brushed
- * axes: dark 14 290/mono JetBrains Mono/warm 68 · posture: restrained · contrast: pass · fold: pass · v2.0.0 */
-/* Hallmark · pre-emit critique: P4 H4 E4 S5 R4 V4 · weakest: R, ten sections counting the footer, because the landing page adds Nodes, the browser, the phone, and security at one screen each; the manifest example, the guide lists, and the trust cards went to make room */
-/* Hallmark · waive 38iii · go nuts. is lumen's verb, set once, in the hero · the hero's one rose verb is the joke the whole landing page tells */
+/* Hallmark · custom · idea: a film you scroll through, with acorn's own windows as the cast · vibe: loud, kinetic, oak wood at night · redesign: full (the landing page, the palette, the faces, the header and footer), restyle (the other marketing pages), by request: the visitor asked for an experience over restraint
+ * hero: a headline that fills the screen and stretches under the pointer, over the task's window lying back before it tips up · nav: a bar that floats over the film · footer: four link columns under the blaze · imagery: the product, in shell snapshots, specimens, the extension's panel, and phone screenshots in Latte and Mocha · signature: the task's window pulled apart into the plugins that draw it
+ * axes: dark 13.5 155/grotesk-heavy Anybody/warm 50 · posture: expressive · v2.0.0 */
+/* Hallmark · waive F8 · the landing page pins three scenes and scrubs them · the page is a film by request, and each scene shows the product doing something a still can't */
 /* Hallmark · waive 47b · every frame holds a capture of acorn's own markup · the snapshots and specimens are the product, drawn by the app's own stylesheet */
-/* Hallmark · waive 64 · the headings, the nav and every control are JetBrains Mono · mono is the material of a workspace that also runs in a terminal */
 /* Hallmark · waive 26b · no button or link on these pages can be disabled · nothing here waits on a form or a request */
-/* Hallmark · waive 49b · each wrapping link at 320 is a docs page title, two lines at most · the FAQ and footer links name the docs pages they open */
-/* Hallmark · waive 39b · the 19 to 21px controls are inside the app's screenshots · the hero window shows acorn's own compact controls at its own scale */
+/* Hallmark · waive 39b · the 19 to 21px controls are inside the app's screenshots · a window shows acorn's own compact controls at its own scale */
 /* Hallmark · waive 75 · the 10px text is the app's own, scaled down inside its screenshots · a snapshot draws the whole acorn window at a reduced size */
 /* Hallmark · waive 72 · the crowded boxes are acorn's own cards inside its screenshots · each card is captured exactly as the app draws it */
 /* Hallmark · answered F1 · the site's copy keeps straight quotes, as its docs pages do */
-/* Hallmark · answered F8 · the loop's track and the plugin outlines each explain their own chapter, and both settle by a third of the way in */
-/* Hallmark · answered F19 · 600 in JetBrains Mono draws with its bold face, and 500 is the app's own, inside its screenshots */
-/* Hallmark · dismissed F3 · every heading takes text-wrap: balance in the site-base layer */
-/* Hallmark · dropped {href}, scaffold, starter-pane · the landing page's six trust cards, its two lists of plugin guides, and its manifest example, cut so the page stays brief with no JSON; the reach map and the plugins and Nodes pages carry them */
-/* Hallmark · waive 44c · the hero's window spans the page under the words and hangs off the stage's foot · a window under the headline is how every marketing page on the site opens */
-/* Hallmark · waive 77 · the closing band holds the install block and the two actions beside the acorn · the close only has to carry the download */
-/* Hallmark · dismissed 59 · ten sections counting the footer: the landing page adds Nodes, the browser, the phone, and security, and each keeps to one screen */
-/* Hallmark · dismissed 28a · the landing page's first img is the phone screenshot in its fifth section, far below the fold; the hero's headline and window are the largest paint */
 
 /* The site's stylesheet, written against acorn's own design tokens, which virtual:acorn-ui.css puts on
    <html>. The site picks Catppuccin Latte or Mocha with the visitor's light or dark mode
@@ -30,19 +19,37 @@
    anywhere but tokens.css, and scripts/contrast.test.mjs checks the pairs of colors the site sets text
    in. */
 
-/* The app's own faces. Inter sets a marketing page's paragraphs. The other two belong to style packs
-   the site never sets, and a browser fetches a face only when a rule uses it. */
+/* The app's own faces, for the style packs. The site never sets one, and a browser fetches a face only
+   when a rule uses it. */
 @import '@acorn/client-core/infra/styles/fonts.css';
 @import './tokens.css';
 
-/* Arial, stretched to Inter's size, so a paragraph keeps its lines when Inter arrives and swaps in. */
+/* A marketing page's two faces, both variable, served from public/fonts with their licenses. Anybody
+   sets the headings: its width axis runs from half to one and a half times the regular width, which
+   is what lets the landing page's headline stretch. Hanken Grotesk sets the paragraphs. */
 @font-face {
-  font-family: 'Inter fallback';
+  font-family: 'Anybody';
+  src: url('/fonts/Anybody-Variable.woff2') format('woff2');
+  font-weight: 100 900;
+  font-stretch: 50% 150%;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: 'Hanken Grotesk';
+  src: url('/fonts/HankenGrotesk-Variable.woff2') format('woff2');
+  font-weight: 100 900;
+  font-style: normal;
+  font-display: swap;
+}
+/* Arial at Hanken Grotesk's size, so a paragraph keeps its lines when the face arrives and swaps in. */
+@font-face {
+  font-family: 'Hanken fallback';
   src: local('Arial');
-  ascent-override: 90.49%;
-  descent-override: 22.56%;
+  ascent-override: 100%;
+  descent-override: 30.8%;
   line-gap-override: 0%;
-  size-adjust: 107.06%;
+  size-adjust: 100%;
 }
 
 /* JetBrains Mono, served from public/fonts with its license (OFL.txt). */
@@ -73,8 +80,10 @@
 html:root {
   /* The app's mono stack, with the face the site serves first. No style pack moves it. */
   --font-mono: 'JetBrains Mono', ui-monospace, 'SF Mono', 'Cascadia Code', Menlo, Consolas, monospace;
-  /* Headings are mono on every page, as they are in the Terminal pack the site draws in. */
+  /* Headings are mono on a docs page, as they are in the Terminal pack the site draws in. A marketing
+     page sets them in its own display face (`.site-page` below). */
   --font-display: var(--font-mono);
+  --site-font-display: 'Anybody', 'Arial Black', 'Hanken fallback', sans-serif;
 
   /* The widest a page's content runs: where a pane stops widening in the app. */
   --site-width: var(--pane-measure);
@@ -88,26 +97,29 @@ html:root {
   --site-lh-prose: 1.7;
   /* The space between two sections of a marketing page. */
   --site-section: clamp(5rem, 3rem + 6vw, 9rem);
-  /* A marketing page's paragraphs: a sans face for reading, beside the mono headings, labels, and code. */
-  --site-font-body: 'Inter', 'Inter fallback', ui-sans-serif, system-ui, sans-serif;
-  --site-fs-body: 1.0625rem;
-  --site-lh-body: 1.65;
+  /* A marketing page's paragraphs: a sans face for reading, under the display headings. */
+  --site-font-body: 'Hanken Grotesk', 'Hanken fallback', ui-sans-serif, system-ui, sans-serif;
+  --site-fs-body: 1.125rem;
+  --site-lh-body: 1.6;
   /* Type above the app's largest size, --fs-xl, which no app surface needs. */
-  --site-fs-hero: clamp(2.75rem, 1.2rem + 5.4vw, 6rem);
+  --site-fs-hero: clamp(3rem, 1rem + 7vw, 8rem);
   /* A landing page chapter's heading: under the hero's, well over a section's. */
-  --site-fs-display: clamp(2.25rem, 1.4rem + 2.8vw, 4rem);
+  --site-fs-display: clamp(2.75rem, 1rem + 6vw, 7.5rem);
   /* The paragraph under a display heading. */
-  --site-fs-lede: clamp(1.125rem, 1rem + 0.45vw, 1.375rem);
+  --site-fs-lede: clamp(1.25rem, 1.05rem + 0.7vw, 1.75rem);
   --site-fs-h1: 2rem;
-  --site-fs-h2: 1.5rem;
-  /* Mono runs wide, and its space is as wide as a letter, so a heading pulls its letters in and its
-     spaces in further: a little at a section's size, more at display size. */
+  --site-fs-h2: 1.75rem;
+  /* Mono runs wide, and its space is as wide as a letter, so a mono heading pulls its letters in and
+     its spaces in further. A marketing page's display face needs neither (`.site-page` below). */
   --site-track-heading: -0.01em;
   --site-words-heading: -0.15em;
-  --site-track-display: -0.04em;
-  --site-words-display: -0.2em;
-  /* Inter over 20 pixels reads loose at its text spacing. */
+  --site-track-display: -0.03em;
+  --site-words-display: 0em;
+  /* A lede over 20 pixels reads loose at its text spacing. */
   --site-track-lede: -0.012em;
+  /* A display heading's width and weight on the display face's axes: wide and black. */
+  --site-wdth-display: 125;
+  --site-wght-display: 850;
   /* How far a hero's picture hangs below the stage onto the page. */
   --site-overhang: clamp(4rem, 2rem + 12vw, 16rem);
   /* A window is rounder than a pane, as a desktop draws one. */
@@ -289,19 +301,22 @@ body {
   min-block-size: var(--control-h);
   padding: var(--pad-control-lg);
   font: inherit;
-  font-family: var(--font-mono);
-  font-size: var(--fs-md);
+  font-family: var(--site-font-body);
+  font-size: var(--fs-lg);
+  font-weight: var(--fw-semibold);
   line-height: var(--lh-tight);
   color: var(--text);
   text-decoration: none;
   white-space: nowrap;
   background: var(--bg);
   border: var(--control-border);
-  border-radius: var(--radius-control);
+  /* A pill at any height. */
+  border-radius: 100vmax;
   cursor: pointer;
   transition:
     var(--transition-color),
-    translate var(--dur-short) var(--ease-out);
+    translate var(--dur-short) var(--ease-out),
+    scale var(--dur-short) var(--ease-out);
 }
 .button:hover {
   border-color: var(--accent);
@@ -317,17 +332,17 @@ body {
   border-color: var(--accent);
 }
 .button[data-variant='primary']:hover {
-  translate: 0 -1px;
+  translate: 0 -2px;
+  scale: 1.04;
 }
 .button[data-variant='primary']:active {
   translate: 0 1px;
 }
 /* A page's main actions: the hero's, and the closing band's. */
 .button[data-size='lg'] {
-  min-block-size: 3rem;
-  padding: 0 var(--space-10);
-  font-size: var(--fs-lg);
-  border-radius: var(--radius-lg);
+  min-block-size: 3.5rem;
+  padding: 0 2rem;
+  font-size: 1.125rem;
 }
 .actions {
   display: flex;
@@ -379,10 +394,13 @@ select {
    is the top of the dark stage, so it runs into the hero with no rule between them. Below Starlight's
    50rem breakpoint the links fold into a menu, so the two kinds of page fold together. */
 .site-bar {
-  position: relative;
-  z-index: 2;
+  position: sticky;
+  inset-block-start: 0;
+  z-index: 20;
   padding-inline: var(--site-gutter);
-  background: var(--bg-subtle);
+  /* The stage's ground, thinned, so the film shows through the bar as it passes under. */
+  background: color-mix(in oklch, var(--bg-subtle) 72%, transparent);
+  backdrop-filter: blur(16px) saturate(1.5);
 }
 .site-bar > .site-header {
   /* The page's width less its gutters, because .site-page's width includes them. */
@@ -394,7 +412,9 @@ select {
   align-items: center;
   gap: var(--space-8);
   block-size: var(--site-bar-h);
-  font-size: var(--fs-md);
+  font-family: var(--site-font-body);
+  font-size: var(--fs-lg);
+  font-weight: var(--fw-medium);
 }
 .site-header .site-mark {
   margin-inline-end: var(--space-6);
@@ -538,7 +558,8 @@ select {
   display: grid;
   gap: var(--space-11);
   padding-block: calc(2 * var(--space-11)) var(--space-11);
-  font-size: var(--fs-md);
+  font-family: var(--site-font-body);
+  font-size: var(--fs-lg);
   line-height: var(--lh);
 }
 .site-footer-columns {
@@ -574,7 +595,9 @@ select {
 }
 
 /* ── Marketing pages ───────────────────────────────────────────────────────────────────────────
-   Paragraphs read in the sans face. Headings, labels, buttons, and code stay mono, as the app's are. */
+   Paragraphs read in the sans face and headings draw in the display face, wide and heavy. Code and
+   the pictures of acorn stay mono, as the app's are. The rules name the faces themselves: a picture
+   inside the page reads the app's own font tokens, so those stay as the app sets them. */
 .site-page {
   max-inline-size: var(--site-width);
   margin-inline: auto;
@@ -583,20 +606,30 @@ select {
   font-size: var(--site-fs-body);
   line-height: var(--site-lh-body);
 }
-/* A page set all in mono, as the landing page is (Marketing.astro's `mono`). */
-.site-page[data-mono] {
-  --site-font-body: var(--font-mono);
+.site-page :where(h1, h2, h3, h4):not(.acorn-ui *) {
+  font-family: var(--site-font-display);
+  font-weight: 750;
+  font-stretch: 110%;
+  letter-spacing: -0.015em;
+  word-spacing: 0;
+  font-synthesis: none;
 }
-.site-page > * + * {
+/* A page whose sections run to the window's edges and keep their own width (Marketing.astro's `bleed`). */
+.site-page[data-bleed] {
+  max-inline-size: none;
+  padding: 0;
+}
+.site-page:not([data-bleed]) > * + * {
   margin-block-start: var(--space-8);
 }
-.site-page :where(p, h1, h2, h3, ul) {
+/* A bleed page sets its own measures and sizes, scene by scene. */
+.site-page:where(:not([data-bleed])) :where(p, h1, h2, h3, ul) {
   max-inline-size: var(--site-measure);
 }
-.site-page h1 {
+.site-page:where(:not([data-bleed])) h1 {
   font-size: var(--site-fs-h1);
 }
-.site-page h2 {
+.site-page:where(:not([data-bleed])) h2 {
   font-size: var(--site-fs-h2);
 }
 .lede {
@@ -649,51 +682,13 @@ select {
   font-size: var(--fs-md);
 }
 .hero h1 {
-  max-inline-size: 16ch;
+  max-inline-size: 14ch;
   font-size: var(--site-fs-hero);
-  font-weight: var(--fw-bold);
-  /* The hero's line is the largest, so it pulls in a touch further than a display heading. */
-  letter-spacing: -0.045em;
-  word-spacing: var(--site-words-display);
-  line-height: 1;
+  font-weight: var(--site-wght-display);
+  font-stretch: calc(var(--site-wdth-display) * 1%);
+  letter-spacing: var(--site-track-display);
+  line-height: 0.95;
   overflow-wrap: break-word;
-}
-/* The hero's one verb, in rose, underlined by a rule that draws in once as the page loads. It holds
-   together on one line so the rule runs under all of it. */
-.hero h1 .verb {
-  display: inline-block;
-  color: var(--site-verb);
-}
-.hero h1 .verb::after {
-  content: '';
-  display: block;
-  block-size: var(--bw-strong);
-  margin-block-start: -0.06em;
-  background: currentcolor;
-  transform-origin: left;
-}
-@media (prefers-reduced-motion: no-preference) {
-  .hero h1 .verb::after {
-    animation: draw-rule 900ms 500ms var(--ease-out) both;
-  }
-}
-@keyframes draw-rule {
-  from {
-    scale: 0 1;
-  }
-}
-/* The sprig behind the words. Its script sizes it to run from the window's left edge to its right. */
-.glyph-field {
-  position: absolute;
-  inset-block-start: 0;
-  inset-inline-start: 0;
-  z-index: -1;
-  pointer-events: none;
-}
-@media (max-width: 47.99rem) {
-  .glyph-field {
-    display: none;
-  }
 }
 /* A page whose hero is only a heading, such as the changelog, keeps it at a section heading's scale. */
 .hero:not(:has(> .hero-text, > .hero-picture)) h1 {
@@ -731,28 +726,6 @@ select {
 .hero:not(:has(> .hero-picture)) + .section {
   padding-block-start: 0;
 }
-/* A split hero: the headline on the left, and the paragraph and actions in a column beside it, both
-   starting under the breadcrumb when there is one. */
-@media (min-width: 64rem) {
-  /* The first row takes the headline's spare height, so the paragraph and the actions sit together at
-     its foot. */
-  .hero[data-split] {
-    grid-template-columns: minmax(0, 1fr) minmax(0, 26rem);
-    grid-template-rows: minmax(0, 1fr) auto;
-    column-gap: calc(2 * var(--space-11));
-    align-items: end;
-  }
-  .hero[data-split] > .hero-crumb {
-    grid-column: 1 / -1;
-  }
-  .hero[data-split] > h1 {
-    grid-row: span 2;
-    align-self: start;
-  }
-  .hero[data-split] > .hero-picture {
-    grid-column: 1 / -1;
-  }
-}
 /* The hero comes in once, as the page loads: each part rises a little after the one before. */
 @media (prefers-reduced-motion: no-preference) {
   .hero > * {
@@ -775,10 +748,6 @@ select {
   .hero > h1 {
     animation-name: site-rise;
   }
-  /* The sprig has its own way in, from where its twig enters. */
-  .hero > .glyph-field {
-    animation: none;
-  }
 }
 @keyframes site-enter {
   from {
@@ -795,7 +764,7 @@ select {
    the way in, so nothing is still faint where you'd read it. Without scroll timelines it just shows. */
 @media (prefers-reduced-motion: no-preference) {
   @supports (animation-timeline: view()) {
-    :is(.chapter-head, .loop > li, .tour, .xray, .wall, .build > *, .trust, .faq, .feature, .cards > li) {
+    :is(.tour, .trust, .feature, .cards > li) {
       animation: site-enter linear both;
       animation-timeline: view();
       animation-range: entry 0% entry 30%;
@@ -811,10 +780,10 @@ select {
 }
 .closing h2 {
   font-size: var(--site-fs-display);
-  font-weight: var(--fw-bold);
+  font-weight: var(--site-wght-display);
+  font-stretch: calc(var(--site-wdth-display) * 1%);
   letter-spacing: var(--site-track-display);
-  word-spacing: var(--site-words-display);
-  line-height: 1.02;
+  line-height: 0.95;
 }
 
 .features {
@@ -1515,10 +1484,13 @@ site-search .search-group {
 }
 .social-card-title {
   align-self: end;
-  font-family: var(--font-display);
-  font-size: 4rem;
-  font-weight: var(--heading-weight);
-  line-height: var(--lh-tight);
+  font-family: var(--site-font-display);
+  /* Narrower than a page's display heading, so a long title leaves the description its three lines. */
+  font-size: 3.5rem;
+  font-weight: var(--site-wght-display);
+  font-stretch: 105%;
+  letter-spacing: var(--site-track-display);
+  line-height: 1;
 }
 /* A long description stops at three lines, so the card's foot always shows. */
 .social-card > p:nth-child(3) {

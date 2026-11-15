@@ -35,9 +35,9 @@ const SITE_PAIRS = [
   ['--accent', '--bg-subtle', LARGE, 'the selected tab in a chrome bar'],
   ['--focus', '--bg', LARGE, 'the focus ring'],
   ['--focus', '--bg-subtle', LARGE, 'the focus ring on the stage'],
+  ['--site-leaf', '--bg-subtle', TEXT, "what a lane's agent is doing, on the landing page's board"],
+  ['--site-blaze-ink', '--site-blaze', TEXT, "the blaze: the running type, the plugin wall's own tile, and the closing band"],
 ]
-// The hero's verb is display text on the stage, so only its night color is checked.
-const NIGHT_PAIRS = [['--site-verb', '--bg-subtle', LARGE, "the hero's verb"]]
 
 const themeSheet = readFileSync(
   new URL('../../../packages/client-core/src/infra/styles/tokens-theme.css', import.meta.url),
@@ -135,7 +135,8 @@ function failing(name, tokens, pairs) {
 
 test("every pair the site's palette draws is legible by day and by night", () => {
   const { day, night } = paletteTokens()
-  assert.deepEqual([...failing('day', day, SITE_PAIRS), ...failing('night', night, [...SITE_PAIRS, ...NIGHT_PAIRS])], [])
+  // Night sits on the same element as day, or inside it, so it keeps whatever it doesn't restate.
+  assert.deepEqual([...failing('day', day, SITE_PAIRS), ...failing('night', { ...day, ...night }, SITE_PAIRS)], [])
 })
 
 test("every pair a picture's frame draws is legible in every theme", () => {
