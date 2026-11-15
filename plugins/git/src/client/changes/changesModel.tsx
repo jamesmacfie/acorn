@@ -485,6 +485,7 @@ export function createChangesModel(task: Task, pane: PaneModelContext & { paneSh
       if (row.newNo == null) return
       openPane(task.id, 'editor', { kind: 'editor:reveal', path: row.path, line: row.newNo }, 'add')
     },
+    openFile: (path, mode) => openPane(task.id, 'editor', { kind: 'editor:reveal', path, line: 1 }, mode),
     find: { commandId: 'changes.diff.find', description: 'Find in changes', category: 'Changes', pane: GIT_PANE },
   }
 

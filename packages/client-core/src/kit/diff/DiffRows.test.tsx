@@ -1,7 +1,7 @@
 import { render } from 'solid-js/web'
 import { createSignal, type JSX } from 'solid-js'
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { DiffLine, NonCodeRow, SplitCell, StackedDiff } from './DiffRows'
+import { DiffLine, FileHead, NonCodeRow, SplitCell, StackedDiff } from './DiffRows'
 import { DiffNote } from './diffNotes'
 import type { CodeRow } from './diffModel'
 
@@ -240,5 +240,33 @@ describe('review comment HTML', () => {
       '<p><strong>Review</strong> unsafe <a href="https://example.test/" target="_blank" rel="noopener noreferrer">safe</a></p>',
     )
     expect(body?.querySelector('img, script, [onerror]')).toBeNull()
+  })
+})
+
+describe('the file header open control', () => {
+  const file = { path: 'src/example.ts', status: 'modified', additions: 1, deletions: 0 }
+
+  it('opens in place on a click and beside on a ⌘- or Ctrl-click', () => {
+    const onOpen = vi.fn()
+    const host = mount(() => <FileHead file={file} onOpen={onOpen} />)
+    const button = host.querySelector<HTMLButtonElement>('.diff-file-open')!
+    button.click()
+    button.dispatchEvent(new MouseEvent('click', { bubbles: true, metaKey: true }))
+    button.dispatchEvent(new MouseEvent('click', { bubbles: true, ctrlKey: true }))
+    expect(onOpen.mock.calls).toEqual([
+      ['src/example.ts', 'show'],
+      ['src/example.ts', 'add'],
+      ['src/example.ts', 'add'],
+    ])
+  })
+
+  it('shows no control for a deleted file or without onOpen', () => {
+    const host = mount(() => (
+      <>
+        <FileHead file={{ ...file, status: 'deleted' }} onOpen={() => {}} />
+        <FileHead file={file} />
+      </>
+    ))
+    expect(host.querySelector('.diff-file-open')).toBeNull()
   })
 })

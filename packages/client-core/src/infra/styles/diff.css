@@ -213,7 +213,7 @@
   font-weight: 600;
   line-height: 20px;
 }
-.diff-file-collapse {
+.diff-file-collapse, .diff-file-open {
   flex: none;
   display: inline-flex;
   align-items: center;
@@ -229,6 +229,11 @@
 }
 .diff-file-collapse:hover { background: var(--bg-hover); }
 .diff-file-collapse:hover { color: var(--text); }
+/* Hidden until the head is hovered, like the copy button beside it. */
+.diff-file-open { opacity: 0; }
+.diff-file-head:hover .diff-file-open, .diff-file-open:focus-visible { opacity: 1; }
+.diff-file-open:hover { color: var(--text); background: var(--bg-hover); }
+@media (hover: none) { .diff-file-open { opacity: 1; } }
 .diff-file-head .diff-file-path {
   flex: 1;
   min-width: 0;

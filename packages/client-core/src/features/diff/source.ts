@@ -106,6 +106,9 @@ export type DiffSource = {
   lineAction?: { title: string; run: (row: CodeRow, event: MouseEvent) => void }
   /** Open an added line in the source's editor. Omit to hide the gutter control. */
   openLine?: (row: CodeRow) => void
+  /** Open a file in the source's editor, in place of the current panes ('show') or beside them ('add').
+   *  Omit to hide the file header's control. */
+  openFile?: (path: string, mode: 'show' | 'add') => void
   /**
    * The find command this pane registers. Each surface brings its own id so a reader's rebinding
    * survives, and its own pane so the chord resolves to the diff they are looking at. Omit `pane`

@@ -611,6 +611,7 @@ export function DiffPane(props: {
             collapsed={collapsedFiles().has(f().path)}
             onToggleCollapse={toggleFileCollapse}
             marks={fileMarks(f().path)}
+            onOpen={source().openFile}
           />
         </div>
       )}
@@ -814,6 +815,7 @@ export function DiffPane(props: {
           fileCollapsed={(path) => collapsedFiles().has(path)}
           onToggleFileCollapse={toggleFileCollapse}
           fileMarks={fileMarks}
+          openFile={source().openFile}
           rows={{
             onMutated: invalidate(),
             resolveThread: (threadId, resolved) => source().resolveThread?.(threadId, resolved) ?? rejectUnsupported(),

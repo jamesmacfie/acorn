@@ -18,6 +18,7 @@ import {
 } from 'solid-js'
 import { Dynamic } from 'solid-js/web'
 import CopyButton from '../components/inputs/CopyButton'
+import Icon from '../components/content/Icon'
 import { fileStatusMeta } from '../lib/rendering/displayMeta'
 import { formatRelativeTime } from '../lib/rendering/formatRelativeTime'
 import MentionTextarea from '../components/inputs/MentionTextarea'
@@ -149,6 +150,8 @@ export function FileHead(props: {
   onToggleCollapse?: (path: string) => void
   /** Indexes into the path that a file filter matched, drawn as find marks. */
   marks?: readonly number[]
+  /** Open the file in an editor: 'add' on a ⌘- or Ctrl-click, which opens it beside, as the pane switcher does. */
+  onOpen?: (path: string, mode: 'show' | 'add') => void
 }) {
   const status = () => fileStatusMeta(props.file.status)
   // The path as runs of marked and unmarked characters, so each run of hits is one mark.
@@ -185,6 +188,19 @@ export function FileHead(props: {
         <For each={pathRuns()}>{(run) => (run.mark ? <mark class="ui-find-mark">{run.text}</mark> : run.text)}</For>
       </span>
       <CopyButton text={() => props.file.path} title="Copy path" />
+      {/* A deleted file has nothing left on disk to open. */}
+      <Show when={props.onOpen && status().letter !== 'D'}>
+        <button
+          type="button"
+          class="diff-file-open"
+          data-tip="Open in editor"
+          data-tip-sub="⌘-click to open beside."
+          aria-label={`Open ${props.file.path} in editor`}
+          onClick={(event) => props.onOpen?.(props.file.path, event.metaKey || event.ctrlKey ? 'add' : 'show')}
+        >
+          <Icon name="file-code" size={12} />
+        </button>
+      </Show>
       <span class="file-stat add">+{props.file.additions ?? 0}</span>
       <span class="file-stat del">&#8722;{props.file.deletions ?? 0}</span>
     </div>

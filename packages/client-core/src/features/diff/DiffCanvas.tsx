@@ -79,6 +79,7 @@ export function DiffCanvas(props: {
   onToggleFileCollapse: (path: string) => void
   /** Where the file filter matched each path, for its header to mark. */
   fileMarks: (path: string) => readonly number[] | undefined
+  openFile?: (path: string, mode: 'show' | 'add') => void
   rows: DiffRowContext
 }) {
   // Mounted items by key, so an item that stays in range keeps its DOM while the range moves and a
@@ -111,6 +112,7 @@ export function DiffCanvas(props: {
           collapsed={props.fileCollapsed(item().file.path)}
           onToggleCollapse={props.onToggleFileCollapse}
           marks={props.fileMarks(item().file.path)}
+          onOpen={props.openFile}
         />
       </Match>
       <Match when={item().kind === 'nodiff'}>
@@ -251,6 +253,7 @@ function FileRowView(props: {
   collapsed: boolean
   onToggleCollapse: (path: string) => void
   marks: readonly number[] | undefined
+  onOpen?: (path: string, mode: 'show' | 'add') => void
 }) {
   return (
     <FullRow split={props.split} class="diff-file-row">
@@ -260,6 +263,7 @@ function FileRowView(props: {
         collapsed={props.collapsed}
         onToggleCollapse={props.onToggleCollapse}
         marks={props.marks}
+        onOpen={props.onOpen}
       />
     </FullRow>
   )

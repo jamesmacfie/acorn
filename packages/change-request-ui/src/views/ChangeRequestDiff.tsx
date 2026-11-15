@@ -51,7 +51,7 @@ function markNote(
   }
 }
 
-export type ChangeRequestDiffSource = Omit<DiffSource, 'threads' | 'inlineChat' | 'openLine'> & {
+export type ChangeRequestDiffSource = Omit<DiffSource, 'threads' | 'inlineChat' | 'openLine' | 'openFile'> & {
   /** Threads already verified against this diff's revision (`inlineReviewThreads`). */
   threads: () => Thread[]
 }
@@ -163,6 +163,8 @@ export function ChangeRequestDiff(props: {
             if (row.newNo == null) return
             openPane(taskId, 'editor', { kind: 'editor:reveal', path: row.path, line: row.newNo }, 'add')
           },
+          openFile: (path: string, mode: 'show' | 'add') =>
+            openPane(taskId, 'editor', { kind: 'editor:reveal', path, line: 1 }, mode),
         }
       : {}),
   }
