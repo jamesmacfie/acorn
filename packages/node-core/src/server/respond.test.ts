@@ -28,6 +28,9 @@ const app = new Hono<AppEnv>()
   .get('/page', () => {
     throw new Error('nope')
   })
+  .get('/v1/p/review-guide/marks', () => {
+    throw new DOMException('The operation was aborted.', 'AbortError')
+  })
   .get('/v1/core/plain', (c) => respondError(c, 404, 'not_found'))
   .get('/v1/core/prose', (c) => respondError(c, 404, 'not_found', ['no such target']))
   .get('/v1/core/rate', (c) => respondError(c, 429, 'rate_limited'))
@@ -230,6 +233,16 @@ describe('the request span', () => {
     expect(JSON.stringify(seen)).not.toContain('db exploded')
     // And it lands in the request's own trace rather than starting a second one.
     expect(error.traceId).toBe(spans()[0]!.traceId)
+    vi.restoreAllMocks()
+  })
+
+  it('reports an aborted request as a log line, not an error', async () => {
+    vi.spyOn(console, 'error').mockImplementation(() => undefined)
+    vi.spyOn(console, 'info').mockImplementation(() => undefined)
+    vi.spyOn(console, 'log').mockImplementation(() => undefined)
+    expect((await get('/v1/p/review-guide/marks')).status).toBe(500)
+    flushTelemetry()
+    expect(seen.some((record) => record.kind === 'error')).toBe(false)
     vi.restoreAllMocks()
   })
 })

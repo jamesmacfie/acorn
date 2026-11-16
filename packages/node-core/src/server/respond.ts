@@ -148,6 +148,13 @@ export const onServerError = (err: Error, c: Context<AppEnv>) => {
   // withholds a message keeps withholding it once there is somewhere to send it to
   // (docs/telemetry/model.md § What never leaves the machine).
   const code = typeof value.code === 'string' && /^[A-Z0-9_:-]{1,80}$/i.test(value.code) ? value.code : undefined
+  // A caller that hangs up mid-request is a cancellation, not a fault. The node server errors the body
+  // stream before it aborts the request's signal, so a POST throws an AbortError while `client.gone`
+  // is still unset. It gets a log line and no error record.
+  if (err.name === 'AbortError') {
+    log.info('request aborted', { method: c.req.method, path: c.req.path, requestId: requestIdOf(c) })
+    return respondError(c, 500, 'internal')
+  }
   log.error('unhandled error', {
     name: err.name,
     ...(code ? { code } : {}),

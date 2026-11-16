@@ -408,7 +408,15 @@ export class ManagedAgentEngine {
       this.subagentQuietMs,
     )
     this.queue = new QueueCoordinator({
-      queuedHeads: () => this.store.queuedHeads(),
+      queuedHeads: async () => {
+        const heads = await this.store.queuedHeads()
+        if (!heads.length) return heads
+        // A session outlives its task's worktree but not its task. A turn queued on a task that was then
+        // archived waits for a restore, rather than failing to start on every scan
+        // (docs/managed-agents/client-surfaces.md § Retired and archived sessions).
+        const archived = new Set(await this.core.tasks.archivedBefore(Date.now() + 1))
+        return heads.filter(({ session }) => !archived.has(session.taskId))
+      },
       getSession: (id) => this.store.getSession(id),
       requireSession: (id) => this.store.requireSession(id),
       nextQueuedTurn: (id) => this.store.nextQueuedTurn(id),

@@ -1,4 +1,4 @@
-import { lazy } from 'solid-js'
+import { createMemo, lazy } from 'solid-js'
 import type { SettingsContribution } from '@acorn/client-core/host/registries/shell'
 import { CORE_SETTINGS_PAGES, type CoreSettingsPageId } from '@acorn/client-core/features/settings'
 
@@ -31,6 +31,10 @@ const ExtensionPointsDev = lazy(() => import('@acorn/client-core/features/settin
 const ClearCacheSettings = lazy(() => import('./ClearCacheSettings.tsx'))
 const BackgroundSettings = lazy(() => import('./BackgroundSettings.tsx'))
 
+// A detail page outlives its workspace or project for a moment after a delete, and the palette can read
+// the page's tab labels in that moment. So the page keeps the last one it had, and still follows a rename.
+const lastDefined = <T,>(read: () => T | undefined, first: T) => createMemo<T>((last) => read() ?? last, first)
+
 // How this app draws each of core's settings pages. Where a page sits, what it affects and what
 // search finds on it are declared once in client-core, because the terminal client lists the same
 // pages (client-core/features/settings/corePages.ts). A record over every id, so a page added there
@@ -42,14 +46,18 @@ const components: Record<CoreSettingsPageId, SettingsContribution['component']> 
   cli: () => <CliSettings />,
   performance: () => <PerformanceSettings />,
   workspaces: (props) => <WorkspaceProjectAssignments navigate={props.context.navigate} />,
-  'workspace.detail': (props) =>
-    props.context.scope.workspace ? (
-      <WorkspaceSettings workspace={props.context.scope.workspace} context={props.context} />
-    ) : null,
-  'project.detail': (props) =>
-    props.context.scope.project ? (
-      <ProjectSettings project={props.context.scope.project} context={props.context} />
-    ) : null,
+  'workspace.detail': (props) => {
+    const first = props.context.scope.workspace
+    if (!first) return null
+    const workspace = lastDefined(() => props.context.scope.workspace, first)
+    return <WorkspaceSettings workspace={workspace()} context={props.context} />
+  },
+  'project.detail': (props) => {
+    const first = props.context.scope.project
+    if (!first) return null
+    const project = lastDefined(() => props.context.scope.project, first)
+    return <ProjectSettings project={project()} context={props.context} />
+  },
   'agent-tools': (props) => <AgentToolsSettings navigate={props.context.navigate} />,
   integrations: (props) => <ServicesSettings context={props.context} />,
   'ai-models': (props) => <AiModelsSettings context={props.context} />,

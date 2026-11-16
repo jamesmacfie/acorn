@@ -146,7 +146,9 @@ its project are retired. They leave every live list, including Agent Center, the
 attention inbox, and the `sessions` dashboard source, and show in the archived list. Retirement is
 worked out when the list is read, because deleting a project removes its tasks and no cascade would
 reach those rows. A read that names a task ID is exempt. On an archived task, the Agent pane is
-read-only ([restoring a task](../workspaces-and-tasks/archive.md#restoring-a-task)).
+read-only ([restoring a task](../workspaces-and-tasks/archive.md#restoring-a-task)). A prompt still
+queued when its task was archived stays queued, and the dispatcher skips it until the task is
+restored.
 
 Archiving is the only way the UI retires a session. The pane header's menu and each row's menu offer
 rename, **Copy session ID**, archive, and stop while running. Archive asks first. The delete route

@@ -514,6 +514,18 @@ describe('durable queue admission', () => {
     expect((await runtime.store.turn(first.id))?.status).toBe('queued')
   })
 
+  it('leaves a turn queued on an archived task alone until the task comes back', async () => {
+    const item = await session()
+    const archived = vi.spyOn(ctx.core.tasks, 'archivedBefore').mockResolvedValue([item.taskId])
+    const turn = await enqueue(item.id)
+    await engine.pump()
+    expect(starts).toHaveLength(0)
+    expect((await runtime.store.turn(turn.id))?.status).toBe('queued')
+    archived.mockResolvedValue([])
+    await engine.pump()
+    await vi.waitFor(() => expect(sends).toEqual([turn.id]))
+  })
+
   it('selects only the earliest queued ordinal for each eligible session, including a deferred head', async () => {
     const eligible = await session(),
       archived = await session(),

@@ -115,7 +115,9 @@ average with `host.cpus` beside it, and `host.memory.free` in bytes. On macOS it
 rather than at Acorn.
 
 A request whose `http.request` span carries `client.gone: true` kept working after the caller gave
-up. Group those by `route` to find work that should be cancelled.
+up. Group those by `route` to find work that should be cancelled. A handler that throws an
+`AbortError` gets a `request aborted` log line rather than an error record. A caller hanging up on a
+POST errors its body before the request's signal aborts, so many of those spans lack `client.gone`.
 
 ### Find slow connections in Sentry
 
