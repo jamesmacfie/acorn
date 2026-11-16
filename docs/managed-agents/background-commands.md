@@ -37,7 +37,12 @@ The chip and the tabs read one list per task, in `client/sessions/taskBackground
    below it, so no chunk draws twice.
 
 A background command doesn't make its session busy. The session reads `ready` when its turn ends,
-the same as with a background subagent. The idle sweep doesn't stop a session while one of its
+the same as with a background subagent. Its state mark still turns, in the resting grey rather than
+the working green, while one of its own background commands runs (`restsWithBackgroundWork` in the
+same module). The task's rail corner does the same in the rail's plain grey, labelled
+**N commands running in background**, when no agent in the task is working or needs an answer.
+The rail asks for a task's list only when the task has a session at `ready`, so it doesn't read
+every task's list from the Node. The idle sweep doesn't stop a session while one of its
 background commands runs, because stopping the harness ends the command.
 
 ## What each harness reports

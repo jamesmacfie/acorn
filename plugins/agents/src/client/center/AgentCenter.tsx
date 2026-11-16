@@ -48,6 +48,7 @@ import {
   Text,
 } from '@acorn/plugin-api/ui'
 import RuntimeStateIcon from '../sessions/RuntimeStateIcon'
+import { restsWithBackgroundWork } from '../sessions/taskBackgroundCommands'
 import { providerTone } from '../sessions/stateTone'
 
 const elapsed = (timestamp: number): string => {
@@ -434,6 +435,7 @@ export default function AgentCenter() {
                                   <RuntimeStateIcon
                                     state={current().session.runtimeState}
                                     queued={current().session.queuedTurns}
+                                    background={restsWithBackgroundWork(current().session)}
                                   />
                                   <Text emphasis="muted">
                                     {current().session.runtimeState}

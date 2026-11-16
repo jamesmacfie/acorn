@@ -46,13 +46,14 @@ const RUNTIME_ICON: Record<string, string> = {
 
 export const runtimeIcon = (state: string): string => RUNTIME_ICON[state] ?? 'circle-dashed'
 
-export type AgentRailState = { working: number; attention: number }
+/** `background` counts the task's background commands still running after their turn ended. */
+export type AgentRailState = { working: number; attention: number; background?: number }
 
 /** The marker for one task's agent state, or nothing to say, on the desktop's rails and the extension's
  *  Agents tab. Each counts its own sessions. Attention wins outright rather than taking a second corner:
  *  one row, one answer to "what is this task's agent doing", and "it needs you" is the answer that
  *  matters. */
-export function agentRailMarkers({ working, attention }: AgentRailState): RailMarker[] {
+export function agentRailMarkers({ working, attention, background = 0 }: AgentRailState): RailMarker[] {
   if (attention)
     return [
       {
@@ -72,6 +73,19 @@ export function agentRailMarkers({ working, attention }: AgentRailState): RailMa
         label: `${working} agent${working > 1 ? 's' : ''} working`,
         icon: runtimeIcon('working'),
         tone: 'accent',
+        busy: true,
+        placements: ['top-end'],
+      },
+    ]
+  // The same loader in the rail's plain grey: something is still moving, but it's a command the agent
+  // left running, not the agent.
+  if (background)
+    return [
+      {
+        id: 'background',
+        label: `${background} command${background > 1 ? 's' : ''} running in background`,
+        icon: runtimeIcon('working'),
+        tone: 'neutral',
         busy: true,
         placements: ['top-end'],
       },

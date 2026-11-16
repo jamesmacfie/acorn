@@ -26,6 +26,18 @@ describe('agentRailMarkers', () => {
     expect(markers[0]!.busy).toBeUndefined()
   })
 
+  it('turns a grey loader for commands left running in the background, below work and attention', () => {
+    expect(agentRailMarkers({ working: 0, attention: 0, background: 2 })[0]).toMatchObject({
+      id: 'background',
+      label: '2 commands running in background',
+      icon: 'loader-circle',
+      tone: 'neutral',
+      busy: true,
+    })
+    expect(agentRailMarkers({ working: 1, attention: 0, background: 2 }).map((m) => m.id)).toEqual(['working'])
+    expect(agentRailMarkers({ working: 0, attention: 1, background: 2 }).map((m) => m.id)).toEqual(['attention'])
+  })
+
   it('counts agents in the label rather than saying the same thing for two as for ten', () => {
     expect(agentRailMarkers({ working: 4, attention: 0 })[0]!.label).toBe('4 agents working')
     expect(agentRailMarkers({ working: 0, attention: 2 })[0]!.label).toBe('2 agents need you')

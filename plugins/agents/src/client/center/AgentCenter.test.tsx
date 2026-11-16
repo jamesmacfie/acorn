@@ -23,6 +23,7 @@ vi.mock('../sessions/managedClient', () => ({
     providers: async () => [],
     sessions: async () => ({ sessions: [] }),
     search: async () => [],
+    backgroundCommands: async () => [],
   },
 }))
 vi.mock('../sessions/managedStore', () => ({

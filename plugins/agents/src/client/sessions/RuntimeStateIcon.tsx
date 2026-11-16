@@ -15,7 +15,13 @@ import { queuedMark, subagentIcon, subagentTone } from './stateTone'
 // scanning the sidebar is actually asking about.
 const SPINS = new Set(['working', 'cancelling', 'reconnecting'])
 
-export default function RuntimeStateIcon(props: { state: string; queued?: number; title?: string }) {
+export default function RuntimeStateIcon(props: {
+  state: string
+  queued?: number
+  /** The session is at rest but a background command of its own still runs (`restsWithBackgroundWork`). */
+  background?: boolean
+  title?: string
+}) {
   // A queued follow-up is not a runtime state: a session holds one while it works and while it rests.
   // It takes the slot only when nothing is in flight, because motion is what a reader scans a busy list
   // for. The case worth the slot is a session resting at `ready` behind the concurrency limit with a
@@ -24,14 +30,17 @@ export default function RuntimeStateIcon(props: { state: string; queued?: number
   // The queued mark carries a title and the state mark does not: every surface writes the state out in
   // words beside the mark, but nothing else on the row says how many are waiting.
   const queued = () => (props.queued ?? 0) > 0 && !SPINS.has(props.state)
+  // A background command turns the loader in the resting grey rather than the working green: something
+  // is moving, but it's a command, not the agent, and nothing new will land in the chat until it ends.
+  const background = () => !!props.background && !SPINS.has(props.state)
   return (
     <Show
       when={queued()}
       fallback={
         <Icon
-          name={runtimeIcon(props.state)}
-          tone={runtimeTone(props.state)}
-          spin={SPINS.has(props.state)}
+          name={background() ? runtimeIcon('working') : runtimeIcon(props.state)}
+          tone={background() ? 'muted' : runtimeTone(props.state)}
+          spin={background() || SPINS.has(props.state)}
           title={props.title}
         />
       }

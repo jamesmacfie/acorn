@@ -9,7 +9,7 @@ import { createSignal, untrack, type Signal } from 'solid-js'
 import { onScopeEvicted, wsOnReconnect } from '@acorn/plugin-api/client'
 import type { PtyIo } from '@acorn/plugin-api/ui'
 import type { TerminalSuppliedTab, TerminalTabSupplier } from '@acorn/plugin-terminal/contract/suppliedTabs.ts'
-import type { AgentBackgroundCommand, AgentEventRecord } from '../../contract/wire.ts'
+import type { AgentBackgroundCommand, AgentEventRecord, AgentSession } from '../../contract/wire.ts'
 import { toolCardKey } from '../../shared/toolFold'
 import type { AgentServerFrame } from '../../shared/wsFrames'
 import { managedAgentApi } from './managedClient'
@@ -178,6 +178,15 @@ export function backgroundCommandsFor(taskId: string): { loaded: boolean; comman
   const list = listFor(taskId)
   return { loaded: list.loaded[0](), commands: list.commands[0]() }
 }
+
+/**
+ * Whether a session whose turn is over still has a background command of its own running. Only a
+ * session at `ready` is asked, so a surface listing many tasks reads the lists of just the tasks with
+ * a live session at rest, the only kind a command can outlive its turn in.
+ */
+export const restsWithBackgroundWork = (session: Pick<AgentSession, 'id' | 'taskId' | 'runtimeState'>): boolean =>
+  session.runtimeState === 'ready' &&
+  backgroundCommandsFor(session.taskId).commands.some((command) => command.sessionId === session.id)
 
 /** What the agents plugin hands the terminal drawer: one read-only tab per running command. */
 export const backgroundCommandTabs: TerminalTabSupplier = {

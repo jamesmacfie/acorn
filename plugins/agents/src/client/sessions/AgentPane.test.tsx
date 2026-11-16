@@ -70,6 +70,7 @@ vi.mock('../usage/usageStore', () => ({
 vi.mock('./managedClient', () => ({ managedAgentApi: { cancel, cancelSubagent, openAccountTerminal } }))
 vi.mock('./taskBackgroundCommands', () => ({
   backgroundCommandsFor: () => ({ loaded: true, commands: backgroundCommands() }),
+  restsWithBackgroundWork: () => false,
 }))
 
 // A stand-in that says which session it shows and whether it takes the caret. The real one needs a

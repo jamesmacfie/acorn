@@ -28,6 +28,7 @@ import { AGENT_PANE_ID } from '../../shared/paneIdentity'
 import { sessionModelSummary } from '../../contract/sessionModel.ts'
 import ProviderGlyph, { providerMarkName } from './ProviderGlyph'
 import RuntimeStateIcon, { SubagentStateIcon } from './RuntimeStateIcon'
+import { restsWithBackgroundWork } from './taskBackgroundCommands'
 import { attentionMark } from './stateTone'
 import { subagentSummary } from './subagentDisplay'
 import { canStopAgent } from './agentActivity'
@@ -157,10 +158,20 @@ function OriginChats<S extends AgentSession>(props: {
                     tipAt={session().updatedAt}
                     collapsed={
                       props.collapsed ? (
-                        <RuntimeStateIcon state={session().runtimeState} queued={session().queuedTurns} />
+                        <RuntimeStateIcon
+                          state={session().runtimeState}
+                          queued={session().queuedTurns}
+                          background={restsWithBackgroundWork(session())}
+                        />
                       ) : undefined
                     }
-                    leading={<RuntimeStateIcon state={session().runtimeState} queued={session().queuedTurns} />}
+                    leading={
+                      <RuntimeStateIcon
+                        state={session().runtimeState}
+                        queued={session().queuedTurns}
+                        background={restsWithBackgroundWork(session())}
+                      />
+                    }
                     trailing={
                       <Show when={needsYou(session())}>
                         <Icon {...attentionMark(session().attention)} />
@@ -344,10 +355,20 @@ export default function AgentTaskSidebar(props: { task: Task; model: AgentPaneMo
                     tipAt={current().updatedAt}
                     collapsed={
                       collapsed() ? (
-                        <RuntimeStateIcon state={current().runtimeState} queued={current().queuedTurns} />
+                        <RuntimeStateIcon
+                          state={current().runtimeState}
+                          queued={current().queuedTurns}
+                          background={restsWithBackgroundWork(current())}
+                        />
                       ) : undefined
                     }
-                    leading={<RuntimeStateIcon state={current().runtimeState} queued={current().queuedTurns} />}
+                    leading={
+                      <RuntimeStateIcon
+                        state={current().runtimeState}
+                        queued={current().queuedTurns}
+                        background={restsWithBackgroundWork(current())}
+                      />
+                    }
                     trailing={
                       <>
                         {/* Dots only: the list is narrow, and the words open with the detail. */}

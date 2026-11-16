@@ -61,7 +61,7 @@ import { managedAgentApi } from './managedClient'
 import { agentPricingOptions } from '../pricingClient'
 import { emptyAgentPricingPreferences } from '../../shared/pricing'
 import { sameSessionHeaderProps, sessionHeaderContext } from './sessionHeaderContext'
-import { backgroundCommandsFor } from './taskBackgroundCommands'
+import { backgroundCommandsFor, restsWithBackgroundWork } from './taskBackgroundCommands'
 import SessionSummaryModal from './SessionSummaryModal'
 import { AGENT_PANE_ID } from '../../shared/paneIdentity'
 import { requestSessionMarks } from './sessionMarks'
@@ -188,7 +188,13 @@ export function AgentDetailHeader(props: { task: Task; model: AgentPaneModel }) 
   const stateIcon = (title?: string) => (
     <Show
       when={subagentId()}
-      fallback={<RuntimeStateIcon state={model.selected()?.runtimeState ?? ''} title={title} />}
+      fallback={
+        <RuntimeStateIcon
+          state={model.selected()?.runtimeState ?? ''}
+          background={!!model.selected() && restsWithBackgroundWork(model.selected()!)}
+          title={title}
+        />
+      }
     >
       <SubagentStateIcon status={subagent()?.status} title={title} />
     </Show>

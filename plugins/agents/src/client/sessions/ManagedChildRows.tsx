@@ -7,6 +7,7 @@ import { managedAgentStore } from './managedStore'
 import { openManagedSession } from './managedSelection'
 import { liveDelegatedChildren } from './sessionRoster'
 import RuntimeStateIcon from './RuntimeStateIcon'
+import { restsWithBackgroundWork } from './taskBackgroundCommands'
 import { attentionMark } from './stateTone'
 
 /** Node roster lineage is the authority for which children belong above this composer. */
@@ -76,7 +77,13 @@ export default function ManagedChildRows(props: { parentSessionId: string; paren
                   variant="stacked"
                   density="compact"
                   title={current().title}
-                  leading={<RuntimeStateIcon state={current().runtimeState} queued={current().queuedTurns} />}
+                  leading={
+                    <RuntimeStateIcon
+                      state={current().runtimeState}
+                      queued={current().queuedTurns}
+                      background={restsWithBackgroundWork(current())}
+                    />
+                  }
                   trailing={
                     <Show when={!['none', 'unread'].includes(attention() ?? 'none') ? attention() : undefined}>
                       {(reason) => <Icon {...attentionMark(reason())} />}

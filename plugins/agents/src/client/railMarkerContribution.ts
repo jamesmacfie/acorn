@@ -8,6 +8,7 @@ import { agentSessionsFor, type RailMarkerContribution } from '@acorn/plugin-api
 import type { AgentSession } from '../contract/wire.ts'
 import { isActiveAgent, needsAttention } from './sessions/agentActivity'
 import { managedAgentStore } from './sessions/managedStore'
+import { backgroundCommandsFor } from './sessions/taskBackgroundCommands'
 import { AGENT_PANE_ID } from '../shared/paneIdentity'
 import { agentRailMarkers } from '../contract/runtimeState.ts'
 
@@ -39,11 +40,16 @@ export const agentRailMarkerContribution: RailMarkerContribution = {
     const taskId =
       target.kind === 'task' ? target.id : target.kind === 'pane' && target.id === AGENT_PANE_ID ? target.taskId : null
     if (!taskId) return []
-    return agentRailMarkers({
-      // `idle` means the harness has gone quiet, which is the PTY tier's nearest thing to "not
-      // working" (docs/terminal/activity.md § Activity and status).
-      working: agentSessionsFor(taskId).filter((session) => !session.idle).length + forTask(taskId, hasAgentWork),
-      attention: forTask(taskId, needsAttention),
-    })
+    // `idle` means the harness has gone quiet, which is the PTY tier's nearest thing to "not
+    // working" (docs/terminal/activity.md § Activity and status).
+    const working = agentSessionsFor(taskId).filter((session) => !session.idle).length + forTask(taskId, hasAgentWork)
+    const attention = forTask(taskId, needsAttention)
+    // Read only when it would show, and only for a task with a session at rest, so the rail doesn't ask
+    // the Node for every task's list.
+    const background =
+      working || attention || !forTask(taskId, (session) => session.runtimeState === 'ready')
+        ? 0
+        : backgroundCommandsFor(taskId).commands.length
+    return agentRailMarkers({ working, attention, background })
   },
 }
