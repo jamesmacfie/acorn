@@ -5,18 +5,20 @@ import { managedAgentApi } from './managedClient'
 import { agentAttentionItemId } from './managedSelection'
 import { managedAgentStore } from './managedStore'
 
-// "Mark all agents read", offered by the palette and the Agents rail icon's right-click menu. Both show it
-// only while `clearableAgents()` has something in it.
+// "Mark all agents read", offered by the palette and the right-click menus of the left Agents rail icon
+// (every task) and the right Agents pane icon (one task). Each shows it only while `clearableAgents()`
+// has something in it.
 
-/** Every session on the node whose finished or failed turn nobody has looked at yet. */
-export const clearableAgents = () => managedAgentStore.sessions().filter(hasClearableAttention)
+/** Every session on the node, or in one task, whose finished or failed turn nobody has looked at yet. */
+export const clearableAgents = (taskId?: string) =>
+  (taskId ? managedAgentStore.sessionsForTask(taskId) : managedAgentStore.sessions()).filter(hasClearableAttention)
 
 /**
  * Do what opening each session would: retire its "Needs you" row, mark its notices read, and move its
  * read mark to the end, which is what clears `attention` on the node (the pane model's mark read).
  */
-export async function markAgentsRead(): Promise<void> {
-  const sessions = clearableAgents()
+export async function markAgentsRead(taskId?: string): Promise<void> {
+  const sessions = clearableAgents(taskId)
   if (!sessions.length) return
   const nodeId = activeNodeId() ?? ''
   for (const session of sessions) markAttentionSeen(nodeId, agentAttentionItemId(session.id))

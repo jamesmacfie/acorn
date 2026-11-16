@@ -3,6 +3,7 @@ import type { AgentSession } from '../../contract/wire.ts'
 
 const mocks = vi.hoisted(() => ({
   sessions: vi.fn(),
+  sessionsForTask: vi.fn(),
   list: vi.fn(),
   patch: vi.fn(),
   upsertSession: vi.fn(),
@@ -14,6 +15,7 @@ vi.mock('./managedClient', () => ({ managedAgentApi: { patch: mocks.patch, sessi
 vi.mock('./managedStore', () => ({
   managedAgentStore: {
     sessions: mocks.sessions,
+    sessionsForTask: mocks.sessionsForTask,
     upsertSession: mocks.upsertSession,
     lastEventSeq: (session: AgentSession) => session.lastEventSeq,
   },
@@ -62,6 +64,14 @@ describe('mark all agents read', () => {
     ])
     expect(mocks.markTargetsRead).toHaveBeenCalledWith('managed-agent', new Set(['done', 'broke']))
     expect(mocks.toast).not.toHaveBeenCalled()
+  })
+
+  it("reads only one task's agents when given the task", async () => {
+    mocks.sessionsForTask.mockReturnValue([session('mine', 'completed'), session('mine-asking', 'question')])
+    await markAgentsRead('task-1')
+    expect(mocks.sessionsForTask).toHaveBeenCalledWith('task-1')
+    expect(mocks.patch.mock.calls).toEqual([['mine', { lastReadSeq: 7 }, {}]])
+    expect(mocks.markTargetsRead).toHaveBeenCalledWith('managed-agent', new Set(['mine']))
   })
 
   it('says how many it could not clear', async () => {
