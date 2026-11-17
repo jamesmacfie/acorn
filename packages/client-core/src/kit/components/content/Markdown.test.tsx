@@ -275,3 +275,31 @@ describe('a host’s fence adapter', () => {
     expect(adapter.disposed()).toBe(1)
   })
 })
+
+describe('a file path in a message', () => {
+  it('opens the file on a click, beside on a ⌘-click, and leaves other links to onSelect', () => {
+    const onFile = vi.fn()
+    const onSelect = vi.fn(() => true)
+    dispose = render(
+      () => (
+        <Markdown
+          text={'Wrote `/work/repo/src/a.ts:12`. See [docs](https://x.com).'}
+          fileRoot="/work/repo"
+          onFile={onFile}
+          onSelect={onSelect}
+        />
+      ),
+      host,
+    )
+    const [file, link] = [...host.querySelectorAll('a')]
+    file.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true, button: 0 }))
+    file.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true, button: 0, metaKey: true }))
+    expect(onFile.mock.calls).toEqual([
+      [{ path: 'src/a.ts', line: 12 }, 'show'],
+      [{ path: 'src/a.ts', line: 12 }, 'add'],
+    ])
+    link.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true, button: 0 }))
+    expect(onSelect).toHaveBeenCalledWith('https://x.com')
+    expect(onSelect).toHaveBeenCalledTimes(1)
+  })
+})

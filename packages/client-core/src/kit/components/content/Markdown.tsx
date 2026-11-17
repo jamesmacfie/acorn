@@ -2,7 +2,12 @@ import { measureWork } from '../../lib/telemetry/workTelemetry'
 import { createEffect, createRenderEffect, createRoot, getOwner, onCleanup, type JSX } from 'solid-js'
 import { insert, render } from 'solid-js/web'
 import { isGrammar, langFor } from '../../../infra/highlight/langs'
-import { renderBlocks, type MarkdownFenceAdapter, type MarkdownOptions } from '../../lib/rendering/markdown'
+import {
+  parseFileLink,
+  renderBlocks,
+  type MarkdownFenceAdapter,
+  type MarkdownOptions,
+} from '../../lib/rendering/markdown'
 import { watchAppearance } from '../../tokens/appearance'
 import CopyButton from '../inputs/CopyButton'
 
@@ -82,6 +87,13 @@ export default function Markdown(props: {
    * terminal host does not have one.
    */
   onSelect?: (href: string) => boolean | void
+  /**
+   * Link file paths in the content and open a pressed one: 'add' on a ⌘- or Ctrl-click, which opens it
+   * beside, as the pane switcher does. `path` arrives relative to `fileRoot`. See MarkdownOptions `files`.
+   */
+  onFile?: (place: { path: string; line: number; column?: number }, mode: 'show' | 'add') => void
+  /** The folder an absolute path has to be inside to link. Without it only relative paths link. */
+  fileRoot?: string
   /** A host's viewer for each closed fence (`MarkdownFenceAdapter`).
    *  Pass one value for the life of this node: its state is the content owner's. */
   fences?: MarkdownFenceAdapter<JSX.Element>
@@ -143,7 +155,8 @@ export default function Markdown(props: {
       if (!root || text === rendered) return
       rendered = text
       revision++
-      const next = measureWork('markdown.parse', () => renderBlocks(text, { images: props.images }), {
+      const files = props.onFile ? { root: props.fileRoot } : undefined
+      const next = measureWork('markdown.parse', () => renderBlocks(text, { images: props.images, files }), {
         characters: text.length,
       })
 
@@ -260,6 +273,14 @@ export default function Markdown(props: {
       class="ui-markdown"
       data-images={props.images}
       onClick={(event) => {
+        // Ahead of the guard below, because ⌘-click on a file means "open beside", not the browser's.
+        const fileHref = (event.target as HTMLElement | null)?.closest('a')?.getAttribute('href')
+        const place = props.onFile && fileHref ? parseFileLink(fileHref) : null
+        if (place && !event.defaultPrevented && event.button === 0 && !event.shiftKey && !event.altKey) {
+          event.preventDefault()
+          props.onFile?.(place, event.metaKey || event.ctrlKey ? 'add' : 'show')
+          return
+        }
         // A modified click is the reader asking the browser for something — a new tab, a saved
         // target — and no handler here should take it. Same guard the host's own content-link
         // handler keeps.

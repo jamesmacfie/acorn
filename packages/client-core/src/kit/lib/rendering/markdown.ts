@@ -40,6 +40,45 @@ export type MarkdownOptions = {
   images?: 'inline' | 'placeholder' | 'thumb'
   /** Keep `acorn://` links, for content whose clicks the host hands to its link opener. Off by default. */
   acornLinks?: boolean
+  /**
+   * Link file paths, for a reader that can open them: a path in a code span, or a link whose address
+   * is a path. A relative path links as written. An absolute path links only inside `root`, and the
+   * link carries it relative to `root`. `parseFileLink` reads a pressed link back. Off by default.
+   */
+  files?: { root?: string }
+}
+
+// A path with a slash and a file extension, then an optional place in it: `src/a.ts:12:4` or
+// `src/a.ts#L12`. The extension has to start with a letter, so `1/2.5` stays text.
+const FILE_PATH =
+  /^(\/?(?:[\w@+.[\]-]+\/)+[\w@+.[\]-]*\.[A-Za-z]\w*)(?::(\d+)(?::(\d+))?(?:-\d+)?|#L(\d+)(?:-L?\d+)?)?$/
+
+// A fragment, like the transcript's `#agent:` links, so a click no handler takes navigates nowhere.
+// An authored link can't forge one, because `safeHref` refuses a fragment with a colon in it.
+const FILE_LINK = /^#path:([^:]+):(\d+)(?::(\d+))?$/
+
+function fileHref(raw: string, root: string | undefined): string | null {
+  const match = FILE_PATH.exec(raw)
+  // A `..` segment could climb out of the folder the reader opens files in.
+  if (!match || match[1].split('/').includes('..')) return null
+  let path = match[1].replace(/^\.\//, '')
+  if (path.startsWith('/')) {
+    const base = root?.replace(/\/+$/, '')
+    if (!base || !path.startsWith(`${base}/`)) return null
+    path = path.slice(base.length + 1)
+  }
+  return `#path:${encodeURIComponent(path)}:${match[2] ?? match[4] ?? 1}${match[3] ? `:${match[3]}` : ''}`
+}
+
+/** The file and place a link from the `files` option names, or null for any other href. */
+export function parseFileLink(href: string): { path: string; line: number; column?: number } | null {
+  const match = FILE_LINK.exec(href)
+  if (!match) return null
+  return {
+    path: decodeURIComponent(match[1]),
+    line: Number(match[2]),
+    ...(match[3] ? { column: Number(match[3]) } : {}),
+  }
 }
 
 // Sentinel wrapping protected inline-token indexes. A private-use char esc() ignores, so tokens
@@ -66,8 +105,12 @@ function inline(raw: string, opts: MarkdownOptions): string {
   // below cannot see a URL it has already handled. Only the href hides: the link's text stays in the
   // string, so emphasis written inside it still renders.
   const hrefs: string[] = []
+  // Code spans already inside a link, which must not become a link of their own.
+  const linked = new Set<string>()
   s = s.replace(/\[([^\]]+)\]\(([^)\s]+)\)/g, (_m, text: string, url: string) => {
-    const href = safeHref(url, opts.acornLinks) // url is already escaped, so don't re-escape it
+    for (const code of text.matchAll(new RegExp(`${S}(\\d+)${S}`, 'g'))) linked.add(code[1])
+    // url is already escaped, so don't re-escape it
+    const href = safeHref(url, opts.acornLinks) ?? (opts.files ? fileHref(url, opts.files.root) : null)
     const opens = href?.startsWith('#') ? '' : ' target="_blank" rel="noreferrer"'
     return href ? `<a href="${S}l${hrefs.push(href) - 1}${S}"${opens}>${text}</a>` : text
   })
@@ -82,7 +125,11 @@ function inline(raw: string, opts: MarkdownOptions): string {
   s = s.replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>').replace(/__([^_]+)__/g, '<strong>$1</strong>')
   s = s.replace(/(^|[^*])\*([^*\s][^*]*?)\*/g, '$1<em>$2</em>')
   s = s.replace(new RegExp(`${S}l(\\d+)${S}`, 'g'), (_m, i: string) => hrefs[Number(i)])
-  s = s.replace(new RegExp(`${S}(\\d+)${S}`, 'g'), (_m, i: string) => `<code>${esc(codes[Number(i)])}</code>`)
+  s = s.replace(new RegExp(`${S}(\\d+)${S}`, 'g'), (_m, i: string) => {
+    const code = `<code>${esc(codes[Number(i)])}</code>`
+    const href = opts.files && !linked.has(i) ? fileHref(codes[Number(i)], opts.files.root) : null
+    return href ? `<a href="${href}">${code}</a>` : code
+  })
   s = s.replace(new RegExp(`${S}i(\\d+)${S}`, 'g'), (_m, i: string) => {
     const image = images[Number(i)]
     if (opts.images === 'placeholder') {
@@ -144,7 +191,8 @@ export function renderBlocks(src: string, opts: MarkdownOptions = {}): MarkdownB
   const out: MarkdownBlock[] = []
   // The image policy is in the key because it decides the html: two Markdown surfaces sharing a
   // highlight cache must not share a block.
-  const flavour = opts.images ?? 'inline'
+  // File links decide it too, and their root decides which absolute paths link.
+  const flavour = `${opts.images ?? 'inline'}${opts.files ? `:files=${opts.files.root ?? ''}` : ''}`
   let i = 0
   const emit = (html: string, from: number, fence?: MarkdownBlock['fence']): void => {
     const source = lines.slice(from, i).join('\n')

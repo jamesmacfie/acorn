@@ -105,6 +105,9 @@ export function Markdown(props: {
   copy?: boolean
   onCopy?: (text: string) => void
   onSelect?: (href: string) => void
+  // Accepted for the desktop's signature. A file link has nothing to press here, so paths stay text.
+  onFile?: (place: { path: string; line: number; column?: number }, mode: 'show' | 'add') => void
+  fileRoot?: string
   /** A host's viewer for each closed fence, as on the desktop. One value for the node's life. */
   fences?: MarkdownFenceAdapter<JSX.Element>
 }) {

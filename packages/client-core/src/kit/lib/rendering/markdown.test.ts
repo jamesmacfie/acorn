@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { renderBlocks, renderMarkdown } from './markdown'
+import { parseFileLink, renderBlocks, renderMarkdown } from './markdown'
 
 describe('renderMarkdown', () => {
   it('renders common markdown', () => {
@@ -178,5 +178,52 @@ describe('renderBlocks', () => {
 
   it('reports nothing for a fence that is still streaming', () => {
     expect(renderBlocks('```json\n{"a": 1')[0].fence).toBeUndefined()
+  })
+})
+
+describe('file links', () => {
+  const files = { root: '/work/repo' }
+  const href = (src: string) => /href="([^"]*)"/.exec(renderMarkdown(src, { files }))?.[1]
+
+  it('links a path in a code span, with its line and column', () => {
+    expect(renderMarkdown('see `src/a.ts`', { files })).toBe(
+      '<p>see <a href="#path:src%2Fa.ts:1"><code>src/a.ts</code></a></p>',
+    )
+    expect(parseFileLink(href('`src/a.ts:12:4`')!)).toEqual({ path: 'src/a.ts', line: 12, column: 4 })
+    expect(parseFileLink(href('`./docs/x.md#L7`')!)).toEqual({ path: 'docs/x.md', line: 7 })
+  })
+
+  it('links an absolute path only inside the root, and carries it relative to the root', () => {
+    expect(parseFileLink(href('`/work/repo/src/a.ts:3`')!)).toEqual({ path: 'src/a.ts', line: 3 })
+    expect(parseFileLink(href('[a.ts](/work/repo/src/a.ts:9)')!)).toEqual({ path: 'src/a.ts', line: 9 })
+    expect(href('`/work/repository/a.ts`')).toBeUndefined()
+    expect(href('`/etc/hosts.conf`')).toBeUndefined()
+    expect(renderMarkdown('`/work/repo/a/b.ts`', { files: {} })).toBe('<p><code>/work/repo/a/b.ts</code></p>')
+  })
+
+  it('leaves code that is not a path, or climbs out of the folder, as code', () => {
+    for (const code of [
+      'README',
+      'a.ts',
+      '@types/node',
+      'src/',
+      '1/2.5',
+      '../a/b.ts',
+      'a b/c.ts',
+      'https://x.com/a.ts',
+    ])
+      expect(href(`\`${code}\``)).toBeUndefined()
+  })
+
+  it('does not link a code span inside a link, or anything without the option', () => {
+    expect(renderMarkdown('[`src/a.ts`](https://x.com)', { files })).toBe(
+      '<p><a href="https://x.com" target="_blank" rel="noreferrer"><code>src/a.ts</code></a></p>',
+    )
+    expect(renderMarkdown('`src/a.ts`')).toBe('<p><code>src/a.ts</code></p>')
+    expect(parseFileLink('#agent:1')).toBeNull()
+  })
+
+  it('keys a linked render apart from a plain one', () => {
+    expect(renderBlocks('`src/a.ts`', { files })[0].key).not.toBe(renderBlocks('`src/a.ts`')[0].key)
   })
 })
