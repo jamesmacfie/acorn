@@ -326,6 +326,8 @@ describe('terminal setup route', () => {
     const wait = intercept('GET', '/v1/core/projects/clone-runs/c1?waitMs=20000', async () =>
       reply({ state: 'finished', result: { ok: true, projectId: 'cloned' } }),
     )
+    // The workflows plugin's after-clone picker lists what a clone may start.
+    const launches = intercept('GET', '/v1/p/workflows/clone-launches/workflows', async () => reply({ workflows: [] }))
     try {
       await screen.until('Choose a project')
       expect(await screen.reach('Clone from URL…')).toBe(true)
@@ -347,6 +349,7 @@ describe('terminal setup route', () => {
       })
       expect(wait.calls).toHaveLength(1)
     } finally {
+      launches.restore()
       wait.restore()
       start.restore()
       screen.done()
