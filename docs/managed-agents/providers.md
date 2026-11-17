@@ -81,6 +81,25 @@ times the input rate; GPT-5.5 uses the input rate. See [OpenAI's prompt caching
 guide](https://developers.openai.com/api/docs/guides/prompt-caching). Catalog matches accept base
 model IDs and dated snapshots. Other variants need an exact-model override.
 
+The Codex model and reasoning choices come from the CLI's advertised options. The price catalog
+in `plugins/agents/src/shared/pricing.ts` supplies the settings table and cost estimates independently.
+
+These standard API rates are in USD per million tokens, verified on November 18, 2026:
+
+| Model | Input | Output | Cache read | Cache write, 30 minutes |
+| --- | --- | --- | --- | --- |
+| GPT-6.2 Astra | $8 | $40 | $0.40 | $10 |
+| GPT-6.2 Sol | $2 | $10 | $0.10 | $2.50 |
+| GPT-6.1 Terra | $1 | $5 | $0.05 | $1.25 |
+
+[GPT-6.2 Astra](https://developers.openai.com/api/docs/models/gpt-6.2-astra) targets complex projects.
+[GPT-6.2 Sol](https://developers.openai.com/api/docs/models/gpt-6.2-sol) targets everyday coding and agents.
+Both accept text and images, produce text, and support a 1,050,000-token API context with up to
+128,000 output tokens. Codex defaults to 272,000 context tokens for Astra and 500,000 for Sol.
+[GPT-6.1 Terra](https://developers.openai.com/api/docs/models/gpt-6.1-terra) targets visual reasoning,
+computer use, and writing. It has the same API context and output limits and requires Codex CLI
+0.159.0 or later. See [OpenAI's Codex model guide](https://learn.chatgpt.com/docs/models).
+
 The badge is an API-equivalent estimate of the root thread's tokens. It excludes subagent threads,
 tool fees, service-tier premiums, regional premiums, and long-context premiums. A turn's captured
 model sets its price, so model changes within that turn cannot be priced separately. Codex's

@@ -147,6 +147,27 @@ export const claudePriceCatalog: readonly AgentPriceCatalogEntry[] = [
 // Match only base ids and dated snapshots: suffixes such as -pro and -cyber have distinct prices.
 export const codexPriceCatalog: readonly AgentPriceCatalogEntry[] = [
   {
+    id: 'gpt-6-2-astra',
+    label: 'GPT-6.2 Astra',
+    models: 'gpt-6.2-astra',
+    matches: matches(/^gpt-6\.2-astra(?:-\d{4}-\d{2}-\d{2})?$/i),
+    defaultPrice: fixedPrice({ input: 8, output: 40, cacheWrite: 10, cacheRead: 0.4 }),
+  },
+  {
+    id: 'gpt-6-2-sol',
+    label: 'GPT-6.2 Sol',
+    models: 'gpt-6.2-sol',
+    matches: matches(/^gpt-6\.2-sol(?:-\d{4}-\d{2}-\d{2})?$/i),
+    defaultPrice: fixedPrice({ input: 2, output: 10, cacheWrite: 2.5, cacheRead: 0.1 }),
+  },
+  {
+    id: 'gpt-6-1-terra',
+    label: 'GPT-6.1 Terra',
+    models: 'gpt-6.1-terra',
+    matches: matches(/^gpt-6\.1-terra(?:-\d{4}-\d{2}-\d{2})?$/i),
+    defaultPrice: fixedPrice({ input: 1, output: 5, cacheWrite: 1.25, cacheRead: 0.05 }),
+  },
+  {
     id: 'gpt-6-astra',
     label: 'GPT-6 Astra',
     models: 'gpt-6-astra',

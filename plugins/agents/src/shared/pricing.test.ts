@@ -44,6 +44,24 @@ describe('agent pricing preferences', () => {
 
   it('includes the Codex model catalog and applies Codex overrides', () => {
     const preferences = emptyAgentPricingPreferences()
+    expect(codexModelPrice('gpt-6.2-astra', Date.now(), preferences)).toEqual({
+      input: 8,
+      output: 40,
+      cacheWrite: 10,
+      cacheRead: 0.4,
+    })
+    expect(codexModelPrice('gpt-6.2-sol', Date.now(), preferences)).toEqual({
+      input: 2,
+      output: 10,
+      cacheWrite: 2.5,
+      cacheRead: 0.1,
+    })
+    expect(codexModelPrice('gpt-6.1-terra', Date.now(), preferences)).toEqual({
+      input: 1,
+      output: 5,
+      cacheWrite: 1.25,
+      cacheRead: 0.05,
+    })
     expect(codexModelPrice('gpt-6-astra', Date.now(), preferences)).toEqual({
       input: 10,
       output: 50,
@@ -67,7 +85,21 @@ describe('agent pricing preferences', () => {
   it('prices dated snapshots without assigning base prices to distinct model variants', () => {
     expect(codexModelPrice('gpt-5.5-2026-04-23')?.input).toBe(5)
     expect(codexModelPrice('gpt-6.1-sol-2026-09-29')?.cacheRead).toBe(0.1)
-    for (const model of ['gpt-5.6-pro', 'gpt-5.6-cyber', 'gpt-6-astra-pro', 'gpt-6-sol-unknown']) {
+    expect(codexModelPrice('gpt-6.2-astra-2026-11-18')?.input).toBe(8)
+    expect(codexModelPrice('gpt-6.2-sol-2026-11-18')?.cacheRead).toBe(0.1)
+    expect(codexModelPrice('gpt-6.1-terra-2026-11-18')?.output).toBe(5)
+    for (const model of [
+      'gpt-5.6-pro',
+      'gpt-5.6-cyber',
+      'gpt-6-astra-pro',
+      'gpt-6-sol-unknown',
+      'gpt-6.2-astra-pro',
+      'gpt-6.2-sol-unknown',
+      'gpt-6.1-terra-pro',
+      'gpt-6x2-astra',
+      'gpt-6x2-sol',
+      'gpt-6x1-terra',
+    ]) {
       expect(codexModelPrice(model), model).toBeNull()
     }
   })
