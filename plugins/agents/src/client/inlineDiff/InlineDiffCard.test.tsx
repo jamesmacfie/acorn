@@ -120,6 +120,22 @@ describe('inline diff chat', () => {
     expect(picker!.dataset.tip).toContain('write access')
   })
 
+  it('focuses the question box when opened fresh, but not on a line that already has a chat or notes', async () => {
+    const fresh = mount()
+    await vi.waitFor(() => expect(document.activeElement).toBe(fresh.querySelector('textarea')))
+    fresh.remove()
+
+    const noted = mount([note])
+    await Promise.resolve()
+    expect(document.activeElement).not.toBe(noted.querySelector('textarea'))
+    noted.remove()
+
+    store.sessions = [{ id: 'session-1', origin, createdAt: 1, runtimeState: 'idle' }]
+    const chatted = mount()
+    await Promise.resolve()
+    expect(document.activeElement).not.toBe(chatted.querySelector('textarea'))
+  })
+
   it('opens with cached session defaults written before inline choices existed', () => {
     const client = new QueryClient({ defaultOptions: { queries: { retry: false } } })
     client.setQueryData(agentSessionDefaultsQueryKey, {
