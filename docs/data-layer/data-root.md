@@ -63,3 +63,10 @@ selected root, inventories the files it owns, and never removes `worktrees/` or 
 It's the supported way to reset any data root, and the one the Node's old-schema error names. It was
 first built for the move to the `acorn-1` baseline, but it isn't tied to it. Moving a data root aside
 by hand loses the recovery copy, the digest check, and the custody stage, so the tool stays.
+
+`pnpm data:move-to-app` moves a development root into the installed macOS desktop app, keeping the same
+Node. Without `--execute` it prints its steps and anything blocking them. It clones the root and the
+`.acorn-shell` custody folder, moves `worktrees/`, repairs each worktree's git links, rewrites
+`tasks.worktree_path`, and renames the Claude transcript folders that are named after a worktree path.
+The installed app reads its data key from the keychain before `data.key`, so an old keychain entry blocks
+the move until `--replace-keychain-key` saves and deletes it.

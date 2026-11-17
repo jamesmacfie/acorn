@@ -16,6 +16,7 @@
     "db:locate": "pnpm --filter @acorn/node-core db:locate",
     "db:migrate": "pnpm --filter @acorn/node-core db:migrate",
     "db:reset": "node scripts/db-reset.mjs",
+    "data:move-to-app": "node scripts/move-dev-root.mjs",
     "dev": "turbo run dev",
     "dev:account": "node --import tsx scripts/dev-account.mts",
     "dev:agent": "pnpm --filter @acorn/desktop dev:agent",
