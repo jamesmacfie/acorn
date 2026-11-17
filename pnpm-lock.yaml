@@ -182,8 +182,8 @@ importers:
         specifier: 1.4.0
         version: 1.4.0
       node-pty:
-        specifier: ^1.0.0
-        version: 1.1.0
+        specifier: 1.2.0-beta.18
+        version: 1.2.0-beta.18
       openai:
         specifier: ^6.48.0
         version: 6.48.0(ws@8.21.0)(zod@4.4.3)
@@ -816,8 +816,8 @@ importers:
         specifier: ^8.5.13
         version: 8.18.1
       node-pty:
-        specifier: ^1.0.0
-        version: 1.1.0
+        specifier: 1.2.0-beta.18
+        version: 1.2.0-beta.18
       typescript:
         specifier: ^6.0.3
         version: 6.0.3
@@ -1481,8 +1481,8 @@ importers:
         specifier: 4.13.11
         version: 4.13.11
       node-pty:
-        specifier: ^1.0.0
-        version: 1.1.0
+        specifier: 1.2.0-beta.18
+        version: 1.2.0-beta.18
       solid-js:
         specifier: 'catalog:'
         version: 1.9.13(patch_hash=65eea923f4f776eef56b57c5a42dec9302a3bca00326a0b1bd5334b155da2169)
@@ -1723,8 +1723,8 @@ importers:
         specifier: 4.13.11
         version: 4.13.11
       node-pty:
-        specifier: ^1.0.0
-        version: 1.1.0
+        specifier: 1.2.0-beta.18
+        version: 1.2.0-beta.18
       smol-toml:
         specifier: ^1.9.0
         version: 1.9.0
@@ -1796,8 +1796,8 @@ importers:
         specifier: 4.13.11
         version: 4.13.11
       node-pty:
-        specifier: ^1.0.0
-        version: 1.1.0
+        specifier: 1.2.0-beta.18
+        version: 1.2.0-beta.18
       solid-js:
         specifier: 'catalog:'
         version: 1.9.13(patch_hash=65eea923f4f776eef56b57c5a42dec9302a3bca00326a0b1bd5334b155da2169)
@@ -2159,8 +2159,8 @@ importers:
         specifier: 4.13.11
         version: 4.13.11
       node-pty:
-        specifier: ^1.0.0
-        version: 1.1.0
+        specifier: 1.2.0-beta.18
+        version: 1.2.0-beta.18
       solid-js:
         specifier: 'catalog:'
         version: 1.9.13(patch_hash=65eea923f4f776eef56b57c5a42dec9302a3bca00326a0b1bd5334b155da2169)
@@ -2517,8 +2517,8 @@ importers:
         specifier: 4.13.11
         version: 4.13.11
       node-pty:
-        specifier: ^1.0.0
-        version: 1.1.0
+        specifier: 1.2.0-beta.18
+        version: 1.2.0-beta.18
       shiki:
         specifier: ^4.2.0
         version: 4.2.0
@@ -7688,6 +7688,9 @@ packages:
 
   node-pty@1.1.0:
     resolution: {integrity: sha512-20JqtutY6JPXTUnL0ij1uad7Qe1baT46lyolh2sSENDd4sTzKZ4nmAFkeAARDKwmlLjPx6XKRlwRUxwjOy+lUg==}
+
+  node-pty@1.2.0-beta.18:
+    resolution: {integrity: sha512-3Rej3788OnasAwoSmTZhlCeUraJ9CQldtL5b571b9+3Nv47+PaxA5VPIGOOs+16OYQePTrC1Lrs8a9/df5WPRg==}
 
   node-releases@2.0.57:
     resolution: {integrity: sha512-kQK9LGGFiHtrWiNhZtA7Qbw17AQz+dmsEKODRIVTXA9+e5MS/2gZEBhYJt13GrAz5/IOZKddH/0Z3TP/Zgo+yw==}
@@ -14559,6 +14562,10 @@ snapshots:
   node-mock-http@1.0.5: {}
 
   node-pty@1.1.0:
+    dependencies:
+      node-addon-api: 7.1.1
+
+  node-pty@1.2.0-beta.18:
     dependencies:
       node-addon-api: 7.1.1
 
