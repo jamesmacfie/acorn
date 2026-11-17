@@ -29,7 +29,7 @@
     "diff": "^9.0.0",
     "drizzle-orm": "catalog:",
     "hono": "catalog:",
-    "node-pty": "^1.0.0",
+    "node-pty": "1.2.0-beta.18",
     "solid-js": "catalog:",
     "zod": "catalog:"
   },

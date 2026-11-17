@@ -69,7 +69,7 @@
   "devDependencies": {
     "@types/node": "^26.0.0",
     "@types/ws": "^8.5.13",
-    "node-pty": "^1.0.0",
+    "node-pty": "1.2.0-beta.18",
     "typescript": "^6.0.3",
     "vite": "^8.0.16",
     "vite-plugin-solid": "^2.11.12",

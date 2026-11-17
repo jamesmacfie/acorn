@@ -19,11 +19,11 @@ import { dirname, join } from 'node:path'
 
 const require = createRequire(import.meta.url)
 
-// node-pty 1.1.0 publishes prebuilds/<platform>-<arch>/spawn-helper as mode 644 and never chmods it
+// node-pty 1.1.0 published prebuilds/<platform>-<arch>/spawn-helper as mode 644 and never chmods it
 // in its own install/postinstall, so node-pty's posix_spawnp of the helper dies with EACCES and
 // reports "posix_spawnp failed". The probe below can't catch it, because pty.node is N-API and loads
 // fine. Re-run after every install: the file is hard-linked from the pnpm store, so a fresh install
-// restores the broken mode.
+// restores the broken mode. 1.2.0-beta.18 ships it executable; the chmod stays as a cheap guard.
 if (process.platform !== 'win32') {
   const ptyDir = dirname(require.resolve('node-pty/package.json'))
   const helper = join(ptyDir, 'prebuilds', `${process.platform}-${process.arch}`, 'spawn-helper')

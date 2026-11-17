@@ -18,17 +18,19 @@ capability. Desktop staging and the standalone pack copy both files with the ser
 Node checks the manifest's host platform and architecture before exposing Editor rename; it never
 compiles on the user's first rename. A cross-built or unsupported host leaves rename disabled.
 `scripts/nodeRuntimePackages.ts` owns the shared runtime package list.
-The stage script resolves one supported target triple before copying packages. For `node-pty` 1.1.0,
+The stage script resolves one supported target triple before copying packages. Acorn pins `node-pty`
+to 1.2.0-beta.18, because 1.1.0 leaks one `/dev/ptmx` handle for every terminal it starts on macOS.
+macOS allows 511, so a Node that ran for a few days could no longer open a terminal.
 `apps/desktop/scripts/native-package-files.mjs` keeps the selected `prebuilds/<platform>-<arch>`
-directory and omits the other reviewed prebuild directories. It checks the selected addon, Unix
-`spawn-helper`, and Windows ConPTY and winpty assets before copying. Licenses and executable modes
+directory and omits the other reviewed prebuild directories. It checks the selected addon, the macOS
+`spawn-helper`, and the Windows ConPTY assets before copying. Licenses and executable modes
 remain in the package. Other package graphs retain their installed files and dependency edges.
-Linux has no prebuild in the installed 1.1.0 package, so Linux staging requires a local Linux build
-with `build/Release/pty.node`. Only macOS needs `spawn-helper`. On Linux, node-pty calls `forkpty`
+A Linux stage uses the package's Linux prebuild, or a local Linux build with `build/Release/pty.node`.
+Only macOS needs `spawn-helper`. On Linux, node-pty calls `forkpty`
 directly and never builds it. A cross-target stage with an unqualified local addon
 fails because node-pty's loader would choose it before a target prebuild. Staging also omits
 node-pty's `deps/`, `third_party/`, and `src/` folders. They're build inputs, including the Windows-only
-winpty and ConPTY sources, and the staged app never rebuilds the addon. A node-pty version or layout
+ConPTY sources, and the staged app never rebuilds the addon. A node-pty version or layout
 change requires review of the policy and its target fixtures.
 The Node build minifies with Oxc and keeps function and class names. It writes hidden source maps and
 a chunk graph, `startup-graph.json`, into `apps/node/dist`. Staging and the standalone tarball leave

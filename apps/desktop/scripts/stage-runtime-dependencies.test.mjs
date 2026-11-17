@@ -42,19 +42,21 @@ it.each(targets)('keeps only node-pty assets for %s', (triple) => {
   const helper = join(dir, 'installed/helper')
   packageAt(pkg, { name: 'desktop' })
   const source = join(pkg, 'node_modules/node-pty')
-  packageAt(source, { name: 'node-pty', version: '1.1.0' })
+  packageAt(source, { name: 'node-pty', version: '1.2.0-beta.18' })
   asset(source, 'LICENSE')
   for (const input of ['deps/winpty/src/agent/Agent.cc', 'third_party/conpty/1.23/win10-x64/conpty.dll', 'src/unix/pty.cc']) asset(source, input)
   for (const selected of targets.map(runtimeTarget)) {
     const prefix = `prebuilds/${selected.platform}-${selected.arch}/`
-    asset(source, `${prefix}pty.node`)
     if (selected.platform === 'win32') {
-      for (const file of ['conpty.node', 'conpty_console_list.node', 'conpty/conpty.dll', 'winpty.dll']) asset(source, `${prefix}${file}`)
-      for (const file of ['conpty/OpenConsole.exe', 'winpty-agent.exe']) asset(source, `${prefix}${file}`, true)
-    } else if (selected.platform === 'darwin') asset(source, `${prefix}spawn-helper`, true)
+      for (const file of ['conpty.node', 'conpty_console_list.node', 'conpty/conpty.dll']) asset(source, `${prefix}${file}`)
+      asset(source, `${prefix}conpty/OpenConsole.exe`, true)
+    } else {
+      asset(source, `${prefix}pty.node`)
+      if (selected.platform === 'darwin') asset(source, `${prefix}spawn-helper`, true)
+    }
   }
   // Windows arm64 is present in the package, though Acorn does not release that target.
-  asset(source, 'prebuilds/win32-arm64/pty.node')
+  asset(source, 'prebuilds/win32-arm64/conpty.node')
   stageRuntimeDependencies(pkg, helper, runtimeTarget(triple), ['node-pty'])
   rmSync(pkg, { recursive: true, force: true })
   const staged = join(helper, 'node_modules/node-pty')
@@ -62,7 +64,7 @@ it.each(targets)('keeps only node-pty assets for %s', (triple) => {
   const prefix = `prebuilds/${chosen.platform}-${chosen.arch}`
   expect(existsSync(join(staged, 'LICENSE'))).toBe(true)
   for (const input of ['deps', 'third_party', 'src']) expect(existsSync(join(staged, input))).toBe(false)
-  expect(existsSync(join(staged, prefix, 'pty.node'))).toBe(true)
+  expect(existsSync(join(staged, prefix, chosen.platform === 'win32' ? 'conpty.node' : 'pty.node'))).toBe(true)
   for (const other of targets.map(runtimeTarget)) {
     if (other.triple !== triple) expect(existsSync(join(staged, `prebuilds/${other.platform}-${other.arch}`))).toBe(false)
   }
@@ -70,7 +72,7 @@ it.each(targets)('keeps only node-pty assets for %s', (triple) => {
   const executable = (path) => process.platform === 'win32' || (statSync(path).mode & 0o111) !== 0
   if (chosen.platform === 'win32') {
     expect(existsSync(join(staged, prefix, 'conpty/conpty.dll'))).toBe(true)
-    expect(executable(join(staged, prefix, 'winpty-agent.exe'))).toBe(true)
+    expect(executable(join(staged, prefix, 'conpty/OpenConsole.exe'))).toBe(true)
   } else if (chosen.platform === 'darwin') expect(executable(join(staged, prefix, 'spawn-helper'))).toBe(true)
 })
 
@@ -79,7 +81,7 @@ it('rejects missing target assets and unreviewed node-pty layouts', () => {
   scratch.push(dir)
   packageAt(dir, { name: 'desktop' })
   const source = join(dir, 'node_modules/node-pty')
-  packageAt(source, { name: 'node-pty', version: '1.1.0' })
+  packageAt(source, { name: 'node-pty', version: '1.2.0-beta.18' })
   asset(source, 'prebuilds/darwin-arm64/pty.node')
   expect(() => stageRuntimeDependencies(dir, join(dir, 'helper'), darwin, ['node-pty'])).toThrow('missing native assets')
   asset(source, 'prebuilds/darwin-arm64/spawn-helper')
@@ -100,14 +102,16 @@ it('rejects an unqualified host build for a different target', () => {
   scratch.push(dir)
   packageAt(dir, { name: 'desktop' })
   const source = join(dir, 'node_modules/node-pty')
-  packageAt(source, { name: 'node-pty', version: '1.1.0' })
+  packageAt(source, { name: 'node-pty', version: '1.2.0-beta.18' })
   const prebuild = `prebuilds/${target.platform}-${target.arch}`
-  asset(source, `${prebuild}/pty.node`)
   if (target.platform === 'win32') {
-    for (const file of ['conpty.node', 'conpty_console_list.node', 'conpty/conpty.dll', 'conpty/OpenConsole.exe', 'winpty.dll', 'winpty-agent.exe']) {
+    for (const file of ['conpty.node', 'conpty_console_list.node', 'conpty/conpty.dll', 'conpty/OpenConsole.exe']) {
       asset(source, `${prebuild}/${file}`)
     }
-  } else asset(source, `${prebuild}/spawn-helper`)
+  } else {
+    asset(source, `${prebuild}/pty.node`)
+    asset(source, `${prebuild}/spawn-helper`)
+  }
   asset(source, 'build/Release/pty.node')
   expect(() => stageRuntimeDependencies(dir, join(dir, 'helper'), target, ['node-pty']))
     .toThrow('host-specific build')
@@ -123,7 +127,7 @@ it('stages a matching Unix source build without prebuilds', () => {
   scratch.push(dir)
   packageAt(dir, { name: 'desktop' })
   const source = join(dir, 'node_modules/node-pty')
-  packageAt(source, { name: 'node-pty', version: '1.1.0' })
+  packageAt(source, { name: 'node-pty', version: '1.2.0-beta.18' })
   asset(source, 'build/Release/pty.node')
   asset(source, 'build/Release/spawn-helper', true)
   const helper = join(dir, 'helper')

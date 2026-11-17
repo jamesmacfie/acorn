@@ -2,11 +2,11 @@ import { existsSync, readFileSync, readdirSync } from 'node:fs'
 import { join, relative, sep } from 'node:path'
 import { runtimeTarget } from './node-runtime.mjs'
 
-// node-pty 1.1.0 loads build/Release, build/Debug, then prebuilds/<platform>-<arch>.
-// Keep the selected prebuild directory whole: Windows can load ConPTY or winpty,
-// including the DLLs and executables beside their addons. deps/, third_party/, and src/
-// are build inputs, including the Windows-only winpty and ConPTY sources, and the
-// staged desktop never rebuilds the addon.
+// node-pty loads build/Release, build/Debug, then prebuilds/<platform>-<arch>.
+// We pin 1.2.0-beta.18 because 1.1.0 leaks one /dev/ptmx handle per spawn on macOS,
+// and macOS caps them at 511. Keep the selected prebuild directory whole: Windows
+// loads ConPTY with the DLL and executable beside its addons. deps/, third_party/, and
+// src/ are build inputs, and the staged desktop never rebuilds the addon.
 const BUILD_INPUTS = new Set(['deps', 'third_party', 'src'])
 
 export function nativePackageFilter(name, source, target) {
@@ -16,7 +16,7 @@ export function nativePackageFilter(name, source, target) {
     throw new Error(`Invalid desktop target descriptor for ${target.triple}`)
   }
   const manifest = JSON.parse(readFileSync(join(source, 'package.json'), 'utf8'))
-  if (manifest.name !== 'node-pty' || manifest.version !== '1.1.0') {
+  if (manifest.name !== 'node-pty' || manifest.version !== '1.2.0-beta.18') {
     throw new Error(`Unreviewed node-pty layout: ${manifest.name}@${manifest.version}`)
   }
 
@@ -31,13 +31,13 @@ export function nativePackageFilter(name, source, target) {
 
   // Only macOS goes through spawn-helper. Linux calls forkpty directly, and node-pty never builds it there.
   const needed = target.platform === 'win32'
-    ? ['conpty.node', 'pty.node', 'conpty_console_list.node', 'conpty/conpty.dll', 'conpty/OpenConsole.exe', 'winpty.dll', 'winpty-agent.exe']
+    ? ['conpty.node', 'conpty_console_list.node', 'conpty/conpty.dll', 'conpty/OpenConsole.exe']
     : target.platform === 'darwin' ? ['pty.node', 'spawn-helper'] : ['pty.node']
   const hasPrebuild = needed.every((file) => existsSync(join(prebuilds, selectedDir, file)))
   const hasLocalBuild = target.platform !== 'win32' && hostMatches
     && needed.every((file) => existsSync(join(source, 'build', 'Release', file)))
   if (!hasPrebuild && !hasLocalBuild) {
-    throw new Error(`node-pty 1.1.0 is missing native assets for ${target.triple}`)
+    throw new Error(`node-pty is missing native assets for ${target.triple}`)
   }
 
   // Unknown sibling layouts require review before omission. This avoids silently
