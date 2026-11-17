@@ -5,10 +5,11 @@ themes, Starlight's replaced parts, and the checks that hold the design to the a
 Read it before you style a page or add a component. [The public site](../site.md) covers running and
 deploying it, and [marketing copy](./marketing-copy.md) covers how the marketing pages read.
 
-Four topics have pages of their own:
+Five topics have pages of their own:
 
 - [Components](./design/components.md): each component, and the conventions for buttons, labels, and callouts.
 - [Fonts](./design/fonts.md): the faces, the JetBrains Mono subsets, and the preloads.
+- [The landing page's look](./design/landing.md): the scroll film, its scenes, and how to add one.
 - [Lighthouse](./design/lighthouse.md): the landing page's target, the command, and its scores.
 - [Motion](./design/motion.md): what moves, when, and how reduced motion stops it.
 
@@ -143,32 +144,6 @@ edges without widening the page. Keep the background on the element itself: axe 
 against an element's background, and it can't see paint from a pseudo-element or a border image. A
 hero's picture ends in a negative margin of `--site-overhang`, so the window hangs over the stage's
 edge onto the page, and whatever follows the hero starts that far down.
-
-## The landing page's look
-
-The landing page is a film the visitor scrolls through, with acorn's own windows as its cast. Its
-markup is `apps/site/src/pages/index.astro`, its look is `apps/site/src/styles/landing.css`, and its
-motion is `apps/site/src/scripts/landing/film.ts`. [Motion](./design/motion.md) lists what moves.
-
-- The page passes `bleed` to `Marketing.astro`, so its sections run to the window's edges. Each keeps
-  its own width with `.wrap`, up to `--land-width`, and the header lines up with that.
-- The page is a plain column first. Every rule outside a `.live` or `.film` block is the finished,
-  still page: every window flat, and every list in order. That's what a visitor without script, with
-  reduced motion, or on a small screen gets.
-- `film.ts` adds `live` to `<html>` when the visitor allows motion, and `film` when the window is
-  also at least 60rem wide and 36rem tall. Three scenes pin under `film`: the opening, the deck of
-  panes, and the window taken apart.
-- A scene is an element with `data-scene`. Each moving part in it plays one set of `@keyframes` laid
-  over the scene's whole scroll, 0% to 100%. Where the browser has scroll timelines, the scene is a
-  view timeline called `--scene`, and the compositor plays the moves. Elsewhere `film.ts` sets `--p`
-  on the scene, how far the scroll has taken it from 0 to 1, and each move is held paused at that
-  point. A pinned scene (`data-scene="pin"`) is taller than the window and holds a sticky stage.
-- The page reads dark, blaze, page, dark, page, blaze, dark: the opening and the plugins scene are on
-  the night stage, and the running type and the closing band are on the blaze.
-
-A new scene needs no script of its own: give it `data-scene`, write its moves as keyframes, and add
-each moving part to the lists under **Moves** in `landing.css`. Keep its still state outside `.live`
-and `.film`, and check it with reduced motion.
 
 ## Starlight's replaced parts
 

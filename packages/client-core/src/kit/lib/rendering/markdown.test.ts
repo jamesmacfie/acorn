@@ -190,7 +190,7 @@ describe('file links', () => {
       '<p>see <a href="#path:src%2Fa.ts:1"><code>src/a.ts</code></a></p>',
     )
     expect(parseFileLink(href('`src/a.ts:12:4`')!)).toEqual({ path: 'src/a.ts', line: 12, column: 4 })
-    expect(parseFileLink(href('`./docs/x.md#L7`')!)).toEqual({ path: 'docs/x.md', line: 7 })
+    expect(parseFileLink(href('`./notes/x.md#L7`')!)).toEqual({ path: 'notes/x.md', line: 7 })
   })
 
   it('links an absolute path only inside the root, and carries it relative to the root', () => {

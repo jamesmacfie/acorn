@@ -48,8 +48,8 @@ export type MarkdownOptions = {
   files?: { root?: string }
 }
 
-// A path with a slash and a file extension, then an optional place in it: `src/a.ts:12:4` or
-// `src/a.ts#L12`. The extension has to start with a letter, so `1/2.5` stays text.
+// A path with a slash and a file extension, then an optional place in it: `rendering/markdown.ts:12:4`
+// or `rendering/markdown.ts#L12`. The extension has to start with a letter, so `1/2.5` stays text.
 const FILE_PATH =
   /^(\/?(?:[\w@+.[\]-]+\/)+[\w@+.[\]-]*\.[A-Za-z]\w*)(?::(\d+)(?::(\d+))?(?:-\d+)?|#L(\d+)(?:-L?\d+)?)?$/
 

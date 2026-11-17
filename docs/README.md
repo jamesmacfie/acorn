@@ -160,6 +160,7 @@ Start with the plugin map, then follow the authoring guide or API reference.
 | [site/design.md](./site/design.md) | How the public site looks: its stylesheet on acorn's tokens, the mark, the light and dark themes, the dark stage that opens and closes a marketing page, components, motion, and the contrast checks. |
 | [site/design/components.md](./site/design/components.md) | The public site's components, and its conventions for buttons, labels, and callouts. |
 | [site/design/fonts.md](./site/design/fonts.md) | The public site's faces: JetBrains Mono and its subsets, Inter for marketing paragraphs and its fallback, and the preloads. |
+| [site/design/landing.md](./site/design/landing.md) | How the landing page is built as a scroll film: its files, its scenes, and how to add one. |
 | [site/design/lighthouse.md](./site/design/lighthouse.md) | The landing page's Lighthouse target, the command that checks it, and its scores. |
 | [site/design/motion.md](./site/design/motion.md) | What moves on the public site, when, and how reduced motion stops it. |
 | [site/marketing-copy.md](./site/marketing-copy.md) | How the marketing pages read: the landing page's one joke, and the marks of a generated page they leave out. |

@@ -20,7 +20,7 @@ rather than partway through rising in.
 ## The landing page
 
 The landing page is a film the visitor scrolls through. `apps/site/src/styles/landing.css` holds every
-moving rule under `.live` or `.film` ([the landing page's look](../design.md#the-landing-pages-look)),
+moving rule under `.live` or `.film` ([the landing page's look](./landing.md)),
 and `apps/site/src/scripts/landing/film.ts` adds those classes and runs what CSS can't: the headline,
 the lanes, the pairing output, and building the window taken apart.
 

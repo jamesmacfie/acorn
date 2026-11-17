@@ -319,7 +319,7 @@ export default function InlineDiffCard(props: Props) {
             onCommit={() => void submit()}
             // A card with no chat and no notes is only on screen because the reader pressed ✦, so it
             // takes the focus. A microtask, because a Solid ref fires before the element is attached.
-            ref={(element) => {
+            ref={(element: { focus(options?: FocusOptions): void }) => {
               if (!session() && !opening().length) queueMicrotask(() => element.focus({ preventScroll: true }))
             }}
             placeholder={opening().length ? 'Ask a follow-up…' : 'Ask about this change…'}
