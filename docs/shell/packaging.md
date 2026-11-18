@@ -76,13 +76,20 @@ detects missing artifacts, not stale ones, and `package.json` holds the build or
 
 `apps/desktop/scripts/verify-bundle.mjs` runs last. It compares every staged file against the same
 path inside the `.app` by digest, and checks the code signature, the bundled runtime's version, the
-updater artifact and its signature, and the DMG. The packaged runtime is checked by its reported
-version, because signing rewrites every Mach-O file.
+updater artifact and its signature, and the DMG. The packaged runtime is checked by the version it
+prints from running JavaScript, because signing rewrites every Mach-O file. `--version` alone isn't
+enough: it answers before V8 starts, so it passes a runtime that macOS won't let compile code.
 
 `bundle.macOS.signingIdentity` is `"-"`, because without an identity Tauri runs no `codesign` pass and
 `codesign --verify` rejects the result. `createUpdaterArtifacts` is on and the updater public key is
 built in, so every release is signed and turning updates on later is configuration. No updater plugin
 is compiled in and no endpoint is set. A Rust test fails if any of the three goes missing.
+
+Tauri signs with the hardened runtime, which blocks V8's compiled code unless the signature grants it.
+`bundle.macOS.entitlements` points at `apps/desktop/src-tauri/entitlements.plist`, which grants JIT
+and the two other keys Node's own macOS build carries. Tauri applies it to the shell and the bundled
+Node alike. Without it, the bundled Node aborts at startup and the shell reports that the desktop
+helper exited during boot. The runtime check above catches that before release.
 
 `node-pty` is the one native module, and it must match the ABI of the pinned Node that loads it, in a
 checkout and in a bundle. `scripts/rebuild-node-abi.mjs` builds it. SQLite is `node:sqlite`. The

@@ -60,7 +60,16 @@ export function verifyResources(pkg, resources, fail, rewritten = () => false) {
 
 export function verifyRuntime(node, pkg, execFileSync, fail) {
   if (!existsSync(node)) return fail(`the bundled Node runtime is missing: ${node}.`)
-  const version = execFileSync(node, ['--version'], { encoding: 'utf8' }).trim()
+  // `--version` answers before V8 starts, so it passes a runtime the OS won't let run code.
+  let version
+  try {
+    version = execFileSync(node, ['-p', 'process.version'], { encoding: 'utf8', stdio: 'pipe' }).trim()
+  } catch (error) {
+    // V8's fatal banner wraps its one useful line in `#` rows.
+    const lines = error.stderr?.toString().split('\n') ?? []
+    const reason = lines.map((line) => line.replace(/^#\s*/, '').trim()).find(Boolean) || error.message
+    return fail(`the bundled Node runtime can't run JavaScript: ${reason}`)
+  }
   const pin = `v${JSON.parse(readFileSync(resolve(pkg, '../../node-runtime.json'), 'utf8')).version}`
   if (version !== pin) fail(`the bundled runtime reports ${version} and node-runtime.json pins ${pin}.`)
   else console.log(`[verify] node runtime: ${version}`)
