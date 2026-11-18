@@ -13,6 +13,11 @@ const routes = filesUnder(dist)
   .filter((file) => file.endsWith('index.html'))
   .map((file) => `/${file.replace(/index\.html$/, '')}`)
 
+// Where a link may go: a page the build wrote, or a download path that src/worker.ts redirects to the
+// release's file on GitHub. The build lists those paths in download/links.json.
+const downloads: Record<string, string> = JSON.parse(readFileSync(new URL('download/links.json', dist), 'utf8')).files
+const served = new Set([...routes, ...Object.keys(downloads)])
+
 for (const route of routes) {
   test(`${route} loads without errors`, async ({ page }) => {
     const errors: string[] = []
@@ -49,9 +54,8 @@ for (const route of ['/', '/download/', ...featureRoutes]) {
     const hrefs = await page
       .locator('main a[href^="/"]')
       .evaluateAll((links) => links.map((link) => link.getAttribute('href')!))
-    const built = new Set(routes)
     expect(hrefs.length).toBeGreaterThan(0)
-    for (const href of new Set(hrefs)) expect(built.has(href.replace(/#.*$/, '')), href).toBe(true)
+    for (const href of new Set(hrefs)) expect(served.has(href.replace(/#.*$/, '')), href).toBe(true)
   })
 }
 
@@ -61,9 +65,8 @@ test('every link on /plugins/ goes to a page the build wrote', async ({ page }) 
   const hrefs = await page
     .locator('main a[href^="/"]')
     .evaluateAll((links) => links.map((link) => link.getAttribute('href')!))
-  const built = new Set(routes)
   expect(hrefs.length).toBeGreaterThan(0)
-  for (const href of new Set(hrefs)) expect(built.has(href.replace(/#.*$/, '')), href).toBe(true)
+  for (const href of new Set(hrefs)) expect(served.has(href.replace(/#.*$/, '')), href).toBe(true)
 })
 
 test('an unknown address offers the docs home and the search box', async ({ page }) => {
