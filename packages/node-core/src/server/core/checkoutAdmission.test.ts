@@ -67,9 +67,15 @@ it('times a wait behind another operation on the repository, and not an unconten
     const request = { traceId: 'a'.repeat(32), spanId: 'b'.repeat(16), owner: 'git' }
     await runWithTelemetry(request, () => service.admitWork('first', async () => {}))
     const held = deferred()
-    const first = service.admitWork('first', () => held.promise)
+    const entered = deferred()
+    const first = service.admitWork('first', () => {
+      entered.resolve()
+      return held.promise
+    })
+    // Queue behind a hold that has started, with headroom over the 10 ms floor for a slow runner.
+    await entered.promise
     const queued = runWithTelemetry(request, () => service.admitWork('alias', async () => {}))
-    setTimeout(held.resolve, 30)
+    setTimeout(held.resolve, 100)
     await Promise.all([first, queued])
     flushTelemetry()
     const waits = records.filter((record) => record.kind === 'span' && record.name === 'checkout.admission.wait')
