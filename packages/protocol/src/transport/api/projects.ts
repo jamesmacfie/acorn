@@ -54,6 +54,12 @@ export type Project = {
   hidden: boolean
   // Optional owner-selected accent for this project's task tabs. null means no project accent.
   color: string | null
+  // A Lucide icon name for the project's folder row in the rail, drawn in `color`. Absent from a Node
+  // older than it, which a client reads as no icon.
+  icon?: string | null
+  // The branchless task the rail keeps in its project folder section. Non-null means the setting is on,
+  // and the Node refuses to archive or delete that task. Absent from a Node older than it.
+  folderTaskId?: string | null
   vcs: 'git' | null
   defaultBranch: string | null
   remoteUrl: string | null
@@ -67,6 +73,9 @@ export type ProjectPatch = Partial<{
   workspaceId: string
   hidden: boolean
   color: string | null
+  icon: string | null
+  // An active, branchless task in this project, or null to turn the setting off.
+  folderTaskId: string | null
   sort: number
   path: string
 }>

@@ -85,7 +85,7 @@ repository's settings and run setup.
 Settings → Overview is one table of projects grouped under their workspaces. Select rows to open a
 bar that moves them to a workspace, hides or shows them, or sets their color. The last workspace
 option creates a workspace. A row opens its project's settings page, which holds the name, folder,
-color, workspace, visibility, and [project configuration](./project-config.md).
+color, [Keep in rail](./task-creation.md#keep-in-rail), workspace, visibility, and [project configuration](./project-config.md).
 
 A workspace's own page edits its [icon](./workspace-icons.md), renames it, and deletes it. The default workspace can't be renamed or deleted,
 because a deleted workspace's projects move there. A project whose workspace has vanished shows under

@@ -165,8 +165,10 @@
 /* Sources zone (docs/workspaces-and-tasks.md): fixed browse entry points above the workspace roster. */
 .tabrail-zone { flex: none; }
 .tabrail-source { font-size: var(--fs-lg); }
-/* The separator below draws the line here, so the last source does not draw a second one 4px above it. */
-.tabrail-sources > .tabrail-tab:last-child { border-bottom: 0; }
+/* The separator below draws the line here, so the last source, and the last kept project folder, do
+   not draw a second one 4px above it. */
+.tabrail-sources > .tabrail-tab:last-child,
+.tabrail-folders > :last-child .tabrail-tab { border-bottom: 0; }
 
 /* Unicode source glyphs stay on the mono stack in every style pack: the box-drawing and dingbat
    characters only have consistent metrics there. */
@@ -174,9 +176,24 @@
 .tabrail-sep {
   flex: none;
   height: 1px;
-  margin: var(--space-2) var(--space-4);
+  /* Room for the fold chevron that sits on the line, so it never overlaps a tab. */
+  margin: calc(var(--control-h-xs) / 2 + var(--space-1)) var(--space-4);
   background: var(--border-strong);
+  /* Centred by layout, not a transform: WebKit snaps a laid-out box to whole pixels, but draws a
+     translated one at the half pixel the rail's width leaves, which shimmers on every hover repaint. */
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }
+/* The fold chevron, the rail's vertical take on the sidebar edge (.ui-listdetail-edge): its own
+   background and border so it reads against the line. */
+.tabrail-sep > .ui-btn[data-variant] {
+  background: var(--bg-subtle);
+  border: var(--control-border);
+  border-radius: var(--radius-surface);
+}
+/* A kept project folder draws its icon in the project colour, so it reads apart from task initials. */
+.tabrail-folder { color: var(--rail-accent); }
 
 /* Project identity accent (docs/workspaces-and-tasks.md): every task for a coloured project carries
    its optional 3px strip, set as --rail-accent by RailTab. Uncoloured active tabs retain the normal

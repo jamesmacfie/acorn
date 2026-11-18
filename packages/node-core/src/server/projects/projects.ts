@@ -398,6 +398,8 @@ export type PatchProjectInput = Partial<{
   workspaceId: string
   hidden: boolean
   color: string | null
+  icon: string | null
+  folderTaskId: string | null
   sort: number
   path: string
 }>
@@ -431,6 +433,17 @@ export async function patchProject(
   }
   if (patch.hidden !== undefined) set.hidden = patch.hidden
   if (patch.color !== undefined) set.color = patch.color
+  if (patch.icon !== undefined) set.icon = patch.icon
+  if (patch.folderTaskId) {
+    // Only an active task in this project's own folder can be kept in the rail's folder section.
+    const [task] = await db
+      .select({ projectId: schema.tasks.projectId, branch: schema.tasks.branch, status: schema.tasks.status })
+      .from(schema.tasks)
+      .where(eq(schema.tasks.id, patch.folderTaskId))
+    if (!task || task.projectId !== id || task.status !== 'active' || task.branch !== null)
+      return { ok: false, reason: 'Only an open task in the project folder can be kept in the rail.' }
+  }
+  if (patch.folderTaskId !== undefined) set.folderTaskId = patch.folderTaskId
   if (patch.sort !== undefined) set.sort = patch.sort
   if (patch.path !== undefined) {
     // Mapping a folder onto a project with no path yet (the "clone or pick folder" affordance for

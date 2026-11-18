@@ -128,6 +128,10 @@ export const projects = sqliteTable(
     // (docs/workspaces-and-tasks/projects.md § Untrusted projects). Only a URL clone starts false.
     trusted: integer('trusted', { mode: 'boolean' }).notNull().default(true),
     color: text('color'), // optional task-tab accent: preset key or 6-hex; null = no project accent
+    icon: text('icon'), // optional Lucide icon name for the project's folder row in the rail
+    // The branchless task kept in the rail's project folder section. Non-null means the setting is on,
+    // and the Node refuses to archive or delete that task (docs/workspaces-and-tasks/projects.md).
+    folderTaskId: text('folder_task_id'),
     // VCS facet: 'git' when a .git entry was detected at `path`, null for a plain folder.
     vcs: text('vcs'),
     defaultBranch: text('default_branch'), // cached from origin/HEAD or the GitHub API; null when unknown

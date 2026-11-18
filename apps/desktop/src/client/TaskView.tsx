@@ -6,6 +6,7 @@ import { useNavigate } from '@solidjs/router'
 import { createQuery, useQueryClient } from '@tanstack/solid-query'
 import {
   prefsOptions,
+  projectsOptions,
   runTargetsOptions,
   tasksKey,
   tasksOptions,
@@ -70,6 +71,9 @@ export default function TaskView(props: {
   const queryClient = useQueryClient()
   const tasksQuery = createQuery(() => tasksOptions(true))
   const workspacesQuery = createQuery(() => workspacesOptions(true))
+  const projectsQuery = createQuery(() => projectsOptions(true))
+  // A project's kept folder task has no archive here: the Node refuses it until "Keep in rail" is off.
+  const keptInRail = () => !!projectsQuery.data?.some((project) => project.folderTaskId === props.task.id)
   const prefs = createQuery(() => prefsOptions(true))
   const workspace = () => workspaceForProject(workspacesQuery.data, props.task.projectId)
   const status = () => taskStatus(props.task.id)
@@ -241,6 +245,7 @@ export default function TaskView(props: {
         category: 'task',
         palette: true,
         scope: 'task',
+        when: () => !keptInRail(),
         run: openClose,
       },
       ...paneContributions().map((pane) => ({
@@ -404,7 +409,7 @@ export default function TaskView(props: {
         <TaskPaneHost
           task={props.task}
           extraButtons={extraButtons()}
-          onCloseTask={openClose}
+          onCloseTask={keptInRail() ? undefined : openClose}
           closing={closing()}
           shortcutFor={shortcutFor}
         />

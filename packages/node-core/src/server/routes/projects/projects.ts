@@ -3,7 +3,13 @@ import { homedir } from 'node:os'
 import { resolve } from 'node:path'
 import { Hono } from 'hono'
 import { z } from 'zod'
-import type { CloneRunStart, Project, ProjectMcpFile, ProjectsResponse } from '@acorn/protocol/api.ts'
+import {
+  ICON_NAME_RE,
+  type CloneRunStart,
+  type Project,
+  type ProjectMcpFile,
+  type ProjectsResponse,
+} from '@acorn/protocol/api.ts'
 import { inspectMcpConfig, MCP_CANDIDATES, STARTER_MCP_JSON } from '@acorn/protocol/mcp.ts'
 import { isValidProjectColor } from '@acorn/protocol/projectColor.ts'
 import { siteAssociationsSchema } from '@acorn/protocol/siteAssociations.ts'
@@ -45,6 +51,8 @@ const patchBody = z.object({
   workspaceId: z.string().optional(),
   hidden: z.boolean().optional(),
   color: z.string().refine(isValidProjectColor).nullable().optional(),
+  icon: z.string().regex(ICON_NAME_RE).nullable().optional(),
+  folderTaskId: z.string().min(1).nullable().optional(),
   sort: z.number().int().optional(),
   path: z.string().min(1).optional(),
 })
@@ -77,6 +85,8 @@ const toWireProject = (row: ProjectRow): Project => {
     sort: row.sort,
     hidden: row.hidden,
     color: row.color,
+    icon: row.icon,
+    folderTaskId: row.folderTaskId,
     vcs: (row.vcs as 'git' | null) ?? null,
     defaultBranch: row.defaultBranch,
     remoteUrl: row.remoteUrl,

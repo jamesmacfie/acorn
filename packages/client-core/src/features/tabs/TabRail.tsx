@@ -70,6 +70,9 @@ import { activeNodeId } from '../../infra/node/activeNode'
 import { copyLink } from '../../host/registries/commands/copyLink'
 import { sourceRegistry } from '../../host/registries/sources/sources'
 import { loadIconNodes } from '../../kit/tokens/iconNodes'
+import { sidebarCollapse } from '../../kit/lib/layout/collapseState'
+import { Button } from '../../kit/components/primitives'
+import Icon from '../../kit/components/content/Icon'
 import './tabrail.css'
 import { RailTab } from './RailTab'
 import { createSourcePresentation } from './railPresentation'
@@ -166,16 +169,33 @@ export default function TabRail() {
     (previous) => workspaceForProject(workspaces.data, activeProjectId()) ?? previous ?? null,
   )
   const sourceScope = createSourceScope(() => activeWorkspace()?.id)
+  // Each project kept in the rail (its `folderTaskId`) draws that task in the folder section, in the
+  // workspace's project order, never in the ordinary list below it.
+  const folderTasks = createMemo(() => {
+    const byId = new Map((query.data ?? []).map((task) => [task.id, task]))
+    const ws = activeWorkspace()
+    const inOrder = ws
+      ? ws.projects.map((ref) => projects.data?.find((project) => project.id === ref.id))
+      : (projects.data ?? [])
+    return inOrder.flatMap((project) => {
+      const task = project && !project.hidden && project.folderTaskId ? byId.get(project.folderTaskId) : undefined
+      return task ? [task] : []
+    })
+  })
+  const isFolderTask = (id: string) => !!projects.data?.some((project) => project.folderTaskId === id)
+  const [sourcesCollapsed, setSourcesCollapsed] = sidebarCollapse('rail:sources')
+  const [foldersCollapsed, setFoldersCollapsed] = sidebarCollapse('rail:folders')
   const orderedTasks = () => {
     const ws = activeWorkspace()
     const all = query.data ?? []
     const inWs = ws ? new Set(ws.projects.map((project) => project.id)) : null
-    const scoped = inWs
-      ? all.filter(
-          (task) =>
-            inWs.has(task.projectId) && !projects.data?.find((project) => project.id === task.projectId)?.hidden,
-        )
-      : all
+    const folders = new Set(folderTasks().map((task) => task.id))
+    const scoped = all.filter(
+      (task) =>
+        !folders.has(task.id) &&
+        (!inWs ||
+          (inWs.has(task.projectId) && !projects.data?.find((project) => project.id === task.projectId)?.hidden)),
+    )
     return applyRailOrder(scoped, railOrder())
   }
   // The New task button's key cap, read from the live binding so a rebound chord shows as rebound.
@@ -187,16 +207,19 @@ export default function TabRail() {
   })
   const taskRows = createMemo(() => workflowTaskHierarchy(orderedTasks(), expandedWorkflowRoots(), activeTaskId()))
   const visibleTasks = () => taskRows().map((row) => row.task)
+  // Every row on screen, folder rows first. `⌘1`–`⌘9` count the folder rows only while they're shown.
+  const railTasks = () => [...folderTasks(), ...visibleTasks()]
+  const numberedTasks = () => [...(foldersCollapsed() ? [] : folderTasks()), ...visibleTasks()]
   const taskDepths = createMemo(() => new Map(taskRows().map((row) => [row.task.id, row.depth])))
   const workflowGroups = createMemo(() => new Map(taskRows().map((row) => [row.task.id, row])))
 
   // What other plugins know about the rows on screen (`core:task`). One request per contributor for the whole
   // list, re-asked when the list changes and not when the rail merely re-renders. The answers arrive as rail
   // markers through `markersFor` below, so nothing here reads them.
-  createEffect(() => requestTaskAnnotations(visibleTasks().map((task) => task.id)))
+  createEffect(() => requestTaskAnnotations(railTasks().map((task) => task.id)))
   // Every row's scripts in one read, rather than a poll per row, and worktree status only for the rows.
-  const scripts = createTaskScriptsBatch(() => visibleTasks().map((task) => task.id))
-  createEffect(() => setRailTaskIds(visibleTasks().map((task) => task.id)))
+  const scripts = createTaskScriptsBatch(() => railTasks().map((task) => task.id))
+  createEffect(() => setRailTaskIds(railTasks().map((task) => task.id)))
   onCleanup(() => setRailTaskIds(null))
 
   // Every source that can open, then the ones this device draws an icon for. The palette opens the
@@ -349,6 +372,8 @@ export default function TabRail() {
         icon: 'archive',
         order: 30,
         tone: 'danger',
+        // The Node refuses it until the project's "Keep in rail" is off.
+        when: (target) => !isFolderTask(target.id),
         run: (target) => {
           const task = taskById(target.id)
           if (task) void openArchive(task)
@@ -371,9 +396,9 @@ export default function TabRail() {
       id: `task.activate.${index + 1}`,
       title: `Activate task ${index + 1}`,
       category: 'navigation' as const,
-      when: () => visibleTasks().length > index,
+      when: () => numberedTasks().length > index,
       run: () => {
-        const task = visibleTasks()[index]
+        const task = numberedTasks()[index]
         if (!task) return
         setMenuId(null)
         // The right-click menu closes on any pointerdown, so this is the one path that can leave it
@@ -519,115 +544,119 @@ export default function TabRail() {
     )
   }
 
-  const CoreTaskList = () => (
-    <div class="tabrail-list">
-      <For each={visibleTasks()}>
-        {(w) => {
-          const st = () => taskStatus(w.id)
-          // Core's own states plus whatever plugins publish for this task. RailTab orders them,
-          // picks a free corner for each, and legends the lot in the hover tooltip, so the icons
-          // and the words cannot drift.
-          const project = () => projects.data?.find((candidate) => candidate.id === w.projectId)
-          const markers = () => [
-            ...railStatusMarkers({
-              unread: !!unreadForTask(w.id),
-              status: st(),
-              archiving:
-                isArchiving(w.id) ||
-                (scripts.freshness() === 'live' && !!scripts.query.data?.[w.id]?.archiveInProgress),
-              settingUp:
-                scripts.freshness() === 'live' &&
-                ['starting', 'running'].includes(scripts.query.data?.[w.id]?.setup.state ?? ''),
-              pinned: pinnedTasks().has(w.id),
-              untrusted: project()?.trusted === false,
-            }),
-            ...markersFor({ kind: 'task', id: w.id }),
-          ]
-          // Project identity owns the optional 3px accent. The task's projectId is the stable join;
-          // workspace membership only scopes which task rows are visible.
-          const accent = () => resolveProjectColor(project()?.color) ?? undefined
-          const group = () => workflowGroups().get(w.id)
-          return (
-            <div
-              class="tabrail-item"
-              data-task-id={w.id}
-              data-task-depth={taskDepths().get(w.id) || undefined}
-              data-dragging={railDrag.dragId() === w.id || undefined}
-              data-drop-position={railDrag.dropTarget()?.id === w.id ? railDrag.dropTarget()?.position : undefined}
-              style={{ '--task-depth': String(taskDepths().get(w.id) ?? 0) }}
-              // Warm the panes this task can show, once the pointer has settled on the row. The tasks
-              // themselves are already cached; what is cold is each pane's own first read, and a task switch
-              // disposes the whole task scope, so nothing else is holding it. The code of the panes it opens
-              // with loads too. Keyboard focus resting on the row is the same intent as the pointer resting
-              // on it.
-              onPointerEnter={() => warmTask(w)}
-              onPointerLeave={cancelPrefetch}
-              onFocusIn={() => warmTask(w)}
-              onFocusOut={cancelPrefetch}
-              // The second door onto the row's actions. The platform also dispatches `contextmenu`
-              // for Shift+F10 and the menu key, so this is the keyboard path too.
-              onContextMenu={(e) => {
-                e.preventDefault()
-                setMenuId(null)
-                rowMenuReturnFocus = e.currentTarget.querySelector<HTMLElement>('.tabrail-task') ?? undefined
-                setRowMenu({ at: { x: e.clientX, y: e.clientY }, target: rowTarget(w) })
-              }}
-              onMouseDown={(e) => railDrag.begin(e, w.id)}
-            >
-              {/* The rail keeps owning which menu is open, because Cmd+1-9 navigation closes it and
+  // One rail row. A folder row draws its project's icon in the project colour and doesn't drag: its
+  // place follows the project order.
+  const taskRow = (w: Task, folder = false) => {
+    const st = () => taskStatus(w.id)
+    // Core's own states plus whatever plugins publish for this task. RailTab orders them,
+    // picks a free corner for each, and legends the lot in the hover tooltip, so the icons
+    // and the words cannot drift.
+    const project = () => projects.data?.find((candidate) => candidate.id === w.projectId)
+    const markers = () => [
+      ...railStatusMarkers({
+        unread: !!unreadForTask(w.id),
+        status: st(),
+        archiving:
+          isArchiving(w.id) || (scripts.freshness() === 'live' && !!scripts.query.data?.[w.id]?.archiveInProgress),
+        settingUp:
+          scripts.freshness() === 'live' &&
+          ['starting', 'running'].includes(scripts.query.data?.[w.id]?.setup.state ?? ''),
+        pinned: pinnedTasks().has(w.id),
+        untrusted: project()?.trusted === false,
+      }),
+      ...markersFor({ kind: 'task', id: w.id }),
+    ]
+    // Project identity owns the optional 3px accent. The task's projectId is the stable join;
+    // workspace membership only scopes which task rows are visible.
+    const accent = () => resolveProjectColor(project()?.color) ?? undefined
+    const group = () => workflowGroups().get(w.id)
+    return (
+      <div
+        class="tabrail-item"
+        data-task-id={w.id}
+        data-task-depth={taskDepths().get(w.id) || undefined}
+        data-dragging={railDrag.dragId() === w.id || undefined}
+        data-drop-position={railDrag.dropTarget()?.id === w.id ? railDrag.dropTarget()?.position : undefined}
+        style={{ '--task-depth': String(taskDepths().get(w.id) ?? 0) }}
+        // Warm the panes this task can show, once the pointer has settled on the row. The tasks
+        // themselves are already cached; what is cold is each pane's own first read, and a task switch
+        // disposes the whole task scope, so nothing else is holding it. The code of the panes it opens
+        // with loads too. Keyboard focus resting on the row is the same intent as the pointer resting
+        // on it.
+        onPointerEnter={() => warmTask(w)}
+        onPointerLeave={cancelPrefetch}
+        onFocusIn={() => warmTask(w)}
+        onFocusOut={cancelPrefetch}
+        // The second door onto the row's actions. The platform also dispatches `contextmenu`
+        // for Shift+F10 and the menu key, so this is the keyboard path too.
+        onContextMenu={(e) => {
+          e.preventDefault()
+          setMenuId(null)
+          rowMenuReturnFocus = e.currentTarget.querySelector<HTMLElement>('.tabrail-task') ?? undefined
+          setRowMenu({ at: { x: e.clientX, y: e.clientY }, target: rowTarget(w) })
+        }}
+        onMouseDown={folder ? undefined : (e) => railDrag.begin(e, w.id)}
+      >
+        {/* The rail keeps owning which menu is open, because Cmd+1-9 navigation closes it and
                   that decision cannot live inside one menu instance. */}
-              <Menu
-                ariaLabel={`Actions for ${w.title}`}
-                placement="right-start"
-                open={() => menuId() === w.id}
-                onOpenChange={(open) => setMenuId(open ? w.id : null)}
-                trigger={() => (
-                  /* The task's own icon, independent of workspace/project grouping. */
-                  <RailTab
-                    class="tabrail-task"
-                    label={w.title}
-                    glyph={w.icon ?? (w.origin === 'local' ? localTaskGlyph(w.title) : originIcon(w.origin))}
-                    active={!selectedSource() && w.id === activeTaskId()}
-                    accent={accent()}
-                    markers={markers()}
-                    data-tip-sub={[w.branch ?? 'Project folder', taskOriginAppearance(w.origin).tooltip]
-                      .filter(Boolean)
-                      .join(' · ')}
-                    aria-haspopup="menu"
-                    aria-expanded={menuId() === w.id}
-                    onClick={() => onRowClick(w)}
-                  />
-                )}
-              >
-                {(menu) => (
-                  <>
-                    {/* No heading rows: the tab's tip already names the task and its branch. Both
+        <Menu
+          ariaLabel={`Actions for ${w.title}`}
+          placement="right-start"
+          open={() => menuId() === w.id}
+          onOpenChange={(open) => setMenuId(open ? w.id : null)}
+          trigger={() => (
+            /* The task's own icon, independent of workspace/project grouping. */
+            <RailTab
+              class={folder ? 'tabrail-task tabrail-folder' : 'tabrail-task'}
+              label={w.title}
+              glyph={
+                folder
+                  ? (project()?.icon ?? localTaskGlyph(project()?.name ?? w.title))
+                  : (w.icon ?? (w.origin === 'local' ? localTaskGlyph(w.title) : originIcon(w.origin)))
+              }
+              active={!selectedSource() && w.id === activeTaskId()}
+              accent={accent()}
+              markers={markers()}
+              data-tip-sub={[w.branch ?? 'Project folder', taskOriginAppearance(w.origin).tooltip]
+                .filter(Boolean)
+                .join(' · ')}
+              aria-haspopup="menu"
+              aria-expanded={menuId() === w.id}
+              onClick={() => onRowClick(w)}
+            />
+          )}
+        >
+          {(menu) => (
+            <>
+              {/* No heading rows: the tab's tip already names the task and its branch. Both
                         doors onto a task row draw from the same registry (docs/plugins/menus-and-markers.md
                         § Context menus), so they cannot offer different things. */}
-                    <ContextMenuItems context={menu} location="task.row" target={rowTarget(w)} />
-                  </>
-                )}
-              </Menu>
-              <Show when={group()?.workflowDescendants}>
-                <button
-                  type="button"
-                  class="tabrail-task-disclosure"
-                  aria-label={`${group()?.expanded ? 'Collapse' : 'Show'} ${group()?.workflowDescendants} workflow tasks under ${w.title}`}
-                  aria-expanded={group()?.expanded}
-                  onMouseDown={(event) => event.stopPropagation()}
-                  onClick={(event) => {
-                    event.stopPropagation()
-                    toggleWorkflowRoot(w.id)
-                  }}
-                >
-                  {group()?.expanded ? '▾' : '▸'}
-                  <span>{group()?.workflowDescendants}</span>
-                </button>
-              </Show>
-            </div>
-          )
-        }}
-      </For>
+              <ContextMenuItems context={menu} location="task.row" target={rowTarget(w)} />
+            </>
+          )}
+        </Menu>
+        <Show when={group()?.workflowDescendants}>
+          <button
+            type="button"
+            class="tabrail-task-disclosure"
+            aria-label={`${group()?.expanded ? 'Collapse' : 'Show'} ${group()?.workflowDescendants} workflow tasks under ${w.title}`}
+            aria-expanded={group()?.expanded}
+            onMouseDown={(event) => event.stopPropagation()}
+            onClick={(event) => {
+              event.stopPropagation()
+              toggleWorkflowRoot(w.id)
+            }}
+          >
+            {group()?.expanded ? '▾' : '▸'}
+            <span>{group()?.workflowDescendants}</span>
+          </button>
+        </Show>
+      </div>
+    )
+  }
+  const CoreTaskList = () => (
+    <div class="tabrail-list">
+      <For each={visibleTasks()}>{(w) => taskRow(w)}</For>
     </div>
   )
   const coreTaskList = registerCoreExclusiveSlot('rail.taskList', CoreTaskList)
@@ -694,7 +723,7 @@ export default function TabRail() {
     const sourceById = createMemo(() => new Map(value().sources.map((source) => [source.id, source])))
     return (
       <nav class="tabrail" data-collapsed={value().collapsed || undefined}>
-        <div class="tabrail-zone tabrail-sources">
+        <div class="tabrail-zone tabrail-sources" hidden={sourcesCollapsed()}>
           {/* Keyed by id rather than by row, so a button and the presentation it reads live as long as
               the source is drawn, not as long as one render of the rail's data. */}
           <For each={sourceIds()}>
@@ -738,7 +767,13 @@ export default function TabRail() {
             }}
           </For>
         </div>
-        <div class="tabrail-sep" />
+        <RailDivider label="sources" collapsed={sourcesCollapsed()} onToggle={setSourcesCollapsed} />
+        <Show when={folderTasks().length}>
+          <div class="tabrail-zone tabrail-folders" hidden={foldersCollapsed()}>
+            <For each={folderTasks()}>{(w) => taskRow(w, true)}</For>
+          </div>
+          <RailDivider label="project folders" collapsed={foldersCollapsed()} onToggle={setFoldersCollapsed} />
+        </Show>
         <NestedChromeSlot slotRef={value().slots.taskList} />
         <RailTab
           class="tabrail-bottom"
@@ -791,6 +826,27 @@ export default function TabRail() {
       <Show when={actionPickerRequest()} keyed>
         {(open) => <ActionPickerDialog request={open} />}
       </Show>
+    </div>
+  )
+}
+
+// The line between two rail sections, with a chevron that folds away the section above it, the way
+// the sidebar's edge button folds away the column to its left. Stored per device.
+function RailDivider(props: { label: string; collapsed: boolean; onToggle: (collapsed: boolean) => void }) {
+  const verb = () => (props.collapsed ? 'Show' : 'Hide')
+  return (
+    <div class="tabrail-sep" data-collapsed={props.collapsed || undefined}>
+      <Button
+        variant="bare"
+        size="xs"
+        iconOnly
+        label={`${verb()} ${props.label}`}
+        tip={`${verb()} ${props.label}`}
+        expanded={!props.collapsed}
+        onPress={() => props.onToggle(!props.collapsed)}
+      >
+        <Icon name={props.collapsed ? 'chevron-down' : 'chevron-up'} />
+      </Button>
     </div>
   )
 }

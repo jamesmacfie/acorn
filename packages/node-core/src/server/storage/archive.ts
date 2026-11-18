@@ -135,6 +135,7 @@ async function archiveTaskTree(
 ): Promise<ArchiveResult> {
   const tree = taskArchiveTree(db, id)
   if (!tree.length) return { ok: false, reason: 'Task not found.' }
+  if (isFolderTask(db, id)) return { ok: false, reason: FOLDER_TASK_REASON }
   const claimed: string[] = []
   const archivedTaskIds: string[] = []
   const cleanupFailed = new Set<string>()
@@ -181,6 +182,13 @@ async function archiveTaskTree(
     for (const taskId of claimed) finishTaskArchive(taskId)
   }
 }
+
+// A project's kept folder task can't be archived or deleted until the setting is off. It is always a
+// root task, so checking the id asked for is enough: no other archive tree can contain it.
+export const FOLDER_TASK_REASON =
+  "This task is kept in the rail. Turn off 'Keep in rail' in its project's settings first."
+export const isFolderTask = (db: AppDatabase, id: string): boolean =>
+  !!db.select({ id: schema.projects.id }).from(schema.projects).where(eq(schema.projects.folderTaskId, id)).get()
 
 /** Descendants before their parent, including active descendants of an archived subtask. */
 export function taskArchiveTree(db: AppDatabase, id: string): (typeof schema.tasks.$inferSelect)[] {

@@ -229,6 +229,35 @@ describe('the active-task list route', () => {
     expect((await t.db.select().from(schema.tasks)).every((row) => row.status === 'active')).toBe(true)
   })
 
+  it('keeps a branchless task in the rail and refuses to archive it until the setting is off', async () => {
+    await seed(2, 2)
+    await t.db.update(schema.tasks).set({ branch: null }).where(eq(schema.tasks.id, 'task-0-0'))
+    await t.db.update(schema.tasks).set({ status: 'archived' }).where(eq(schema.tasks.id, 'task-0-1'))
+    const send = (url: string, method: string, body: unknown) =>
+      app.request(`http://acorn.test${url}`, {
+        method,
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify(body),
+      })
+    const keep = (folderTaskId: string | null) => send('/api/projects/project-0', 'PATCH', { folderTaskId })
+    const archive = () => send('/api/tasks/task-0-0', 'PATCH', { status: 'archived' })
+
+    // A branched, archived, or other project's task can't be kept.
+    expect((await send('/api/projects/project-1', 'PATCH', { folderTaskId: 'task-0-0' })).status).toBe(400)
+    expect((await keep('task-0-1')).status).toBe(400)
+    await t.db.update(schema.tasks).set({ status: 'active' }).where(eq(schema.tasks.id, 'task-0-1'))
+    expect((await keep('task-0-1')).status).toBe(400)
+
+    const kept = await send('/api/projects/project-0', 'PATCH', { folderTaskId: 'task-0-0', icon: 'house' })
+    expect(await kept.json()).toMatchObject({ project: { folderTaskId: 'task-0-0', icon: 'house' } })
+    const refused = await archive()
+    expect(refused.status).toBe(409)
+    expect(await refused.json()).toMatchObject({ error: { code: 'folder_task' } })
+
+    expect((await keep(null)).status).toBe(200)
+    expect((await archive()).status).toBe(200)
+  })
+
   it('stores setup opt-out per task and defaults other task seeds to setup enabled', async () => {
     await seed(1, 0)
     const create = (body: Record<string, unknown>) =>

@@ -1,7 +1,7 @@
 import { recordSetupDecision } from '../../taskScripts/setup'
 import { checkoutAdmissionFor } from '../../core/checkoutAdmission'
 import { taskScripts } from '../../taskScripts/service'
-import { taskArchiveTree } from '../../storage/archive'
+import { FOLDER_TASK_REASON, isFolderTask, taskArchiveTree } from '../../storage/archive'
 import { randomUUID } from 'node:crypto'
 import { realpathSync } from 'node:fs'
 import { z } from 'zod'
@@ -447,6 +447,8 @@ export const tasks = new Hono<AppEnv>()
       patch.status = body.status
       patch.archivedAt = body.status === 'archived' ? Date.now() : null
     }
+    if (patch.status === 'archived' && isFolderTask(db, id))
+      return respondError(c, 409, 'folder_task', [FOLDER_TASK_REASON])
     const archiveTree = patch.status === 'archived' ? taskArchiveTree(db, id) : []
     if (archiveTree.some((task) => !mayActOnTask(c, task.id))) return respondError(c, 404, 'not_found')
     const archivedTasks = archiveTree.filter((task) => task.status !== 'archived')

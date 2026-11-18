@@ -17,6 +17,7 @@ import { clearAnnotations } from '../../host/annotations/annotations'
 import { setActiveNode } from '../../infra/node/activeNode'
 import { PrefKeys } from '../../infra/persistence/prefKeys'
 import { writeDevicePref } from '../../infra/persistence/devicePrefs'
+import { _resetSidebarCollapse } from '../../kit/lib/layout/collapseState'
 
 const { archiveTaskMock, copyLinkMock, createTaskMock, navigateMock, readJsonMock } = vi.hoisted(() => ({
   archiveTaskMock: vi.fn(),
@@ -287,6 +288,52 @@ describe('hovering a task row', () => {
     hover(rows[1]!)
     vi.advanceTimersByTime(200)
     expect(prefetched.sort()).toEqual(['agents:t2', 'notes:t2'])
+  })
+})
+
+describe('a project kept in the rail', () => {
+  afterEach(() => _resetSidebarCollapse())
+
+  const keep = async () => {
+    mount([{ ...task('t1', 'acorn'), branch: null, worktreePath: null }, task('t2', 'Second')])
+    queryClient.setQueryData(projectsKey, [
+      { id: 'p1', name: 'acorn', workspaceId: 'w1', vcs: null, color: null, hidden: false, folderTaskId: 't1' },
+    ])
+    await vi.waitFor(() => expect(host.querySelector('.tabrail-folders')).not.toBeNull())
+  }
+  const folderLabels = () =>
+    [...host.querySelectorAll('.tabrail-folders .tabrail-task')].map((row) => row.getAttribute('aria-label'))
+  const listLabels = () =>
+    [...host.querySelectorAll('.tabrail-list .tabrail-task')].map((row) => row.getAttribute('aria-label'))
+
+  it('draws its folder task in its own section, not the task list, with no Archive action', async () => {
+    await keep()
+    expect(folderLabels()).toEqual([expect.stringContaining('acorn')])
+    expect(listLabels()).toEqual([expect.stringContaining('Second')])
+
+    host
+      .querySelector('.tabrail-folders .tabrail-item')!
+      .dispatchEvent(new MouseEvent('contextmenu', { button: 2, bubbles: true, cancelable: true }))
+    const items = [...document.querySelectorAll('[role="menuitem"]')].map((item) => item.textContent)
+    expect(items.some((text) => text?.includes('Copy link'))).toBe(true)
+    expect(items.some((text) => text?.includes('Archive'))).toBe(false)
+  })
+
+  it('folds the section above a divider and remembers it on this device', async () => {
+    await keep()
+    const toggle = host.querySelector<HTMLButtonElement>('[aria-label="Hide project folders"]')!
+    expect(toggle.getAttribute('aria-expanded')).toBe('true')
+    toggle.click()
+    expect(host.querySelector<HTMLElement>('.tabrail-folders')!.hidden).toBe(true)
+    expect(localStorage.getItem('sidebar:rail:folders')).toBe('1')
+    host.querySelector<HTMLButtonElement>('[aria-label="Show project folders"]')!.click()
+    expect(host.querySelector<HTMLElement>('.tabrail-folders')!.hidden).toBe(false)
+  })
+
+  it('draws no folder section or second divider when no project is kept', () => {
+    mount()
+    expect(host.querySelector('.tabrail-folders')).toBeNull()
+    expect(host.querySelectorAll('.tabrail-sep')).toHaveLength(1)
   })
 })
 

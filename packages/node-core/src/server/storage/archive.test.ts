@@ -22,7 +22,7 @@ import { taskScripts } from '../taskScripts/service'
 import { createTaskService } from '../core/tasks'
 import { registerCheckoutAdmission, type CheckoutAdmission } from '../core/checkoutAdmission'
 import { worktreeBranchDirName } from '../worktrees/pathGuards'
-import { archiveTask, restoreTask, runTeardownProcess, type ArchiveDeps } from './archive'
+import { archiveTask, FOLDER_TASK_REASON, restoreTask, runTeardownProcess, type ArchiveDeps } from './archive'
 import { clearHooks, registerHookHandler } from '../pluginHost/hooks'
 import {
   computeTaskStatuses,
@@ -148,6 +148,13 @@ describe('archiveTask teardown ordering', () => {
   })
 
   const setTeardown = (script: string | null) => t.db.update(schema.projects).set({ teardownScript: script })
+
+  it("refuses a project's kept folder task, which also stops a delete that archives first", async () => {
+    await t.db.update(schema.projects).set({ folderTaskId: 'task1' })
+    expect(await archiveTask(t.db, 'task1', {}, deps())).toEqual({ ok: false, reason: FOLDER_TASK_REASON })
+    const [row] = await t.db.select().from(schema.tasks).where(eq(schema.tasks.id, 'task1'))
+    expect(row?.status).toBe('active')
+  })
 
   const addSubtasks = async () => {
     const childWorktree = join(dir, 'child-wt')

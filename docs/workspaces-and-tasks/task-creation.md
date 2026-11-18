@@ -111,6 +111,28 @@ dispatch reuses its tasks and runs. Starting a root workflow again creates a fre
 The desktop stores task order, layout, the last pane and source, and drafts for each Node. `⌘1` to
 `⌘9` activate the matching visible task.
 
+The desktop rail has up to three sections: sources, the folder tasks of projects kept in the rail,
+then the other tasks. A line with a chevron on it separates them, and the chevron folds away the
+section above the line. The second line and the folder section appear only when a project in the
+workspace is kept. Folder rows follow the workspace's project order and don't drag. Each device
+stores which sections are folded. `⌘1` to `⌘9` count folder rows first, and skip them while their
+section is folded.
+
+### Keep in rail
+
+**Keep in rail** on a project's settings page keeps one task in the project folder in the rail's folder
+section. Turning it on creates a new branchless task and stores its ID as the project's
+`folder_task_id`. A project with no folder can't turn it on. **Rail icon** then picks the Lucide icon
+that row draws, in the project color, stored as the project's `icon`. With no icon the row shows the
+project name's first letter.
+
+`PATCH /v1/core/projects/:id` takes `folderTaskId` and `icon`. A `folderTaskId` must name an active,
+branchless task in that project, or the Node answers 400. While it's set, the Node refuses to archive
+that task, with 409 `folder_task` from the status patch and `ok: false` from the archive routes. That
+also stops a delete, which archives first. The desktop offers no Archive action for the task.
+Turning the setting off clears the ID, then archives the task through the usual archive dialog. The
+terminal client shows the task as an ordinary rail row.
+
 The desktop and terminal rails place a child after its parent, from `Task.parentId`, and keep the
 stored order among roots and siblings. A child is a normal task with its own panes. An orphan or a
 cycle shows as a top-level row instead of disappearing.

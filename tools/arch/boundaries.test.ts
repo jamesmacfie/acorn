@@ -1093,6 +1093,7 @@ describe('architecture boundaries', () => {
       // cleanly rather than crash. What stays out of core is each decision that uses the answer, not
       // the asking.
       ['packages/client-core/src/features/tabs/TabRail.tsx', 'the host-capability probe'],
+      ['packages/client-core/src/features/settings/ProjectSettings.tsx', 'the host-capability probe'],
       // `github` the website an installable plugin comes from, which is a different thing wearing the
       // same word, and `github` the brand mark every glyph named `brand:github` resolves through.
       ['packages/client-core/src/features/settings/plugins/InstallPlugin.tsx', "'github' the install source kind"],

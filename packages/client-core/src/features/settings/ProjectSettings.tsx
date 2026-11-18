@@ -8,6 +8,12 @@ import { canPickNodeFolder, pickNodeFolder } from '../workspaces/addProject'
 import { NodePathForm } from '../workspaces/NodePathForm'
 import { deleteProject, patchProject, trustProject } from '../workspaces/workspaceMutations'
 import { ProjectColorInput } from '../workspaces/ProjectColorInput'
+import IconPicker from '../../kit/components/inputs/IconPicker'
+import { hasHostCapability } from '../../infra/node/hostCapabilities'
+import { createTask } from '../tasks/taskMutations'
+import { archiveOrDeleteTask, confirmTaskArchive } from '../tasks/confirmTaskArchive'
+import { completeTaskArchive, withArchiving } from '../tasks/archiveLifecycle'
+import { localTaskGlyph } from '../tasks/origin'
 import {
   settingsDetailTabs,
   settingsPagesInOrder,
@@ -159,6 +165,8 @@ function GeneralTab(props: { project: Project; store: ProjectConfigStore; contex
   })
   const folder = createSettingSave()
   const colour = createSettingSave()
+  const icon = createSettingSave()
+  const keep = createSettingSave()
   const workspace = createSettingSave()
   const visibility = createSettingSave()
   const removal = createSettingSave()
@@ -173,6 +181,40 @@ function GeneralTab(props: { project: Project; store: ProjectConfigStore; contex
       stays: "You can't mark it untrusted again. Agents already running keep how they started.",
     })
     if (confirmed) await trust.run(() => trustProject(props.project.id).then(refresh))
+  }
+
+  // Keep in rail: on makes a fresh task in the project folder and keeps it; off archives that task.
+  // shortcut: each is two requests, so a failed second one leaves an ordinary task behind, visible in
+  // the rail. Move both into one Node route if that turns out to matter.
+  const keepInRail = async (on: boolean) => {
+    if (on) {
+      await keep.run(async () => {
+        const task = await createTask({ projectId: props.project.id, origin: 'local' })
+        await qc.invalidateQueries({ queryKey: tasksKey })
+        await patch({ folderTaskId: task.id })
+      })
+      return
+    }
+    const task = (tasks.data ?? []).find((candidate) => candidate.id === props.project.folderTaskId)
+    if (!task) return void keep.run(() => patch({ folderTaskId: null }))
+    const decision = await confirmTaskArchive(task, tasks.data ?? [])
+    if (!decision.confirmed) return
+    await keep.run(async () => {
+      await patch({ folderTaskId: null })
+      // The rail's own archive, minus its navigation: this page isn't showing the task.
+      const result = await withArchiving(task.id, () =>
+        archiveOrDeleteTask(
+          task.id,
+          decision.action,
+          hasHostCapability({ plugin: 'terminal' })
+            ? { guarded: true, force: true, applyChecks: decision.checked }
+            : { guarded: false },
+        ),
+      )
+      completeTaskArchive(task.id, () => {}, result.archivedTaskIds ?? (result.ok ? [task.id] : []))
+      await qc.invalidateQueries({ queryKey: tasksKey })
+      if (!result.ok) throw new Error(result.reason)
+    })
   }
 
   const changeFolder = async () => {
@@ -276,6 +318,33 @@ function GeneralTab(props: { project: Project; store: ProjectConfigStore; contex
             onChange={(color) => colour.run(() => patch({ color }))}
           />
         </SettingRow>
+        <SettingRow
+          label="Keep in rail"
+          description="Keeps a task in this project's folder in its own section at the top of the rail. It can't be archived while this is on."
+          error={keep.error()}
+        >
+          <Checkbox
+            switch
+            ariaLabel="Keep in rail"
+            checked={!!props.project.folderTaskId}
+            disabled={!props.project.path}
+            onChange={(on) => void keepInRail(on)}
+          />
+        </SettingRow>
+        <Show when={props.project.folderTaskId}>
+          <SettingRow
+            label="Rail icon"
+            help="Drawn in the rail colour on this project's folder task."
+            error={icon.error()}
+          >
+            <IconPicker
+              ariaLabel="Rail icon"
+              value={props.project.icon ?? null}
+              fallback={localTaskGlyph(props.project.name)}
+              onSelect={(value) => void icon.run(() => patch({ icon: value }))}
+            />
+          </SettingRow>
+        </Show>
         <Show when={mode() === 'on'}>
           <SettingRow label="Workspace" error={workspace.error()}>
             <Select

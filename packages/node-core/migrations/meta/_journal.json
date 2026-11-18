@@ -127,6 +127,13 @@
       "when": 1793913261614,
       "tag": "0017_project_trust",
       "breakpoints": true
+    },
+    {
+      "idx": 18,
+      "version": "6",
+      "when": 1795035865538,
+      "tag": "0018_project_folder_task",
+      "breakpoints": true
     }
   ]
 }
