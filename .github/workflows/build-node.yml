@@ -121,6 +121,13 @@ jobs:
         run: |
           gh release view "$TAG" >/dev/null 2>&1 || gh release create "$TAG" --verify-tag --title "$TAG" --notes ""
           gh release upload "$TAG" archives/* --clobber
+      # A release published with the workflow token starts no other workflow, so this asks site.yml to
+      # redeploy the site with the new downloads. It's sent after the upload so the build sees the files.
+      - name: Redeploy the site
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+        run: gh api "repos/$GH_REPO/dispatches" -f event_type=release-published
 
   # The standalone Node as a Linux container image (docs/node-distribution/container.md). It's for x64
   # only, because the image compiles node-pty and an arm64 build would run under emulation. A tag pushes

@@ -4,7 +4,8 @@ name: Site
 # deploy from main. It runs when the site changes or when something it reads from does, so a kit or
 # contract change outside the site still runs the site's checks (docs/site.md). It also rebuilds
 # production once a day and on every published release, because the build reads the star count and the
-# newest release from GitHub.
+# newest release from GitHub. A release that build-node.yml publishes with the workflow token can't
+# start a `release` run, so that job sends the `release-published` repository dispatch instead.
 on:
   pull_request:
     paths: &site-inputs
@@ -34,6 +35,9 @@ on:
     - cron: '17 4 * * *'
   release:
     types: [published]
+  # GitHub runs a repository dispatch on the default branch only, so it can't deploy another branch.
+  repository_dispatch:
+    types: [release-published]
   workflow_dispatch:
 
 permissions:
@@ -143,7 +147,8 @@ jobs:
         if: >-
           matrix.build == 'production' && (
           (github.event_name == 'push' && github.ref == 'refs/heads/main') ||
-          github.event_name == 'schedule' || github.event_name == 'release')
+          github.event_name == 'schedule' || github.event_name == 'release' ||
+          github.event_name == 'repository_dispatch')
         working-directory: apps/site
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}

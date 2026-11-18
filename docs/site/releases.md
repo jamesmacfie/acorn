@@ -8,7 +8,9 @@ deploying it.
 
 A build asks the GitHub API for the repository's star count and its newest release that isn't a draft
 (`apps/site/src/lib/github.ts`). `.github/workflows/site.yml` rebuilds production once a day and on each
-published release, so the count and the links stay current. The download page, the footer, the star button, and the landing and
+published release, so the count and the links stay current. A release that `build-node.yml` publishes
+for a `v*` tag uses the workflow token, which can't start a `release` run, so its release job sends a
+`release-published` repository dispatch once the archives are uploaded. The download page, the footer, the star button, and the landing and
 feature pages' primary action read the answer. The visitor's browser asks GitHub for nothing. Set
 `GITHUB_TOKEN` to lift GitHub's anonymous limit of 60 requests an hour.
 

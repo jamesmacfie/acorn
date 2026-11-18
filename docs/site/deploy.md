@@ -13,7 +13,10 @@ type-checks the site, then builds and tests the production and preview builds si
 - On a pull request, it uploads the preview build as a Worker version with the alias `pr-<number>`,
   and writes the preview URL to the job summary. Preview responses carry `X-Robots-Tag: noindex`. A
   pull request from a fork gets no preview, because it gets no secrets.
-- On a push to `main`, once a day, and on each published release, it deploys the production build.
+- On a push to `main`, once a day, and on each published release, it deploys the production build of
+  `main`. `build-node.yml` publishes a tagged release with the workflow token, which starts no other
+  workflow, so it sends a `release-published` repository dispatch instead. GitHub runs that dispatch
+  on `main` only. A manual run checks the builds but doesn't deploy.
 
 The workflow needs two repository secrets:
 
