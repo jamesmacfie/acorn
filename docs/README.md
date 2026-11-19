@@ -507,6 +507,15 @@ Each plugin landing page above has topic pages in a folder of the same name:
   [keeping the machine awake](./future/node-tray/07-keep-awake.md), and [acceptance on real
   machines](./future/node-tray/08-acceptance.md).
 
+## Slack plugin proposal
+
+- [Slack for Acorn agents](./future/slack/README.md), with [research](./future/slack/research.md),
+  [the conversation rules](./future/slack/rules.md), and phases for [the gateway
+  contract](./future/slack/01-gateway-contract.md), [delivery to the
+  Node](./future/slack/02-node-delivery.md), [linking and projects](./future/slack/03-link-and-projects.md),
+  [threads to tasks](./future/slack/04-threads-to-tasks.md), [approvals in
+  Slack](./future/slack/05-approvals.md), and [acceptance](./future/slack/06-acceptance.md).
+
 ## Review guide v2
 
 - [What's left for review guide v2](./future/review-guide.md): the terminal walk, the wide pane's

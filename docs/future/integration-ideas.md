@@ -236,6 +236,7 @@ beside the editor in a task, `CollectionContribution` for dashboard rows,
 ### Chat, mail, and calendar
 
 - Slack. Threads that mention you, the channel for this repository, posting a deploy note, reactions.
+  [The Slack plan](./slack/README.md) covers talking to your agents from Slack.
 - Discord and Microsoft Teams. The same shape.
 - Email, restricted to what a developer needs: alerts, build failures, review requests.
 - Calendar. The next meeting, the time until it, and the join link. One row is enough.
