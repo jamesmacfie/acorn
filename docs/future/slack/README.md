@@ -1,7 +1,8 @@
 # Slack for Acorn agents
 
-Date: November 19, 2026. Status: phases 1 to 5 built on November 19, 2026, against the stand-in. The
-hosted gateway and [phase 6, acceptance](./06-acceptance.md), are left.
+Date: November 19, 2026. Status: phases 1 to 5 built and rechecked against their docs on November 19,
+2026, against the stand-in. Most of [phase 6, acceptance](./06-acceptance.md), step 1 ran the same
+day. The hosted gateway and the rest of acceptance are left.
 
 Mention @acorn in a Slack channel, or DM it, and an agent starts work on your own Node. What shipped is
 described in its owning pages:
@@ -27,8 +28,8 @@ alternatives rejected.
    lapse after 90 days idle. The stand-in does none of the last four. Its conformance runs with the
    standalone fake Slack (`startFakeSlack`), as [acceptance](./06-acceptance.md) stage 2 describes.
 2. **The event subscriptions** on the production app, once the gateway answers Slack's address check.
-3. **[Acceptance](./06-acceptance.md)**: the stand-in walk in `pnpm dev:agent`, the live run, and the
-   release.
+3. **[Acceptance](./06-acceptance.md)**: the rest of the stand-in walk (an approval card from a harness
+   that asks, and a Node restart during a turn), the live run, the rate limit run, and the release.
 
 Left out of the first version on purpose, as the plan decided: a list of other Slack users whose
 messages become turns, reactions as triggers, a **Stop** button, files and images, watching a channel,
