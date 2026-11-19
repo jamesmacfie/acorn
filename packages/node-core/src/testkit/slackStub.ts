@@ -62,6 +62,8 @@ export type FakeSlack = {
     threadTs?: string
     ephemeral?: boolean
     action: Record<string, unknown>
+    /** Slack's `state.values`: what the message's other inputs hold, such as a ticked checkbox. */
+    state?: Record<string, unknown>
   }): Promise<FakeSlackSend>
   command(input: { teamId: string; user: string; channel: string; text: string }): Promise<FakeSlackSend>
   /** An event as Slack would wrap and sign it, for removal events and anything the helpers above don't build. */
@@ -307,7 +309,7 @@ export async function startFakeSlack(options: { signingSecret: string; port?: nu
       post(teamId, input, 'channel', input.text.includes(`<@${team(teamId).botUserId}>`)),
     dm: ({ teamId, user, text, threadTs }) =>
       post(teamId, { channel: `D${user.slice(1)}`, user, text, ...(threadTs ? { threadTs } : {}) }, 'im', false),
-    async click({ teamId, user, channel, messageTs, threadTs, ephemeral, action }) {
+    async click({ teamId, user, channel, messageTs, threadTs, ephemeral, action, state }) {
       const payload = {
         type: 'block_actions',
         team: { id: teamId, domain: teamId.toLowerCase() },
@@ -324,6 +326,7 @@ export async function startFakeSlack(options: { signingSecret: string; port?: nu
         },
         ...(ephemeral ? {} : { message: find(channel, messageTs) ?? { ts: messageTs } }),
         response_url: `${url}/hooks/${teamId}/${channel}/${messageTs}`,
+        state: { values: state ?? {} },
         actions: [{ action_ts: nextTs(), ...action }],
       }
       const status = await send(

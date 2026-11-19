@@ -1,7 +1,23 @@
 # Phase 6: acceptance
 
-Date: November 19, 2026. Status: proposed. Depends on phases 1 to 5, and on the hosted gateway for
-the live run.
+Date: November 19, 2026. Status: step 1 run in part and step 4 done on November 19, 2026. Steps 2
+and 3, and the release, wait on the hosted gateway. Depends on phases 1 to 5, and on the hosted
+gateway for the live run.
+
+**Completion note, November 19, 2026.** Step 1 ran in `pnpm dev:agent` against `pnpm dev:account`, with
+real Claude Code turns. Step 4: branch `slack`, rebased on main at f7baea4f4, measures 1,958,081 B, and
+the ceiling went to 1,958,800 B. What later work needs to know:
+
+- `pnpm dev:account` fails on main as well as here, because the root package has no `tsx`. Run
+  `node --import tsx ../../scripts/dev-account.mts` from `packages/node-core` instead.
+- `/_test/slack/mention` adds the bot's mention itself. Text that names another bot ID keeps it.
+- A `dev:agent` window on a locked screen is hidden, so **Settings → Slack** stops polling while a link
+  finishes. Leave the page and come back to see the link.
+- A Slack turn uses the harness's own permission mode. In a session whose Claude Code mode is auto, a
+  harmless command runs without asking, so no approval card appears. Run the approval card check with
+  a harness mode that asks.
+- The fake Slack's `click` now takes `state`, Slack's `state.values`, so a walk can tick **Remember
+  for this channel** on the picker.
 
 ## Goal
 
@@ -84,3 +100,9 @@ The hosted service builds from this repository's `main`, so the order matters:
 
 Record each step's date and result here, with what the gateway logged about stored data. It should
 show IDs only.
+
+| Step | Date | Result |
+| --- | --- | --- |
+| 1 | November 19, 2026 | In part, against the stand-in with real Claude Code turns. Passed: **Settings → Slack** in its signed-out, remote-access-off, not-linked, and linked states, with the approvals box carried over from before the link. A mention in a channel with no default, then the picker. A turn that read files, with 👀, ⏳, the status line ending "Worked 9s", ✅, and the answer under "Acorn · owner". A guest reply, then an owner turn: the agent read the guest's words as context and didn't act on them. A question from the agent: ✋, "owner, the agent has a question for you in Acorn" with the task's address, then answered in Acorn, and the thread went on to ✅ and the answer. A turn typed in the desktop composer, mirrored as two posts. `/acorn project` in a DM, then two DMs, which ran at once as two sessions in one "Slack DM" task with no branch. One DM session archived, which ended only its thread. The task archived: "Archived in Acorn.", a reply ignored, and a fresh mention in its thread starting again. Not run: an approval card with **Approve** and **Deny** from a real harness, a Node restart during a turn, and the Node stopped, then a mention. The plugin tests and the relay test cover those three. Every recorded Slack call matched [the conversation rules](../../integrations/slack/conversation-rules.md). |
+| 2, 3 | | Waits on the hosted gateway. |
+| 4 | November 19, 2026 | 1,958,081 B on branch `slack` after rebasing on main, which was at 1,955,845 B. The ceiling went from 1,957,500 B to 1,958,800 B under James's standing approval for the Slack work. |
