@@ -123,5 +123,5 @@ tests. The relay route needs no relay change.
 which suits a guest. But a note always starts a turn of its own, so every guest reply would spend the
 owner's usage ([session messages](../../managed-agents/session-messages.md)).
 
-**A loaded plugin.** The [README](./README.md#decisions-in-this-plan) says why the plugin is compiled
+**A loaded plugin.** [Slack § Why](../../integrations/slack.md#why) says why the plugin is compiled
 in.

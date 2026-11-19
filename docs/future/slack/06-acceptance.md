@@ -81,7 +81,7 @@ payment method to keep it. Adding one doesn't charge anything.
 3. **Rate limits.** Run three Slack tasks at once on two Nodes in one workspace, and check that status
    edits slow down and that no answer is lost.
 4. **Size.** Build the Node, read the service size against its ceiling, and raise the ceiling by the
-   growth, as [the rules for the work](./README.md#rules-for-the-work) allow.
+   growth, as James approved in advance on November 19, 2026, for this work.
 
 ## Release order
 

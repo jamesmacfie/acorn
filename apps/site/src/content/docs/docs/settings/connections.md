@@ -8,13 +8,15 @@ sources:
   - docs/integrations/model-providers.md
   - packages/client-core/src/features/settings/corePages.ts
   - packages/client-core/src/features/settings/models/AiModelsSettings.tsx
+  - plugins/slack/src/client/SlackSettings.tsx
 covers:
   - integrations
   - ai-models
+  - slack
 checked: 52225e24f
 ---
 
-This page lists every setting in **Settings** > **Connections**. Both pages are stored on the Node:
+This page lists every setting in **Settings** > **Connections**. Every page is stored on the Node:
 a connection you add is used by every device paired with it. A credential is encrypted on the Node and
 never shown again ([Credentials and secrets](/docs/security/credentials-and-secrets/)).
 
@@ -52,7 +54,21 @@ Keys for generating text, beside the agent CLIs that can do the same
 Which backend Generate controls use is **Generate with**, under **Agents** > **Harnesses and
 defaults**.
 
+## Slack
+
+Links your Slack user to this Node, so a mention of @acorn or a DM to it starts an agent here
+([Slack](/docs/built-in-plugins/slack/)). It needs you signed in under **Machines** > **Account**,
+with **Remote access** on, and says which is missing.
+
+| Setting | What it changes | Stored on | Default |
+| --- | --- | --- | --- |
+| **Link Slack** | Gives an address that runs Sign in with Slack, and waits until the link reaches this Node. | Account service | Not linked |
+| **Link this Node instead** | Moves a link that sends Slack work to another of your Nodes to this one. | Account service | |
+| **Unlink** | Removes the link. Mentions and DMs from you stop reaching this Node. | Account service | |
+| **Answer approvals from Slack** | Shows **Approve** and **Deny** in the thread when the agent asks to run something. Off, the card links to acorn instead. Turning it on means a break-in at the hosted service could approve what your agent runs. | Node | Off |
+
 ## In the terminal
 
-Both pages open in the desktop app. A connection added there applies to the terminal client too,
-because the Node keeps it.
+**Services** and **AI models** open in the desktop app. A connection added there applies to the terminal
+client too, because the Node keeps it. **Slack** draws in the terminal client as well, and prints the
+sign-in address for you to open.
