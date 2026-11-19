@@ -2,7 +2,7 @@ import { randomUUID } from 'node:crypto'
 import type { SlackDelivery } from '@acorn/protocol/account.ts'
 import type { SlackRuntime } from './runtime'
 import type { Mode, Thread } from './store'
-import { firstLine, REACTIONS, stableId, withoutMention } from './text'
+import { firstLine, installId, REACTIONS, stableId, withoutMention } from './text'
 import type { Turns } from './turns'
 
 // What arrives from Slack, by the conversation rules (docs/integrations/slack/conversation-rules.md § When the bot acts):
@@ -34,7 +34,7 @@ export function slackInbound(rt: SlackRuntime, turns: Turns, onClick?: (payload:
   }
 
   async function event(envelope: Payload): Promise<void> {
-    const teamId = String(envelope.team_id ?? '')
+    const teamId = installId(envelope)
     const event = (envelope.event ?? {}) as Payload
     const link = await store.link(teamId)
     if (!link) return
@@ -261,7 +261,7 @@ export function slackInbound(rt: SlackRuntime, turns: Turns, onClick?: (payload:
 
   // A pick from the project picker: set the default when asked, replace the picker, and start the message.
   async function pick(payload: Payload, value: string) {
-    const teamId = String((payload.team as Payload).id)
+    const teamId = installId(payload)
     const user = String((payload.user as Payload).id)
     const channel = String((payload.container as Payload).channel_id)
     const respond = (text: string) =>
@@ -301,7 +301,7 @@ export function slackInbound(rt: SlackRuntime, turns: Turns, onClick?: (payload:
   }
 
   async function command(payload: Payload): Promise<void> {
-    const teamId = String(payload.team_id)
+    const teamId = installId(payload)
     const channel = String(payload.channel_id)
     const user = String(payload.user_id)
     const link = await store.link(teamId)

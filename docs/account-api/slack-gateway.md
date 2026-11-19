@@ -45,6 +45,25 @@ An `app_uninstalled` event deletes the install with its links and grants. So doe
 event that lists a bot token. Slack also sends `tokens_revoked` when a person revokes their own sign-in,
 which leaves the bot working, so one that lists only user tokens changes nothing.
 
+## Enterprise Grid
+
+An install is named by one ID, and every `teamId` in this API is that ID: a link's, a call's, and a
+grant's. For a workspace install it's the workspace's team ID, `T…`. For an org-wide install on
+Enterprise Grid it's the org's enterprise ID, `E…`, and one bot token covers every workspace the org's
+admin gave the app.
+
+A Node reads the same ID from what Slack sent, so the gateway and the Node always agree. When the payload
+marks an org-wide install, the ID is the enterprise ID. Otherwise it's the team ID:
+
+| Payload | Org-wide when | Enterprise ID | Team ID |
+| --- | --- | --- | --- |
+| Event | `authorizations[0].is_enterprise_install` is `true` | `enterprise_id` | `team_id` |
+| Click | `is_enterprise_install` is `true` | `enterprise.id` | `team.id` |
+| Command | `is_enterprise_install` is `"true"` | `enterprise_id` | `team_id` |
+
+A Grid user's ID is the same in every workspace of the org, so one link covers the whole org. Sign in
+with Slack and **Add to Slack** have to name a workspace on Grid: see [the Slack app](./slack-app.md#slack-facts-the-gateway-relies-on).
+
 ## Routing
 
 The gateway picks a Node for each event by the first rule that matches:

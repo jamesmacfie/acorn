@@ -7,7 +7,7 @@ import type { SlackGateway } from './gateway'
 import { matchProject, slackInbound } from './inbound'
 import { slackRuntime } from './runtime'
 import { slackStore } from './store'
-import { REACTIONS, stableId } from './text'
+import { installId, REACTIONS, stableId } from './text'
 import { slackTurns } from './turns'
 
 // The plugin by the conversation rules (docs/integrations/slack.md), with the gateway and the agents
@@ -758,5 +758,23 @@ describe('approvals', () => {
       }),
     )
     expect(h.posts().at(-1)).toMatch(/^James, the agent has a question for you in Acorn: https:\/\/account\.test\/t\//)
+  })
+})
+
+describe('installId', () => {
+  it("names a workspace install by the workspace, and an org-wide one by the org, in each payload's shape", () => {
+    const event = (orgWide: boolean) => ({
+      team_id: 'T0WORK',
+      enterprise_id: 'E0ORG',
+      authorizations: [{ team_id: orgWide ? null : 'T0WORK', is_enterprise_install: orgWide }],
+    })
+    expect(installId(event(false))).toBe('T0WORK')
+    expect(installId(event(true))).toBe('E0ORG')
+    const click = { team: { id: 'T0WORK' }, enterprise: { id: 'E0ORG' }, is_enterprise_install: true }
+    expect(installId(click)).toBe('E0ORG')
+    expect(installId({ ...click, is_enterprise_install: false })).toBe('T0WORK')
+    const command = { team_id: 'T0WORK', enterprise_id: 'E0ORG', is_enterprise_install: 'true' }
+    expect(installId(command)).toBe('E0ORG')
+    expect(installId({ team_id: 'T0WORK', is_enterprise_install: 'false' })).toBe('T0WORK')
   })
 })

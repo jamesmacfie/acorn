@@ -66,7 +66,7 @@ Replace `ACCOUNT_SERVICE` with the service's address. Slack accepted this manife
       "is_enabled": true,
       "request_url": "https://ACCOUNT_SERVICE/slack/v1/interactions"
     },
-    "org_deploy_enabled": false,
+    "org_deploy_enabled": true,
     "socket_mode_enabled": false,
     "token_rotation_enabled": false
   }
@@ -76,6 +76,11 @@ Replace `ACCOUNT_SERVICE` with the service's address. Slack accepted this manife
 `messages_tab_enabled` matters. Without the **Messages** tab, nobody can DM the bot, and DMs are where
 conversation mode starts. The `openid` and `profile` user scopes let Sign in with Slack share the bot's
 app, so linking needs no second client.
+
+`org_deploy_enabled` lets an Enterprise Grid org install the app for the whole org. Grid treats an install
+started by an org owner as org-wide, and refuses it when this is off: "can't be installed on an
+organization". The `acorn-dev` sandbox showed that on November 20, 2026, even with the workspace's ID
+in the request. After an org-wide install, an org admin chooses which of the org's workspaces get the app.
 
 `message.channels` sends every message in every public channel the bot is in, not only the ones meant
 for it. The gateway forwards a message only when a [routing rule](./slack-gateway.md#routing) matches,
@@ -114,6 +119,12 @@ app confirmed the manifest, the **Messages** tab, and the sandbox steps below. C
   and `reactions.remove` allow about 50 a minute for the app in one workspace. Status edits are the
   first thing a Node drops.
 - The `markdown` block takes standard Markdown, up to 12,000 characters a message.
+- On Enterprise Grid, a payload from an org-wide install says so: `authorizations[0].is_enterprise_install`
+  on an event, `is_enterprise_install` on a click as a boolean and on a command as a string. Its
+  `team_id` is the workspace the message was in, and `enterprise_id` is the org.
+- On Grid, Sign in with Slack with no workspace named sends a person who isn't signed in through the org's
+  sign-in, which ends on the org's workspace list and drops the request. The `acorn-dev` sandbox showed
+  that on November 20, 2026. The same request on the workspace's own address went through.
 - A button click posts a signed payload with the clicker's user ID, and its `response_url` replaces
   the message for 30 minutes. Ephemeral messages can carry buttons and a `static_select` of up to 100
   options.

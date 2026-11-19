@@ -18,6 +18,19 @@ const ANSWER_LIMIT = 12_000
 // What the owner's next turn carries of guests' replies, newest kept.
 const GUEST_CONTEXT_BYTES = 8 * 1024
 
+/** The ID a link is keyed by: the org's on Enterprise Grid when the app is installed for the whole org, the
+ *  workspace's otherwise. Every payload says which kind of install it came through, as Slack's own SDKs read
+ *  it: `authorizations` on an event, and `is_enterprise_install` on a click (a boolean) or a command (a string). */
+export function installId(payload: Record<string, unknown>): string {
+  const authorization = (payload.authorizations as Record<string, unknown>[] | undefined)?.[0]
+  const orgWide = [payload.is_enterprise_install, authorization?.is_enterprise_install].some(
+    (value) => value === true || value === 'true',
+  )
+  const enterprise = payload.enterprise_id ?? (payload.enterprise as { id?: unknown } | null | undefined)?.id
+  const team = payload.team_id ?? (payload.team as { id?: unknown } | null | undefined)?.id
+  return String((orgWide ? enterprise : team) ?? '')
+}
+
 /** The message's text without the bot's mention. An `app_mention` names the bot in its first mention. */
 export const withoutMention = (text: string, mention: boolean): string =>
   (mention ? text.replace(/<@[A-Z0-9]+>/, '') : text).trim()

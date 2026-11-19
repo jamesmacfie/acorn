@@ -1,4 +1,5 @@
 import type { SlackRuntime } from './runtime'
+import { installId } from './text'
 import type { Turns } from './turns'
 
 // Requests in Slack sessions (docs/integrations/slack.md § Approvals). A permission request posts a card
@@ -104,7 +105,7 @@ export function slackApprovals(rt: SlackRuntime, turns: Turns) {
     async click(payload: Payload): Promise<boolean> {
       const action = ((payload.actions ?? []) as Payload[])[0]
       if (action?.action_id !== APPROVE && action?.action_id !== DENY) return false
-      const teamId = String((payload.team as Payload).id)
+      const teamId = installId(payload)
       const user = String((payload.user as Payload).id)
       const channel = String((payload.container as Payload).channel_id)
       const [sessionId = '', requestId = ''] = String(action.value ?? '').split('|')
