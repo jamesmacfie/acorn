@@ -69,6 +69,7 @@ Settled November 19, 2026, from the code unless marked:
 | Does `createRoot` with no branch use the project folder? | No, it derived a branch. `branch: null` was added. |
 | What happens when two new sessions start in one task at once? | Each has its own step ID, so each gets its own session. |
 | Does `plugin:agents:sessions-changed` report an archive? | Yes, with `archived: true`. |
+| How does a Slack task show in the task rail? | The plugin has no rail source, so `taskOriginAppearance` draws the plain dot with `slack` as the tooltip. Left as is. |
 | Can `agents:composer-actions` draw a plain label? | Yes, any kit content. The plugin draws "Shared to …" there. |
 | Which address opens a task from Slack? | The phone app's `/t/<task ID>` on the account website. Not checked with more than one paired Node. |
 | Can an ephemeral message carry a `static_select`? | Yes, up to 100 options, from Slack's docs as recorded, not checked live. |
@@ -83,7 +84,7 @@ Settled November 19, 2026, from the code unless marked:
 | 1 | November 19, 2026 | `slackGatewayContract.test.ts` against the stand-in passes, including an unlinked user's mention: one ephemeral note, no delivery, no grant. Rechecked against the phase doc the same day: the relay test gained the calls table against a real grant, a grant beating the connect note, and giving a thread up. |
 | 2 | November 19, 2026 | `apps/relay/src/slackGateway.test.ts` sends a stand-in delivery through a real relay to a real Node, and `gatewayRoute.test.ts` refuses a replayed token. Not run by hand in `pnpm dev:agent`: the test runs the same steps. Rechecked against the phase doc the same day: `account.service` gained the tests it lacked. `mountCoverage.test.ts` only covers `/v1/core`, so the gateway route test's "opens nothing else" stands in for it. |
 | 3 | November 19, 2026 | The relay test links from **Settings → Slack** and checks a non-owner's `/acorn`. The plugin tests cover `/acorn project`, `/acorn mode`, and the picker. **Settings → Slack** wasn't opened in `pnpm dev:agent`; left for acceptance step 1. Rechecked against the phase doc the same day: added tests for each settings state and for two picks waiting in one channel. |
-| 4 | November 19, 2026 | `plugins/slack/src/server/slack.test.ts` covers both modes, guests, reactions, the status line, answers, mirroring, archives, and a restart, with the agents plugin faked at its contract. No real agent turn ran from Slack; left for acceptance step 1. |
+| 4 | November 19, 2026 | `plugins/slack/src/server/slack.test.ts` covers both modes, guests, reactions, the status line, answers, mirroring, archives, and a restart, with the agents plugin faked at its contract. No real agent turn ran from Slack; left for acceptance step 1. Rechecked against the phase doc the same day: every step is in place. The tests cover the doc's list, except a `429` on a status edit, which logs and leaves the next edit to try again. |
 | 5 | November 19, 2026 | The plugin tests cover the card with approvals on and off, the owner's and a guest's clicks, a double click, and an answer in Acorn first. `requestAnswer.test.ts` covers each refusal. Not run against a real harness; left for acceptance step 1. |
 
 The Node service size grew 2,218 B, from 1,952,863 B to 1,955,081 B, measured locally on November 19,
