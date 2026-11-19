@@ -97,6 +97,19 @@ describe('calls', () => {
     expect(stub.slack.calls().at(-1)).toMatchObject({ method: 'chat.postMessage', args: { username: 'Acorn · james' } })
   })
 
+  it('the fake Slack reads a Web API call sent as a form, as a gateway may send one', async () => {
+    const { botToken } = stub.slack.installTeam({ teamId: 'T0FORM', teamName: 'Form' })
+    await fetch(`${stub.slack.url}/api/chat.postMessage`, {
+      method: 'POST',
+      headers: { authorization: `Bearer ${botToken}`, 'content-type': 'application/x-www-form-urlencoded' },
+      body: new URLSearchParams({ channel: 'C1', text: 'hi', blocks: JSON.stringify([{ type: 'divider' }]) }),
+    })
+    expect(stub.slack.calls().at(-1)).toMatchObject({
+      method: 'chat.postMessage',
+      args: { channel: 'C1', text: 'hi', blocks: [{ type: 'divider' }] },
+    })
+  })
+
   it("passes Slack's errors and rate limits on in the gateway's terms", async () => {
     const info = (user: string) =>
       call('POST', slackGatewayPaths.calls, { teamId: TEAM, method: 'users.info', args: { user } })
@@ -158,6 +171,16 @@ describe('what Slack sends', () => {
     })
     await stub.slack.event(TEAM, { type: 'message', bot_id: 'B1', text: 'a bot', channel: 'C0GENERAL', ts: '2.000001' })
     expect(stub.slack.calls().slice(before)).toEqual([])
+  })
+
+  it("keeps the install when a person revokes their own sign-in, and removes it when the bot's token goes", async () => {
+    stub.slack.installTeam({ teamId: 'T0REVOKE', teamName: 'Revoke' })
+    const info = () =>
+      call('POST', slackGatewayPaths.calls, { teamId: 'T0REVOKE', method: 'users.info', args: { user: 'U0JAMES' } })
+    await stub.slack.event('T0REVOKE', { type: 'tokens_revoked', tokens: { oauth: ['U0JAMES'] } })
+    expectError(await info(), 404, 'not_linked')
+    await stub.slack.event('T0REVOKE', { type: 'tokens_revoked', tokens: { bot: ['U0BOT'] } })
+    expectError(await info(), 404, 'not_installed')
   })
 
   it('removes the install, its links, and its grants when the app is uninstalled', async () => {

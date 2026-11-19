@@ -225,7 +225,10 @@ export async function startSlackGateway(host: SlackGatewayHost): Promise<SlackGa
     if (seen.has(eventId)) return c.body(null, 200)
     seen.set(eventId, host.nowSeconds() + 3600)
     const event = callback.event as Payload
-    if (event.type === 'app_uninstalled' || event.type === 'tokens_revoked') {
+    // Slack also sends `tokens_revoked` when a person revokes their own sign-in, which leaves the bot working.
+    const botRevoked =
+      event.type === 'tokens_revoked' && ((event.tokens as Payload | undefined)?.bot as unknown[])?.length
+    if (event.type === 'app_uninstalled' || botRevoked) {
       installs.delete(teamId)
       for (const old of links.filter((l) => l.teamId === teamId)) unlink(teamId, old.slackUserId)
       return c.body(null, 200)

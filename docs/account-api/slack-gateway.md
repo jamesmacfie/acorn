@@ -37,7 +37,13 @@ Signing in to Slack proves the team and the user. When the team has no install, 
 from another Node moves the link. A Slack user already linked to another account gets `409 conflict`.
 Whether the owner answers approvals from Slack is kept on the Node, so the gateway can't change it.
 
-An `app_uninstalled` or `tokens_revoked` event deletes the install with its links and grants.
+The link page names the account and the Node, and asks before it links. It finishes only in the browser
+that opened it. Without that, anyone sent someone else's link address could link their own Slack user
+to that person's Node, and the Node's owner would read what they say to @acorn.
+
+An `app_uninstalled` event deletes the install with its links and grants. So does a `tokens_revoked`
+event that lists a bot token. Slack also sends `tokens_revoked` when a person revokes their own sign-in,
+which leaves the bot working, so one that lists only user tokens changes nothing.
 
 ## Routing
 
@@ -60,8 +66,9 @@ When the relay answers `404`, `502`, or `504`, or nothing answers, for a mention
 command, the sender gets "Your Node (<label>) is offline, so nothing was sent." A grant-routed reply from
 anyone but the Node's own linked user is dropped without a note.
 
-Slack sends a mention in a channel twice, as `app_mention` and as `message`. Both reach the Node, which
-drops the second by the message's timestamp.
+Slack sends a mention in a channel twice, as `app_mention` and as `message`. A gateway that answers Slack
+before it delivers usually drops the second copy, because it arrives before the grant is recorded. When
+both reach the Node, the Node drops the second by the message's timestamp.
 
 ## Deliver to a Node
 
@@ -170,4 +177,4 @@ offline Node. `packages/node-core/src/server/accountSchema.test.ts` pins the sch
 A gateway under test reads Slack's Web API address and its signing secret from its settings. It may
 take an address that isn't Slack's only in a test mode, so a production service can't be pointed
 anywhere else. The fake Slack in `slackStub.ts` runs on its own with `startFakeSlack`, and signs for
-any gateway `setGateway` names.
+any gateway `setGateway` names. Its Web API reads a call as JSON or as a form, as Slack's does.

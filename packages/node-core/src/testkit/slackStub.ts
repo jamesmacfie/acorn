@@ -79,6 +79,24 @@ export type FakeSlack = {
 const sign = (secret: string, timestamp: string, body: string): string =>
   `v0=${createHmac('sha256', secret).update(`v0:${timestamp}:${body}`).digest('hex')}`
 
+// A Web API call's arguments, as JSON or as a form. Slack's read methods take only a form, and a form
+// carries an object such as `blocks` as a JSON string.
+async function webApiArgs(request: Request): Promise<Record<string, unknown>> {
+  if (!request.headers.get('content-type')?.startsWith('application/x-www-form-urlencoded'))
+    return ((await request.json().catch(() => ({}))) ?? {}) as Record<string, unknown>
+  const form = new URLSearchParams(await request.text())
+  return Object.fromEntries(
+    [...form].map(([key, value]) => {
+      if (!/^[[{]/.test(value)) return [key, value]
+      try {
+        return [key, JSON.parse(value) as unknown]
+      } catch {
+        return [key, value]
+      }
+    }),
+  )
+}
+
 /** Check a request the way Slack's docs say a receiver must: the signature, and a timestamp within five minutes. */
 export function verifySlackSignature(
   secret: string,
@@ -179,7 +197,7 @@ export async function startFakeSlack(options: { signingSecret: string; port?: nu
   app.post('/api/:method', async (c) => {
     const team = teamFor(c.req.header('authorization'))
     const method = c.req.param('method')
-    const args = ((await c.req.json().catch(() => ({}))) ?? {}) as Record<string, unknown>
+    const args = await webApiArgs(c.req.raw)
     if (!team) return c.json({ ok: false, error: 'invalid_auth' })
     const retryAfter = limited.get(method)
     if (retryAfter !== undefined) {
