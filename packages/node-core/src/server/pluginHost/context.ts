@@ -51,6 +51,7 @@ import { hookHandlersFor, registerHookHandler, registerHookPoint, runHook } from
 import { DISCLOSED_NODE_POINTS, qualifiedExtensionPointId } from '@acorn/protocol/extensionPoints.ts'
 import { asContextSection, registerContextSection } from '../agentTools/contextSections'
 import { registerRoute, pluginMountPath, reserveHostDispatchedPath } from '../routes/registry'
+import { registerGatewayRoute } from '../routes/gatewayRoutes'
 import { connectionProviderRegistry } from '../integrations/connectionProviders/registry'
 import { integrationProviderRegistry } from '../integrations/registry'
 import { modelProviderRegistry } from '../modelProviders/registry'
@@ -279,6 +280,10 @@ export function buildPluginContext(options: PluginContextOptions): HostPluginCon
                 note,
               }).dispose,
             ),
+      // Compiled plugins only: it takes a request no device or task token signed (../routes/gatewayRoutes.ts).
+      gateway: permissions
+        ? (undefined as never)
+        : (handler) => recordUndo(registerGatewayRoute(plugin, handler).dispose),
     },
     // The owner is bound here, not passed by the plugin: a plugin cannot contribute a tool under another
     // plugin's name, and cannot remove another plugin's tools.

@@ -35,6 +35,7 @@
     "@acorn/plugin-gitlab": "workspace:*",
     "@acorn/plugin-memory": "workspace:*",
     "@acorn/plugin-notes": "workspace:*",
+    "@acorn/plugin-slack": "workspace:*",
     "@acorn/plugin-onboarding": "workspace:*",
     "@acorn/plugin-preview": "workspace:*",
     "@acorn/plugin-terminal": "workspace:*",

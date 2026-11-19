@@ -283,6 +283,14 @@ export const PLUGINS = {
       'node.env:ACORN_SENTRY_URL': "Reads which Sentry region to ask, if it isn't the US one.",
     },
   },
+  slack: {
+    name: 'Slack',
+    sentence: 'Starts an agent on your Node when you mention @acorn in Slack or DM it, and answers in the thread.',
+    icon: 'messages-square',
+    ships: 'compiled',
+    worksIn: both,
+    docs: '/docs/built-in-plugins/slack/',
+  },
   terminal: {
     name: 'Terminal',
     sentence: 'Terminals for every task, in a drawer or a pane, that keep running when you close the window.',

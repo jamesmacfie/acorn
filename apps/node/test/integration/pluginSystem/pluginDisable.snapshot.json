@@ -67,6 +67,7 @@
       "notes",
       "preview",
       "preview/tasks/:taskId/proxy",
+      "slack",
       "terminal",
       "terminal/data/runs",
       "trellis",
@@ -150,6 +151,7 @@
     "providerRoutes": [],
     "modelProviders": [],
     "capabilities": [
+      "account.service",
       "agents.activity.v1",
       "agents.customAgentRegistry",
       "agents.defaultProfile",
@@ -160,6 +162,7 @@
       "agents.managedRoute",
       "agents.mcpServersRoute",
       "agents.profiles",
+      "agents.requestAnswer",
       "agents.requests",
       "agents.reviewInput.v1",
       "agents.runtime",
@@ -224,6 +227,9 @@
       ],
       "connectionProviders": [
         "account"
+      ],
+      "capabilities": [
+        "account.service"
       ]
     },
     "browser": {
@@ -383,6 +389,11 @@
       ],
       "capabilities": [
         "preview.urls"
+      ]
+    },
+    "slack": {
+      "routes": [
+        "slack"
       ]
     },
     "trellis": {

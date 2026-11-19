@@ -1,0 +1,255 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$defs": {
+    "CreateLinkRequest": {
+      "type": "object",
+      "properties": {
+        "nodeId": {
+          "type": "string",
+          "format": "uuid",
+          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+        }
+      },
+      "required": [
+        "nodeId"
+      ],
+      "additionalProperties": false
+    },
+    "CreateLinkResponse": {
+      "type": "object",
+      "properties": {
+        "url": {
+          "type": "string",
+          "format": "uri"
+        },
+        "expiresAt": {
+          "type": "integer",
+          "minimum": -9007199254740991,
+          "maximum": 9007199254740991
+        }
+      },
+      "required": [
+        "url",
+        "expiresAt"
+      ],
+      "additionalProperties": false
+    },
+    "Link": {
+      "type": "object",
+      "properties": {
+        "teamId": {
+          "type": "string",
+          "pattern": "^[A-Z0-9]{2,40}$"
+        },
+        "teamName": {
+          "type": "string"
+        },
+        "slackUserId": {
+          "type": "string",
+          "pattern": "^[A-Z0-9]{2,40}$"
+        },
+        "slackUserName": {
+          "type": "string"
+        },
+        "nodeId": {
+          "type": "string",
+          "format": "uuid",
+          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+        }
+      },
+      "required": [
+        "teamId",
+        "teamName",
+        "slackUserId",
+        "slackUserName",
+        "nodeId"
+      ],
+      "additionalProperties": false
+    },
+    "ListLinksResponse": {
+      "type": "object",
+      "properties": {
+        "links": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "teamId": {
+                "type": "string",
+                "pattern": "^[A-Z0-9]{2,40}$"
+              },
+              "teamName": {
+                "type": "string"
+              },
+              "slackUserId": {
+                "type": "string",
+                "pattern": "^[A-Z0-9]{2,40}$"
+              },
+              "slackUserName": {
+                "type": "string"
+              },
+              "nodeId": {
+                "type": "string",
+                "format": "uuid",
+                "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+              }
+            },
+            "required": [
+              "teamId",
+              "teamName",
+              "slackUserId",
+              "slackUserName",
+              "nodeId"
+            ],
+            "additionalProperties": false
+          }
+        }
+      },
+      "required": [
+        "links"
+      ],
+      "additionalProperties": false
+    },
+    "CallRequest": {
+      "type": "object",
+      "properties": {
+        "teamId": {
+          "type": "string",
+          "pattern": "^[A-Z0-9]{2,40}$"
+        },
+        "method": {
+          "type": "string",
+          "enum": [
+            "chat.postMessage",
+            "chat.update",
+            "chat.delete",
+            "chat.postEphemeral",
+            "reactions.add",
+            "reactions.remove",
+            "conversations.replies",
+            "chat.getPermalink",
+            "users.info",
+            "respond"
+          ]
+        },
+        "args": {
+          "type": "object",
+          "propertyNames": {
+            "type": "string"
+          },
+          "additionalProperties": {}
+        }
+      },
+      "required": [
+        "teamId",
+        "method",
+        "args"
+      ],
+      "additionalProperties": false
+    },
+    "CallResponse": {
+      "type": "object",
+      "properties": {
+        "ok": {
+          "type": "boolean",
+          "const": true
+        },
+        "result": {
+          "type": "object",
+          "propertyNames": {
+            "type": "string"
+          },
+          "additionalProperties": {}
+        }
+      },
+      "required": [
+        "ok",
+        "result"
+      ],
+      "additionalProperties": false
+    },
+    "Delivery": {
+      "type": "object",
+      "properties": {
+        "eventId": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 100
+        },
+        "routedBy": {
+          "type": "string",
+          "enum": [
+            "grant",
+            "sender"
+          ]
+        },
+        "kind": {
+          "type": "string",
+          "enum": [
+            "event",
+            "interaction",
+            "command"
+          ]
+        },
+        "payload": {
+          "type": "object",
+          "propertyNames": {
+            "type": "string"
+          },
+          "additionalProperties": {}
+        }
+      },
+      "required": [
+        "eventId",
+        "routedBy",
+        "kind",
+        "payload"
+      ],
+      "additionalProperties": false
+    },
+    "DeliveryAnswer": {
+      "type": "object",
+      "properties": {
+        "ok": {
+          "type": "boolean",
+          "const": true
+        }
+      },
+      "required": [
+        "ok"
+      ],
+      "additionalProperties": false
+    },
+    "Error": {
+      "type": "object",
+      "properties": {
+        "error": {
+          "type": "string",
+          "enum": [
+            "invalid_request",
+            "invalid_token",
+            "not_found",
+            "conflict",
+            "not_installed",
+            "not_linked",
+            "not_granted",
+            "rate_limited",
+            "slack_error"
+          ]
+        },
+        "message": {
+          "type": "string"
+        },
+        "retryAfter": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 9007199254740991
+        }
+      },
+      "required": [
+        "error"
+      ],
+      "additionalProperties": false
+    }
+  }
+}

@@ -21,6 +21,7 @@ registering the plugin's routes.
 | Sign-in plugin | Runs on each person's local Node. It signs in, registers its Node, and asks for tickets for clients. See [the sign-in plugin](#the-sign-in-plugin). |
 | Relay | Reads the service's public keys and revoked credential list. It never calls any other route. |
 | Node | Keeps the owner account, the keys, and a relay credential in `node.json`. |
+| Slack gateway | Part of the service, with its own API: Slack events in, Slack calls out ([the Slack gateway API](./account-api/slack-gateway.md)). |
 
 A device token still decides who gets into a Node. A ticket gets a client to the Node, and the account
 service can't approve a pairing or read traffic.
@@ -134,6 +135,7 @@ format is written down.
 | Relay credential | `acorn-relay-credential+jwt` | `iss`, `sub` (account), `jti`, `iat`, `aud: "relay"`, `node` | Until the Node is removed or registers again. |
 | Relay ticket | `acorn-relay-ticket+jwt` | The credential's claims, plus `exp` | Five minutes. |
 | Account assertion | `acorn-account-assertion+jwt` | `iss`, `sub`, `jti`, `iat`, `aud` (the Node ID), `exp` | Two minutes. |
+| Gateway token | `acorn-gateway+jwt` | `iss`, `sub`, `jti`, `iat`, `aud` (the Node ID), `exp`, `scope` (the plugin) | 60 seconds, one request ([the gateway token](./account-api/slack-gateway.md#the-gateway-token)). |
 
 The credential names the account that owns the Node, and the ticket names the account that may open
 streams to it. The relay opens a stream only when the two match.

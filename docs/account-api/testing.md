@@ -33,6 +33,9 @@ certificate authority that speaks ACME for one DNS-01 order and reads those reco
 certificate in a test with no internet. It checks each request's signature, nonce, and address, and signs with
 a CA of its own that a test trusts through `caPem`.
 
+`account.slack` is the Slack gateway and a fake Slack in front of it, for the Slack plugin's tests
+([the Slack gateway's stand-in](./slack-gateway.md#the-stand-in)).
+
 A browser can sign in too. `GET /account/v1/browser/sign-in?next=/` signs in the test account at once and
 sends the browser back to `next` with a session cookie, which is what the phone app's **Sign in** does
 ([browsers](./browsers.md)).

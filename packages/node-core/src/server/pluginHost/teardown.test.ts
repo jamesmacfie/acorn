@@ -18,6 +18,7 @@ import { modelProviderRegistry } from '../modelProviders/registry'
 import { nodeAction } from '../nodeActions'
 import { nodeProviders } from '../nodeProviders/registry'
 import { pluginRouteContributions } from '../routes/registry'
+import { hasGatewayRoute } from '../routes/gatewayRoutes'
 import { runSources } from '../runs/registry'
 import { SCHEDULER } from '../schedules'
 import { telemetrySummary } from '../telemetry/collector'
@@ -133,6 +134,11 @@ const PROBES: Record<string, Probe> = {
   'routes.loopback': {
     register: (ctx) => ctx.routes.loopback({ prefix: '/loopback', target: async () => null }),
     present: () => routeAt('/loopback'),
+    compiledOnly: true,
+  },
+  'routes.gateway': {
+    register: (ctx) => ctx.routes.gateway(() => new Response()),
+    present: () => hasGatewayRoute(PLUGIN),
     compiledOnly: true,
   },
   'tools.register': {

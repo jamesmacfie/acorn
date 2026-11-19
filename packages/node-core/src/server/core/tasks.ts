@@ -55,7 +55,9 @@ type TaskLinkRef = { provider: string; integrationId: string; identifier: string
 // What a dispatched child needs to exist. `branch` is a suggestion: it is slugged and de-duped against
 // task reservations, worktree directories, and Git worktrees. A base also reserves local branches.
 type ChildTaskSeed = { title: string; branch: string; origin?: string; baseBranch?: string }
-type RootTaskSeed = { title: string; branch?: string; origin: string }
+// `branch: null` makes a branchless task in the project folder, as **New task → Project folder** does.
+// Left out, a git project's task gets a branch derived from the title.
+type RootTaskSeed = { title: string; branch?: string | null; origin: string }
 
 type TaskPullRelation = {
   taskId: string
@@ -377,7 +379,7 @@ export function createTaskService(db: AppDatabase, env?: Env): CompiledTaskServi
             .all()
             .flatMap((row) => (row.id !== intendedTaskId && row.branch ? [row.branch] : []))
           const branch =
-            project.vcs === 'git'
+            project.vcs === 'git' && seed.branch !== null
               ? dedupeBranch(slugifyBranch(seed.branch || title) || `workflow-${intendedTaskId.slice(0, 8)}`, branches)
               : null
           if (existing) {
@@ -417,7 +419,7 @@ export function createTaskService(db: AppDatabase, env?: Env): CompiledTaskServi
           return true
         })
       const created =
-        project.vcs === 'git'
+        project.vcs === 'git' && seed.branch !== null
           ? await (await import('../worktrees/taskBranch')).withBranchReservation(db, project, reserve, true)
           : await reserve()
       if (created) {

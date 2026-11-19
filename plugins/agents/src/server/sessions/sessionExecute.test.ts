@@ -243,6 +243,19 @@ describe('agents.sessionExecute config options', () => {
     })
   })
 
+  it('names the session and the first turn as soon as the turn is queued', async () => {
+    const queued: { sessionId: string; turnId: string }[] = []
+    const result = await createSessionExecute(runtime)({
+      taskId,
+      profileId: 'claude-code',
+      title: 'Slack thread',
+      prompt: 'Hello.',
+      stepId: 'step-turn',
+      onTurn: (turn) => queued.push(turn),
+    })
+    expect(queued).toEqual([{ sessionId: result!.agentSessionId, turnId: driver.turns[0]!.turn.id }])
+  })
+
   it('mints the managed session token from its persisted tool ceiling', async () => {
     const tools = { allow: ['task_current'], maxRisk: 'read' as const }
     const result = await execute(undefined, tools)

@@ -356,6 +356,7 @@ export function createSessionExecute(
         { posture },
       )
       persistedAttendance(first.effectivePolicy)
+      request.onTurn?.({ sessionId: session.id, turnId: first.id })
       // Every turn the step owns, in the order they were queued. Notes join through the operation.
       const turnIds = [first.id]
       forwarding.acceptTurn(first.id)

@@ -380,6 +380,15 @@ describe('createRoot replay identity', () => {
       { channel: 'tasks:changed', taskId: 'intended-root' },
     ])
   })
+
+  it('makes a branchless task in the project folder when the seed says branch null', async () => {
+    const tasks = createTaskService(t.db)
+    const seed = { title: '#ideas', branch: null, origin: 'slack' }
+    expect(await tasks.createRoot('project-root', seed, 'folder-root')).toBe('folder-root')
+    expect(await tasks.createRoot('project-root', seed, 'folder-root')).toBe('folder-root')
+    const [row] = await t.db.select().from(schema.tasks).where(eq(schema.tasks.id, 'folder-root'))
+    expect(row).toMatchObject({ branch: null, worktreePath: null, origin: 'slack' })
+  })
 })
 
 describe('archivedBefore', () => {

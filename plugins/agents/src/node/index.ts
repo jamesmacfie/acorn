@@ -43,6 +43,7 @@ import { AGENTS_TURN_FOLLOW_UP } from '../contract/turnFollowUp.ts'
 import type { TurnFollowUps } from '../server/sessions/turnFollowUps'
 import { AGENTS_RUNTIME } from '../contract/runtime'
 import { AGENTS_DEFAULT_PROFILE } from '../contract/defaultProfile'
+import { AGENTS_REQUEST_ANSWER, type AgentRequestAnswer } from '../contract/requestAnswer'
 import { AGENTS_DRAFT_ATTACHMENTS } from '../contract/draftAttachments'
 import {
   AGENTS_ACTIVITY,
@@ -759,6 +760,22 @@ export const agentsPlugin = (dataDir: string, deps: AgentsPluginDeps): NodePlugi
         backends: () => Promise.all(managedProfiles().map(readHarnessBackend)),
       })
       ctx.capabilities.provide(AGENTS_SESSION_CONTROL, createSessionControl(runtime))
+      // A plugin answers only through the copy it binds for itself, so the session check names it. The
+      // unbound value answers nothing (contract/requestAnswer.ts).
+      ctx.audit.declare({ id: 'request-answered', label: 'A plugin answered an agent request' })
+      const requestAnswer = (caller: string): AgentRequestAnswer => ({
+        answer: async (input) =>
+          (await import('../server/sessions/requestAnswer')).createRequestAnswer(executeRuntime, caller, (entry) =>
+            ctx.audit.record('request-answered', entry),
+          )(input),
+      })
+      ctx.capabilities.provide(
+        AGENTS_REQUEST_ANSWER,
+        Object.assign(
+          { answer: async () => ({ ok: false, reason: 'not-started-by-caller' }) as const },
+          { [BIND_CAPABILITY_CALLER]: requestAnswer },
+        ),
+      )
       // Who a signed tool call came from, for another plugin's tools (`AgentToolCallerLookup`).
       toolCallers = createToolCallers(runtime.store)
       ctx.capabilities.provide(AGENTS_TOOL_CALLER, toolCallers.lookup)

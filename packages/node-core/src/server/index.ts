@@ -38,6 +38,7 @@ import { tasks } from './routes/projects/tasks'
 import { configTrust } from './routes/security/configTrust'
 import { worktree } from './routes/projects/worktree'
 import { dispatchPluginFetch } from './pluginHost/fetchRoute'
+import { GATEWAY_NAMESPACE, serveGateway } from './routes/gatewayRoutes'
 import './dataSources/coreTasks'
 import './dataSources/localGitRegistration'
 import './dataSources/coreSchedulesRegistration'
@@ -76,6 +77,10 @@ export function createApp() {
     .use('*', requestIdMiddleware)
     .use('/v1/*', authMiddleware) // resolve ctx.principal from a device bearer or the internal token
     .route('/v1', pairing.open) // GET /v1/node + POST /v1/pair, pre-auth by construction
+    // A hosted gateway's deliveries, gated by a gateway token of their own (routes/gatewayRoutes.ts). Both
+    // forms, so no path under the prefix falls through to the routes below.
+    .all(`${GATEWAY_NAMESPACE}/:plugin`, serveGateway)
+    .all(`${GATEWAY_NAMESPACE}/:plugin/*`, serveGateway)
     .use('/v1/*', requireUser) // single 401 gate over the protected router table
     .use('/v1/*', phoneRules) // a phone's device is held to the routes it has a screen for
     // Below the gate: replay is keyed on the caller's deviceId, which only exists once the

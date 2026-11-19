@@ -68,6 +68,14 @@ with the impostor and sends it their work. Four things bound that:
 Signing out deletes the connection on that Node and turns remote access off first. It doesn't revoke
 a device token, because device tokens don't depend on the account.
 
+**A Node that linked Slack takes prompts from the service.** The Slack gateway delivers through the
+relay with a gateway token, which opens one route, the Slack plugin's ([gateway routes](../authentication/gateway-routes.md)).
+So a breach of the service could send a linked Node's agent a prompt as its owner, which spends the
+owner's usage and runs gated. On a Node whose owner turned on **Answer approvals from Slack**, it could
+approve what that agent asks to run, too. Both need the owner to have linked Slack, the box is unticked
+by default with this risk beside it, and the Node checks every sender against its own record of the
+owner ([Slack](../integrations/slack.md#linking)).
+
 ## Node providers
 
 A plugin-contributed node provider vouches for a Node's fingerprint. The desktop host probes that

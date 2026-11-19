@@ -113,12 +113,40 @@ The plugin's `signal` crosses too: aborting it cancels the turn, and the result 
 `cancelled`. `reload.test.ts` checks the binding, a streamed event, and the abort across a real
 loaded worker.
 
+`onTurn` is called once the first turn is queued, with its session and turn IDs. The result names
+neither until every turn the step owns has settled, so a caller that follows the turn through the
+agents events, as the Slack plugin does, learns them here.
+
+A compiled plugin that wants the loaded copy's rules binds it for itself, by calling the function under
+`BIND_CAPABILITY_CALLER` with its own ID. The Slack plugin does, so its turns run gated, refuse an
+unguarded harness mode, and show "by slack" ([Slack](../integrations/slack.md#turns)).
+
 To let the person pick a harness, read `agents.profiles`. Its `list()` returns the ID and label of
 each profile that has a managed driver, the profiles `agents.sessionExecute` can run on. Its
 `backends()` returns the same profiles as `harness:<profileId>` model backends with each one's models,
 for a tree that draws `ModelBackendPicker`. Pass the picked model as `configOptions.model`. Reading a
 live model list can start the CLI, so call `backends()` when the picker opens. Its trust line is "See
 which agent harnesses can run its turns".
+
+## Answering a request from a plugin
+
+`agents.requestAnswer` allows or denies one permission request, once, for a compiled plugin that carries
+approvals somewhere a person reads them. The contract is `plugins/agents/src/contract/requestAnswer.ts`.
+The unbound value answers nothing: a plugin binds its own copy with `BIND_CAPABILITY_CALLER`, so the
+session check names it. Loaded plugins have no grant for it.
+
+`answer({ taskId, sessionId, requestId, decision, idempotencyKey })` takes the provider's request ID
+and `allow` or `deny`. It answers with the request's `allow_once` or `reject_once` option through the
+same `resolveRequest` the client's route calls, and writes a `request-answered` audit row naming the
+plugin. It answers `{ ok: false, reason }` without acting when:
+
+- `not-in-task`: the session isn't in the task.
+- `not-started-by-caller`: the calling plugin didn't start the session.
+- `not-pending`: the request isn't pending.
+- `no-once-option`: the request isn't a permission request, or offers no once-only option.
+
+The same idempotency key answers once. The Slack plugin's **Approve** and **Deny** buttons are the
+consumer ([Slack](../integrations/slack.md#approvals)).
 
 ## Tool callers
 

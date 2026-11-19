@@ -82,7 +82,7 @@ Check each row before the phase named in its last column.
 
 Setting up a test app and workspace confirmed these:
 
-- Slack accepted [the manifest](./01-gateway-contract.md#the-slack-app) as written, including the
+- Slack accepted [the manifest](../../account-api/slack-app.md#the-manifest) as written, including the
   **Messages** tab, `chat:write.customize`, and the `openid` and `profile` user scopes.
 - **Paste a manifest** creates the app and installs it in the chosen workspace in one step. It then
   shows a bot token, a user token, and an app-level token, even with Socket Mode off.
@@ -99,7 +99,7 @@ Setting up a test app and workspace confirmed these:
   `create-slack-app` skill scaffolds a Bolt starter project, which this plan doesn't use.
 
 `message.channels` sends every message in every public channel the bot was invited to, not only the
-ones meant for it. The gateway forwards a message only when a [routing rule](./01-gateway-contract.md#routing)
+ones meant for it. The gateway forwards a message only when a [routing rule](../../account-api/slack-gateway.md#routing)
 matches, and keeps nothing from the rest.
 
 ## Alternatives rejected

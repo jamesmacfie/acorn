@@ -14,6 +14,7 @@ import { gitPlugin } from '@acorn/plugin-git/node/index.ts'
 import { memoryPlugin } from '@acorn/plugin-memory/node/index.ts'
 import { notesPlugin } from '@acorn/plugin-notes/node/index.ts'
 import { previewPlugin } from '@acorn/plugin-preview/node/index.ts'
+import { slackPlugin } from '@acorn/plugin-slack/node/index.ts'
 import { terminalPlugin, type TerminalPluginDeps } from '@acorn/plugin-terminal/node/index.ts'
 import { trellisPlugin } from '@acorn/plugin-trellis/node/index.ts'
 import { workflowsPlugin, type WorkflowsPluginDeps } from '@acorn/plugin-workflows/node/index.ts'
@@ -48,6 +49,7 @@ export const nodePlugins = (dataDir: string, deps: NodePluginDeps): NodePlugin[]
   memoryPlugin(),
   notesPlugin(dataDir, deps.notes),
   previewPlugin(),
+  slackPlugin(),
   terminalPlugin(deps.terminal),
   trellisPlugin(dataDir),
   workflowsPlugin(deps.workflows),

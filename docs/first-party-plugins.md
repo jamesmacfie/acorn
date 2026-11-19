@@ -10,7 +10,7 @@ the shell's own realm, and is trusted like the rest of the app. Being in the bin
 What makes a plugin first-party is using something a loaded plugin can't be given.
 
 The compiled plugins are account, agents, browser, context, docker, editor, git, github, memory, notes,
-onboarding, preview, terminal, and workflows. agent-cost, database, http, linear, model-providers,
+onboarding, preview, slack, terminal, and workflows. agent-cost, database, http, linear, model-providers,
 review-guide ([the review guide plugin](./first-party-plugins/review-guide.md)), rollbar, and
 sentry-telemetry ship as loaded packages, and nodes-file is a loaded package that isn't bundled. All of
 them live in `plugins/` as source.
@@ -60,6 +60,7 @@ plugins.
 | **terminal** | Owns the PTY stream handlers and a WebSocket channel prefix, and carries `node-pty`. It's required, publishes capabilities four other plugins consume and `TERMINAL_RUNTIME`, whose tmux reconcile the composition root runs, handles the `core:worktree-created` hook, contributes two component slots and the `terminal:command` and `terminal:run-target` workflow step kinds, and is the most privileged plugin | A, B, D, F, G |
 | **agents** | Required. Publishes `MANAGED_AGENTS`, `AGENTS_RUNTIME`, `AGENTS_SESSION_EXECUTE`, `AGENT_USAGE`, and the harness registry, and owns the managed-agent session model that core's context assembler and the transcript both read | D, E, F |
 | **account** | Signs a person in to an account service and turns remote access on and off. It starts and stops the Node's relay tunnel through the listener's control, writes the relay and owner to `node.json`, and stores its tokens through core's connection store, none of which a loaded plugin can reach. It isn't required, and its code stays off the Node's boot path | H |
+| **slack** | Serves the `/v1/gateway/slack` route the account service's Slack gateway delivers to, creates root tasks with `createRoot`, and calls the gateway through `account.service`. None of the three is a loaded grant ([Slack](./integrations/slack.md#why)) | H |
 | **docker** | Owns a WebSocket channel prefix for container log and event streams. Its footer badge is a component contribution | A, B |
 | **memory** | Required. Publishes `KNOWLEDGE` and `MEMORY_KNOWLEDGE`, and contributes task-context sections core's assembler depends on | D, F |
 | **notes** | Required. Publishes `NOTES_STORE` and `NOTES_SEED_TASK`, consumed by two other plugins, and contributes a context section | D, F |

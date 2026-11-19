@@ -99,7 +99,7 @@ There are two node context types, declared in `packages/node-core/src/server/plu
 - `NodePluginContext` is what a plugin loaded from disk receives. It has one member per contribution
   kind the loaded tier has.
 - `CompiledNodePluginContext` adds what only a plugin compiled into this binary gets:
-  `routes.register` with a live Hono instance, `routes.loopback`, `tools`, `contextSections`, `events.channel`,
+  `routes.register` with a live Hono instance, `routes.loopback`, `routes.gateway`, `tools`, `contextSections`, `events.channel`,
   `events.streams`, and `search`, plus the compiled shapes of `core` and `schedules`.
   [Contribution kinds](../contribution-kinds.md) says why, kind by kind.
 
@@ -120,6 +120,13 @@ skips them, so a context left over from a reload keeps logging under its own nam
 throwing. A logger that throws would break the rule that telemetry never fails the work it
 describes ([telemetry](../telemetry.md)). Reading the telemetry stream is the separate `telemetry`
 core facet.
+
+## Gateway routes
+
+`ctx.routes.gateway(handler)` serves `/v1/gateway/<plugin>/*`, where a hosted gateway of the account
+service, such as the Slack gateway, delivers to the Node. Core accepts a gateway token and nothing else
+there, only through the relay, and hands the handler the request and the owner's account
+([gateway routes](../authentication/gateway-routes.md)). One per plugin, compiled plugins only.
 
 ## Loopback routes
 

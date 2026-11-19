@@ -16,11 +16,11 @@ anything deployed:
 | Stage | What runs | What it proves |
 | --- | --- | --- |
 | 1. The stand-in | `pnpm dev:account` with the fake Slack, a local relay, and a `pnpm dev:agent` Node | Phases 1 to 5 against the contract, with nothing real |
-| 2. The hosted service, locally, with the fake Slack | The hosted service on this computer in its test mode, a local relay in account mode, a `dev:agent` Node pointed at the service, and the [standalone fake Slack](./01-gateway-contract.md#the-stand-in) | The real gateway's routing, storage, delivery, and calls, plus the conformance suite |
+| 2. The hosted service, locally, with the fake Slack | The hosted service on this computer in its test mode, a local relay in account mode, a `dev:agent` Node pointed at the service, and the [standalone fake Slack](../../account-api/slack-gateway.md#test-an-implementation) | The real gateway's routing, storage, delivery, and calls, plus the conformance suite |
 | 3. The hosted service, locally, with real Slack | Stage 2 with real Slack in place of the fake one, reaching this computer through a tunnel with a fixed public address, as a separate dev Slack app installed in the test sandbox | Slack's real payloads, signatures, limits, and Block Kit rendering, before anything ships |
 | 4. Production | The released Node and the deployed hosted service, with the production app installed in the test sandbox | The release itself |
 
-The dev app in stage 3 is a second Slack app made from [the manifest](./01-gateway-contract.md#the-slack-app),
+The dev app in stage 3 is a second Slack app made from [the manifest](../../account-api/slack-app.md#the-manifest),
 with every address pointing at the tunnel. Make it in the test sandbox, so it needs no public
 distribution. Its credentials are kept apart from production's.
 
@@ -57,7 +57,7 @@ payment method to keep it. Adding one doesn't charge anything.
    - The task archived, then a reply and a fresh mention in its thread.
    - One session archived in a conversation task, which ends only its own thread.
 
-   Check every Slack call the stand-in recorded against [the conversation rules](./rules.md).
+   Check every Slack call the stand-in recorded against [the conversation rules](../../integrations/slack/conversation-rules.md).
 2. **The live run.** With the hosted gateway deployed, install the app in a test Slack workspace. Link
    two Slack users to two Nodes, and repeat step 1 from Slack on a phone and on a computer. Check
    that each person's posts read "Acorn · <name>", and that one person's reply in the other's thread

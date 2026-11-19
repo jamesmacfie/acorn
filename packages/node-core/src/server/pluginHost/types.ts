@@ -142,6 +142,9 @@ type CompiledPluginRouteRegistry = PluginRouteRegistry & {
   // plugin supplies the port. Core owns every rule that makes it safe, so a plugin can't loosen them, and a
   // loaded plugin has no such route.
   loopback(options: LoopbackRouteOptions): void
+  // The route a hosted gateway of the account service delivers to, at `/v1/gateway/<plugin>`
+  // (../routes/gatewayRoutes.ts). Core checks the gateway token and the relay, and a plugin may serve one.
+  gateway(handler: import('../routes/gatewayRoutes').GatewayHandler): void
 }
 
 type PluginToolRegistry = {

@@ -177,11 +177,11 @@ callback URL ([connecting](./github-integration.md#connecting)).
 
 ## Accounts
 
-A Node has no account and runs no account code until someone signs in. **Settings → Account** runs the
-device flow against an account service on the local Node, and the tokens are an encrypted `account`
-connection, as GitHub's is ([the account API](./account-api.md#the-sign-in-plugin)). **Remote access**
-records the account as the Node's owner in `node.json`. That isn't a grant: a device token still decides
-who may use a Node, and signing out revokes none.
+A Node runs no account code until someone signs in. **Settings → Account** runs the device flow, and the
+tokens are an encrypted `account` connection ([the account API](./account-api.md#the-sign-in-plugin)).
+**Remote access** records the account as the Node's owner in `node.json`. That isn't a grant: a device
+token still decides who may use a Node. A hosted gateway reaches a compiled plugin's
+`/v1/gateway/<plugin>` route with a gateway token alone ([gateway routes](./authentication/gateway-routes.md)).
 
 ## WebSocket authentication
 

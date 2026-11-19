@@ -1,0 +1,54 @@
+---
+title: Slack
+description: Mention @acorn in Slack, or DM it, and an agent starts work on your own Node, with its answers and approvals in the thread.
+sources:
+  - docs/integrations/slack.md
+  - docs/integrations/slack/conversation-rules.md
+  - plugins/slack/src/client/index.ts
+  - plugins/slack/src/client/SlackSettings.tsx
+  - plugins/slack/src/node/index.ts
+  - plugins/slack/src/server/inbound.ts
+  - plugins/slack/src/server/turns.ts
+  - plugins/slack/src/server/approvals.ts
+checked: 'a18d5dd02'
+---
+
+import PluginFacts from '../../../../components/PluginFacts.astro'
+
+The Slack plugin starts an agent on your Node when you mention @acorn in a Slack channel or send it a
+DM. The agent's progress, its permission requests, and its answer come back to the same thread. Your
+Node never holds a Slack token: the account service's Slack gateway makes each Slack call for it.
+
+<PluginFacts id="slack">
+  <Fragment slot="adds">**Settings** > **Connections** > **Slack**, with **Link Slack**, **Unlink**, and the **Answer approvals from Slack** switch, and a "Shared to …" note in the composer of a session Slack started.</Fragment>
+  <Fragment slot="needs">A sign-in on **Settings** > **Account**, **Remote access** on, and the Acorn app installed in your Slack workspace.</Fragment>
+  <Fragment slot="reach">The account service's Slack gateway, through your sign-in. Nothing is contacted until you link Slack.</Fragment>
+</PluginFacts>
+
+## Link Slack
+
+Open **Settings** > **Connections** > **Slack** and click **Link Slack**. Open the address it shows and
+sign in with Slack. The page finds the link once it reaches your Node. Only your own Slack user starts
+turns on your Node. Anyone else's reply in your thread reaches the agent as context with your next
+message.
+
+**Answer approvals from Slack** is off unless you tick it. With it on, a request to run a command shows
+**Approve** and **Deny** in the thread. With it off, the card links to the task in acorn instead. If the
+hosted service were broken into, whoever did it could send your agent a prompt, and with the switch on,
+approve what it runs.
+
+## Use it
+
+- **Mention @acorn** in a channel the bot is in. In a channel, each mention starts a task of its own,
+  with a branch. Reply in the thread to send the agent more.
+- **DM the bot.** Each DM starts a separate conversation in one task for the project, with no branch.
+- **`/acorn project <name>`** sets the project for the channel or DM. With none set, the bot asks you
+  to pick one.
+- **`/acorn mode tasks`** or **`/acorn mode conversation`** chooses how new threads work there.
+
+A reaction on your message shows where the turn is: 👀 received, ⏳ working, ✋ waiting for you, ✅ done,
+❌ failed. A status line in the thread names what the agent is doing, and the answer posts as a reply of
+its own. Turns you type in acorn for that session post to the thread too.
+
+Archive the task, or the session in a conversation, and the thread ends. Mention @acorn there to start
+again. If your Node is off, Slack tells you so, and nothing is kept for later.

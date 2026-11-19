@@ -186,6 +186,129 @@ export const accountMessages = {
   Error: accountErrorSchema,
 } as const
 
+// --- The Slack gateway API (docs/account-api/slack-gateway.md) ---
+// What Slack, a Node, and the account service's Slack gateway say to each other. It has a version of
+// its own in its path, and docs/schemas/slack-gateway-v1.json is generated from the schemas below. A
+// breaking change is a new `/slack/v2` and a new schema file. Requests are strict and answers are open,
+// as in the account API.
+export const SLACK_GATEWAY_API_VERSION = 1
+const PREFIX = `/slack/v${SLACK_GATEWAY_API_VERSION}`
+
+export const slackGatewayPaths = {
+  // Slack calls these, signed with the app's signing secret.
+  events: `${PREFIX}/events`,
+  interactions: `${PREFIX}/interactions`,
+  commands: `${PREFIX}/commands`,
+  oauthCallback: `${PREFIX}/oauth/callback`,
+  // A Node calls these with the account's access token.
+  links: `${PREFIX}/links`,
+  link: (teamId: string): string => `${PREFIX}/links/${encodeURIComponent(teamId)}`,
+  calls: `${PREFIX}/calls`,
+  grant: (teamId: string, channelId: string, threadTs: string): string =>
+    `${PREFIX}/grants/${[teamId, channelId, threadTs].map(encodeURIComponent).join('/')}`,
+}
+
+// Where the gateway delivers on a Node, through the relay. The last segment is the plugin the gateway
+// token's `scope` names.
+export const SLACK_GATEWAY_NODE_PATH = '/v1/gateway/slack/events'
+
+// Slack's IDs: a team `T…`, a user `U…` or `W…`, a channel `C…`, `G…`, or `D…`.
+const slackId = z.string().regex(/^[A-Z0-9]{2,40}$/)
+
+// --- Links: one Slack user in one team, linked to one account and one Node ---
+
+export const createSlackLinkRequestSchema = z.strictObject({ nodeId })
+export const createSlackLinkResponseSchema = z.object({
+  // The account website's page that runs Sign in with Slack.
+  url: z.string().url(),
+  // Epoch seconds. Ten minutes after the request.
+  expiresAt: z.number().int(),
+})
+export type CreateSlackLinkResponse = z.infer<typeof createSlackLinkResponseSchema>
+
+const slackLinkSchema = z.object({
+  teamId: slackId,
+  teamName: z.string(),
+  slackUserId: slackId,
+  slackUserName: z.string(),
+  nodeId,
+})
+export type SlackLink = z.infer<typeof slackLinkSchema>
+export const listSlackLinksResponseSchema = z.object({ links: z.array(slackLinkSchema) })
+
+// --- Calls: the Slack Web API, made with the team's bot token, held to what the Node's grants allow ---
+
+const SLACK_CALL_METHODS = [
+  'chat.postMessage',
+  'chat.update',
+  'chat.delete',
+  'chat.postEphemeral',
+  'reactions.add',
+  'reactions.remove',
+  'conversations.replies',
+  'chat.getPermalink',
+  'users.info',
+  // Not a Slack method: posts `args.body` to `args.url`, a `response_url` on hooks.slack.com.
+  'respond',
+] as const
+export type SlackCallMethod = (typeof SLACK_CALL_METHODS)[number]
+
+export const slackCallRequestSchema = z.strictObject({
+  teamId: slackId,
+  method: z.enum(SLACK_CALL_METHODS),
+  args: z.record(z.string(), z.unknown()),
+})
+export const slackCallResponseSchema = z.object({ ok: z.literal(true), result: z.record(z.string(), z.unknown()) })
+
+// --- Delivery: what the gateway posts to a Node ---
+
+export const slackDeliverySchema = z.strictObject({
+  // Slack's `event_id` for an event. For a click or a command, which have none, an ID the gateway made.
+  eventId: z.string().min(1).max(100),
+  // `grant`: the thread is this Node's. `sender`: the sender is this Node's owner.
+  routedBy: z.enum(['grant', 'sender']),
+  kind: z.enum(['event', 'interaction', 'command']),
+  // Slack's JSON, as Slack sent it: the whole event callback, with `team_id` and `event`, a click's payload, or a
+  // command's fields.
+  payload: z.record(z.string(), z.unknown()),
+})
+export type SlackDelivery = z.infer<typeof slackDeliverySchema>
+const slackDeliveryAnswerSchema = z.object({ ok: z.literal(true) })
+
+// --- Errors: the account API's shape, with its codes these routes answer and five of their own ---
+
+const SLACK_GATEWAY_ERROR_CODES = [
+  'invalid_request',
+  'invalid_token',
+  'not_found',
+  'conflict',
+  'not_installed',
+  'not_linked',
+  'not_granted',
+  'rate_limited',
+  'slack_error',
+] as const
+export const slackGatewayErrorSchema = z.object({
+  error: z.enum(SLACK_GATEWAY_ERROR_CODES),
+  // For `slack_error`, Slack's own error string.
+  message: z.string().optional(),
+  // For `rate_limited`, seconds to wait.
+  retryAfter: z.number().int().nonnegative().optional(),
+})
+export type SlackGatewayError = z.infer<typeof slackGatewayErrorSchema>
+
+export const slackGatewayMessages = {
+  CreateLinkRequest: createSlackLinkRequestSchema,
+  CreateLinkResponse: createSlackLinkResponseSchema,
+  Link: slackLinkSchema,
+  ListLinksResponse: listSlackLinksResponseSchema,
+  CallRequest: slackCallRequestSchema,
+  CallResponse: slackCallResponseSchema,
+  Delivery: slackDeliverySchema,
+  DeliveryAnswer: slackDeliveryAnswerSchema,
+  Error: slackGatewayErrorSchema,
+} as const
+
 // --- Signed tokens: what the account service signs, and what its holder presents ---
 // The format is in ./accountToken.ts. These are the claims inside.
 
@@ -203,8 +326,19 @@ export const credentialClaimsSchema = z.object({ ...claims, aud: z.literal('rela
 export const ASSERTION_LIFETIME_SECONDS = 120
 export const assertionClaimsSchema = z.object({ ...claims, aud: nodeId, exp: instant })
 
+// "A gateway of the service's own, delivering for plugin `scope`, to Node `aud` owned by account `sub`."
+// One request within 60 seconds (docs/account-api/slack-gateway.md § The gateway token).
+export const GATEWAY_TOKEN_LIFETIME_SECONDS = 60
+export const gatewayClaimsSchema = z.object({
+  ...claims,
+  aud: nodeId,
+  exp: instant,
+  scope: z.string().regex(/^[a-z][a-z0-9-]*$/),
+})
+
 export const TOKEN_TYPES = {
   ticket: 'acorn-relay-ticket+jwt',
   credential: 'acorn-relay-credential+jwt',
   assertion: 'acorn-account-assertion+jwt',
+  gateway: 'acorn-gateway+jwt',
 } as const

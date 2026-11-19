@@ -21,6 +21,7 @@ import {
   tokenRequestSchema,
   tokenResponseSchema,
   DEVICE_CODE_GRANT,
+  GATEWAY_TOKEN_LIFETIME_SECONDS,
   type Account,
   type AccountError,
   type ListNodesResponse,
@@ -29,6 +30,7 @@ import {
 } from '@acorn/protocol/account.ts'
 import { generateSigningKey, signToken, verifyToken } from '@acorn/protocol/accountToken.ts'
 import { previewDomainHost, previewNodeLabel } from '@acorn/protocol/relay.ts'
+import { startSlackGateway, type SlackGatewayStub } from './slackGatewayStub'
 
 // A small account service for the tests and `pnpm dev:agent` flows that need one
 // to exist (docs/account-api/testing.md § The stand-in). Like the control plane stub, it isn't a mock: every
@@ -61,6 +63,10 @@ export type AccountStub = {
   setPreview(preview: PreviewResponse | undefined): void
   /** The TXT records Nodes have published, by name, which is what a certificate authority would look up. */
   challenges(): ReadonlyMap<string, string>
+  /** The Slack gateway and the fake Slack in front of it (docs/account-api/slack-gateway.md § The stand-in). */
+  slack: SlackGatewayStub
+  /** An account's ID by its login, made on first use, as a sign-in would make it. */
+  accountId(login: string): string
   close(): Promise<void>
 }
 
@@ -340,6 +346,23 @@ export async function startAccountStub(options: AccountStubOptions = {}): Promis
     return c.body(null, 204)
   })
 
+  // Before the catch-all routes nothing here has, and after `baseUrl` exists to name the website's pages.
+  const slack = await startSlackGateway({
+    app,
+    baseUrl: () => baseUrl,
+    signedIn,
+    node: (nodeId) => registered.get(nodeId),
+    relayUrl: () => relayUrl,
+    ticket: ticketFor,
+    gatewayToken: (accountId, nodeId, scope) =>
+      signToken(
+        'gateway',
+        { ...claims(accountId), aud: nodeId, scope, exp: nowSeconds() + GATEWAY_TOKEN_LIFETIME_SECONDS },
+        signing,
+      ),
+    nowSeconds,
+  })
+
   function remove(nodeId: string): void {
     const node = registered.get(nodeId)
     if (!node) return
@@ -353,6 +376,7 @@ export async function startAccountStub(options: AccountStubOptions = {}): Promis
     )
   })
   baseUrl = `http://127.0.0.1:${(server.address() as AddressInfo).port}`
+  slack.setGateway(baseUrl)
 
   return {
     url: baseUrl,
@@ -384,8 +408,11 @@ export async function startAccountStub(options: AccountStubOptions = {}): Promis
     forgeTicket: ticketFor,
     setPreview: (next) => (preview = next),
     challenges: () => challenges,
+    slack,
+    accountId: (login) => accountFor(login).id,
     close: () =>
       new Promise<void>((resolve) => {
+        void slack.close()
         ;(server as unknown as Server).closeAllConnections()
         server.close(() => resolve())
       }),

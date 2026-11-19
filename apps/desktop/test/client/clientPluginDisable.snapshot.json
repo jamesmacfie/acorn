@@ -68,6 +68,7 @@
       "git",
       "git-display",
       "memory",
+      "slack",
       "terminal",
       "workflows"
     ],
@@ -123,6 +124,7 @@
       "changes.diff-fence",
       "line-blame",
       "memory.tool-card",
+      "slack.composer-note",
       "trellis.app-card",
       "workflows.tool-card"
     ],
@@ -405,6 +407,14 @@
       ],
       "persistedStateSlices": [
         "changes.view"
+      ]
+    },
+    "slack": {
+      "settingsPages": [
+        "slack"
+      ],
+      "extensions": [
+        "slack.composer-note"
       ]
     },
     "onboarding": {

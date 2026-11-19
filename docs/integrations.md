@@ -58,6 +58,9 @@ with no cached fallback, even when the connection needs authentication or is off
 - [Linear](./integrations/linear.md), [Rollbar](./integrations/rollbar.md), and
   [Sentry](./integrations/sentry.md): the provider plugins.
 
+- [Slack](./integrations/slack.md): mentions and DMs that start agents on your Node, through the
+  account service's Slack gateway. It holds no connection of its own.
+
 - [Model providers](./integrations/model-providers.md): backends for Generate controls, and the
   model grant and daily allowance a loaded plugin spends when it names no backend.
 

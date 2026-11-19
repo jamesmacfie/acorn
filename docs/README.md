@@ -51,7 +51,10 @@ the whole plugin system in one page.
 | [account-api/browsers.md](./account-api/browsers.md) | How a browser served by the account website calls the API: the session cookie, its header, and sign-in. |
 | [account-api/previews.md](./account-api/previews.md) | The two routes a Node calls to serve previews under a preview domain: the domain, and the DNS challenge. |
 | [account-api/testing.md](./account-api/testing.md) | The stand-in account service and the conformance suite that holds every implementation to the schemas. |
+| [account-api/slack-gateway.md](./account-api/slack-gateway.md) | The Slack gateway API: Slack's events in, routing to a Node through the relay, the gateway token, Slack calls out, and its stand-in. |
+| [account-api/slack-app.md](./account-api/slack-app.md) | The shared Slack app's manifest and setup, the Slack facts the gateway relies on, and a test workspace. |
 | [authentication.md](./authentication.md) | Device pairing, tokens, principals, and the internal-call scopes. |
+| [authentication/gateway-routes.md](./authentication/gateway-routes.md) | `/v1/gateway/<plugin>`: the one door a hosted gateway has into a Node, and the gateway token that opens it. |
 | [security.md](./security.md) | The trust boundaries, what is out of scope, and which page owns each control. |
 | [security/security-diagnostics.md](./security/security-diagnostics.md) | Passive, device-only Node security evidence, scope, and limits. |
 | [security/instruction-review.md](./security/instruction-review.md) | Hidden-character checks, changed instruction approval, first-time setup, and blocked-turn recovery. |
@@ -380,7 +383,8 @@ Each feature landing page above has topic pages in a folder of the same name:
   sources](./integrations/project-sources.md), [Provider
   boundaries](./integrations/provider-boundaries.md), [Rollbar](./integrations/rollbar.md),
   [Sentry](./integrations/sentry.md) ([The acorn team's
-  DSN](./integrations/sentry/the-acorn-teams-dsn.md)), [Connection settings](./integrations/settings.md).
+  DSN](./integrations/sentry/the-acorn-teams-dsn.md)), [Connection settings](./integrations/settings.md),
+  [Slack](./integrations/slack.md) ([Conversation rules](./integrations/slack/conversation-rules.md)).
 - [data-sources.md](./data-sources.md): [Data source authoring
   controls](./data-sources/authoring-controls.md), [Source catalog](./data-sources/catalog.md), [Derived
   sources](./data-sources/derived-sources.md), [Provider data
@@ -510,12 +514,8 @@ Each plugin landing page above has topic pages in a folder of the same name:
 
 ## Slack plugin proposal
 
-- [Slack for Acorn agents](./future/slack/README.md), with [research](./future/slack/research.md),
-  [the conversation rules](./future/slack/rules.md), and phases for [the gateway
-  contract](./future/slack/01-gateway-contract.md), [delivery to the
-  Node](./future/slack/02-node-delivery.md), [linking and projects](./future/slack/03-link-and-projects.md),
-  [threads to tasks](./future/slack/04-threads-to-tasks.md), [approvals in
-  Slack](./future/slack/05-approvals.md), and [acceptance](./future/slack/06-acceptance.md).
+- [Slack for Acorn agents](./future/slack/README.md), with [research](./future/slack/research.md) and
+  [acceptance](./future/slack/06-acceptance.md).
 
 ## Review guide v2
 

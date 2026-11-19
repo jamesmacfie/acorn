@@ -87,6 +87,9 @@ export type AgentSessionExecuteRequest = {
   /** Each change to the completion condition's state, for a live view of the step. */
   onGoal?: (summary: AgentExecuteGoalSummary) => void
   onEvent?: (event: StreamEvent) => void
+  /** Once the first turn is queued, its session and turn. The result names neither until every turn the
+   *  step owns has settled, which can be hours, so a caller that tracks the turn learns it here. */
+  onTurn?: (turn: { sessionId: string; turnId: string }) => void
   signal?: AbortSignal
 }
 

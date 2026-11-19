@@ -9,6 +9,7 @@ import { gitlabClientPlugin } from '@acorn/plugin-gitlab/client/index.ts'
 import { gitClientPlugin } from '@acorn/plugin-git/client/index.ts'
 import { memoryClientPlugin } from '@acorn/plugin-memory/client/index.ts'
 import { notesClientPlugin } from '@acorn/plugin-notes/client/index.ts'
+import { slackClientPlugin } from '@acorn/plugin-slack/client/index.ts'
 import { onboardingClientPlugin } from '@acorn/plugin-onboarding/client/index.ts'
 import { previewClientPlugin } from '@acorn/plugin-preview/client/index.ts'
 import { terminalClientPlugin } from '@acorn/plugin-terminal/client/index.ts'
@@ -47,6 +48,7 @@ export function installRoster(): void {
     gitClientPlugin,
     memoryClientPlugin,
     notesClientPlugin,
+    slackClientPlugin,
     onboardingClientPlugin,
     previewClientPlugin,
     terminalClientPlugin,
