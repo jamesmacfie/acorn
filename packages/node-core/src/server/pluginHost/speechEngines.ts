@@ -17,11 +17,19 @@ export function declareSpeechEngines(pluginId: string, engines: readonly PluginS
   }
 }
 
-/** The engine the composer uses: the first one by plugin ID, then by declaration order.
- *  shortcut: no picker yet, so a second engine plugin is never used; add one to agent settings if
- *  anyone installs two. */
-export function activeSpeechEngine(): SpeechEngine | undefined {
-  const pluginId = [...declared.keys()].sort()[0]
-  const engine = pluginId === undefined ? undefined : declared.get(pluginId)![0]
-  return engine && { ...engine, pluginId: pluginId! }
+/** The engine the composer uses: the first one the only engine plugin declares. Two plugins with
+ *  engines is a clash, and neither gets audio, so a newly installed plugin can't take dictation
+ *  from the one the person set up.
+ *  shortcut: no picker; add one to agent settings if two engines ever need to coexist. */
+export function activeSpeechEngine():
+  | { kind: 'none' }
+  | { kind: 'one'; engine: SpeechEngine }
+  | { kind: 'clash'; first: SpeechEngine; pluginIds: string[] } {
+  const pluginIds = [...declared.keys()].sort()
+  if (!pluginIds.length) return { kind: 'none' }
+  const first = { ...declared.get(pluginIds[0]!)![0]!, pluginId: pluginIds[0]! }
+  return pluginIds.length === 1 ? { kind: 'one', engine: first } : { kind: 'clash', first, pluginIds }
 }
+
+export const speechEngineClash = (pluginIds: readonly string[]) =>
+  `More than one plugin offers a speech engine (${pluginIds.join(', ')}), so dictation is off. Turn all but one off in Settings, under Plugins.`

@@ -9,7 +9,7 @@ import {
 import type { AppEnv } from '../middleware/auth'
 import { respondError } from '../respond'
 import { dispatchPluginRoute } from '../pluginHost/dispatch'
-import { activeSpeechEngine } from '../pluginHost/speechEngines'
+import { activeSpeechEngine, speechEngineClash } from '../pluginHost/speechEngines'
 
 // Dictation in the agent composer (docs/agent-tools/speech-engines.md). The device records, and these
 // handlers give the audio to the active engine plugin. server/index.ts loads them on first use. Neither the audio nor the text is logged, audited,
@@ -43,14 +43,19 @@ async function engineMessage(response: Response): Promise<string | undefined> {
 }
 
 export async function readSpeechStatus(c: Context<AppEnv>): Promise<Response> {
-  const engine = activeSpeechEngine()
-  if (!engine) return c.json({ engine: null } satisfies SpeechStatusResponse)
+  const choice = activeSpeechEngine()
+  if (choice.kind === 'none') return c.json({ engine: null } satisfies SpeechStatusResponse)
+  const engine = choice.kind === 'one' ? choice.engine : choice.first
   const named = {
     pluginId: engine.pluginId,
     id: engine.id,
     label: engine.label,
     ...(engine.settings ? { settings: engine.settings } : {}),
   }
+  if (choice.kind === 'clash')
+    return c.json({
+      engine: { ...named, state: 'failed', detail: speechEngineClash(choice.pluginIds) },
+    } satisfies SpeechStatusResponse)
   try {
     const response = await dispatchPluginRoute(
       c.env,
@@ -72,8 +77,10 @@ export async function readSpeechStatus(c: Context<AppEnv>): Promise<Response> {
 }
 
 export async function transcribeSpeech(c: Context<AppEnv>): Promise<Response> {
-  const engine = activeSpeechEngine()
-  if (!engine) return respondError(c, 404, 'not_found', ['No speech engine is installed on this Node.'])
+  const choice = activeSpeechEngine()
+  if (choice.kind === 'none') return respondError(c, 404, 'not_found', ['No speech engine is installed on this Node.'])
+  if (choice.kind === 'clash') return respondError(c, 409, 'conflict', [speechEngineClash(choice.pluginIds)])
+  const { engine } = choice
   let audio: Uint8Array<ArrayBuffer>
   try {
     const file = (await c.req.formData()).get('audio')

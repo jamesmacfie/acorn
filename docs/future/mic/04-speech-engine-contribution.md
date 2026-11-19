@@ -12,7 +12,8 @@ The contract is in [speech engines](../../agent-tools/speech-engines.md), and th
   to plugin routes for agent tools and context sections.
 - The composer posts a multipart form with an `audio` part, through the same `sendForm` an attachment
   upload uses. Core sends the engine the bare WAV.
-- No engine picker yet. The first engine by plugin ID is the active one.
+- No engine picker yet. With one engine plugin its first engine is used. With two, dictation is off
+  and says which plugins clash, rather than picking one silently.
 - The handlers load on first use, to keep the Node's startup code small.
 
 ## Answers found while building

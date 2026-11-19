@@ -66,8 +66,10 @@ Both are device-only, so a task token is refused.
   answers `{ "text" }`. A recording over 10 MiB, about 5 minutes, gets 413 before any plugin sees it.
   A missing engine gets 404, a slow one 504, and an engine error 502 with the engine's message.
 
-The active engine is the first by plugin ID, then by declaration order. There's no picker yet, so a
-second engine plugin is never used. Disabling the plugin removes its engine at the next status read.
+The active engine is the first one the only engine plugin declares. When two or more plugins offer
+an engine, neither gets audio: status answers `failed` naming them, and `transcribe` answers 409. That
+way a newly installed plugin can't take dictation from the one the person set up. There's no picker
+yet. Disabling the plugin removes its engine at the next status read.
 
 ## Privacy
 

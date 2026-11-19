@@ -95,6 +95,22 @@ describe('speech routes', () => {
     expect(((await response.json()) as { error: { message: string } }).error.message).toBe('Download a model first.')
   })
 
+  it('sends audio to no engine when two plugins offer one', async () => {
+    undo = declareSpeechEngines('voice', [ENGINE])
+    const other = declareSpeechEngines('aaa', [
+      { ...ENGINE, transcribe: '/v1/p/aaa/transcribe', status: '/v1/p/aaa/status' },
+    ])
+    try {
+      const status = (await (await call('/status')).json()) as { engine: { state: string; detail: string } }
+      expect(status.engine.state).toBe('failed')
+      expect(status.engine.detail).toContain('aaa, voice')
+      expect((await call('/transcribe', recording(100))).status).toBe(409)
+      expect(dispatch).not.toHaveBeenCalled()
+    } finally {
+      other()
+    }
+  })
+
   it('refuses an agent', async () => {
     undo = declareSpeechEngines('voice', [ENGINE])
     expect((await call('/transcribe', recording(100), AGENT)).status).toBe(403)
