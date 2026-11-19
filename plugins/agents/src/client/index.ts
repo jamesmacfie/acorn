@@ -236,13 +236,11 @@ export const agentsClientPlugin: ClientPlugin = {
         void markAgentsRead()
       },
     })
-    // The same, for one task, on the Agents icon in the task's right rail.
     ctx.contextMenus.register({
       id: 'agents.task.mark-read',
       location: 'rail.pane',
       surface: AGENT_PANE_ID,
       label: 'Mark all as read',
-      icon: 'check',
       order: 110,
       when: (target) => target.location === 'rail.pane' && clearableAgents(target.taskId).length > 0,
       run: (target) => {
