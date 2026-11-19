@@ -722,6 +722,28 @@ describe('approvals', () => {
     expect(h.answers).toEqual([])
   })
 
+  it('marks the card expired when the request expires, and answers a later click the same way', async () => {
+    const h = await harness({ approvals: true })
+    await withProject(h)
+    await h.mention('test it')
+    await pending(h)
+    h.requests[0]!.status = 'expired'
+    await h.rt.serial(() =>
+      h.approvals.requestChanged({
+        taskId: '',
+        sessionId: 'session-1',
+        requestId: 'req-1',
+        kind: 'permission',
+        status: 'expired',
+      }),
+    )
+    expect(h.calls.at(-1)).toMatchObject({ method: 'chat.update', args: { text: 'Expired.', blocks: [] } })
+    expect(h.reactions().at(-1)).toBe(`+${REACTIONS.running}`)
+    await h.click({ action_id: 'acorn_approve', value: 'session-1|req-1' })
+    expect(h.calls.at(-1)).toMatchObject({ method: 'respond', args: { body: { text: 'Expired.' } } })
+    expect(h.answers).toEqual([])
+  })
+
   it('asks the owner to answer any other kind of request in Acorn', async () => {
     const h = await harness()
     await withProject(h)
