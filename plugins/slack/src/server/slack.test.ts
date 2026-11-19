@@ -629,6 +629,22 @@ describe('/acorn and the project picker', () => {
       body: { text: 'This expired. Mention @acorn again.' },
     })
   })
+
+  it('keeps two messages waiting in one channel apart, each started by its own pick', async () => {
+    const h = await harness()
+    await h.mention('first')
+    await h.mention('second')
+    const pickers = h.calls
+      .filter((call) => call.method === 'chat.postEphemeral')
+      .map((call) => (call.args.blocks as { accessory: { options: { value: string }[] } }[])[0]!.accessory.options)
+    expect(pickers).toHaveLength(2)
+    await h.click({ action_id: 'acorn_project_pick', selected_option: { value: pickers[1]![0]!.value } })
+    await h.click({ action_id: 'acorn_project_pick', selected_option: { value: pickers[0]![2]!.value } })
+    expect(h.created.map((task) => [task.projectId, (task.seed as { title: string }).title])).toEqual([
+      [PROJECTS[0]!.id, 'second'],
+      [PROJECTS[2]!.id, 'first'],
+    ])
+  })
 })
 
 describe('approvals', () => {
