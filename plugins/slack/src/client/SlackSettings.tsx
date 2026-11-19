@@ -19,6 +19,9 @@ export default function SlackSettings() {
   const state = createQuery(() => ({
     queryKey: key,
     queryFn: () => fetchSlackState(),
+    // Sign-in and Remote access change on Settings → Account, and nothing tells this query, so it reads
+    // again each time the page opens.
+    staleTime: 0,
     // Linking finishes in the browser. Look again until the link reaches this Node.
     refetchInterval: (query) =>
       pending() && !query.state.data?.links.some((link) => link.here) ? POLL_WHILE_LINKING_MS : false,
