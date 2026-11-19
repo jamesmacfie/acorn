@@ -1,5 +1,6 @@
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 import { startAccountStub, type AccountStub } from '@acorn/node-core/testkit'
+import { slackGatewayPaths } from '@acorn/protocol/account.ts'
 import { accountAuth } from './auth'
 import { nodeHarness, waitFor, type RunningNode } from './testkit/nodes'
 import { startRelay, type Relay } from './relay'
@@ -32,6 +33,7 @@ const slack = (node: RunningNode, method: string, path: string, body?: unknown) 
 
 describe('Slack through the relay', () => {
   let node: RunningNode
+  let heldThread: string
 
   it('makes no request to the gateway and acts on nothing before a link', async () => {
     node = await startNode()
@@ -57,6 +59,7 @@ describe('Slack through the relay', () => {
     const before = account.slack.calls().length
     const sent = await account.slack.mention({ teamId: TEAM, channel: 'C0GENERAL', user: 'U0OWNER', text: 'hello' })
     expect(sent.status).toBe(200)
+    heldThread = sent.ts!
     expect(account.slack.grants()).toEqual([
       expect.objectContaining({
         teamId: TEAM,
@@ -81,6 +84,55 @@ describe('Slack through the relay', () => {
       user: 'U0OWNER',
       text: 'This Node has no projects with a folder. Add one in Acorn first.',
     })
+  }, 60_000)
+
+  it("keeps the Node's calls to the threads it holds, routes the thread by its grant, and gives it up", async () => {
+    const { accessToken } = await account.signIn('test-account')
+    const gateway = async (method: string, path: string, body?: unknown) => {
+      const response = await fetch(`${account.url}${path}`, {
+        method,
+        headers: { authorization: `Bearer ${accessToken}`, 'content-type': 'application/json' },
+        ...(body === undefined ? {} : { body: JSON.stringify(body) }),
+      })
+      const text = await response.text()
+      return { status: response.status, json: (text ? JSON.parse(text) : undefined) as Record<string, any> }
+    }
+    const slackCall = (method: string, args: object) =>
+      gateway('POST', slackGatewayPaths.calls, { teamId: TEAM, method, args })
+    const channel = 'C0GENERAL'
+
+    const posted = await slackCall('chat.postMessage', { channel, thread_ts: heldThread, text: 'working' })
+    expect(posted.status).toBe(200)
+    expect(account.slack.calls().at(-1)!.args).toMatchObject({ username: 'Acorn · owner' })
+    const botTs = posted.json.result.ts as string
+    expect((await slackCall('chat.update', { channel, ts: botTs, text: 'done' })).status).toBe(200)
+    expect((await slackCall('conversations.replies', { channel, ts: heldThread })).status).toBe(200)
+    expect((await slackCall('chat.getPermalink', { channel, message_ts: botTs })).status).toBe(200)
+    for (const [method, args] of [
+      ['chat.postMessage', { channel, thread_ts: heldThread, text: 'to everyone', reply_broadcast: true }],
+      ['chat.update', { channel, ts: heldThread, text: "the owner's own message" }],
+      ['conversations.replies', { channel, ts: '9.000001' }],
+      ['reactions.add', { channel, timestamp: '9.000001', name: 'eyes' }],
+    ] as const)
+      expect((await slackCall(method, args)).json.error, method).toBe('not_granted')
+
+    // A mention in a held thread goes to that Node, so a stranger gets no note to connect.
+    const before = account.slack.calls().length
+    account.slack.addUser(TEAM, { id: 'U0STRANGER', name: 'stranger' })
+    await account.slack.mention({ teamId: TEAM, channel, user: 'U0STRANGER', text: 'me too', threadTs: heldThread })
+    expect(
+      account.slack
+        .calls()
+        .slice(before)
+        .filter((call) => String(call.args.text).includes('/slack/connect')),
+    ).toEqual([])
+
+    const grant = slackGatewayPaths.grant(TEAM, channel, heldThread)
+    expect((await gateway('DELETE', grant)).status).toBe(204)
+    expect((await slackCall('chat.postMessage', { channel, thread_ts: heldThread, text: 'late' })).json.error).toBe(
+      'not_granted',
+    )
+    expect((await gateway('DELETE', grant)).json.error).toBe('not_found')
   }, 60_000)
 
   it("answers a non-owner's /acorn with a note, and leaves the owner's settings alone", async () => {

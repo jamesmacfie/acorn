@@ -80,7 +80,7 @@ Settled November 19, 2026, from the code unless marked:
 
 | Phase | Date | Result |
 | --- | --- | --- |
-| 1 | November 19, 2026 | `slackGatewayContract.test.ts` against the stand-in passes, including an unlinked user's mention: one ephemeral note, no delivery, no grant. |
+| 1 | November 19, 2026 | `slackGatewayContract.test.ts` against the stand-in passes, including an unlinked user's mention: one ephemeral note, no delivery, no grant. Rechecked against the phase doc the same day: the relay test gained the calls table against a real grant, a grant beating the connect note, and giving a thread up. |
 | 2 | November 19, 2026 | `apps/relay/src/slackGateway.test.ts` sends a stand-in delivery through a real relay to a real Node, and `gatewayRoute.test.ts` refuses a replayed token. Not run by hand in `pnpm dev:agent`: the test runs the same steps. |
 | 3 | November 19, 2026 | The relay test links from **Settings → Slack** and checks a non-owner's `/acorn`. The plugin tests cover `/acorn project`, `/acorn mode`, and the picker. **Settings → Slack** wasn't opened in `pnpm dev:agent`; left for acceptance step 1. |
 | 4 | November 19, 2026 | `plugins/slack/src/server/slack.test.ts` covers both modes, guests, reactions, the status line, answers, mirroring, archives, and a restart, with the agents plugin faked at its contract. No real agent turn ran from Slack; left for acceptance step 1. |
