@@ -123,7 +123,7 @@ const modes = {
     codeHostLabel: 'sync',
   },
 } as const satisfies {
-  [K in Exclude<keyof NodePluginContext, 'name' | 'core'>]: Methods<NodePluginContext[K]>
+  [K in Exclude<keyof NodePluginContext, 'name' | 'core' | 'dataFolder'>]: Methods<NodePluginContext[K]>
 } & { core: { [K in keyof CoreServices]: Methods<NonNullable<CoreServices[K]>> } }
 
 export function hostFunctionMode(path: string): Mode {

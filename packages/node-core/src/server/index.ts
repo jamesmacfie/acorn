@@ -61,6 +61,15 @@ export function createApp() {
     .put('/', async (c) => (await import('./routes/security/secretPublication')).writeSecretPublication(c))
     .post('/allow', async (c) => (await import('./routes/security/secretPublication')).allowSecretPublicationOnce(c))
 
+  // Dictation (docs/agent-tools/speech-engines.md), loaded on first use, the upload cap included.
+  const speech = new Hono<AppEnv>()
+    .get('/status', async (c) => (await import('./routes/speech')).readSpeechStatus(c))
+    .post(
+      '/transcribe',
+      async (c, next) => (await import('./routes/speech')).limitSpeechUpload(c, next),
+      async (c) => (await import('./routes/speech')).transcribeSpeech(c),
+    )
+
   const app = new Hono<AppEnv>()
     // First, unconditionally. Every response carries a request id, so a user-reported failure is
     // findable in the log.
@@ -174,6 +183,8 @@ export function createApp() {
     // extension's device reads it.
     .use(`${CORE_NAMESPACE}/browser-handoffs`, requireDevice)
     .use(`${CORE_NAMESPACE}/browser-handoffs/*`, requireDevice)
+    // Dictation. A person records on a device; an agent has no microphone and no business posting audio.
+    .use(`${CORE_NAMESPACE}/speech/*`, requireDevice)
     .route(CORE_NAMESPACE, pairing.core) // /pair, /pair/start, /devices: owner-only device administration
     .route(`${CORE_NAMESPACE}/node`, nodeStop) // /stop: drain and exit, from this computer only (docs/cli/local-service.md)
     .route(`${CORE_NAMESPACE}/node`, nodeReach) // /reach: the hosts this Node answers on (docs/node-distribution.md)
@@ -192,6 +203,7 @@ export function createApp() {
     .route(`${CORE_NAMESPACE}/data-sources`, dataSources)
     .route(`${CORE_NAMESPACE}/queries`, queries)
     .route(`${CORE_NAMESPACE}/browser-handoffs`, browserHandoffsRoute) // the browser extension's site buttons (docs/plugin-authoring/browser-handoffs.md)
+    .route(`${CORE_NAMESPACE}/speech`, speech) // dictation for the agent composer (docs/agent-tools/speech-engines.md)
     .route(`${CORE_NAMESPACE}/runs`, runs) // Settings → Run history: every plugin's runs, merged (@acorn/protocol/runs.ts)
     .route(`${CORE_NAMESPACE}/search`, search) // core and plugin search providers, grouped (docs/plugins/search-providers.md § Search providers)
     .route(`${CORE_NAMESPACE}/backup`, backup) // docs/data-layer/backup-and-retention.md § Backup and import: core + plugin databases, minus credentials

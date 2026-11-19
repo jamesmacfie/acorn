@@ -43,6 +43,7 @@ for pixels.
 | `skills` | 16 | A named procedure every managed session can load ([skills](../managed-agents/skills.md)) |
 | `agentTools` | 16 | A task-scoped agent tool with a bounded JSON Schema and a handler in your namespace, named `<pluginId>_<id>` at runtime ([loaded tools](../agent-tools/loaded-tools.md#loaded-manifest-carriers)) |
 | `contextSections` | 8 | Bounded reference data for the task prompt: `{ id, label, order, read, maxBytes, maxTokens, scope?, defaultIncluded?, timeoutMs? }` |
+| `speechEngines` | 2 | Turns dictation in the agent composer into text: `{ id, label, transcribe, status, settings? }` ([speech engines](../agent-tools/speech-engines.md)) |
 | `cliCommands` | 16 | Typed headless commands under `acorn plugin <id> <name>` ([CLI command authoring](./cli-commands.md)) |
 
 ## Frame keys

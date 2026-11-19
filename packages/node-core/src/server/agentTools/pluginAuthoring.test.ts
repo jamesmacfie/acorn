@@ -250,6 +250,7 @@ describe('the permission facets are the ones scopeCore honours', () => {
       'exec',
       'net',
       'sockets',
+      'dataFolder',
       'env',
       'files',
     ])

@@ -499,6 +499,9 @@ export type NodePluginContext = {
   // Present for a loaded plugin, and for a built-in that declared `migrationsModule`. A plugin that owns
   // no tables never receives this projection, so reaching for it is an immediate "not a function".
   storage: PluginStorage
+  /** The folder only this plugin may read and write, when its manifest sets
+   *  `permissions.node.dataFolder`. Absent otherwise. Uninstalling the plugin deletes it. */
+  dataFolder?: string
   // Path confinement, git, the process broker and use-scoped secrets (server/core/). A plugin consumes
   // core capability through this rather than deep-importing whichever core module has the helper.
   core: CoreServices

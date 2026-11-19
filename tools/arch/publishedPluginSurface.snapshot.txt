@@ -905,6 +905,7 @@ acorn-plugin-types: member NodePluginContext.capabilities
 acorn-plugin-types: member NodePluginContext.codeHosts
 acorn-plugin-types: member NodePluginContext.codeHosts.claim
 acorn-plugin-types: member NodePluginContext.core
+acorn-plugin-types: member NodePluginContext.dataFolder
 acorn-plugin-types: member NodePluginContext.dataSources
 acorn-plugin-types: member NodePluginContext.dataSources.append
 acorn-plugin-types: member NodePluginContext.dataSources.changed

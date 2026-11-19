@@ -48,6 +48,12 @@ process, and network access are also absent unless declared.
   `{ "env": "MY_PLUGIN_FILE", "access": "read" | "read-write" }`. The value must be absolute and outside
   acorn's data root. A read-write grant includes one fixed `.acorn-tmp` file beside it, so you can
   replace the file atomically.
+- `dataFolder` is a Boolean. When it's true, the host creates `<data root>/plugin-data/<id>/` with mode
+  `0700` before the worker starts, grants the worker read and write access to it, and passes its path
+  as `ctx.dataFolder`. Use it for downloads and caches, such as a speech model. Disabling the plugin
+  keeps the folder. Uninstalling deletes it, so keep anything the person can't get back in your
+  database. Backups copy only databases, so they skip it. The trust prompt reads "Store files in its
+  own folder on this Node", marked low risk.
 
 `agent-tool-provenance` lets your plugin verify the proof an agent tool call carries, that it came
 from a given task and session.

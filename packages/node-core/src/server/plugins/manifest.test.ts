@@ -310,6 +310,33 @@ describe('runtime contribution descriptors', () => {
   })
 })
 
+describe('speech engines', () => {
+  const engine = (over: Record<string, unknown> = {}) => ({
+    id: 'local',
+    label: 'On-device speech',
+    transcribe: '/v1/p/board/transcribe',
+    status: '/v1/p/board/status',
+    ...over,
+  })
+  const settings = { target: 'settings', id: 'voice', label: 'Voice', layout: 'single', regions: { body: 'frame' } }
+
+  it('accepts an engine whose routes and settings page are its own', () => {
+    expect(messages(nodeManifest({ speechEngines: [engine({ settings: 'voice' })], frames: [settings] }))).toEqual([])
+  })
+
+  it('refuses a route outside the namespace, a settings page it lacks, and a missing node half', () => {
+    expect(messages(nodeManifest({ speechEngines: [engine({ transcribe: '/v1/core/speech/transcribe' })] }))).toEqual([
+      'route must be inside /v1/p/board/',
+    ])
+    expect(messages(nodeManifest({ speechEngines: [engine({ settings: 'voice' })] }))).toEqual([
+      "settings names 'voice', which this manifest does not declare as a settings surface",
+    ])
+    expect(messages(manifest({ speechEngines: [engine()] }))).toContain(
+      'a speech engine calls node routes; declare `node` in the manifest',
+    )
+  })
+})
+
 describe('permission identifier shape', () => {
   it('bounds scope and event strings before they can reach the trust layout', () => {
     expect(permissionManifest({ api: ['x'.repeat(65)] }).success).toBe(false)

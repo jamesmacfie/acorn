@@ -132,6 +132,12 @@ pub fn run() {
         .plugin(tauri_plugin_notification::init())
         // A LaunchAgent on macOS rather than a login item, because only a LaunchAgent passes arguments.
         .plugin(tauri_plugin_autostart::init(tauri_plugin_autostart::MacosLauncher::LaunchAgent, Some(vec![tray::HIDDEN_ARG])))
+        // Every webview asks here, child browser webviews included. With no handler, wry grants the
+        // mic and camera to any page that asks. See docs/shell/origins.md, "Microphone".
+        .on_permission_request(|webview, kind| {
+            let renderer = webview.label() == "main" && webview.url().is_ok_and(|url| is_renderer_url(&url));
+            media_permission(renderer, kind)
+        })
         // Asynchronous, because the synchronous form runs the whole response on the thread that
         // delivered the request — the same thread the webview draws on — and a cold window asks for
         // more than a hundred module scripts. Each would be a blocking `fs::read` in front of the next
@@ -573,6 +579,17 @@ fn open_reset_window(app: &tauri::AppHandle, fixture: bool) -> tauri::Result<()>
     Ok(())
 }
 
+/// Only the app's own renderer may use the mic, for dictation. The handler can't see which frame
+/// asked, so a plugin frame is kept out by having no `allow="microphone"` (PluginFrame.tsx).
+fn media_permission(renderer: bool, kind: tauri::webview::PermissionKind) -> tauri::webview::PermissionResponse {
+    use tauri::webview::{PermissionKind, PermissionResponse};
+    match kind {
+        PermissionKind::Microphone if renderer => PermissionResponse::Allow,
+        PermissionKind::Microphone | PermissionKind::Camera | PermissionKind::DisplayCapture => PermissionResponse::Deny,
+        _ => PermissionResponse::Default,
+    }
+}
+
 fn is_renderer_url(url: &tauri::Url) -> bool {
     is_renderer_url_for(url, MAPPED_SCHEMES)
 }
@@ -673,6 +690,17 @@ mod tests {
             assert!(is_renderer_url_for(&loaded.parse().unwrap(), mapped), "{loaded}");
         }
         assert_eq!(APP_ORIGIN, app_scheme::app_origin(MAPPED_SCHEMES));
+    }
+
+    #[test]
+    fn only_the_renderer_gets_the_mic_and_nothing_gets_the_camera() {
+        use tauri::webview::{PermissionKind, PermissionResponse};
+        assert!(matches!(media_permission(true, PermissionKind::Microphone), PermissionResponse::Allow));
+        for renderer in [true, false] {
+            assert!(matches!(media_permission(renderer, PermissionKind::Camera), PermissionResponse::Deny));
+            assert!(matches!(media_permission(renderer, PermissionKind::DisplayCapture), PermissionResponse::Deny));
+        }
+        assert!(matches!(media_permission(false, PermissionKind::Microphone), PermissionResponse::Deny));
     }
 
     #[test]

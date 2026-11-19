@@ -67,6 +67,13 @@ export const nodePermissions = z.object({
     .describe(
       "Unrestricted socket access, for a protocol that can't go through `fetch`. It's a broad grant, so ask for `net` instead whenever `fetch` will do.",
     ),
+  // A folder under the data root that only this plugin may read and write (docs/plugin-authoring/permissions.md).
+  dataFolder: z
+    .boolean()
+    .optional()
+    .describe(
+      'Gives your Node half one folder of its own on the Node, at `ctx.dataFolder`, for downloads and caches. Uninstalling the plugin deletes it.',
+    ),
   // Explicit parent-environment values the worker may inherit. The default worker environment is the
   // process broker's credential-free base allowlist.
   env: z

@@ -21,6 +21,9 @@ Renderer       app://acorn, reaches the helper over one authenticated loopback W
 The renderer never holds a Node token. Every byte to or from a Node goes through the helper's broker,
 which pins certificates and adds the bearer.
 
+The renderer is also the only page that may use the microphone. No plugin frame and no child webview
+gets it ([origins](./shell/origins.md#microphone)).
+
 ## Pages
 
 [The shell process](./shell/process.md) covers startup, the Rust modules, the helper and its

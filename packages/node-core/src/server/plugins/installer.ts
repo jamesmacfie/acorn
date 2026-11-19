@@ -44,7 +44,7 @@ import {
   speaksApiVersion,
   type PluginManifest,
 } from './manifest'
-import { pluginDbPath, PLUGIN_DB_DIR } from './storage'
+import { pluginDataFolder, pluginDbPath, PLUGIN_DB_DIR } from './storage'
 import { markPluginRemoved, markPluginUserManaged } from './bundledState'
 import { hasPendingPluginReview, pluginReviewFingerprint, removePluginReview, stagePluginReview } from './pendingReview'
 
@@ -489,6 +489,8 @@ export function uninstallPlugin(
   rmSync(lockfilePath(dataRoot, id), { force: true })
   removePluginReview(dataRoot, id)
 
+  // Downloads and caches the plugin can fetch again, which can run to hundreds of megabytes.
+  rmSync(pluginDataFolder(dataRoot, id), { recursive: true, force: true })
   // Retained by default, as disabling does, so reinstalling finds its data where it left it.
   if (options.purgeData) {
     const db = pluginDbPath(dataRoot, id)

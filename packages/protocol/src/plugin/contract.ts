@@ -43,7 +43,11 @@ import {
 } from './manifest/displayDescriptors.ts'
 import { extensionDescriptor, extensionPointDescriptor } from './manifest/extensionDescriptors.ts'
 import { brandMark, entry, ID_RE, nodePermissions, pluginRoute } from './manifest/manifestFields.ts'
-import { pluginAgentToolDescriptorSchema, pluginContextSectionDescriptorSchema } from './runtimeContributions.ts'
+import {
+  pluginAgentToolDescriptorSchema,
+  pluginContextSectionDescriptorSchema,
+  pluginSpeechEngineDescriptorSchema,
+} from './runtimeContributions.ts'
 import {
   auditActionDescriptor,
   harnessDescriptor,
@@ -411,6 +415,13 @@ const contributionsShape = z.looseObject({
     .max(8)
     .default([])
     .describe("Sections of a task's context, each read from a route on your Node half."),
+  speechEngines: z
+    .array(pluginSpeechEngineDescriptorSchema)
+    .max(2)
+    .optional()
+    .describe(
+      'Engines that turn dictation in the agent composer into text, each answered by routes on your Node half.',
+    ),
   cliCommands: z
     .array(pluginCliCommandDescriptorSchema)
     .max(16)
@@ -873,6 +884,7 @@ export type PluginContributions = {
   skills?: PluginSkillDescriptor[]
   agentTools?: import('./runtimeContributions.ts').PluginAgentToolDescriptor[]
   contextSections?: import('./runtimeContributions.ts').PluginContextSectionDescriptor[]
+  speechEngines?: import('./runtimeContributions.ts').PluginSpeechEngineDescriptor[]
   cliCommands?: import('./cliCommands.ts').PluginCliCommandDescriptor[]
   browserHandoffs?: Omit<import('./handoffs.ts').BrowserHandoff, 'pluginId'>[]
   taskAddresses?: string

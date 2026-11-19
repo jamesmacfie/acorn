@@ -1,12 +1,12 @@
 // Host side of rung 2 for loaded Node plugins: one permission-scoped worker realm per package, with
 // the already-scoped NodePluginContext as its only authority-bearing object.
-import { existsSync, lstatSync, realpathSync, statSync } from 'node:fs'
+import { existsSync, lstatSync, mkdirSync, realpathSync, statSync } from 'node:fs'
 import { basename, dirname, isAbsolute, join, resolve, sep } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { MessageChannel, Worker } from 'node:worker_threads'
 import { assertSupportedNodeRuntime } from '@acorn/protocol/nodeRuntime.ts'
 import { hostFunctionMode } from './hostCallModes'
-import { pluginDbPath, preparePluginDbFiles } from './storage'
+import { pluginDataFolder, pluginDbPath, preparePluginDbFiles } from './storage'
 import { brokerEnv } from '../core/proc'
 import type { NodePlugin, NodePluginContext } from '../pluginHost/types'
 import type { NodePermissions } from './manifest'
@@ -134,6 +134,15 @@ export async function isolateNodePlugin(options: {
       write.add(realpathSync(path))
     }
   }
+  // Both spellings, as for the database files, so a data root reached through a link still matches.
+  const dataFolder = options.permissions.dataFolder ? pluginDataFolder(options.dataRoot, options.plugin) : undefined
+  if (dataFolder) {
+    mkdirSync(dataFolder, { recursive: true, mode: 0o700 })
+    for (const path of [dataFolder, realpathSync(dataFolder)]) {
+      read.add(path)
+      write.add(path)
+    }
+  }
   const environment = brokerEnv({})
   const environmentNames = new Set([
     ...(options.permissions.env ?? []),
@@ -196,6 +205,7 @@ export async function isolateNodePlugin(options: {
       pluginDir: packageDir,
       plugin: options.plugin,
       databasePath: pluginDbPath(options.dataRoot, options.plugin),
+      dataFolder,
       migrationsFolder: options.migrationsFolder,
       allowNetwork: options.permissions.net.length > 0,
       allowSockets: options.permissions.sockets,

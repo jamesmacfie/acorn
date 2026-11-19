@@ -94,6 +94,7 @@ The Node runs these, with or without a client attached.
 | Node actions | Both | Host seam / a `commands` entry whose verb is `runNodeAction` | Work a plugin does when a user schedule asks |
 | Agent tools | Both | `ctx.tools` / `contributions.agentTools` | The MCP, harness HTTP, and renderer projections. The host qualifies a loaded tool as `<pluginId>_<localId>` and applies authority, permissions, risk, and limits before dispatch |
 | Context sections | Both | `ctx.contextSections` / `contributions.contextSections` | The assembled task-context prompt |
+| Speech engines | Loaded | `contributions.speechEngines` | Dictation in the agent composer, turned into text by the plugin's own routes ([speech engines](./agent-tools/speech-engines.md)). **Direction: gains a compiled twin** if a built-in ever ships an engine |
 | Code hosts | Both | `NodePlugin.codeHost` / `contributions.codeHost`, and `ctx.codeHosts` (`claim`) for a `selfHosted` one | Which plugin owns a project's Git remote, by host, and how core checks out and shows its change requests ([code hosts](./plugins/code-hosts.md)) |
 | Browser handoffs | Both | `NodePlugin.browserHandoffs` / `contributions.browserHandoffs` | Buttons the browser extension draws on websites, each resolved by the plugin's own route ([browser handoffs](./plugin-authoring/browser-handoffs.md)) |
 | Task addresses | Loaded | `contributions.taskAddresses` | One route listing the exact origins the plugin's tasks' apps answer at while they run, which the browser extension matches pages against ([task addresses](./plugin-authoring/browser-handoffs.md#task-addresses)). **Direction: gains a compiled twin** on `NodePlugin` when a compiled plugin runs an app for a task |
@@ -102,6 +103,7 @@ The Node runs these, with or without a client attached.
 | Providers | Both | `ctx.providers` | Connection, integration, model-provider, and Node registries. A model adapter's `generateText` crosses the worker as data, and `providers.integration` takes a fetch handler for routes ([Node providers](./plugins/node-providers.md)) |
 | Capabilities | Both | `ctx.capabilities` | Cross-plugin typed functions. A loaded plugin provides only ids in its own `<pluginId>.` namespace |
 | Storage | Both | `ctx.storage` | One host-opened, host-migrated SQLite file per plugin |
+| Data folder | Loaded | `ctx.dataFolder`, granted by `permissions.node.dataFolder` | One folder of the plugin's own on the Node, for downloads and caches ([permissions](./plugin-authoring/permissions.md#node-permissions)). **Direction: stays loaded-only**, because a compiled plugin already runs with the Node's own file access |
 | Core services | Both | `ctx.core` | Path confinement, Git, the process broker, credentials, and core read models |
 | Broadcasts | Both | `ctx.events` | The WebSocket hub. A loaded plugin sends on `plugin:<id>:*` only, and hears events by manifest grant |
 | Telemetry | Both | `ctx.telemetry` | Spans, events, counts, gauges, and errors about the plugin's own work, with no permission ([telemetry](./telemetry.md)) |

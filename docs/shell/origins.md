@@ -152,6 +152,26 @@ URL. Its policy is the desktop frame's with `blob:` added to `script-src`. The r
 bridge only after the page says the module has run. [The phone's plugin
 sandbox](../mobile/plugin-sandbox.md#frames) covers the messages and the checks.
 
+### Microphone
+
+Only the renderer at `app://acorn` may use the microphone, for dictation in the agent composer
+([the composer](../managed-agents/composer.md#voice-input)). Three things make that hold:
+
+- The bundle carries `com.apple.security.device.audio-input`
+  (`apps/desktop/src-tauri/entitlements.plist`), which the hardened runtime needs, and
+  `NSMicrophoneUsageDescription` (`apps/desktop/src-tauri/Info.plist`), the reason macOS shows when it
+  asks the first time. Under `pnpm dev` the binary isn't a bundle, so macOS may name the terminal app
+  instead.
+- The shell answers every webview's permission request in `media_permission`. The main window gets
+  the mic when its page is the renderer. Every other webview, child browser webviews included, is
+  refused the mic, and nothing gets the camera or screen capture. Without this handler, wry grants
+  every media request from any page. The handler can't see which frame asked.
+- A plugin frame has no `allow="microphone"`, so WebKit refuses its `getUserMedia` before the request
+  reaches the shell. `PluginFrame.test.tsx` fails if an `allow` attribute appears.
+
+The same handler covers WebView2 on Windows and WebKitGTK on Linux, which raise the request through
+wry the same way.
+
 ### Navigation policy
 
 External anchor clicks and calls to `window.open` in the main renderer pass through

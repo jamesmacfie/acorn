@@ -92,6 +92,8 @@ describe('PluginFrame', () => {
     const { frame, target, transferred } = mount()
     expect(frame.getAttribute('src')).toBe('app-plugin://abc123/index.html')
     expect(frame.getAttribute('sandbox')).toBe('allow-scripts allow-same-origin')
+    // The shell grants the mic to the renderer's webview, and this is what keeps a frame out of it.
+    expect(frame.hasAttribute('allow')).toBe(false)
     expect(target).toHaveBeenCalledWith({ acornBridge: PLUGIN_BRIDGE_VERSION }, 'app-plugin://abc123', [transferred])
     expect(transferred).toBeDefined()
     expect(await firstMessage(transferred!)).toMatchObject({

@@ -113,6 +113,9 @@ export type NodePluginContext<Conn = unknown, Items = unknown> = {
   codeHosts: { claim(host: string): Disposable }
   capabilities: PluginCapabilities
   storage: PluginStorage
+  /** The folder only this plugin may read and write, when its manifest sets
+   *  `permissions.node.dataFolder`. Absent otherwise. Uninstalling the plugin deletes it. */
+  dataFolder?: string
   core: CoreServices
   events: PluginBroadcast
   telemetry: PluginTelemetry

@@ -1,5 +1,15 @@
 import { createHash } from 'node:crypto'
-import { existsSync, mkdirSync, mkdtempSync, realpathSync, rmSync, statSync, symlinkSync, writeFileSync } from 'node:fs'
+import {
+  existsSync,
+  mkdirSync,
+  mkdtempSync,
+  readFileSync,
+  realpathSync,
+  rmSync,
+  statSync,
+  symlinkSync,
+  writeFileSync,
+} from 'node:fs'
 import { tmpdir } from 'node:os'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
@@ -708,6 +718,42 @@ export default {
     expect(loaded).toEqual([])
     expect(failures.map((failure) => failure.id)).toEqual(['snoop-core', 'snoop-peer'])
     for (const failure of failures) expect(failure.reason).toMatch(/may not (?:import|load builtin) 'node:sqlite'/)
+  })
+
+  it('gives a plugin that asks for a data folder that folder and nothing above it', async () => {
+    const body = `import { readFileSync, rmSync, writeFileSync } from 'node:fs'
+import { join } from 'node:path'
+export default { name: 'keeper', init(ctx) {
+  const file = join(ctx.dataFolder, 'model.bin')
+  writeFileSync(file, 'weights')
+  const read = readFileSync(file, 'utf8')
+  rmSync(file)
+  let above = 'written'
+  try { writeFileSync(join(ctx.dataFolder, '..', 'escape.txt'), 'x') } catch (error) { above = error.code }
+  writeFileSync(join(ctx.dataFolder, 'result.json'), JSON.stringify({ read, above }))
+} }
+`
+    install('keeper', manifest('keeper', { permissions: { node: { dataFolder: true } } }), body)
+    install(
+      'plain',
+      manifest('plain'),
+      `export default { name: 'plain', init(ctx) { if ('dataFolder' in ctx) throw new Error('no folder was asked for') } }\n`,
+    )
+    const { loaded, failures } = await loadExternalPlugins(root, { builtins: [] })
+    expect(failures).toEqual([])
+    try {
+      for (const entry of loaded)
+        await entry.plugin.init({ routes: {}, schedules: {}, providers: {}, events: {} } as never)
+    } finally {
+      for (const entry of loaded) await entry.plugin.dispose?.()
+    }
+    const folder = join(root, 'plugin-data', 'keeper')
+    expect(statSync(folder).mode & 0o777).toBe(0o700)
+    expect(JSON.parse(readFileSync(join(folder, 'result.json'), 'utf8'))).toEqual({
+      read: 'weights',
+      above: 'ERR_ACCESS_DENIED',
+    })
+    expect(existsSync(join(root, 'plugin-data', 'plain'))).toBe(false)
   })
 
   it('cannot import the trusted worker storage adapter as a sqlite bypass', async () => {

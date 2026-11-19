@@ -25,6 +25,7 @@ import type {
   PluginTaskCheckDescriptor,
 } from '../plugins/manifest'
 import type { PluginCliCommandDescriptor } from '@acorn/protocol/plugin/cliCommands.ts'
+import type { PluginSpeechEngineDescriptor } from '@acorn/protocol/plugin/runtimeContributions.ts'
 import { scopeCapabilities, scopeCore } from '../plugins/permissions'
 import { registerAgentTool } from '../agentTools/registry'
 import { registerDataSource, registerDataSourceDiscovery } from '../dataSources/registry'
@@ -126,6 +127,8 @@ export type LoadedPluginBinding = {
   skills?: readonly PackageSkill[]
   agentTools?: readonly PluginAgentToolDescriptor[]
   contextSections?: readonly PluginContextSectionDescriptor[]
+  // Its speech engines, replayed into the speech engine registry (./speechEngines.ts).
+  speechEngines?: readonly PluginSpeechEngineDescriptor[]
   // Read only for their routes, which the host reserves (./manifestWork.ts § reserveManifestRoutes). The
   // CLI route itself reads the running manifest from the plugin state.
   cliCommands?: readonly PluginCliCommandDescriptor[]

@@ -5,6 +5,7 @@
   Without allow-jit, V8 can't reserve memory for compiled code and Node aborts before running a line,
   so the shell reports that the desktop helper exited during boot. The other two keys follow Node's own
   macOS release entitlements: V8 writes code pages, and node-pty's ad-hoc signed add-on has no team ID.
+  audio-input lets the renderer use the mic for dictation. The hardened runtime refuses it otherwise.
 -->
 <plist version="1.0">
 <dict>
@@ -13,6 +14,8 @@
   <key>com.apple.security.cs.allow-unsigned-executable-memory</key>
   <true/>
   <key>com.apple.security.cs.disable-library-validation</key>
+  <true/>
+  <key>com.apple.security.device.audio-input</key>
   <true/>
 </dict>
 </plist>

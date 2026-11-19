@@ -34,6 +34,7 @@ import {
   webviewPermissionLines,
   inputPermissionLines,
   codeHostLines,
+  speechEngineLines,
   providedSourceLines,
 } from './permissions'
 import { recordPluginTrust } from '../plugins/host'
@@ -91,7 +92,11 @@ export function trustTiers(request: PluginTrustRequest | undefined): TrustTier[]
     },
     {
       key: 'provides',
-      now: [...codeHostLines(installed.contributions), ...providedSourceLines(installed.contributions)],
+      now: [
+        ...codeHostLines(installed.contributions),
+        ...speechEngineLines(installed.contributions),
+        ...providedSourceLines(installed.contributions),
+      ],
       was: null,
     },
     {

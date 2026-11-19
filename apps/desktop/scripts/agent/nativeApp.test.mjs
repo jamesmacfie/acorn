@@ -26,6 +26,12 @@ describe('the test app identity', () => {
     expect(TEST_APP_ID).not.toBe('com.acorn.desktop')
   })
 
+  it('carries a microphone reason, which WebKit needs before it offers the mic', () => {
+    expect(infoPlist({ identifier: TEST_APP_ID, name: 'Acorn Agent Test', executable: 'acorn-desktop' })).toContain(
+      '<key>NSMicrophoneUsageDescription</key>',
+    )
+  })
+
   it.skipIf(process.platform !== 'darwin')('stages a signed bundle whose executable runs from inside it', async () => {
     const directory = await mkdtemp(join(tmpdir(), 'native-app-'))
     cleanups.push(() => rm(directory, { recursive: true, force: true }))

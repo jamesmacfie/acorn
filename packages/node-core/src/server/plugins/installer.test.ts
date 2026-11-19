@@ -25,7 +25,7 @@ import {
   type PluginLockfile,
 } from './installer'
 import { PLUGIN_API_MAJOR } from './manifest'
-import { pluginDbPath } from './storage'
+import { pluginDataFolder, pluginDbPath } from './storage'
 
 // The installer's whole job is to turn bytes from somewhere else into a directory under the data root,
 // so these tests build real tarballs with real tar and hand them over real (stubbed) fetches. A fixture
@@ -338,6 +338,14 @@ describe('uninstalling', () => {
     expect(existsSync(join(pluginInstallRoot(root), 'ntfy'))).toBe(false)
     expect(existsSync(lockfilePath(root, 'ntfy'))).toBe(false)
     expect(existsSync(pluginDbPath(root, 'ntfy'))).toBe(true)
+  })
+
+  it('deletes the data folder, which holds only files the plugin can fetch again', async () => {
+    await installed()
+    mkdirSync(pluginDataFolder(root, 'ntfy'), { recursive: true })
+    writeFileSync(join(pluginDataFolder(root, 'ntfy'), 'model.bin'), 'x')
+    uninstallPlugin(root, 'ntfy')
+    expect(existsSync(pluginDataFolder(root, 'ntfy'))).toBe(false)
   })
 
   it('deletes the database and its WAL sidecars when asked to purge', async () => {

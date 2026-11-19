@@ -75,6 +75,7 @@ export const loadedPluginBinding = (entry: LoadedPlugin): LoadedPluginBinding =>
   skills: entry.skills,
   agentTools: entry.manifest.contributions.agentTools,
   contextSections: entry.manifest.contributions.contextSections,
+  speechEngines: entry.manifest.contributions.speechEngines,
   cliCommands: entry.manifest.contributions.cliCommands,
   browserHandoffs: entry.manifest.contributions.browserHandoffs,
   taskAddresses: entry.manifest.contributions.taskAddresses,

@@ -59,6 +59,45 @@ The composer has two cooperative extension points
 - `agents:composer-actions` is room in the action bar beside **Attach** and the two pickers, in
   `stack` mode with a ceiling of four.
 
+## Voice input
+
+Press the mic button beside **Attach**, or hold Cmd+Shift+L (Ctrl+Shift+L off a Mac), and speak.
+Let go, and the words go into the draft at the cursor, with a space on either side where the draft
+needs one. A tap shorter than 300 ms leaves the mic on until the next press or **Stop**. Nothing is
+sent: the person reads what was heard first. The shortcut can be changed in **Shortcuts**.
+
+The mic can take a moment to open, about 2 seconds the first time in a window and almost nothing
+after that. Until the first sound arrives, the pill shows a spinner and **Starting the microphone**,
+so you know when to speak. While the mic is live, the pill shows **Listening**, the time, **Stop**, and a
+level meter on a line of its own. If the engine is still loading its model, a spinner takes the mic
+icon's place and the pill reads **Loading the speech model** until the engine is ready. Recording
+carries on meanwhile. After you stop, it shows **Transcribing**. Escape or the pill's × cancels
+at any point until the words arrive: the mic closes, the recording or the transcription is thrown
+away, and the draft stays exactly as it was. While you're dictating, Escape cancels the dictation
+rather than stopping the agent's turn. A problem, such as the mic being off for Acorn in System
+Settings or the engine not answering, takes its place as one line, and Escape or its close button
+dismisses it. Recording stops at 5 minutes and says so. If no sound reaches the composer from the mic for 2
+seconds, it tries to wake the audio. At 4 seconds, or if the mic is switched off or unplugged, it
+stops, transcribes what it already heard, and says why. Silence in the room doesn't count: the mic
+still delivers sound then. A device that sends exact silence for 1.5 seconds, such as a virtual
+input whose app isn't running, stops the recording too, and the pill names the device.
+
+The button and the shortcut appear only when the Node runs a speech engine, a loaded plugin that
+turns audio into text ([speech engines](../agent-tools/speech-engines.md)). If the engine needs setup,
+the button reads **Set up voice input** and opens the engine's settings page.
+
+- The app's own renderer records, and only it may use the mic
+  ([origins](../shell/origins.md#microphone)). The mic track stops the moment recording does, so the
+  system's mic indicator goes off.
+- The recording is turned into 16 kHz mono and trimmed of silence at both ends before it's posted.
+- The words go to the session that was showing when recording began. If that session is still in the
+  composer they go in at the cursor, and if not, at the end of its draft.
+- With two composers on screen, the shortcut goes to the one whose message box has focus.
+- The terminal client has no voice input. On a phone the button shows, but there's no shortcut.
+
+`plugins/agents/src/client/composer/dictation.ts` owns the states, and `voiceAudio.ts` beside it the
+WAV, the silence trim, and the insert.
+
 ## Steer
 
 While a Claude Code or Codex turn runs, **Steer** sits beside **Send**. It queues the draft and hands

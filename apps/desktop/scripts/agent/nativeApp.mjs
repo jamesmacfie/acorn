@@ -27,6 +27,9 @@ export function infoPlist({ identifier, name, executable }) {
     CFBundleShortVersionString: '0.0.0',
     CFBundleVersion: '0',
     NSHighResolutionCapable: true,
+    // WebKit hides navigator.mediaDevices from an app without this, so dictation can't open the mic.
+    // The same text as the release bundle's, in apps/desktop/src-tauri/Info.plist.
+    NSMicrophoneUsageDescription: 'Acorn uses the microphone only while you dictate a message to an agent.',
   }
   const body = Object.entries(entries).map(([key, value]) => typeof value === 'boolean'
     ? `  <key>${key}</key>\n  <${value}/>`

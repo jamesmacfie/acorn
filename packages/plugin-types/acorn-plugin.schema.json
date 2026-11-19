@@ -255,6 +255,10 @@
               "description": "Unrestricted socket access, for a protocol that can't go through `fetch`. It's a broad grant, so ask for `net` instead whenever `fetch` will do.",
               "type": "boolean"
             },
+            "dataFolder": {
+              "description": "Gives your Node half one folder of its own on the Node, at `ctx.dataFolder`, for downloads and caches. Uninstalling the plugin deletes it.",
+              "type": "boolean"
+            },
             "env": {
               "description": "Environment variables your Node half inherits from the Node, by name. Without them it gets a base environment that holds no credentials.",
               "maxItems": 32,
@@ -4501,6 +4505,51 @@
               "read",
               "maxBytes",
               "maxTokens"
+            ]
+          }
+        },
+        "speechEngines": {
+          "description": "Engines that turn dictation in the agent composer into text, each answered by routes on your Node half.",
+          "maxItems": 2,
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "string",
+                "pattern": "^[a-z][a-z0-9_]{0,63}$",
+                "description": "The engine's ID, in lowercase snake case starting with a letter."
+              },
+              "label": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 60,
+                "description": "The name the composer shows for this engine."
+              },
+              "transcribe": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 256,
+                "description": "A POST route on your Node half. The body is a WAV file, 16 kHz, mono, 16-bit. Answer `{ text }`."
+              },
+              "status": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 256,
+                "description": "A GET route on your Node half that answers `{ state, detail? }`, where `state` is `ready`, `needs-setup`, `preparing`, or `failed`."
+              },
+              "settings": {
+                "description": "A `settings` surface in this manifest, where the composer sends someone whose engine needs setup.",
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 64
+              }
+            },
+            "required": [
+              "id",
+              "label",
+              "transcribe",
+              "status"
             ]
           }
         },

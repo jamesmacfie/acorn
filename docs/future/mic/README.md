@@ -1,6 +1,6 @@
 # Voice input for the agent composer
 
-Date: November 19, 2026. Status: proposed. No phase started.
+Date: November 19, 2026. Status: built on the `mic` branch, November 19, 2026. Phase 1 is partly measured, and no hand checkpoint has run yet.
 
 ## What this is
 
@@ -41,10 +41,10 @@ These are the plan's defaults. Confirm or change each one before phase 4 starts.
 | Decision | Default in this plan |
 | --- | --- |
 | Where mic capture lives | The agents plugin's composer, in the main renderer. Plugin frames never get the mic. |
-| How an engine plugs in | A new manifest contribution, `speechEngines`, that names a route in the plugin's own namespace, the way `agentTools` does. |
+| How an engine plugs in | A new manifest contribution, `speechEngines`, that names a route in the plugin's own namespace, the way `agentTools` does. The core route is `/v1/core/speech`, not an agents route, because the agents plugin has no way to call another plugin's route. |
 | Where the engine plugin lives | Its own repository, `../acorn-voice`, as TruffleHog and the disk cleanup plugin do. Plugin ID `voice`. |
 | First engine | sherpa-onnx running Parakeet TDT 0.6B v2, int8, as a long-running local process. Phase 1 can overturn this. |
-| Shortcut behaviour | Hold to talk, release to stop. A tap shorter than 300 ms turns on hands-free mode until the next press. |
+| Shortcut behaviour | Hold to talk, release to stop. A tap shorter than 300 ms turns on hands-free mode until the next press. The default chord is Cmd+Shift+L: a chord key must be one character, so Space can't be one, and Option changes the key a Mac reports. |
 | Cloud transcription | Out of scope. |
 | Clean-up by a language model | Out of scope. A personal dictionary of replacements is in scope. |
 | Terminal client | No voice input. A terminal has no mic API. |
@@ -63,14 +63,14 @@ These are the plan's defaults. Confirm or change each one before phase 4 starts.
 
 ## The phases
 
-| Phase | What it delivers | Depends on |
+| Phase | What it delivers | State on November 19, 2026 |
 | --- | --- | --- |
-| [1. Engine spike](./01-engine-spike.md) | A measured choice of engine and model, against Voice Type, on James's Mac | Nothing |
-| [2. Desktop microphone](./02-desktop-microphone.md) | The desktop app may use the mic from its own renderer, and plugin frames still can't | Nothing |
-| [3. Plugin data folder](./03-plugin-data-folder.md) | A permission that gives a loaded plugin one folder of its own to write | Nothing |
-| [4. Speech engine contribution](./04-speech-engine-contribution.md) | The `speechEngines` manifest key, and an agents route that posts audio to the active engine | Nothing to build, phase 1 to settle the audio format |
-| [5. Composer voice input](./05-composer-voice.md) | The mic button, shortcut, pill, capture, and insert | Phases 2 and 4 |
-| [6. The voice plugin](./06-voice-plugin.md) | The engine plugin: consent, download, the engine process, settings, and dictionary | Phases 1, 3, and 4 |
+| [1. Engine spike](./01-engine-spike.md) | A measured choice of engine and model, against Voice Type, on James's Mac | sherpa-onnx with Parakeet v2 measured on synthetic speech. Voice Type and real recordings not done |
+| [2. Desktop microphone](./02-desktop-microphone.md) | The desktop app may use the mic from its own renderer, and plugin frames still can't | Built. Packaged-build check not run |
+| [3. Plugin data folder](./03-plugin-data-folder.md) | A permission that gives a loaded plugin one folder of its own to write | Built and tested |
+| [4. Speech engine contribution](./04-speech-engine-contribution.md) | The `speechEngines` manifest key, and a core route that posts audio to the active engine | Built and tested |
+| [5. Composer voice input](./05-composer-voice.md) | The mic button, shortcut, pill, capture, and insert | Built. Not tried with a real mic |
+| [6. The voice plugin](./06-voice-plugin.md) | The engine plugin: consent, download, the engine process, settings, and dictionary | Built in `~/Source/acorn-voice`. Not installed in the app yet |
 
 Phases 1, 2, and 3 can run side by side. Phase 1 should finish first in practice. If no local engine
 is close to Voice Type, stop and rethink before building anything else.

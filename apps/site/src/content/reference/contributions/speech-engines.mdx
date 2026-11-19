@@ -1,0 +1,71 @@
+---
+title: speechEngines
+description: 'Engines that turn dictation in the agent composer into text, answered by routes on your Node half.'
+sources:
+  - docs/agent-tools/speech-engines.md
+  - docs/managed-agents/composer.md
+checked: 'e85336ca3'
+---
+
+A speech engine turns what someone dictates in the agent composer into text. Acorn records in its own
+window and posts the audio to your route only after the person pressed record. Your plugin never
+touches the microphone.
+
+## A minimal example
+
+```json manifest
+{
+  "node": "./node/index.js",
+  "contributions": {
+    "speechEngines": [
+      {
+        "id": "local",
+        "label": "On-device speech",
+        "transcribe": "/v1/p/acme/transcribe",
+        "status": "/v1/p/acme/status"
+      }
+    ]
+  }
+}
+```
+
+`transcribe` gets a WAV file, 16 kHz, mono, 16-bit, and answers `{ "text" }`. `status` answers
+`{ "state", "detail"? }`, where `state` is `ready`, `needs-setup`, `preparing`, or `failed`.
+
+## A fuller example
+
+`settings` names your settings page, which the composer opens when your engine needs setup.
+
+```json manifest
+{
+  "node": "./node/index.js",
+  "contributions": {
+    "frames": [
+      {
+        "target": "settings",
+        "id": "acme-voice",
+        "label": "Voice input",
+        "layout": "single",
+        "regions": { "body": "frame" }
+      }
+    ],
+    "speechEngines": [
+      {
+        "id": "local",
+        "label": "On-device speech",
+        "transcribe": "/v1/p/acme/transcribe",
+        "status": "/v1/p/acme/status",
+        "settings": "acme-voice"
+      }
+    ]
+  }
+}
+```
+
+## Fields
+
+{/* facts */}
+
+## In the terminal
+
+The terminal client has no voice input, so it never calls your engine.

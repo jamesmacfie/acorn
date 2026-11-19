@@ -26,7 +26,7 @@ export function validateDependencies(manifest: ManifestInput, ctx: IssueSink): v
 
 export function validateNodeDeclarations(refs: ManifestReferences): void {
   const { manifest, issues: ctx, route } = refs
-  const { agentTools, contextSections, cliCommands, browserHandoffs, taskAddresses, browserPanel } =
+  const { agentTools, contextSections, cliCommands, browserHandoffs, taskAddresses, browserPanel, speechEngines } =
     manifest.contributions
   agentTools.forEach((entry, i) => route(entry.handler, ['contributions', 'agentTools', i, 'handler']))
   browserHandoffs.forEach((entry, i) => route(entry.resolve, ['contributions', 'browserHandoffs', i, 'resolve']))
@@ -42,6 +42,30 @@ export function validateNodeDeclarations(refs: ManifestReferences): void {
       })
   }
   contextSections.forEach((entry, i) => route(entry.read, ['contributions', 'contextSections', i, 'read']))
+  const settingsPages = new Set(
+    manifest.contributions.frames.filter((frame) => frame.target === 'settings').map((frame) => frame.id),
+  )
+  const engineIds = new Set<string>()
+  speechEngines?.forEach((entry, i) => {
+    const at = ['contributions', 'speechEngines', i] as (string | number)[]
+    route(entry.transcribe, [...at, 'transcribe'])
+    route(entry.status, [...at, 'status'])
+    if (entry.settings !== undefined && !settingsPages.has(entry.settings))
+      ctx.addIssue({
+        code: 'custom',
+        path: [...at, 'settings'],
+        message: `settings names '${entry.settings}', which this manifest does not declare as a settings surface`,
+      })
+    if (engineIds.has(entry.id))
+      ctx.addIssue({ code: 'custom', path: [...at, 'id'], message: `duplicate speech engine id '${entry.id}'` })
+    engineIds.add(entry.id)
+    if (!manifest.node)
+      ctx.addIssue({
+        code: 'custom',
+        path: at,
+        message: 'a speech engine calls node routes; declare `node` in the manifest',
+      })
+  })
   const changeRequestApi = manifest.contributions.codeHost?.changeRequest?.api
   if (changeRequestApi !== undefined) route(changeRequestApi, ['contributions', 'codeHost', 'changeRequest', 'api'])
   const cliNames = new Set<string>()

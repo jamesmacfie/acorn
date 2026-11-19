@@ -155,6 +155,9 @@ export const nodePermissionLines = (permissions: NodePluginPermissions): Permiss
     ...(permissions.node.exec
       ? [line('node.exec', { text: 'Run commands on the node', icon: 'square-terminal', high: true })]
       : []),
+    ...(permissions.node.dataFolder
+      ? [line('node.dataFolder', { text: 'Store files in its own folder on this Node', icon: 'folder-plus' })]
+      : []),
     ...(permissions.node.sockets
       ? [line('node.sockets', { text: 'Open unrestricted network connections', icon: 'globe', high: true })]
       : []),
@@ -552,6 +555,20 @@ export const codeHostLines = (contributions: PluginContributions): PermissionLin
     },
   ]
 }
+
+/** A speech engine: it receives what you dictate in the agent composer, as audio, whenever you record. */
+export const speechEngineLines = (contributions: PluginContributions): PermissionLine[] =>
+  (contributions.speechEngines ?? []).length
+    ? [
+        {
+          key: 'provides:speech-engine',
+          text: 'Turns your dictation into text',
+          detail: 'It receives the audio each time you record a message to an agent.',
+          icon: 'mic',
+          high: false,
+        },
+      ]
+    : []
 
 /** Each data source the plugin registers. Its name is the plugin's own, which is what a person picks it by.
  *  An event feed adds a line for what acorn stores, with the cap in the key, so a version that keeps

@@ -367,6 +367,7 @@ Each feature landing page above has topic pages in a folder of the same name:
   sections](./agent-tools/context-sections.md), [Loaded tools and context
   sections](./agent-tools/loaded-tools.md), [Managed-session
   orchestration](./agent-tools/orchestration.md), [Plugin tools](./agent-tools/plugin-tools.md),
+  [Speech engines](./agent-tools/speech-engines.md),
   [Tracker and GitHub tools](./agent-tools/tracker-tools.md), [Workflow
   tools](./agent-tools/workflow-tools.md).
 - [dashboards.md](./dashboards.md): [Mapping and the editor](./dashboards/mapping-and-editor.md),

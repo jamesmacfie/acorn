@@ -1,47 +1,32 @@
 # Phase 2: let the desktop renderer use the microphone
 
-Date: November 19, 2026. Status: proposed. Depends on nothing.
+Date: November 19, 2026. Status: built, packaged-build check not run.
 
-## Goal
+What landed is described in [origins](../../shell/origins.md#microphone): the audio-input
+entitlement, `NSMicrophoneUsageDescription` in `apps/desktop/src-tauri/Info.plist`, the shell's
+`media_permission` handler, and the test that keeps `allow` off plugin frames.
 
-`navigator.mediaDevices.getUserMedia({ audio: true })` works in the desktop app's own renderer. macOS
-asks once with an Acorn-specific reason. Plugin frames still can't reach the mic.
+## Answers found while building
 
-## Changes
+- Wry 0.57 grants every media request from any page when no handler is set, and its handler gets no
+  origin. So the handler goes by webview: the main window's renderer gets the mic, every other
+  webview, child browser webviews included, is refused, and nothing gets the camera. A plugin frame is
+  kept out by the missing `allow="microphone"`.
+- Tauri's codegen embeds `src-tauri/Info.plist` into a dev build. The bundler merging it into a
+  packaged one is assumed, not checked.
+- Linux and Windows raise the request through the same handler in wry. Not tried on either.
+- macOS charges the mic to the process that launched the app, not to the app. A `dev:agent` window
+  started from an agent inside the installed Acorn asks as `/Applications/acorn.app`, and a build
+  without the audio-input entitlement is refused with no prompt. Start a test session from your own
+  terminal app, and macOS asks as that terminal. Found November 19, 2026.
+- WebKit hides `navigator.mediaDevices` from an app with no `NSMicrophoneUsageDescription`, so the
+  `dev:agent` bundle (`apps/desktop/scripts/agent/nativeApp.mjs`) carries the string too.
 
-1. Add `com.apple.security.device.audio-input` to `apps/desktop/src-tauri/entitlements.plist`. The
-   bundle is signed with the hardened runtime, which blocks the mic without it. Add a line to the
-   comment at the top saying why.
-2. Add an `NSMicrophoneUsageDescription` string. Suggested text: "Acorn uses the microphone only while
-   you dictate a message to an agent." Put it in an `Info.plist` in `apps/desktop/src-tauri/`, which
-   the Tauri bundler merges.
-3. Grant media capture for the renderer's own origin and nothing else. The grant goes in the web
-   view's permission handler (the `WKUIDelegate` media capture callback on macOS). Deny every
-   `app-plugin://` origin explicitly, even though plugin frames have no `allow="microphone"`.
-4. Leave `PluginFrame.tsx` without an `allow` attribute. Add a test that fails if one appears.
+## What's left
 
-## Verify before building
-
-- Whether wry, through Tauri 2, already answers the macOS media capture callback, and how. If it
-  grants every origin, step 3 must narrow it. If it denies, step 3 must add the grant.
-- Whether the Tauri bundler picks up `src-tauri/Info.plist` automatically or needs `bundle.macOS`
-  config in `tauri.conf.json`.
-- Which process macOS charges the mic to in `pnpm dev`, where the app isn't a signed bundle. The
-  prompt may name the terminal app instead of Acorn.
-- What Linux (WebKitGTK's permission request signal) and Windows (WebView2's `PermissionRequested`)
-  do by default. Record the answer, even if those platforms wait.
-
-## Done when
-
-- In a packaged build, a `getUserMedia` call from the renderer shows the macOS prompt with the new
-  reason once, then returns a live audio track.
-- The same call from a plugin frame fails with `NotAllowedError`.
-- `cargo test` covers the origin check, and the client-core test covers the missing `allow`
-  attribute.
-
-## Owning pages
-
-Update [the shell](../../shell.md) and [origins](../../shell/origins.md) with who may use the mic.
+- In a packaged build, call `getUserMedia` from the renderer: macOS should ask once with the new
+  reason and then return a live track. The same call from a plugin frame should fail with
+  `NotAllowedError`.
 
 ## Checkpoint
 

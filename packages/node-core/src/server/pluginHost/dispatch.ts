@@ -41,8 +41,9 @@ export function confinePluginPath(pluginId: string, path: string): URL {
 
 export type PluginDispatchInit = {
   method: 'GET' | 'POST'
-  /** JSON, serialized by the caller. Absent for a GET. */
-  body?: string
+  /** JSON, serialized by the caller, or raw bytes with their `contentType`. Absent for a GET. */
+  body?: string | Uint8Array<ArrayBuffer>
+  contentType?: string
 }
 
 /** Call a plugin's own route as this node. Returns the raw `Response`; status handling belongs to
@@ -95,7 +96,9 @@ export async function dispatchPluginRoute(
     // (../telemetry/context.ts).
     const request = new Request(forwarded, {
       method: init.method,
-      ...(init.body === undefined ? {} : { headers: { 'content-type': 'application/json' }, body: init.body }),
+      ...(init.body === undefined
+        ? {}
+        : { headers: { 'content-type': init.contentType ?? 'application/json' }, body: init.body }),
       signal,
     })
     const response = await runWithTelemetry({ traceId: span.traceId, spanId: span.spanId, owner: pluginId }, () => {

@@ -42,6 +42,11 @@ export type PluginDatabase = ReturnType<typeof drizzleOverSqlite> & {
 export const pluginDbPath = (dataDir: string, plugin: string): string =>
   join(resolve(dataDir), PLUGIN_DB_DIR, `${plugin}.sqlite`)
 
+/** The folder a loaded plugin with `permissions.node.dataFolder` may write. Backups skip it, because
+ *  they copy only the databases. */
+export const pluginDataFolder = (dataDir: string, plugin: string): string =>
+  join(resolve(dataDir), 'plugin-data', plugin)
+
 /** Give a renamed built-in the database it had under its old id. Moves the files once, before
  *  anything opens either one, and does nothing when there is no old database or the new id already
  *  has one, so a fresh install and every later boot are no-ops. The write-ahead log and shared-memory

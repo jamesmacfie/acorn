@@ -48,7 +48,9 @@ function. The host strips the mount, so a request to `/v1/p/<id>/greeting` reach
 These members are present, shaped by your manifest: `ctx.storage`, `ctx.core`, `ctx.capabilities`,
 `ctx.providers`, `ctx.schedules`, `ctx.dataSources`, `ctx.taskChecks`, `ctx.runs`, `ctx.audit`,
 `ctx.extensionPoints`, `ctx.hooks`, `ctx.events.send`, `ctx.events.status`, `ctx.events.on`,
-`ctx.events.worktreeStatus`, `ctx.events.notice`, `ctx.log`, and `ctx.telemetry`.
+`ctx.events.worktreeStatus`, `ctx.events.notice`, `ctx.log`, and `ctx.telemetry`. `ctx.dataFolder`
+is present only when the manifest sets `permissions.node.dataFolder`
+([permissions](./permissions.md#node-permissions)).
 
 Agent tools and context sections are available only as manifest descriptors,
 `contributions.agentTools` and `contributions.contextSections`. The host turns each into the same

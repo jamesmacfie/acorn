@@ -70,6 +70,8 @@ import {
 } from './contextReferences'
 import { AttachmentSlot } from './AttachmentSlot'
 import TerminalComposerShortcut from './TerminalComposerShortcut'
+import { createComposerVoice } from './ComposerVoice'
+import { insertDictation } from './voiceAudio'
 import {
   addDraftFiles,
   pickDraftAttachments,
@@ -461,6 +463,25 @@ export default function AgentComposer(props: {
   const removeReferences = (references: readonly ContextReference[]) =>
     setDraft((current) => removeContextTokens(current, references))
 
+  // A terminal has no microphone. The words go to the session that was showing when recording began,
+  // at the caret if it is still showing here and at the end of its draft if not.
+  const voice =
+    formFactor() === 'tui'
+      ? undefined
+      : createComposerVoice({
+          nodeId: () => shared().nodeId,
+          owns: (element) => !!field && element === field,
+          begin: () => {
+            const owner = capture()
+            return (words) => {
+              const here = owner.visible()
+              const inserted = insertDictation(owner.state.text(), here ? caret() : owner.state.text().length, words)
+              owner.state.setText(inserted.text)
+              if (here) queueMicrotask(() => field?.setSelectionRange?.(inserted.cursor, inserted.cursor))
+            }
+          },
+        })
+
   // Read when the field first takes focus, so the list is there by the time somebody types `@`. A
   // visit that never writes to the agent never pays for the worktree walk.
   const files = useWorktreeFiles(() => props.session.taskId)
@@ -637,6 +658,7 @@ export default function AgentComposer(props: {
       >
         Attach
       </Button>
+      {voice?.button()}
       <ContextReferencePicker
         catalog={catalog}
         references={contextReferences}
@@ -760,6 +782,7 @@ export default function AgentComposer(props: {
           )}
         </Show>
       </Only>
+      {voice?.pill()}
       <MentionTextarea
         ref={(element) => {
           field = element
@@ -776,6 +799,7 @@ export default function AgentComposer(props: {
         onFocus={() => {
           files.want()
           catalog.refresh()
+          voice?.refresh()
         }}
         onBlur={() => shared().flushText()}
         onFiles={addFiles}

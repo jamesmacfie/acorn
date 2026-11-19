@@ -91,6 +91,7 @@ export function reserveManifestRoutes(name: string, binding: LoadedPluginBinding
   const paths = [
     ...(binding.agentTools ?? []).map((tool) => tool.handler),
     ...(binding.contextSections ?? []).map((section) => section.read),
+    ...(binding.speechEngines ?? []).flatMap((engine) => [engine.transcribe, engine.status]),
     ...(binding.cliCommands ?? []).map((command) => `${PLUGIN_NAMESPACE}/${name}${command.route.path}`),
     ...(binding.schedules ?? []).map((schedule) => schedule.run),
     ...(binding.taskChecks ?? []).flatMap((check) => (check.apply ? [check.check, check.apply] : [check.check])),

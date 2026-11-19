@@ -19,6 +19,7 @@ type WorkerOptions = {
   pluginDir: string
   plugin: string
   databasePath: string
+  dataFolder?: string
   migrationsFolder: string | null
   allowNetwork: boolean
   allowSockets: boolean
@@ -174,6 +175,7 @@ try {
       const remote = endpoint.decode(encodedContext, 'context') as NodePluginContext
       const ctx: NodePluginContext = {
         ...remote,
+        ...(options.dataFolder ? { dataFolder: options.dataFolder } : {}),
         storage: (options.migrationsFolder
           ? {
               open: () => {
@@ -191,6 +193,7 @@ try {
             const remote = endpoint.decode(encodedContext, 'context') as NodePluginContext
             await plugin.ready!({
               ...remote,
+              ...(options.dataFolder ? { dataFolder: options.dataFolder } : {}),
               storage: (database
                 ? { open: () => database! }
                 : options.migrationsFolder

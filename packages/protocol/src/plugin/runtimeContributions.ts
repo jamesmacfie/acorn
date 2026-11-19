@@ -210,7 +210,27 @@ export const pluginContextSectionDescriptorSchema = z.object({
     .describe('The most tokens the section may add.'),
 })
 
+// A speech engine turns recorded dictation into text (docs/agent-tools/speech-engines.md). The host
+// owns the mic and posts audio here only after the person pressed record.
+export const pluginSpeechEngineDescriptorSchema = z.object({
+  id: localId.describe("The engine's ID, in lowercase snake case starting with a letter."),
+  label: z.string().trim().min(1).max(60).describe('The name the composer shows for this engine.'),
+  transcribe: pluginRoute.describe(
+    'A POST route on your Node half. The body is a WAV file, 16 kHz, mono, 16-bit. Answer `{ text }`.',
+  ),
+  status: pluginRoute.describe(
+    'A GET route on your Node half that answers `{ state, detail? }`, where `state` is `ready`, `needs-setup`, `preparing`, or `failed`.',
+  ),
+  settings: z
+    .string()
+    .min(1)
+    .max(64)
+    .optional()
+    .describe('A `settings` surface in this manifest, where the composer sends someone whose engine needs setup.'),
+})
+
 export type PluginAgentToolDescriptor = z.infer<typeof pluginAgentToolDescriptorSchema>
+export type PluginSpeechEngineDescriptor = z.infer<typeof pluginSpeechEngineDescriptorSchema>
 export type PluginContextSectionDescriptor = z.infer<typeof pluginContextSectionDescriptorSchema>
 
 export const qualifiedPluginToolName = (pluginId: string, localId: string): string => `${pluginId}_${localId}`

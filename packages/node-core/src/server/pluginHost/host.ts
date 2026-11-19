@@ -14,6 +14,7 @@ import { disposeUnstartedPlugin, onWorkerStopped } from '../plugins/isolation'
 import type { PluginEmit } from '@acorn/protocol/plugin/contract.ts'
 import { declareEmits } from './emits'
 import { declareBrowserHandoffs } from './browserHandoffs'
+import { declareSpeechEngines } from './speechEngines'
 import { declareCodeHost } from './codeHosts'
 import type { HostPluginContext, NodePlugin, PluginStorage } from './types'
 import { createLogger, describeError } from '../telemetry/logger'
@@ -243,6 +244,7 @@ export async function initPlugins(
       ),
     )
     onUndo(declareCodeHost(plugin.name, binding ? binding.codeHost : plugin.codeHost, !binding))
+    onUndo(declareSpeechEngines(plugin.name, binding?.speechEngines ?? []))
     if (binding) onUndo(reserveManifestRoutes(plugin.name, binding))
   }
 
