@@ -8,10 +8,15 @@ import type { AgentConfigOption, AgentSession } from '../../contract/wire.ts'
 //   3. Commands run unasked with neither (`unguardedSetting`).
 // Codex's `mode` is its collaboration mode, which grants nothing, so its setting is `permissions`. The
 // unprefixed Codex values are the older sandbox-mode names of the same profiles.
-const EXECUTION_POLICY: Record<string, { optionId: string; ranks: Record<string, number> }> = {
+//
+// `asking` is the value that asks a person before each command and still lets the agent work. Claude
+// Code's `default` asks for every shell command the owner's own settings don't allow. Codex has none,
+// because it reports its sandbox but not its approval policy.
+const EXECUTION_POLICY: Record<string, { optionId: string; ranks: Record<string, number>; asking?: string }> = {
   claude: {
     optionId: 'mode',
     ranks: { plan: 0, dontAsk: 0, default: 0, acceptEdits: 1, auto: 2, bypassPermissions: 3 },
+    asking: 'default',
   },
   codex: {
     optionId: 'permissions',
@@ -29,6 +34,12 @@ const EXECUTION_POLICY: Record<string, { optionId: string; ranks: Record<string,
 /** The option that carries this harness's execution policy, or undefined for a harness not listed. */
 export const executionPolicyOptionId = (providerId: string): string | undefined =>
   EXECUTION_POLICY[providerId]?.optionId
+
+/** The option and value under which this harness asks before each command, or undefined when it has none. */
+export function askingSetting(providerId: string): { optionId: string; value: string } | undefined {
+  const policy = EXECUTION_POLICY[providerId]
+  return policy?.asking ? { optionId: policy.optionId, value: policy.asking } : undefined
+}
 
 /** The rank of one value of the harness's policy option, or null when the table doesn't know it. */
 export function executionPolicyValueRank(providerId: string, value: string | null | undefined): number | null {

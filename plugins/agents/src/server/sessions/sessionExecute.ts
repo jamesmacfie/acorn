@@ -25,6 +25,7 @@ import {
   type GoalJudgePorts,
 } from './sessionGoal'
 import { StepGoal, type GoalDecision } from './stepGoal'
+import { askingSetting } from './executionPolicy'
 
 function turnEvents(snapshot: AgentSessionSnapshot, turnIds: readonly string[]): StreamEvent[] {
   return snapshot.events
@@ -252,17 +253,10 @@ async function applyRequestedConfig(
   await runtime.applyRequestedConfig(sessionId, wanted)
 }
 
-// The setting, by provider, under which the harness asks a person before each command. Claude Code's
-// `default` mode asks for every shell command, unless the owner's own settings allow that command.
-// A provider missing from this table can't show that it asks, so a turn that needs approval is refused
-// on it. Codex is missing because it doesn't report its approval policy, only its sandbox.
-const ASKING_SETTING: Record<string, { optionId: string; value: string }> = {
-  claude: { optionId: 'mode', value: 'default' },
-}
-
-/** Switches the session to the setting that asks before each command, then checks that it holds. */
+/** Switches the session to the setting that asks before each command, then checks that it holds. A
+ *  harness with no such setting (`askingSetting`) can't show that it asks, so the turn is refused. */
 async function requireAskingSetting(runtime: ManagedAgentRuntime, sessionId: string, providerId: string) {
-  const asking = ASKING_SETTING[providerId]
+  const asking = askingSetting(providerId)
   if (!asking) throw new Error(`This agent (${providerId}) can't be made to ask before each command it runs.`)
   await applyRequestedConfig(runtime, sessionId, { [asking.optionId]: asking.value })
   const { config } = await runtime.store.requireSession(sessionId)
