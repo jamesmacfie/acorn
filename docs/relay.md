@@ -117,13 +117,19 @@ pnpm --filter @acorn/relay start
 | `ACORN_RELAY_PREVIEW_DOMAIN` | A host name to take browsers' TLS connections on, for a Node's previews. | Unset, which serves none. |
 | `ACORN_RELAY_PREVIEW_PORT` | The port for those connections. | `443` |
 
-To run it as a container, build `apps/relay/Dockerfile` from the repository root and pass the same
-variables to `docker run`:
+To run it as a container, build `apps/relay/Dockerfile` from a committed revision of the repository
+and pass the same variables to `docker run`:
 
 ```sh
-docker build -f apps/relay/Dockerfile -t acorn-relay .
+git archive --format=tar HEAD | docker build -f apps/relay/Dockerfile -t acorn-relay -
 docker run -p 8443:8443 -e ACORN_RELAY_CREDENTIAL=$(openssl rand -hex 32) acorn-relay
 ```
+
+`git archive` sends only the files committed at that revision, so a local file such as `.env.local`
+never reaches the builder, which may be a remote machine. Name a commit in place of `HEAD` to build a
+release you've checked. If you build from the working checkout instead, the repository's
+`.dockerignore` sends only the paths the Dockerfile copies, without anything shaped like a credential,
+such as `.env*`, `.npmrc`, or key files.
 
 On a public network, serve `wss://`, either with a certificate and key or behind a proxy that
 terminates TLS. Plain `ws://` still carries only the Nodes' TLS, but it sends the credential in the

@@ -1,18 +1,22 @@
-# What `docker build .` leaves out of the context (apps/relay/Dockerfile). Mirrors .gitignore's build
-# output and local state, so the context is the tracked source.
+# What a build from the repository root may send to the builder. Only apps/relay/Dockerfile builds
+# from here. Everything is left out, then the paths its COPY lines name are let back in, so a new
+# local file is excluded by default. tools/arch/relayImage.test.mjs keeps this list equal to them.
+*
+!package.json
+!pnpm-lock.yaml
+!pnpm-workspace.yaml
+!patches
+!packages/protocol
+!apps/relay
+# Inside those paths, drop build output and anything shaped like a local credential. These come
+# after the paths above because a later line wins.
 **/node_modules
 **/dist
 **/.turbo
-.pnpm-store
-.acorn
-**/.acorn
-.git
-apps/node/release
-apps/desktop/src-tauri/target
-apps/desktop/src-tauri/binaries
-apps/desktop/src-tauri/gen
-references
-test-results
-.coverage
-**/.env
 **/*.log
+**/.env*
+**/.npmrc
+**/*.pem
+**/*.key
+**/*.p12
+**/*.pfx
