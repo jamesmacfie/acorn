@@ -133,6 +133,7 @@ pnpm test                                  # native rebuild, then every Vitest s
 pnpm db:check                              # replay every SQLite migration chain
 pnpm dist                                  # build and package the desktop app
 pnpm pack:node                             # build the standalone Node tarball
+pnpm lock:node                             # re-resolve the standalone Node's reviewed npm lockfile
 ```
 
 GitHub connects with acorn's public client ID, so development needs no environment file.

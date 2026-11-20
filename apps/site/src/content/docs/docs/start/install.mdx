@@ -16,7 +16,7 @@ sources:
   - plugins/onboarding/src/client/AiSetup.tsx
   - plugins/onboarding/src/client/CodeHostConnect.tsx
   - packages/client-core/src/features/fleet/NodeChip.tsx
-checked: 'e7c7447f7'
+checked: '3489fd328'
 ---
 
 import { Steps } from '@astrojs/starlight/components'
@@ -113,7 +113,7 @@ unpack and start it:
 tar -xzf acorn-node-*.tar.gz
 cd acorn-node
 npm ci --omit=dev
-npm rebuild
+npm run build-native
 node scripts/prune-runtime.mjs
 ACORN_DATA_DIR=/var/lib/acorn-node npm start
 ```

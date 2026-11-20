@@ -13,7 +13,7 @@ sources:
   - packages/client-core/src/features/settings/nodes/NodeReachSetting.tsx
   - packages/client-core/src/host/trust/PairingRequestDialog.tsx
   - packages/custody/src/local/pair.ts
-checked: '6857132fe'
+checked: '3489fd328'
 ---
 
 Pairing gives a client, such as the desktop app on your laptop, a token for a Node on another machine.

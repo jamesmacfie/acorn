@@ -123,7 +123,7 @@ target machine needs no Node.js, npm, or compiler.
 ```text
 bin/acorn, bin/acorn.cmd   launchers that run lib/bin/acorn.mjs on runtime/node
 runtime/                   the Node.js release node-runtime.json pins, with its LICENSE
-lib/                       the tarball's tree, with npm ci --omit=dev and the prune step already run
+lib/                       the tarball's tree, with npm ci, build-native, and the prune step already run
 install.sh                 the installer, install.ps1 on Windows (node-distribution/install.md)
 README.md, BUILD           how to check and install it; version, commit, build time, and platform
 ```
@@ -133,7 +133,8 @@ README.md, BUILD           how to check and install it; version, commit, build t
 checkout with a bare environment, then runs `scripts/node-archive/smoke.mjs`: help, a node-pty
 terminal, `node start`, `node status`, `node pair`, `node stop`, a log search for device tokens, and an
 install and uninstall where the runner isn't root or an administrator. A tag attaches each archive and its
-`.sha256` to the tag's GitHub release and publishes the [container image](./node-distribution/container.md).
+`.sha256` to the tag's GitHub release once, with a provenance attestation, and publishes the
+[container image](./node-distribution/container.md).
 
 The Linux archives build node-pty in a Debian 11 container, so they need glibc 2.31 or later: Ubuntu
 22.04, Debian 11, Raspberry Pi OS 11, or later. musl distributions such as Alpine can't run them. On
@@ -149,18 +150,18 @@ These steps install the platform-neutral tarball on a machine with its own Node.
 tar -xzf acorn-node-*.tar.gz
 cd acorn-node
 npm ci --omit=dev
-npm rebuild
+npm run build-native
 node scripts/prune-runtime.mjs
 ACORN_DATA_DIR=/var/lib/acorn-node npm start
 node bin/acorn.mjs --help
 ```
 
-`scripts/prune-runtime.mjs` removes installed files that no runtime loads, including the Claude Agent
-SDK's executable for this platform ([runtime file policy](./shell/packaging.md#runtime-file-policy)).
-It's a separate command because npm skips install scripts when `ignore-scripts` is set. Running it
-again removes nothing. Run it again after every `npm ci`. npm still downloads the executable package,
-because the lockfile lists it as an optional dependency, so the download is larger than what stays
-installed. The packer pins the Claude adapter to the version the policy reviewed, so `npm ci` can't
+The tarball's `.npmrc` turns install scripts off, and `build-native` runs only the reviewed ones
+([dependency security](./node-distribution/dependency-security.md)). `scripts/prune-runtime.mjs`
+removes installed files that no runtime loads, including the Claude Agent SDK's executable for this
+platform ([runtime file policy](./shell/packaging.md#runtime-file-policy)). Running it again removes
+nothing. Run both again after every `npm ci`. npm still downloads the executable package, because the
+lockfile lists it as an optional dependency, so the download is larger than what stays installed. The packer pins the Claude adapter to the version the policy reviewed, so `npm ci` can't
 install one the prune step refuses.
 
 Claude Code agents need `claude` installed on this machine and on the Node process's `PATH`. The Node
@@ -179,9 +180,8 @@ the packaged `node-forge`, loaded only when minting, so no OpenSSL executable is
 certificate persist under `tls/` and are reused, including ones OpenSSL made.
 
 `node-pty` is the only native module. It ships prebuilt binaries for macOS and Windows and compiles from
-source on Linux, which needs the usual build tools. If installation skipped lifecycle scripts, run
-`npm rebuild` before diagnosing a missing-bindings failure. The prune step keeps node-pty's sources, so
-a later `npm rebuild` still works.
+source on Linux, which needs the usual build tools. Run `npm run build-native` before diagnosing a
+missing-bindings failure. The prune step keeps node-pty's sources, so a later build still works.
 
 `SESSION_ENC_KEY` is optional. Unset, the Node generates one into `session.key` in the data root at mode
 `0600` and never mints it again. Agents on a standalone Node run as its user and can read that file,

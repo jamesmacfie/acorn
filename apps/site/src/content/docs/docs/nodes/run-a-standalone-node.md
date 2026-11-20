@@ -11,7 +11,7 @@ sources:
   - apps/node/src/composition/plugins.ts
   - scripts/pack-node.mjs
   - scripts/node-archive/README.md
-checked: 'adb301ec6'
+checked: '3489fd328'
 ---
 
 A standalone Node is acorn's Node with no desktop app: on a server, a build machine, or Linux, where the
@@ -66,11 +66,13 @@ module, compiles when you install.
    tar -xzf acorn-node-*.tar.gz
    cd acorn-node
    npm ci --omit=dev
-   npm rebuild
+   npm run build-native
    node scripts/prune-runtime.mjs
    ```
 
-   `prune-runtime.mjs` removes installed files nothing loads. Run it again after every `npm ci`.
+   The archive's settings stop `npm ci` from running any package's install script. `build-native`
+   runs only the ones the release allows, which build `node-pty`. `prune-runtime.mjs` removes
+   installed files nothing loads. Run both again after every `npm ci`.
 
 3. Start it, with a folder of its own for its data:
 

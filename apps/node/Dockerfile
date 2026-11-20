@@ -14,10 +14,11 @@ FROM node:24.21.0-bookworm-slim AS build
 RUN apt-get update \
   && apt-get install -y --no-install-recommends python3 make g++ \
   && rm -rf /var/lib/apt/lists/*
-# ADD unpacks a local tarball, which holds one acorn-node folder.
+# ADD unpacks a local tarball, which holds one acorn-node folder. Its .npmrc keeps install scripts off
+# during `npm ci`, and build-native runs only the ones the lockfile review allowed.
 ADD acorn-node-*.tar.gz /opt/
 WORKDIR /opt/acorn-node
-RUN npm ci --omit=dev --no-audit --no-fund && node scripts/prune-runtime.mjs
+RUN npm ci --omit=dev --no-audit --no-fund && npm run build-native && node scripts/prune-runtime.mjs
 
 FROM node:24.21.0-bookworm-slim
 # Links the published image to its repository (.github/workflows/build-node.yml pushes it on a tag).
@@ -26,8 +27,16 @@ LABEL org.opencontainers.image.source=https://github.com/jamesmacfie/acorn
 RUN apt-get update \
   && apt-get install -y --no-install-recommends ca-certificates git openssh-client ripgrep tmux \
   && rm -rf /var/lib/apt/lists/*
-# The agent CLIs the managed agents drive. The Node never downloads them itself.
-RUN npm install -g --no-audit --no-fund @anthropic-ai/claude-code @openai/codex && npm cache clean --force
+# The agent CLIs the managed agents drive. The Node never downloads them itself. Exact versions, so
+# the image changes only when this file does: each pins its platform packages exactly, and only Claude
+# Code's install script runs, which links its platform binary. Pick releases at least a week old, as
+# pnpm-workspace.yaml's minimumReleaseAge does for the workspace.
+ARG CLAUDE_CODE_VERSION=2.1.329
+ARG CODEX_VERSION=0.171.0
+RUN npm install -g --ignore-scripts --no-audit --no-fund \
+    "@anthropic-ai/claude-code@${CLAUDE_CODE_VERSION}" "@openai/codex@${CODEX_VERSION}" \
+  && npm rebuild -g @anthropic-ai/claude-code --ignore-scripts=false \
+  && npm cache clean --force
 RUN useradd --create-home --shell /bin/bash acorn && install -d -m 0700 -o acorn /data
 COPY --from=build /opt/acorn-node /opt/acorn-node
 # The Host check compares the port, so publish it at the same number: -p 4317:4317. Docker sets no

@@ -19,8 +19,10 @@
 //   migrations/    every Drizzle chain: core's at the root, each plugin's under its own name
 //   plugins/       the desktop's bundled loaded plugins (scripts/bundled-plugins.mjs), which the Node
 //                  reconciles into its data root on boot
-//   package.json   generated, listing only the real runtime dependencies (see RUNTIME below)
-//   package-lock.json  resolved at pack time, so every operator installs the same versions
+//   package.json   generated, listing only the real runtime dependencies (RUNTIME in scripts/node-standalone-lock.mjs)
+//   package-lock.json  the reviewed lockfile from apps/node/standalone, so every platform and operator
+//                  installs the same versions (scripts/node-standalone-lock.mjs)
+//   .npmrc         turns install scripts off, so only the allowed ones run, through `npm run build-native`
 //   README.md      pointing at docs/node-distribution.md
 //
 // ## Platform archives
@@ -42,8 +44,7 @@ import { parseArgs } from 'node:util'
 import { cachedLicense, cachedRuntime, sha256, tar } from '../apps/desktop/scripts/node-runtime.mjs'
 import { buildBundledPlugins } from './bundled-plugins.mjs'
 import { externalSpecifiers, packageName, readChunkGraph } from './chunkGraph.mts'
-import { requiredRuntimePackages } from './nodeRuntimePackages.ts'
-import { REVIEWED_PACKAGES } from './prune-runtime.mjs'
+import { allowedInstallScripts, LOCK_DIR, reviewedLock, RUNTIME, standaloneManifest } from './node-standalone-lock.mjs'
 import { runPnpm } from './run-pnpm.mjs'
 
 // Each archive platform and the target triple its pinned runtime is cached under.
@@ -74,21 +75,6 @@ const CLI_APP = join(ROOT, 'apps/cli')
 const TUI_APP = join(ROOT, 'apps/tui')
 const OUT = join(ROOT, 'apps/node/release')
 
-// The shared service/helper runtime set plus the terminal client's extra externals. Versions are read
-// from apps/desktop's manifest rather than repeated here, since that package already pins them for
-// the bundled node, so the packaged app and the standalone one cannot diverge.
-// `assertManifestCoversImports` below keeps the names honest.
-//
-// Node externals (apps/node/externals.ts), plus dependencies the terminal host externalizes. Other
-// third-party packages are inside the corresponding bundle already.
-const RUNTIME = [
-  ...requiredRuntimePackages,
-  // The terminal bundle leaves these Node-core imports external, even though the standalone service
-  // bundle includes them. They are required beside the shared `acorn` launcher.
-  'drizzle-orm',
-  'hono',
-]
-
 // Loaded through `createRequire(...)` rather than an import, and the two that would break a boot if
 // the manifest missed them. The build's graph must list both, or its require detection has gone blind
 // (scripts/chunkGraph.mts § requiredSpecifiers).
@@ -115,7 +101,7 @@ function assertManifestCoversImports(distDir, runtime) {
   if (missing.length) {
     throw new Error(
       `The generated package.json is missing packages ${distDir} imports: ${missing.join(', ')}.\n` +
-        'Add them to RUNTIME in scripts/pack-node.mjs (and to apps/desktop/package.json if they are new).',
+        'Add them to RUNTIME in scripts/node-standalone-lock.mjs (and to apps/desktop/package.json if they are new).',
     )
   }
   return { imported, required }
@@ -131,6 +117,15 @@ function stageMigrations(target) {
   for (const [name, dir] of chains) cpSync(dir, name ? join(target, name) : target, { recursive: true })
   return chains.length
 }
+
+// Every platform installs from the one reviewed lockfile, so the manifest it was resolved from must be
+// the one these sources produce now. `pnpm lock:node` resolves it again after a dependency change.
+const { manifest, runtime: standaloneRuntime } = standaloneManifest()
+const reviewed = reviewedLock()
+if (JSON.stringify(manifest) !== JSON.stringify(reviewed.manifest)) {
+  throw new Error('apps/node/standalone/package.json is out of date. Run `pnpm lock:node`, review the lockfile diff, and commit both.')
+}
+const installScripts = allowedInstallScripts(reviewed.lock)
 
 console.log('[pack-node] building the artifact')
 runPnpm(['--filter', '@acorn/node', 'build'], { cwd: ROOT, stdio: 'inherit' })
@@ -165,45 +160,7 @@ console.log(`[pack-node] staged ${chains} migration chains`)
 const plugins = buildBundledPlugins(join(staging, 'plugins'))
 console.log(`[pack-node] staged ${plugins.length} bundled plugins`)
 
-// Versions come from apps/desktop's manifest, the package that already pins them for the bundled node,
-// so the standalone one cannot drift from it. `catalog:` entries are resolved out of pnpm-workspace.yaml,
-// which is where the single-versioned packages live (a duplicate zod means schema instances that fail
-// each other's instanceof checks, which is why they are pinned there in the first place).
 const desktop = read(join(ROOT, 'apps/desktop/package.json'))
-const tui = read(join(TUI_APP, 'package.json'))
-const workspaceText = readFileSync(join(ROOT, 'pnpm-workspace.yaml'), 'utf8')
-const workspaceLines = workspaceText.split(/\r?\n/)
-const catalogStart = workspaceLines.indexOf('catalog:') + 1
-if (catalogStart === 0) throw new Error('pnpm-workspace.yaml has no catalog section.')
-const catalogEnd = workspaceLines.findIndex((line, index) => index >= catalogStart && /^[^\s#]/.test(line))
-const catalog = Object.fromEntries(
-  workspaceLines
-    .slice(catalogStart, catalogEnd === -1 ? undefined : catalogEnd)
-    .map((line) => /^\s{2}([@\w./-]+):\s*"([^"]+)"\s*$/.exec(line))
-    .filter((match) => match !== null)
-    .map((match) => [match[1], match[2]]),
-)
-
-const dependencies = {}
-const standaloneRuntime = new Set([...RUNTIME, ...Object.keys(tui.dependencies ?? {}).filter((name) => !name.startsWith('@acorn/'))])
-for (const name of standaloneRuntime) {
-  const declared = desktop.dependencies?.[name] ?? tui.dependencies?.[name]
-  if (!declared) throw new Error(`${name} is in the standalone runtime set but has no declared version.`)
-  const version = declared === 'catalog:' ? catalog[name] : declared
-  if (!version) throw new Error(`${name} is declared as 'catalog:' but pnpm-workspace.yaml has no entry for it.`)
-  dependencies[name] = version
-}
-// A provider's compatible range can still select a release requiring a newer Node than Acorn.
-// These narrow pins match the tested workspace graph; the root manifest owns their rationale.
-for (const [name, version] of Object.entries(workspaceManifest.acornStandalone.dependencyPins)) {
-  if (!Object.hasOwn(dependencies, name)) throw new Error(`${name} is pinned but absent from the standalone runtime set.`)
-  dependencies[name] = version
-}
-// The install prunes against exact reviewed versions and refuses any other, so lock those versions here.
-// The adapter pins its SDK exactly, which covers the one reviewed package that isn't direct.
-for (const [name, { version }] of Object.entries(REVIEWED_PACKAGES)) {
-  if (Object.hasOwn(dependencies, name)) dependencies[name] = version
-}
 // The terminal's Markdown renderer imports mermaid on first use and leaves a diagram as code when it is
 // absent (packages/client-core/src/kit/lib/rendering/mermaid.ts). The standalone install leaves it out.
 // @openuidev/lang-core imports ci-info inside a try and reports "not in CI" when it's missing, so it stays out too.
@@ -214,9 +171,9 @@ writeFileSync(
   join(staging, 'package.json'),
   `${JSON.stringify(
     {
-      name: 'acorn-node',
+      name: manifest.name,
       version: desktop.version,
-      private: true,
+      private: manifest.private,
       type: 'module',
       // The entry an operator runs, and the one a launchd plist or systemd unit points at.
       main: 'dist/standalone.js',
@@ -225,36 +182,25 @@ writeFileSync(
       // require. It is accurate about the API's status and useless to an operator who did not choose
       // the storage engine, and it lands in the middle of the pairing banner. Scoped to this one
       // warning class rather than --no-warnings, so a real deprecation still gets through.
-      scripts: { start: 'node --disable-warning=ExperimentalWarning dist/standalone.js' },
+      scripts: {
+        start: 'node --disable-warning=ExperimentalWarning dist/standalone.js',
+        // Runs the install scripts the lockfile review allowed, which .npmrc turns off for `npm ci`.
+        // An empty list would make `npm rebuild` rebuild every package.
+        'build-native': installScripts.length ? `npm rebuild ${installScripts.join(' ')} --ignore-scripts=false` : 'node -e ""',
+      },
       // npm warns on a mismatch; plugin worker factories also enforce this security floor.
       engines: { node: NODE_ENGINES },
-      dependencies,
-      // npm does not inherit pnpm-workspace.yaml; carry the verified runtime security floors.
-      overrides: {
-        ...Object.fromEntries(
-          Object.entries(workspaceManifest.overrides).map(([name, version]) => [
-            name,
-            // npm requires a direct dependency's override to match its declared specifier. A $ref
-            // also keeps transitive copies aligned with that dependency's patched manifest floor.
-            Object.hasOwn(dependencies, name) ? `$${name}` : version,
-          ]),
-        ),
-        ...workspaceManifest.acornStandalone.peerOverrides,
-      },
+      dependencies: manifest.dependencies,
+      overrides: manifest.overrides,
     },
     null,
     2,
   )}\n`,
 )
 
-// Resolve the tree once, here, so every operator installs the same versions and npm checks each
-// download against the hash recorded now. `--before` applies pnpm's minimumReleaseAge, so a version
-// published within that window can't enter the lockfile.
-const minimumReleaseAge = Number(/^minimumReleaseAge: (\d+)$/m.exec(workspaceText)?.[1])
-if (!minimumReleaseAge) throw new Error('pnpm-workspace.yaml has no minimumReleaseAge.')
-const before = new Date(Date.now() - minimumReleaseAge * 60_000).toISOString()
-npm(['install', '--package-lock-only', '--ignore-scripts', '--no-audit', '--no-fund', `--before=${before}`], staging)
-console.log(`[pack-node] locked the runtime dependencies to releases before ${before}`)
+cpSync(join(LOCK_DIR, 'package-lock.json'), join(staging, 'package-lock.json'))
+writeFileSync(join(staging, '.npmrc'), 'ignore-scripts=true\n')
+console.log(`[pack-node] staged the reviewed lockfile. Install scripts allowed: ${installScripts.join(', ') || 'none'}`)
 
 writeFileSync(
   join(staging, 'README.md'),
@@ -268,7 +214,8 @@ writeFileSync(
     'never downloads it.',
     '',
     '```sh',
-    'npm ci --omit=dev   # installs the locked versions; builds node-pty against THIS Node if no prebuilt fits',
+    'npm ci --omit=dev   # installs the locked versions; .npmrc keeps every install script off',
+    'npm run build-native   # runs only the reviewed install scripts; builds node-pty against THIS Node if no prebuilt fits',
     'node scripts/prune-runtime.mjs   # removes files no runtime loads, including the SDK\'s Claude executable',
     'ACORN_DATA_DIR=<a folder for its data> node dist/standalone.js',
     'node bin/acorn.mjs --help   # headless commands; no arguments open the terminal client',
@@ -303,6 +250,7 @@ async function packPlatformArchive(tree) {
   mkdirSync(root)
   renameSync(tree, lib)
   npm(['ci', '--omit=dev', '--no-audit', '--no-fund'], lib)
+  npm(['run', 'build-native'], lib)
   execFileSync(process.execPath, ['scripts/prune-runtime.mjs'], { cwd: lib, stdio: 'inherit' })
   // Its steps are the ones this function has already run. The archive's own README replaces it.
   rmSync(join(lib, 'README.md'))

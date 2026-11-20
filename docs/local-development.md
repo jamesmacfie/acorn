@@ -109,7 +109,7 @@ node apps/cli/bin/acorn.mjs node stop --output json
 
 Keep the same `ACORN_DATA_DIR` for later commands, including `node stop`. The service uses the
 standalone Node bundle. Run the CLI suite with `pnpm --filter @acorn/cli test`. To check the packed
-artifact, run `pnpm pack:node`, then `npm install --omit=dev` inside the extracted archive.
+artifact, run `pnpm pack:node`, then `npm ci --omit=dev` and `npm run build-native` inside the extracted archive.
 [CLI](./cli.md) covers resource schemas, pairing, and examples.
 
 ## Native ABI

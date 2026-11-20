@@ -18,8 +18,8 @@ is wrong.
 The bridge is the CLI's native host. The browser starts it through a registration that names a
 launcher script, so install it from the copy of the CLI you keep:
 
-1. Unpack the standalone archive from `pnpm pack:node`, then run `npm ci --omit=dev` and
-   `node scripts/prune-runtime.mjs` inside it, as [Node distribution](../node-distribution.md) says.
+1. Unpack the standalone archive from `pnpm pack:node`, then run `npm ci --omit=dev`,
+   `npm run build-native`, and `node scripts/prune-runtime.mjs` inside it, as [Node distribution](../node-distribution.md) says.
    From a checkout, run `pnpm --filter @acorn/cli build` instead.
 2. In your own terminal, run `node bin/acorn.mjs browser install`, or
    `node apps/cli/bin/acorn.mjs browser install` in a checkout. An agent's task session can't run it,

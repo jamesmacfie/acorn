@@ -96,31 +96,63 @@ jobs:
           retention-days: 14
 
   # A tag attaches every archive and its checksum to the tag's GitHub release, so a machine can download
-  # one with curl long after the run's artifacts expire. The installers stay off it until they're signed
-  # (build-desktop.yml's publish job). Run again for the same tag, it replaces the files.
+  # one with curl long after the run's artifacts expire, with a provenance attestation for each. The
+  # installers stay off it until they're signed (build-desktop.yml's publish job).
   # It runs when an archive job fails too, because an archive is uploaded only after its smoke test
-  # passes, so one platform's failure leaves the others' release files out for no reason.
+  # passes, so one platform's failure leaves the others' release files out for no reason. Run again for
+  # the same tag, it adds the missing platforms and never replaces a published file.
   release:
     needs: archive
     if: ${{ !cancelled() && startsWith(github.ref, 'refs/tags/v') }}
     runs-on: ubuntu-24.04
     permissions:
       contents: write
+      id-token: write
+      attestations: write
     steps:
       - uses: actions/download-artifact@634f93cb2916e3fdff6788551b99b062d0335ce0 # v5
         with:
           pattern: acorn-node-*
           path: archives
           merge-multiple: true
+      # A rebuild isn't byte-identical, so a published archive and its checksum stay as they are, and
+      # this run's copies of them are dropped. Half a pair would leave a checksum for different bytes.
       # Through the environment, never interpolated into the script: a tag name is untrusted text here.
-      - name: Attach the archives to the release
+      - name: Keep the archives the release already has
         env:
           GH_TOKEN: ${{ github.token }}
           GH_REPO: ${{ github.repository }}
           TAG: ${{ github.ref_name }}
         run: |
           gh release view "$TAG" >/dev/null 2>&1 || gh release create "$TAG" --verify-tag --title "$TAG" --notes ""
-          gh release upload "$TAG" archives/* --clobber
+          published=$(gh release view "$TAG" --json assets --jq '.assets[].name')
+          for checksum in archives/*.sha256; do
+            archive=${checksum%.sha256}
+            name=${archive##*/}
+            state=$(grep -cxF "$name" <<<"$published" || true)$(grep -cxF "$name.sha256" <<<"$published" || true)
+            if [ "$state" = 11 ]; then
+              echo "$name is already published. Keeping it."
+              rm "$archive" "$checksum"
+            elif [ "$state" != 00 ]; then
+              echo "::error::The release has only one of $name and its checksum. Delete that file from the release, then run again."
+              exit 1
+            fi
+          done
+
+      - name: Attest the provenance of the new archives
+        if: hashFiles('archives/*') != ''
+        uses: actions/attest-build-provenance@4d101475d8b20a2381f78447822ac1eab6504dd8 # v4.2.2
+        with:
+          subject-path: archives/*
+
+      # Without --clobber, an upload fails rather than replace a file of the same name.
+      - name: Attach the new archives to the release
+        if: hashFiles('archives/*') != ''
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          TAG: ${{ github.ref_name }}
+        run: gh release upload "$TAG" archives/*
       # A release published with the workflow token starts no other workflow, so this asks site.yml to
       # redeploy the site with the new downloads. It's sent after the upload so the build sees the files.
       - name: Redeploy the site
@@ -131,13 +163,15 @@ jobs:
 
   # The standalone Node as a Linux container image (docs/node-distribution/container.md). It's for x64
   # only, because the image compiles node-pty and an arm64 build would run under emulation. A tag pushes
-  # it to the GitHub container registry. A manual run builds and starts it but pushes nothing, so a
-  # branch never replaces `latest`.
+  # it to the GitHub container registry once, with a provenance attestation. A manual run builds and
+  # starts it but pushes nothing, so a branch never replaces `latest`.
   image:
     runs-on: ubuntu-24.04
     permissions:
       contents: read
       packages: write
+      id-token: write
+      attestations: write
     steps:
       - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
         with:
@@ -167,14 +201,32 @@ jobs:
           docker logs acorn-node
           exit 1
 
+      # A version that's already in the registry keeps its image, and `latest` stays where it is.
       - name: Push the image
+        id: push
         if: startsWith(github.ref, 'refs/tags/v')
         env:
           TOKEN: ${{ github.token }}
         run: |
           image="ghcr.io/${GITHUB_REPOSITORY_OWNER,,}/acorn-node"
+          version="${GITHUB_REF_NAME#v}"
           echo "$TOKEN" | docker login ghcr.io -u "$GITHUB_ACTOR" --password-stdin
-          for tag in "${GITHUB_REF_NAME#v}" latest; do
+          if docker manifest inspect "$image:$version" >/dev/null 2>&1; then
+            echo "$image:$version is already published. Keeping it."
+            exit 0
+          fi
+          for tag in "$version" latest; do
             docker tag acorn-node "$image:$tag"
             docker push "$image:$tag"
           done
+          digest=$(docker inspect --format '{{index .RepoDigests 0}}' "$image:$version")
+          echo "name=$image" >> "$GITHUB_OUTPUT"
+          echo "digest=${digest#*@}" >> "$GITHUB_OUTPUT"
+
+      - name: Attest the provenance of the image
+        if: steps.push.outputs.digest
+        uses: actions/attest-build-provenance@4d101475d8b20a2381f78447822ac1eab6504dd8 # v4.2.2
+        with:
+          subject-name: ${{ steps.push.outputs.name }}
+          subject-digest: ${{ steps.push.outputs.digest }}
+          push-to-registry: true
