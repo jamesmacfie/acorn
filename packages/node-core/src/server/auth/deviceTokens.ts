@@ -11,7 +11,7 @@ import { recordAudit, type AuditActor } from '../audit'
 // random secret makes offline hash guessing infeasible, so nothing reversible is layered on.
 //
 // Every paired device has full owner authority, disclosed at pairing, except a phone's, which is held
-// to fewer routes (`phoneRules`) and expires when unused. Device revocation is the lifecycle control;
+// to fewer routes (`phoneRules`) until a computer gives it shell access, and expires when unused. Device revocation is the lifecycle control;
 // there are no per-token scopes because this is single-owner software.
 
 // acorn_dt_<uuid>_<base64url(32 bytes)>. Anchored, so trailing garbage or whitespace is rejected
@@ -40,11 +40,14 @@ type DeviceSummary = PairedDevice
 
 type IssuedDevice = { token: string; device: DeviceSummary }
 
+// Who a bearer belongs to. `shellAccess` is set only for a phone a computer let run commands.
+type AuthenticatedDevice = { deviceId: string; kind?: 'phone'; shellAccess?: true }
+
 export type DeviceService = {
   // `kind` is `phone` for a device paired through a phone's channel.
   issue(name: string, kind?: 'phone'): Promise<IssuedDevice>
   // Resolves a raw bearer to a device id, or null. See the uniform-null note on the implementation.
-  authenticate(bearer: string | undefined): Promise<{ deviceId: string; kind?: 'phone' } | null>
+  authenticate(bearer: string | undefined): Promise<AuthenticatedDevice | null>
   list(): Promise<DeviceSummary[]>
   // True if the device existed (whether or not it was already revoked); false if it never existed,
   // which is how a route decides between 204 and 404.
@@ -57,6 +60,11 @@ export type DeviceService = {
   // Fires after a successful revoke so live sockets for that device close immediately
   // (docs/api-reference/transport.md § Pairing: "open sockets are closed").
   onRevoked(listener: (deviceId: string) => void): () => void
+  // Give a phone shell access, or take it away (docs/relay/phone-channel/phone-devices.md § Shell access). False when
+  // the device doesn't exist, is revoked, or isn't a phone.
+  setShellAccess(id: string, granted: boolean, actor?: AuditActor): Promise<boolean>
+  // Fires after a phone's shell access changes, so its live sockets close and reopen with the new grant.
+  onShellAccessChanged(listener: (deviceId: string) => void): () => void
   // Is this device still allowed? The 60s stream re-check reads this rather than re-authenticating,
   // because a long-lived socket holds no bearer to re-present.
   isActive(id: string): Promise<boolean>
@@ -84,10 +92,12 @@ const summarize = (row: typeof schema.devices.$inferSelect): DeviceSummary => ({
   lastSeenAt: row.lastSeenAt,
   revokedAt: row.revokedAt,
   ...(row.kind ? { kind: row.kind } : {}),
+  ...(row.kind === 'phone' ? { shellAccess: row.shellAccessAt !== null } : {}),
 })
 
 export function deviceService(db: AppDatabase, now: () => number = () => Date.now()): DeviceService {
   const revokeListeners = new Set<(deviceId: string) => void>()
+  const shellListeners = new Set<(deviceId: string) => void>()
 
   // Resolved bearers, keyed by sha256 of the whole token so the secret itself is never a map key. The
   // hash is still computed per request — it is the lookup key, and it is what the comparison below
@@ -95,7 +105,7 @@ export function deviceService(db: AppDatabase, now: () => number = () => Date.no
   //
   // A miss is the only path that reads the row, so `revokedAt` is re-checked on every miss. A revoke
   // through this service drops every entry for that device before it notifies anyone.
-  const warm = new Map<string, { deviceId: string; kind?: 'phone'; at: number }>()
+  const warm = new Map<string, AuthenticatedDevice & { at: number }>()
   const forget = (deviceId: string): void => {
     for (const [key, entry] of warm) if (entry.deviceId === deviceId) warm.delete(key)
   }
@@ -162,8 +172,10 @@ export function deviceService(db: AppDatabase, now: () => number = () => Date.no
 
       const key = sha256(bearer).toString('base64')
       const cached = warm.get(key)
-      if (cached && now() - cached.at < AUTH_CACHE_TTL_MS)
-        return { deviceId: cached.deviceId, ...(cached.kind ? { kind: cached.kind } : {}) }
+      if (cached && now() - cached.at < AUTH_CACHE_TTL_MS) {
+        const { at: _at, ...device } = cached
+        return device
+      }
       warm.delete(key)
 
       const [row] = await db.select().from(schema.devices).where(eq(schema.devices.id, id)).limit(1)
@@ -193,9 +205,13 @@ export function deviceService(db: AppDatabase, now: () => number = () => Date.no
         })()
       }
 
-      const kind = row.kind ?? undefined
-      warm.set(key, { deviceId: id, ...(kind ? { kind } : {}), at: now() })
-      return { deviceId: id, ...(kind ? { kind } : {}) }
+      const device: AuthenticatedDevice = {
+        deviceId: id,
+        ...(row.kind ? { kind: row.kind } : {}),
+        ...(row.kind === 'phone' && row.shellAccessAt !== null ? { shellAccess: true as const } : {}),
+      }
+      warm.set(key, { ...device, at: now() })
+      return device
     },
 
     async list() {
@@ -208,6 +224,34 @@ export function deviceService(db: AppDatabase, now: () => number = () => Date.no
     onRevoked(listener) {
       revokeListeners.add(listener)
       return () => revokeListeners.delete(listener)
+    },
+
+    async setShellAccess(id, granted, actor = { actor: 'system' as const }) {
+      const [row] = await db
+        .select({
+          kind: schema.devices.kind,
+          revokedAt: schema.devices.revokedAt,
+          shellAccessAt: schema.devices.shellAccessAt,
+        })
+        .from(schema.devices)
+        .where(eq(schema.devices.id, id))
+        .limit(1)
+      if (!row || row.kind !== 'phone' || row.revokedAt !== null) return false
+      if ((row.shellAccessAt !== null) === granted) return true
+      await db
+        .update(schema.devices)
+        .set({ shellAccessAt: granted ? now() : null })
+        .where(eq(schema.devices.id, id))
+      recordAudit(db, { ...actor, action: granted ? 'device.shell.granted' : 'device.shell.revoked', subject: id })
+      // A warm entry would answer with the old grant for up to a minute.
+      forget(id)
+      for (const listener of shellListeners) listener(id)
+      return true
+    },
+
+    onShellAccessChanged(listener) {
+      shellListeners.add(listener)
+      return () => shellListeners.delete(listener)
     },
 
     async isActive(id) {

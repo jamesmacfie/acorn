@@ -135,7 +135,8 @@ export const githubPlugin = (): NodePlugin => {
       // data, so they load on that first request, in the order `mirrorRoutes` keeps.
       ctx.routes.register(
         lazyRouter(async () => (await import('../server/routes/mirrorRoutes')).mirrorRoutes(store, ctx.core, emit)),
-        { prefix: '/repos', note: 'repository and pull request mirror' },
+        // A phone may act on GitHub, which runs nothing on this computer.
+        { prefix: '/repos', note: 'repository and pull request mirror', phone: ['* /*'] },
       )
       ctx.routes.register(taskPulls(ctx.core), { prefix: '/tasks', note: '/:taskId/pulls — durable task PR relations' })
       ctx.routes.register(

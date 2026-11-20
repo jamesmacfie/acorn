@@ -21,6 +21,7 @@ import { customAgentRegistry, readCustomAgents } from '../customAgents'
 import { customAgentSnapshot, sessionCustomAgent, type CustomAgent } from '../../shared/customAgents'
 import { delegatedToolCeiling } from '../delegation/policy'
 import { agentChosenOptions } from './executionPolicy'
+import { assertPhoneKeepsAsking, assertPhoneMayAnswer } from './phoneTurns'
 import { parseToolCeiling } from '@acorn/protocol/toolPolicy.ts'
 import { SessionTitleGeneration } from './sessionTitleGeneration'
 import { SessionDefaultsCommands } from './sessionDefaultsCommands'
@@ -808,6 +809,8 @@ export class ManagedAgentRuntime {
     providerRequestId: string,
     resolution: unknown,
     idempotencyKey: string,
+    // Set when a phone without shell access answers (./phoneTurns.ts).
+    options: { phoneWithoutShell?: boolean } = {},
   ): Promise<AgentRequest> {
     assertBoundedJson('Agent request resolution', resolution, MAX_AGENT_RESOLUTION_BYTES)
     const existing = await this.store.request(sessionId, providerRequestId)
@@ -815,6 +818,7 @@ export class ManagedAgentRuntime {
       throw new Error('Agent request not found.')
     }
     if (existing.status === 'resolved' || existing.status === 'expired') return existing
+    if (options.phoneWithoutShell) assertPhoneMayAnswer(await this.store.requireSession(sessionId), existing)
     assertOfferedOption(existing, resolution)
     const claim = await this.store.claimRequestResolution(sessionId, providerRequestId, resolution, idempotencyKey)
     if (!claim.claimed) return claim.request
@@ -861,7 +865,8 @@ export class ManagedAgentRuntime {
     sessionId: string,
     patch: { title?: string; archived?: boolean; lastReadSeq?: number; config?: Record<string, unknown> },
     // `changedBy` names a plugin that changed an option, so the person can see who changed their model.
-    options: { remember?: boolean; changedBy?: string } = {},
+    // `phoneWithoutShell` holds a phone without shell access to modes that ask first (./phoneTurns.ts).
+    options: { remember?: boolean; changedBy?: string; phoneWithoutShell?: boolean } = {},
   ): Promise<AgentSession> {
     const before = await this.store.requireSession(sessionId)
     let persistedPatch = patch
@@ -904,6 +909,14 @@ export class ManagedAgentRuntime {
           },
         ]
       })
+      if (options.phoneWithoutShell) {
+        // The options the next start applies count too, or a phone could widen the mode for later.
+        const requestedBefore = stringValues(before.config.requestedConfigOptions)
+        const requested = Object.entries(stringValues(patch.config.requestedConfigOptions))
+          .filter(([id, value]) => requestedBefore[id] !== value)
+          .map(([id, value]) => ({ id, value }))
+        assertPhoneKeepsAsking(before.providerId, [...changed, ...requested])
+      }
       if (changed.length) {
         const live = await this.engine.ensureSession(before)
         for (const option of changed) {

@@ -50,7 +50,7 @@ export const editorPlugin = (): NodePlugin => {
       // authenticated WebSocket, so it is part of this plugin's surface: drop it and the routes keep
       // working while terminal mode opens onto a box that never fills.
       registerEditorWsChannel(ctx.events, ctx.core)
-      ctx.routes.register(search, { prefix: '/tasks', note: '/:id/search' })
+      ctx.routes.register(search, { prefix: '/tasks', note: '/:id/search', phone: ['POST /:id/search'] })
       ctx.routes.register(editor, { prefix: '/tasks', note: '/:id/editor/*' })
       ctx.routes.fetch(
         async (request, context) =>

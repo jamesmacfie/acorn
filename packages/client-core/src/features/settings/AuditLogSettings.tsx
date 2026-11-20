@@ -31,6 +31,8 @@ const ACTION_LABELS: Record<string, string> = {
   'pairing.request.raised': 'Pairing request from your account',
   'device.paired': 'Device paired',
   'device.revoked': 'Device revoked',
+  'device.shell.granted': 'Phone given shell access',
+  'device.shell.revoked': 'Phone shell access removed',
   'secret.created': 'Credential connected',
   'secret.replaced': 'Credential replaced',
   'secret.deleted': 'Credential removed',

@@ -27,6 +27,9 @@ type CoreAuditAction =
   | 'pairing.request.raised'
   | 'device.paired'
   | 'device.revoked'
+  // A computer let a phone run commands on the Node, or took that away.
+  | 'device.shell.granted'
+  | 'device.shell.revoked'
   // Credentials, write side only. `secret.used` is not recorded (docs/security/audit.md § Audit explains
   // why).
   | 'secret.created'

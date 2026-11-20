@@ -26,10 +26,17 @@ const PLUGIN_ID_RE = /^[a-z][a-z0-9-]*$/
 // `fetch` handler, because a Hono instance is a live object from the plugin's realm and cannot
 // cross the worker boundary (docs/security/plugin-storage-and-supply-chain.md § Design rules).
 // Everything downstream, the mount path, the auth envelope, per-plugin removal, is identical.
-export type RouteContribution = { plugin: string; prefix: string; note?: string } & (
-  | { router: Hono<AppEnv>; fetch?: never }
-  | { fetch: PluginFetchHandler; router?: never }
-)
+//
+// `phone` names the writes under the mount that a phone without shell access may make, and `loopback`
+// marks a mount that reaches one of this Node's loopback ports. The phone rules read both
+// (../middleware/phoneRules.ts).
+export type RouteContribution = {
+  plugin: string
+  prefix: string
+  note?: string
+  phone?: readonly PhoneWrite[]
+  loopback?: true
+} & ({ router: Hono<AppEnv>; fetch?: never } | { fetch: PluginFetchHandler; router?: never })
 
 export class RouteRegistry {
   readonly #contributions: RouteContribution[] = []
@@ -81,6 +88,45 @@ export function routeMountPath(contribution: RouteContribution): string {
 }
 
 const registry = new RouteRegistry()
+
+// A write a phone without shell access may make, as a method and a path relative to the mount
+// (docs/relay/phone-channel/phone-devices.md § What a phone device may do). `:name` is one segment and a final `/*` is the rest.
+// `*` for the method is any write.
+export type PhoneWrite = `${'POST' | 'PUT' | 'PATCH' | 'DELETE' | '*'} ${string}`
+
+const PHONE_WRITE_METHODS = ['POST', 'PUT', 'PATCH', 'DELETE']
+const escapeRegExp = (text: string) => text.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+// Case-insensitive, because the phone rules match a lower-cased path.
+function phonePathPattern(mount: string, path: string): RegExp {
+  const rest = path.endsWith('/*')
+  const segments = `${mount}${rest ? path.slice(0, -2) : path}`
+    .split('/')
+    .map((segment) => (segment.startsWith(':') ? '[^/]+' : escapeRegExp(segment)))
+  return new RegExp(`^${segments.join('/')}${rest ? '/.+' : ''}$`, 'i')
+}
+
+/**
+ * How the phone rules treat a request under a plugin's namespace, for a path already decoded and
+ * normalized: `write` when a contribution names it as a phone write, `loopback` when it reaches a loopback
+ * mount, which a phone without shell access may only open, and null otherwise.
+ */
+export function pluginPhoneAccess(method: string, path: string): 'write' | 'loopback' | null {
+  for (const contribution of registry.list()) {
+    if (!contribution.loopback) continue
+    const mount = routeMountPath(contribution)
+    if (method === 'POST' && phonePathPattern(mount, '/__acorn/open').test(path)) return 'write'
+    if (phonePathPattern(mount, '').test(path) || phonePathPattern(mount, '/*').test(path)) return 'loopback'
+  }
+  for (const contribution of registry.list()) {
+    for (const write of contribution.phone ?? []) {
+      const [writeMethod, writePath] = write.split(' ', 2) as [string, string]
+      const methods = writeMethod === '*' ? PHONE_WRITE_METHODS : [writeMethod]
+      if (methods.includes(method) && phonePathPattern(routeMountPath(contribution), writePath).test(path))
+        return 'write'
+    }
+  }
+  return null
+}
 
 export function registerRoute(contribution: RouteContribution): Disposable {
   return registry.register(contribution)

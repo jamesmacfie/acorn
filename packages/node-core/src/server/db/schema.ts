@@ -362,6 +362,10 @@ export const devices = sqliteTable(
     // through a phone's channel (`phoneRules` middleware). Null for everything else, which has full owner
     // authority.
     kind: text('kind', { enum: ['phone'] }),
+    // When a computer let this phone run commands on the Node
+    // (docs/relay/phone-channel/phone-devices.md § Shell access). Null for no grant, and always null for
+    // a device that isn't a phone.
+    shellAccessAt: integer('shell_access_at'),
   },
   (t) => [index('devices_revoked_idx').on(t.revokedAt)],
 )

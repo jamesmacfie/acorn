@@ -40,7 +40,9 @@ A phone draws panes and no drawers, so the plugin registers a **Terminal** pane 
 (`TerminalPane.tsx`) draw one body, `TerminalSessions.tsx`: the tab strip, the profile menu, and a
 surface per session. The drawer adds its box, grip, and Hide. The pane loads after the first frame.
 
-The sessions live on the Node, so a phone reaches them over its channel like any client. With no
+The sessions live on the Node, so a phone reaches them over its channel like any client. A phone
+needs [shell access](../relay/phone-channel/phone-devices.md#shell-access) from a computer to start a session or
+type into one. Without it, the Node refuses both and the pane only shows output. With no
 sessions, the pane starts one from the default profile in **Settings** > **Terminal**, as the drawer's
 button does, or shows **New terminal**. Leaving the pane leaves its sessions running, as hiding the
 drawer does, and closing the last tab leaves the pane empty.

@@ -153,7 +153,7 @@ The CLI, the terminal client, and the browser bridge keep the owner's device tok
 client config folder. The read block is what keeps agents from them. Sealing them with the platform
 keychain, as the desktop does, is the follow-up; the CLI also runs on Linux and beside a standalone Node,
 where there's no keychain to use. A phone keeps its token encrypted in the browser's storage
-([the phone channel](../relay/phone-channel.md#a-device-for-each-phone)).
+([the phone channel](../relay/phone-channel/phone-devices.md#a-device-for-each-phone)).
 
 ### Upgrading a Node with plain key files
 

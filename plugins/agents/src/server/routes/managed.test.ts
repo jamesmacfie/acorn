@@ -576,3 +576,48 @@ describe('open requests', () => {
       expect((await app.fetch(req('/api/requests'), {} as Env)).status).toBe(403)
   })
 })
+
+// A phone without shell access drives agents only where each command waits for a person
+// (plugins/agents/src/server/sessions/phoneTurns.ts). The routes say who sent the work.
+describe('a phone without shell access', () => {
+  afterEach(() => setManagedAgentsBridge(null))
+  const phone = (shellAccess?: true) =>
+    as({
+      kind: 'device',
+      userId: 'james',
+      deviceId: 'p1',
+      deviceKind: 'phone',
+      ...(shellAccess ? { shellAccess } : {}),
+    })
+  const turn = { input: [{ type: 'text', text: 'Run it' }] }
+
+  it('marks the turns it sends, and a phone with shell access sends unmarked ones', async () => {
+    const enqueue = vi.fn(async () => ({}))
+    setManagedAgentsBridge(fake({ enqueueTurn: enqueue as never }))
+    expect((await phone().fetch(req('/api/sessions/s1/turns', 'POST', turn), {} as Env)).status).toBe(200)
+    expect((await phone(true).fetch(req('/api/sessions/s1/turns', 'POST', turn), {} as Env)).status).toBe(200)
+    expect(enqueue.mock.calls.map((call) => (call as unknown[])[1])).toMatchObject([
+      { effectivePolicy: { fromPhoneWithoutShell: true } },
+      { effectivePolicy: {} },
+    ])
+  })
+
+  it('tells the runtime who answers a request or changes a session', async () => {
+    const resolve = vi.fn(async () => ({}))
+    const patch = vi.fn(async () => ({}))
+    setManagedAgentsBridge(fake({ resolveRequest: resolve as never, patchSession: patch as never }))
+    await phone().fetch(
+      req('/api/sessions/s1/requests/r1/resolve', 'POST', { resolution: { optionId: 'allow' } }),
+      {} as Env,
+    )
+    await phone().fetch(req('/api/sessions/s1', 'PATCH', { title: 'Renamed' }), {} as Env)
+    expect((resolve.mock.calls[0] as unknown[])[4]).toEqual({ phoneWithoutShell: true })
+    expect((patch.mock.calls[0] as unknown[])[2]).toEqual({ phoneWithoutShell: true })
+  })
+
+  it('can’t rewrite a queued turn, which would reach the agent unmarked', async () => {
+    setManagedAgentsBridge(fake())
+    const res = await phone().fetch(req('/api/sessions/s1/turns/t1', 'PATCH', turn), {} as Env)
+    expect(res.status).toBe(403)
+  })
+})

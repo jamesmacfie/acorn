@@ -1,6 +1,7 @@
 // The Node-side plugin interface. The host binds each plugin's route namespace and owns its
 // registration/disposal records; cross-plugin behavior is resolved through typed capabilities,
 // provider registries and contracts, and clients are told about change through broadcasts.
+import type { PhoneWrite } from '../routes/registry'
 import type { Hono } from 'hono'
 import type { DataFeedEvent } from '@acorn/protocol/eventFeeds.ts'
 import type { Cadence } from '@acorn/protocol/schedules.ts'
@@ -50,6 +51,9 @@ type PluginRouteOptions = {
   // task-scoped sub-resources. The effective mount is /v1/p/<plugin><prefix>.
   prefix?: string
   note?: string
+  // The writes here that a phone without shell access may make (`PhoneWrite`). Built-in plugins only:
+  // the host drops it for a loaded plugin, whose writes need shell access.
+  phone?: readonly PhoneWrite[]
 }
 
 // What a fetch-shaped route handler learns about the caller. The identity projection is plain data, and

@@ -1,0 +1,1 @@
+ALTER TABLE `devices` ADD `shell_access_at` integer;

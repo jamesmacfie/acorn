@@ -17,6 +17,8 @@ export type Principal = {
   // `phone` for a device paired from a phone's browser, which is held to fewer routes
   // (./phoneRules.ts).
   deviceKind?: 'phone'
+  // Set for a phone a computer let run commands on the Node (docs/relay/phone-channel/phone-devices.md § Shell access).
+  shellAccess?: true
   // Set only for kind 'internal'. A route that must not be reachable from an agent-spawned child checks
   // this rather than the kind: `kind === 'internal'` cannot distinguish the service from an agent.
   scope?: InternalScope
@@ -82,6 +84,7 @@ async function devicePrincipal(c: { env: Env }, header: string): Promise<Princip
     userId: c.env.ACTIVE_IDENTITY.get() ?? '',
     deviceId: authenticated.deviceId,
     ...(authenticated.kind ? { deviceKind: authenticated.kind } : {}),
+    ...(authenticated.shellAccess ? { shellAccess: true as const } : {}),
   }
 }
 

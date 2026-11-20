@@ -1,8 +1,15 @@
 import type { NodePairRequest, NodeProbeResult, NodeRecord } from '@acorn/protocol/broker.ts'
 import { canPairNodes, fleetBridge } from '../platform'
-import type { DevicesResponse, PairingDecision, PairingRequestResponse, PairingWindow } from '@acorn/protocol/node.ts'
+import type {
+  DevicesResponse,
+  PairingDecision,
+  PairingRequestResponse,
+  PairingWindow,
+  ShellAccessRequest,
+} from '@acorn/protocol/node.ts'
 import {
   coreDeviceRoute,
+  coreDeviceShellAccessRoute,
   coreDevicesRoute,
   coreNodePowerRoute,
   coreNodeReachRoute,
@@ -121,9 +128,18 @@ export const answerPairingRequest = (
   })
 
 // The devices paired with a Node, newest first, and the one revoke that signs a device out of it. Any
-// paired device may do both, except a phone's (docs/relay/phone-channel.md § What a phone device may do).
+// paired device may do both, except a phone's (docs/relay/phone-channel/phone-devices.md § What a phone device may do).
 export const readNodeDevices = (nodeId: string): Promise<DevicesResponse> =>
   readJson<DevicesResponse>(coreDevicesRoute, { nodeId })
 
 export const revokeNodeDevice = (nodeId: string, deviceId: string): Promise<void> =>
   sendJson(coreDeviceRoute(deviceId), { method: 'DELETE', nodeId })
+
+// Lets a phone run commands on the Node, or stops it (docs/relay/phone-channel/phone-devices.md § Shell access).
+export const setNodeDeviceShellAccess = (nodeId: string, deviceId: string, granted: boolean): Promise<void> =>
+  sendJson(coreDeviceShellAccessRoute(deviceId), {
+    method: 'PUT',
+    nodeId,
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify({ granted } satisfies ShellAccessRequest),
+  })

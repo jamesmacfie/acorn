@@ -282,6 +282,38 @@ describe('the active-task list route', () => {
     expect((await create({ skipSetup: 'yes' })).status).toBe(400)
   })
 
+  // Its worktree could check out anyone's change request, and setup runs the project's script there.
+  it('runs no setup for a task a phone without shell access makes', async () => {
+    await seed(1, 0)
+    const asPhone = (shellAccess: boolean) =>
+      new Hono<AppEnv>()
+        .use('/api/*', async (c, next) => {
+          c.set('principal', {
+            kind: 'device',
+            userId: 'james',
+            deviceId: 'phone',
+            deviceKind: 'phone',
+            ...(shellAccess ? { shellAccess: true as const } : {}),
+          })
+          await next()
+        })
+        .route('/api/tasks', tasks)
+    const create = async (shellAccess: boolean, branch: string) => {
+      const res = await asPhone(shellAccess).request('http://acorn.test/api/tasks', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ origin: 'local', projectId: 'project-0', branch, skipSetup: false }),
+      })
+      expect(res.status).toBe(200)
+      return ((await res.json()) as Task).id
+    }
+    const held = await create(false, 'from-phone')
+    const granted = await create(true, 'from-granted-phone')
+    const rows = await t.db.select({ id: schema.tasks.id, skipSetup: schema.tasks.skipSetup }).from(schema.tasks)
+    expect(rows).toContainEqual({ id: held, skipSetup: true })
+    expect(rows).toContainEqual({ id: granted, skipSetup: false })
+  })
+
   describe('when an agent creates the task', () => {
     const asTask = (taskId: string | undefined) =>
       new Hono<AppEnv>()

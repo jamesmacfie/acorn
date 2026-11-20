@@ -134,6 +134,13 @@
       "when": 1795035865538,
       "tag": "0018_project_folder_task",
       "breakpoints": true
+    },
+    {
+      "idx": 19,
+      "version": "6",
+      "when": 1795152563362,
+      "tag": "0019_phone_shell_access",
+      "breakpoints": true
     }
   ]
 }

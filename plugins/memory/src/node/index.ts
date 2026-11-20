@@ -49,7 +49,16 @@ export const memoryPlugin = (): NodePlugin => {
         current: (taskId) => runtime.standingContext(taskId, true),
       })
       routeCapability = ctx.capabilities.provide(KNOWLEDGE, runtime.route)
-      ctx.routes.register(knowledge, { prefix: '', note: 'memory pane' })
+      ctx.routes.register(knowledge, {
+        prefix: '',
+        note: 'memory pane',
+        phone: [
+          'POST /library/:action',
+          'POST /memory/changes/:id/undo',
+          'POST /tasks/:id/memory',
+          'POST /projects/:id/memory',
+        ],
+      })
       ctx.routes.fetch(
         async (request, context) =>
           (await import('../server/memorySourceHandler')).createMemorySourceHandler(runtime.list, ctx.core.projects)(

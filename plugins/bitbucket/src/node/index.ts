@@ -123,7 +123,8 @@ export const bitbucketPlugin = (): NodePlugin => ({
           .route('/', repositoryReads(store, account, { core: ctx.core, emit, maxPages }))
           .route('/', repositoryWrites(store, account, emit))
       }),
-      { prefix: '/repositories', note: 'repository and pull request mirror' },
+      // A phone may act on Bitbucket, which runs nothing on this computer.
+      { prefix: '/repositories', note: 'repository and pull request mirror', phone: ['* /*'] },
     )
     ctx.routes.register(
       lazyRouter(async () =>

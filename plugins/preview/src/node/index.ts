@@ -46,6 +46,7 @@ export const previewPlugin = (): NodePlugin => {
       ctx.routes.fetch(serveUrl, {
         prefix: '',
         note: '/tasks/:taskId/url — resolved preview home; /configured — which tasks have one',
+        phone: ['POST /tasks/:taskId/recipe-url'],
       })
 
       // The task's app, through this Node to a paired device, and to a phone's browser on a name of its own

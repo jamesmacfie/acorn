@@ -571,6 +571,7 @@
     "POST /v1/pair",
     "POST /v1/pair/requests",
     "POST /v1/pair/requests/claim",
+    "PUT /v1/core/devices/:id/shell-access",
     "PUT /v1/core/integrations/:id",
     "PUT /v1/core/integrations/:id/mappings",
     "PUT /v1/core/node/reach",

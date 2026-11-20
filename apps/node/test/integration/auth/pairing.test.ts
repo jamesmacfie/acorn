@@ -216,6 +216,43 @@ describe('device administration', () => {
     expect(revoke.status).toBe(204)
   })
 
+  // A phone's app runs on the account website's origin, so whoever controls that website can act as the
+  // phone. Shell access is a separate grant that only a computer can give (docs/relay/phone-channel.md §
+  // Shell access).
+  it('gives a phone shell access only from a computer, and only then lets it open a terminal', async () => {
+    const laptop = await pairDevice('laptop')
+    const phone = await env.DEVICES.issue('iPhone Safari 1a2b', 'phone')
+    const grant = (token: string, granted: boolean) =>
+      send(`/v1/core/devices/${phone.device.id}/shell-access`, { method: 'PUT', token, body: { granted } })
+    const openTerminal = () => send('/v1/p/terminal/sessions', { method: 'POST', token: phone.token, body: {} })
+    const code = async (res: Response) => ((await res.json()) as ApiError).error.code
+
+    const refused = await openTerminal()
+    expect(refused.status).toBe(403)
+    expect(await code(refused)).toBe('phone_refused')
+    expect(await code(await grant(phone.token, true))).toBe('phone_refused')
+
+    expect((await grant(laptop.deviceToken, true)).status).toBe(204)
+    const listed = (await (await send('/v1/core/devices', { token: laptop.deviceToken })).json()) as DevicesResponse
+    expect(listed.devices.find((device) => device.id === phone.device.id)).toMatchObject({ shellAccess: true })
+    // Past the phone rules. No terminal plugin runs in this app, so nothing answers the route.
+    expect((await openTerminal()).status).toBe(404)
+    // Still no way to manage devices, so it can't keep the grant once a computer takes it away.
+    expect(await code(await grant(phone.token, false))).toBe('phone_refused')
+
+    expect((await grant(laptop.deviceToken, false)).status).toBe(204)
+    expect(await code(await openTerminal())).toBe('phone_refused')
+    expect(
+      (
+        await send(`/v1/core/devices/${laptop.device.id}/shell-access`, {
+          method: 'PUT',
+          token: laptop.deviceToken,
+          body: { granted: true },
+        })
+      ).status,
+    ).toBe(404)
+  })
+
   it('404s a device that never existed, and closes a pairing window idempotently', async () => {
     const paired = await pairDevice('laptop')
     const missing = await send('/v1/core/devices/nope', { method: 'DELETE', token: paired.deviceToken })

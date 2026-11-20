@@ -149,7 +149,8 @@ export const gitlabPlugin = (): NodePlugin => ({
           .route('/', projectReads(store, servers, { core: ctx.core, emit, maxPages }))
           .route('/', projectWrites(store, servers, emit))
       }),
-      { prefix: '/projects', note: 'project and merge request mirror, by server host' },
+      // A phone may act on GitLab, which runs nothing on this computer.
+      { prefix: '/projects', note: 'project and merge request mirror, by server host', phone: ['* /*'] },
     )
     ctx.routes.register(
       lazyRouter(async () =>

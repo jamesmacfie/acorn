@@ -1,7 +1,7 @@
 import { createStore, del, entries, get, set } from 'idb-keyval'
 
-// The Nodes this phone is paired with, and the device token for each (docs/relay/phone-channel.md § A device
-// for each phone). They live in IndexedDB. A token is stored encrypted under an AES-GCM key the browser
+// The Nodes this phone is paired with, and the device token for each
+// (docs/relay/phone-channel/phone-devices.md § A device for each phone). They live in IndexedDB. A token is stored encrypted under an AES-GCM key the browser
 // made and will not hand over, so a copy of the browser's storage holds ciphertext it can't open. That
 // doesn't protect against script running in the app itself.
 //

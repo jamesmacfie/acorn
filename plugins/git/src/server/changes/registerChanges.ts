@@ -18,7 +18,11 @@ export function registerChanges(ctx: Context): () => void {
   // Opened and migrated by the host before any request can reach it
   // (docs/data-layer/plugin-databases.md § Plugin databases).
   const db = ctx.storage.open()
-  ctx.routes.register(reviewNotesRoutes(db, ctx.core, ctx.events.send), { prefix: '/tasks', note: '/:id/review-notes' })
+  ctx.routes.register(reviewNotesRoutes(db, ctx.core, ctx.events.send), {
+    prefix: '/tasks',
+    note: '/:id/review-notes',
+    phone: ['* /:id/review-notes', '* /:id/review-notes/*'],
+  })
   registerDeletedTaskPurge(
     ctx,
     async (taskIds) => (await db.delete(reviewNotes).where(inArray(reviewNotes.taskId, [...taskIds]))).changes,
@@ -50,7 +54,12 @@ export function registerChanges(ctx: Context): () => void {
     id: 'uncommitted',
     check: async (task) => (await import('./archiveCheck')).changesArchiveConcern(bridge, task),
   })
-  ctx.routes.register(localGit, { prefix: '/tasks', note: '/:id/local/*' })
+  // A phone without shell access may stage, commit, and push, but not save a file's content.
+  ctx.routes.register(localGit, {
+    prefix: '/tasks',
+    note: '/:id/local/*',
+    phone: ['POST /:id/local/:action', 'POST /:id/local/document/segments', 'POST /:id/local/document/search'],
+  })
   // local_changes, local_diff, and git_log. Same reads as the bridge above, so the agent and the
   // Changes tab cannot disagree about the working tree.
   for (const tool of localGitAgentTools(ctx.core)) ctx.tools.register(tool)

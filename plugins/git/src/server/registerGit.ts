@@ -6,18 +6,32 @@ export async function registerGit(ctx: Context): Promise<() => void> {
   const { registerChanges } = await import('./changes/registerChanges')
   const disposeChanges = registerChanges(ctx)
   const { worktreeRoutes } = await import('./routes/worktrees')
-  ctx.routes.register(worktreeRoutes(ctx.core), { prefix: '', note: 'project worktree inventory and guarded cleanup' })
+  ctx.routes.register(worktreeRoutes(ctx.core), {
+    prefix: '',
+    note: 'project worktree inventory and guarded cleanup',
+    phone: ['POST /projects/:projectId/worktrees/:observation/remove'],
+  })
   const { historyRoutes } = await import('./routes/history')
-  ctx.routes.register(historyRoutes(ctx.core), { prefix: '', note: 'pinned history and read-only revision documents' })
+  ctx.routes.register(historyRoutes(ctx.core), {
+    prefix: '',
+    note: 'pinned history and read-only revision documents',
+    phone: [
+      'POST /projects/:projectId/revisions/:id/file',
+      'POST /projects/:projectId/revisions/:id/search',
+      'POST /projects/:projectId/revisions/:id/segments',
+    ],
+  })
   const { stashRoutes } = await import('./routes/stashes')
   ctx.routes.register(stashRoutes(ctx.core, ctx.events), {
     prefix: '',
     note: 'stash roster and guarded task checkout writes',
+    phone: ['POST /projects/:projectId/stashes/:action'],
   })
   const { operationRoutes } = await import('./routes/operations')
   ctx.routes.register(operationRoutes(ctx.core, ctx.events), {
     prefix: '',
     note: 'task Git operations and their continue, skip, and abort controls',
+    phone: ['POST /tasks/:taskId/operation/:action'],
   })
   const { conflictRoutes } = await import('./routes/conflicts')
   ctx.routes.register(conflictRoutes(ctx.core, ctx.events), {
@@ -25,7 +39,11 @@ export async function registerGit(ctx: Context): Promise<() => void> {
     note: 'three-way conflict reads and guarded save and stage',
   })
   const { explanationRoutes } = await import('./routes/explain')
-  ctx.routes.register(explanationRoutes(ctx.core), { prefix: '', note: 'explicit bounded Git explanations' })
+  ctx.routes.register(explanationRoutes(ctx.core), {
+    prefix: '',
+    note: 'explicit bounded Git explanations',
+    phone: ['POST /projects/:projectId/explanations/*'],
+  })
   const { refRoutes } = await import('./routes/refs')
   ctx.routes.register(
     refRoutes(ctx.core, () => ctx.events.worktreeStatus(null)),
@@ -45,9 +63,17 @@ export async function registerGit(ctx: Context): Promise<() => void> {
     run: (signal) => autoFetcher.tick(signal),
   })
   const { lineBlameRoutes } = await import('./routes/lineBlame')
-  ctx.routes.register(lineBlameRoutes(ctx.core), { prefix: '', note: 'who last changed the Editor cursor line' })
+  ctx.routes.register(lineBlameRoutes(ctx.core), {
+    prefix: '',
+    note: 'who last changed the Editor cursor line',
+    phone: ['POST /editor/line-blame'],
+  })
   const { comparisonRoutes } = await import('./routes/comparison')
-  ctx.routes.register(comparisonRoutes(ctx.core), { prefix: '', note: 'pin direct and merge-base comparisons' })
+  ctx.routes.register(comparisonRoutes(ctx.core), {
+    prefix: '',
+    note: 'pin direct and merge-base comparisons',
+    phone: ['POST /projects/:projectId/comparison'],
+  })
   ctx.routes.fetch(
     async (request, context) =>
       (await import('./data/commitSource')).createCommitSourceHandler(ctx.core)(request, context),

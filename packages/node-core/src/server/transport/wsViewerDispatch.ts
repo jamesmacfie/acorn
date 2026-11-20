@@ -9,7 +9,19 @@ import {
 import type { StreamHandlers, StreamSink, WsChannelHandler } from './wsHub'
 import type { EventViewer, WsViewers } from './wsViewers'
 
-type Parent = { viewers: WsViewers; multiplexed: boolean; internal?: InternalClaims }
+type Parent = { viewers: WsViewers; multiplexed: boolean; internal?: InternalClaims; phoneWithoutShell?: true }
+
+// All a phone without shell access may send: watching a terminal's output, or a container's logs and
+// stats. Typing into a terminal, and the editor's and Docker's own terminals, run programs on this
+// computer (docs/relay/phone-channel/phone-devices.md § Shell access).
+const PHONE_FRAMES: ReadonlySet<string> = new Set([
+  'term:attach',
+  'term:detach',
+  'docker:logs:attach',
+  'docker:logs:detach',
+  'docker:stats:attach',
+  'docker:stats:detach',
+])
 type Outputs = {
   send(frame: WsServerFrame, viewerId?: string | null): void
   stream(viewer: EventViewer, id: string, message: Parameters<StreamSink>[0]): void
@@ -73,6 +85,7 @@ export function createWsViewerDispatch(
         owner = held
         frame = nested.data.frame
       }
+      if (parent.phoneWithoutShell && !PHONE_FRAMES.has(frame.channel)) return
       const handlers = streams()
       if (frame.channel.startsWith('term:')) {
         const { id, data, cols, rows } = frame

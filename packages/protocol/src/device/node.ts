@@ -112,8 +112,11 @@ const pairedDeviceSchema = z.object({
   lastSeenAt: z.number().int().nullable(),
   revokedAt: z.number().int().nullable(),
   // Set for a device paired from a phone's browser, which the Node holds to fewer routes
-  // (docs/relay/phone-channel.md § What a phone device may do).
+  // (docs/relay/phone-channel/phone-devices.md § What a phone device may do).
   kind: z.literal('phone').optional(),
+  // Whether a computer let this phone run commands on the Node. Set only for a phone
+  // (docs/relay/phone-channel/phone-devices.md § Shell access).
+  shellAccess: z.boolean().optional(),
 })
 export type PairedDevice = z.infer<typeof pairedDeviceSchema>
 
@@ -160,6 +163,10 @@ export type PairingRequestResponse = { request: PairingRequest | null }
 // POST /v1/core/pair/requests/:id.
 export const pairingDecisionSchema = z.strictObject({ decision: z.enum(['allow', 'deny']) })
 export type PairingDecision = z.infer<typeof pairingDecisionSchema>
+
+// PUT /v1/core/devices/:id/shell-access. A computer gives a phone shell access, or takes it away.
+export const shellAccessRequestSchema = z.strictObject({ granted: z.boolean() })
+export type ShellAccessRequest = z.infer<typeof shellAccessRequestSchema>
 
 // POST /v1/core/node/stop (docs/cli/local-service.md § Stop and restart). No body is a plain stop.
 export const nodeStopRequestSchema = z.strictObject({ restart: z.boolean().optional() })

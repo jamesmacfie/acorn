@@ -251,6 +251,7 @@ const RULES: readonly RouteRule[] = [
   },
   { path: shape('/v1/core/devices'), scopes: {}, note: 'Pairing administration.' },
   { path: shape(`/v1/core/devices/${SEG}`), scopes: {} },
+  { path: shape(`/v1/core/devices/${SEG}/shell-access`), scopes: {}, note: 'A phone’s shell access.' },
   {
     path: shape('/v1/core/plugins'),
     scopes: {},

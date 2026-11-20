@@ -582,7 +582,32 @@ export const agentsPlugin = (dataDir: string, deps: AgentsPluginDeps): NodePlugi
         register: (agent) => ({ dispose: customAgentRegistry.register(contributedCustomAgent(agent)) }),
       })
 
-      ctx.routes.register(managedAgents, { prefix: '', note: 'managed agent sessions, turns, attachments, artifacts' })
+      ctx.routes.register(managedAgents, {
+        prefix: '',
+        note: 'managed agent sessions, turns, attachments, artifacts',
+        // A phone without shell access, held to sessions that ask first (../server/sessions/phoneTurns.ts).
+        phone: [
+          'POST /attachments',
+          'DELETE /attachments/:attachmentId',
+          'POST /sessions',
+          'PATCH /sessions/:sessionId',
+          'DELETE /sessions/:sessionId',
+          'POST /sessions/:sessionId/turns',
+          'PATCH /sessions/:sessionId/turns/:turnId',
+          'DELETE /sessions/:sessionId/turns/:turnId',
+          'POST /sessions/:sessionId/turns/:turnId/steer',
+          'POST /sessions/:sessionId/requests/:requestId/resolve',
+          'POST /sessions/:sessionId/cancel',
+          'POST /sessions/:sessionId/subagents/:subagentId/cancel',
+          'POST /sessions/:sessionId/fork',
+          'POST /sessions/:sessionId/btw',
+          'POST /sessions/:sessionId/compact',
+          'POST /sessions/:sessionId/regenerate-title',
+          'POST /sessions/:sessionId/summarize',
+          'POST /sessions/:sessionId/resume-managed',
+          'POST /stop-idle',
+        ],
+      })
 
       // This plugin's sessions, for the merged run list core assembles (`packages/protocol/src/runtime/runs.ts`). A
       // pointer at the route above; nothing here knows workflows is on the same list.
@@ -595,6 +620,7 @@ export const agentsPlugin = (dataDir: string, deps: AgentsPluginDeps): NodePlugi
       })
       ctx.routes.register(agentUsage, {
         prefix: '',
+        phone: ['POST /usage/refresh', 'POST /usage/refresh/:providerId'],
         note: '/usage, /pricing, /concurrency, /session-defaults, /custom-agents — account-scoped provider usage, dispatch limits, new-session defaults, and saved agents',
       })
       ctx.routes.register(agentInstructionReview, { prefix: '', note: 'device-only instruction review and approval' })

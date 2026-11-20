@@ -159,6 +159,11 @@ phone](./mobile/agent-pane.md) covers how the shared Agents pane draws here.
 
 - Editing files and the dashboard editor draw but aren't promised on a phone
   ([features](./features.md#phone)). The app has no help screen to say so.
+- Until a computer gives the phone [shell access](./relay/phone-channel/phone-devices.md#shell-access), the Node
+  refuses what could run a program on it. That covers terminals, run targets, task scripts, file
+  edits, approving an agent's command or a workflow gate, and sending work to an agent that runs
+  commands without asking ([what a phone device may do](./relay/phone-channel/phone-devices.md#what-a-phone-device-may-do)).
+  The pane shows the Node's refusal.
 - The terminal pane has no layout recipes or run targets, and its key row has no Alt and no Ctrl with
   an arrow ([the phone's terminal pane](./terminal/client.md#the-phones-terminal-pane)).
 - With the keyboard up the composer is tall and the transcript nearly disappears.

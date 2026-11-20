@@ -9,6 +9,7 @@ import { createMiddleware } from 'hono/factory'
 import { z } from 'zod'
 import {
   type AppEnv,
+  isPhoneWithoutShell,
   isProviderOperationError,
   isTaskConfined,
   mayActOnTask,
@@ -127,10 +128,13 @@ export type ManagedAgentsBridge = {
     requestId: string,
     resolution: unknown,
     idempotencyKey: string,
+    // Set for a phone without shell access (plugins/agents/src/server/sessions/phoneTurns.ts).
+    options?: { phoneWithoutShell?: boolean },
   ): Promise<AgentRequest>
   patchSession(
     sessionId: string,
     patch: { title?: string; archived?: boolean; lastReadSeq?: number; config?: Record<string, unknown> },
+    options?: { phoneWithoutShell?: boolean },
   ): Promise<AgentSession>
   fork(sessionId: string, title?: string): Promise<AgentSession>
   btw(sessionId: string, requestedConfigOptions?: Record<string, string>): Promise<AgentSession>
@@ -514,7 +518,8 @@ export const managedAgents = new Hono<AppEnv>()
   .patch('/sessions/:sessionId', async (c) => {
     const parsed = patchAgentSessionSchema.safeParse(await c.req.json().catch(() => null))
     if (!parsed.success) return respondError(c, 400, 'bad_request')
-    return viaBridge(c, MANAGED_AGENTS, (bridge) => bridge.patchSession(c.req.param('sessionId'), parsed.data))
+    const options = { phoneWithoutShell: isPhoneWithoutShell(c.get('principal')) }
+    return viaBridge(c, MANAGED_AGENTS, (bridge) => bridge.patchSession(c.req.param('sessionId'), parsed.data, options))
   })
   .delete('/sessions/:sessionId', (c) =>
     viaBridge(c, MANAGED_AGENTS, (bridge) => bridge.deleteSession(c.req.param('sessionId'))),
@@ -530,6 +535,8 @@ export const managedAgents = new Hono<AppEnv>()
       typeof body === 'object' && body != null ? { ...body, idempotencyKey: key } : body,
     )
     if (!parsed.success) return respondError(c, 400, 'bad_request')
+    // Read again before the turn is sent (plugins/agents/src/server/sessions/phoneTurns.ts).
+    if (isPhoneWithoutShell(c.get('principal'))) parsed.data.effectivePolicy.fromPhoneWithoutShell = true
     return viaBridge(c, MANAGED_AGENTS, (bridge) => bridge.enqueueTurn(c.req.param('sessionId'), parsed.data))
   })
   .post('/sessions/:sessionId/implement-plan', async (c) => {
@@ -542,6 +549,11 @@ export const managedAgents = new Hono<AppEnv>()
   .patch('/sessions/:sessionId/turns/:turnId', async (c) => {
     const parsed = patchQueuedTurnSchema.safeParse(await c.req.json().catch(() => null))
     if (!parsed.success) return respondError(c, 400, 'bad_request')
+    // A queued turn's text from such a phone would reach the agent unmarked.
+    if (parsed.data.input && isPhoneWithoutShell(c.get('principal')))
+      return respondError(c, 403, 'phone_refused', [
+        'A phone without shell access can’t edit a queued message. Remove it and send a new one.',
+      ])
     return viaBridge(c, MANAGED_AGENTS, (bridge) =>
       bridge.patchQueuedTurn(c.req.param('sessionId'), c.req.param('turnId'), parsed.data),
     )
@@ -579,7 +591,9 @@ export const managedAgents = new Hono<AppEnv>()
     )
     if (!parsed.success) return respondError(c, 400, 'bad_request')
     return viaBridge(c, MANAGED_AGENTS, (bridge) =>
-      bridge.resolveRequest(c.req.param('sessionId'), c.req.param('requestId'), parsed.data.resolution, key),
+      bridge.resolveRequest(c.req.param('sessionId'), c.req.param('requestId'), parsed.data.resolution, key, {
+        phoneWithoutShell: isPhoneWithoutShell(c.get('principal')),
+      }),
     )
   })
   .post('/sessions/:sessionId/fork', async (c) => {

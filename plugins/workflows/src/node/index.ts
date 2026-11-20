@@ -113,7 +113,12 @@ export const workflowsPlugin = (deps: WorkflowsPluginDeps): NodePlugin => {
       // Namespace-root router: it owns both task-scoped (/tasks/:id/workflows) and run-scoped
       // (/workflows/runs/:runId/...) paths. The internal paths are registered as declared, so the
       // client route builders and the server surface share one contract.
-      ctx.routes.register(workflow, { prefix: '', note: 'workflow control' })
+      // A phone without shell access may stop a run. A gate or a retry runs the workflow's next steps.
+      ctx.routes.register(workflow, {
+        prefix: '',
+        note: 'workflow control',
+        phone: ['POST /workflows/runs/:runId/cancel', 'POST /workflows/runs/:runId/kill'],
+      })
       ctx.routes.register(workflowDefsRoutes, { prefix: '', note: '/defs — definitions stored as rows, device only' })
       ctx.routes.register(workflowTriggerRoutes, { prefix: '/workflows/triggers', note: 'approved workflow triggers' })
       // Clone a URL, then run a workflow on it. Loaded on the first request, to stay inside the service

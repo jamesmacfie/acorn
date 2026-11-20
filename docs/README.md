@@ -256,7 +256,8 @@ Start with the plugin map, then follow the authoring guide or API reference.
 | [node-distribution/keep-awake.md](./node-distribution/keep-awake.md) | How a Node keeps its computer awake while agents work or workflows run, the inhibitor on each platform, and the setting. |
 | [node-distribution/reaching.md](./node-distribution/reaching.md) | How a person chooses the addresses a Node answers other machines on, and why the port stays fixed. |
 | [relay/accounts.md](./relay/accounts.md) | How a relay checks an account service, how a client gets a ticket, and what Remote access does on a Node. |
-| [relay/phone-channel.md](./relay/phone-channel.md) | The phone's encrypted channel through a relay: the Noise handshake, the Node's channel key, the messages, each phone's device, and what a phone device may not do. |
+| [relay/phone-channel.md](./relay/phone-channel.md) | The phone's encrypted channel through a relay: the Noise handshake, the Node's channel key, the messages, and previews. |
+| [relay/phone-channel/phone-devices.md](./relay/phone-channel/phone-devices.md) | Each phone's device, what it may do on a Node, how it may drive an agent, and shell access, the grant a computer gives one phone to run commands. |
 | [relay.md](./relay.md) | The relay: reaching a Node with no public address, the Node's tunnel, relay addresses in clients, and running your own relay. |
 | [release-notes.md](./release-notes.md) | What is in the current release. |
 

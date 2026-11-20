@@ -55,6 +55,7 @@ export type { DeliverableSkill } from '@acorn/node-core/server/pluginHost'
 // ── Route toolkit ─────────────────────────────────────────────────────────────────────────────
 export type { AppEnv, Principal } from '@acorn/node-core/server/middleware/auth.ts'
 export {
+  isPhoneWithoutShell,
   isTaskConfined,
   mayActOnTask,
   ownerId,

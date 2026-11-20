@@ -157,6 +157,38 @@ describe('device tokens', () => {
       expect(JSON.parse(row!.details!)).toEqual({ name: 'iPhone', kind: 'phone' })
     })
 
+    it('has no shell access until a computer gives it some, and loses it when taken away', async () => {
+      const { token, device } = await devices.issue('iPhone', 'phone')
+      const changed: string[] = []
+      devices.onShellAccessChanged((id) => changed.push(id))
+      expect((await devices.list())[0]).toMatchObject({ shellAccess: false })
+
+      // Read again rather than answered from the warm entry the first authenticate made.
+      expect(await devices.setShellAccess(device.id, true, { actor: 'device', actorId: 'laptop' })).toBe(true)
+      expect(await devices.authenticate(token)).toEqual({ deviceId: device.id, kind: 'phone', shellAccess: true })
+      expect((await devices.list())[0]).toMatchObject({ shellAccess: true })
+
+      expect(await devices.setShellAccess(device.id, false)).toBe(true)
+      expect(await devices.authenticate(token)).toEqual({ deviceId: device.id, kind: 'phone' })
+      expect(changed).toEqual([device.id, device.id])
+      const actions = harness.db
+        .select()
+        .from(schema.audit)
+        .all()
+        .map((row) => row.action)
+      expect(actions).toEqual(['device.paired', 'device.shell.granted', 'device.shell.revoked'])
+    })
+
+    it('gives shell access to no device that isn’t a live phone', async () => {
+      const laptop = await devices.issue('laptop')
+      const phone = await devices.issue('iPhone', 'phone')
+      await devices.revoke(phone.device.id)
+      expect(await devices.setShellAccess(laptop.device.id, true)).toBe(false)
+      expect(await devices.setShellAccess(phone.device.id, true)).toBe(false)
+      expect(await devices.setShellAccess('nobody', true)).toBe(false)
+      expect((await devices.list()).find((row) => row.id === laptop.device.id)).not.toHaveProperty('shellAccess')
+    })
+
     it('leaves another device with no kind', async () => {
       const { token, device } = await devices.issue('laptop')
       expect(device).not.toHaveProperty('kind')

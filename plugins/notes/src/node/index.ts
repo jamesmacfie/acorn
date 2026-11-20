@@ -26,7 +26,11 @@ export const notesPlugin = (dataDir: string, deps: NotesPluginDeps = { internalE
       if (await seedTaskNotes(ctx.core, silent, deps.internalEnv({ scope: 'service' }), task))
         store.changed({ scope: 'task', taskId: task.id })
     })
-    ctx.routes.register(notes, { prefix: '', note: 'notes CRUD' })
+    ctx.routes.register(notes, {
+      prefix: '',
+      note: 'notes CRUD',
+      phone: ['* /tasks/:id/notes', '* /tasks/:id/notes/*', '* /workspaces/:wsId/notes', '* /workspaces/:wsId/notes/*'],
+    })
     registerDeletedTaskPurge(ctx, async (taskIds) =>
       (await import('../server/taskFolders')).removeTaskFolders(join(dataDir, 'notes'), taskIds),
     )

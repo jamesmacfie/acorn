@@ -23,6 +23,7 @@ const devices = (over: Partial<DeviceService> = {}): DeviceService =>
     authenticate: async () => ({ deviceId: 'd1' }),
     isActive: async () => true,
     onRevoked: () => () => {},
+    onShellAccessChanged: () => () => {},
     ...over,
   }) as DeviceService
 

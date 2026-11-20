@@ -76,7 +76,7 @@ The Node runs these, with or without a client attached.
 
 | Kind | Tier | Where | Host |
 | --- | --- | --- | --- |
-| Routes | Both | `ctx.routes.register` (compiled, Hono) / `ctx.routes.fetch` (both, portable) | `/v1/p/<pluginId>/` |
+| Routes | Both | `ctx.routes.register` (compiled, Hono) / `ctx.routes.fetch` (both, portable) | `/v1/p/<pluginId>/`. A built-in's `phone` option names the writes a phone without shell access may make ([phone devices](./relay/phone-channel/phone-devices.md#what-a-phone-device-may-do)) |
 | Schedules | Both | `ctx.schedules` / `contributions.schedules` | The Node scheduler ([schedules](./schedules.md)) |
 | Typed data sources | Both | `ctx.dataSources.register` / `contributions.dataSources` | Bounded typed record reads |
 | Dataset writes | Compiled | `ctx.datasets` | A task-scoped host call for workflow output. **Direction: stays compiled.** Loaded plugins and frames cannot write host datasets; the Node validates the task, feeder, version, and row schema |

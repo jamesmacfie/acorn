@@ -181,11 +181,11 @@ offline states. The workspace picker and Settings show only the selected Node. [
 ## Phone
 
 A phone's browser opens a [mobile web app](./mobile.md) from the account website and reaches the Node through a relay. It
-lists what agents are waiting on in **Needs you** and answers a permission request or a question with
-a tap. It shows each task's conversation and sends a message, stops a turn, and starts a task with the
-same draft form the desktop uses. Every built-in pane draws, one at a time. **Preview** shows the task's running
+lists what agents are waiting on in **Needs you** and answers a question with a tap. It shows each
+task's conversation and sends a message, stops a turn, and starts a task with the same draft form the
+desktop uses. A terminal or approving a command needs [shell access](./relay/phone-channel/phone-devices.md#shell-access) from a computer. Every built-in pane draws, one at a time. **Preview** shows the task's running
 app in a frame the Node serves through the relay, with hot reload ([previews on a phone](./relay/phone-channel.md#previews)).
-Safari won't keep the frame's cookie, so it offers the app as a page of its own. A **Terminal** pane opens the task's terminal sessions, with a row of keys for Esc, Tab, Ctrl, and the
+Safari won't keep the frame's cookie, so it offers the app as a page of its own. A **Terminal** pane shows the task's terminal sessions, and with shell access types into them, with a row of keys for Esc, Tab, Ctrl, and the
 arrows above the on-screen keyboard. The Database, API, Rollbar, and Linear panes, and the session cost in the
 agents header, draw too, and need no prompt when the phone and the Node come from the same release. Editing files, which nobody has checked at phone width, and the
 dashboard editor draw but aren't promised on a phone.

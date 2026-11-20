@@ -16,7 +16,7 @@ Every route in this table is device-only.
 | `GET` | `/v1/core/pair/requests` | Read the pairing request waiting for an answer |
 | `POST` | `/v1/core/pair/requests/:id` | Allow or deny that request |
 | `GET` | `/v1/core/devices` | List paired devices, without token material |
-| `DELETE` | `/v1/core/devices/:id` | Revoke a device and close its sockets |
+| `DELETE`, `PUT` | `/v1/core/devices/:id`, `/shell-access` | Revoke a device and close its sockets, or give a phone [shell access](../relay/phone-channel/phone-devices.md#shell-access) with `{ "granted": true }` and take it away with `false`. `404` for a device that isn't a live phone |
 | `POST` | `/v1/core/node/stop` | Answer `202`, then drain and exit. `{ "restart": true }` exits with code 75 for a foreground launcher to start it again. A loopback peer only, and the desktop's Node refuses it ([stop and restart](../cli/local-service.md#stop-and-restart)) |
 | `GET` | `/v1/core/node/reach` | The hosts the Node answers other machines on, their `source`, the `port`, this machine's IPv4 `candidates`, and `restartRequired` ([reach a Node from another machine](../node-distribution/reaching.md)) |
 | `PUT` | `/v1/core/node/reach` | Record `{ "hosts": [...] }` for the next boot, at most eight IPv4 addresses or DNS names, and audit `node.reach.changed`. A loopback peer only. `409 reach_set_by_environment` while `ACORN_ADVERTISE_HOST` is set |

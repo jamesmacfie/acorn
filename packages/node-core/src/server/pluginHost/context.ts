@@ -263,9 +263,21 @@ export function buildPluginContext(options: PluginContextOptions): HostPluginCon
       register: permissions
         ? (undefined as never)
         : (router, opts) =>
-            recordUndo(registerRoute({ plugin, prefix: opts?.prefix ?? '', router, note: opts?.note }).dispose),
+            recordUndo(
+              registerRoute({ plugin, prefix: opts?.prefix ?? '', router, note: opts?.note, phone: opts?.phone })
+                .dispose,
+            ),
+      // A loaded plugin can't name phone writes, so its writes need shell access on a phone.
       fetch: (handler, opts) =>
-        recordUndo(registerRoute({ plugin, prefix: opts?.prefix ?? '', fetch: handler, note: opts?.note }).dispose),
+        recordUndo(
+          registerRoute({
+            plugin,
+            prefix: opts?.prefix ?? '',
+            fetch: handler,
+            note: opts?.note,
+            ...(permissions ? {} : { phone: opts?.phone }),
+          }).dispose,
+        ),
       // Compiled plugins only, for the reason `register` is: the router is a live object.
       loopback: permissions
         ? (undefined as never)
@@ -278,6 +290,7 @@ export function buildPluginContext(options: PluginContextOptions): HostPluginCon
                   (await import('../proxy/loopbackRoute')).serveLoopback(c, pluginMountPath(plugin, prefix), target),
                 ),
                 note,
+                loopback: true,
               }).dispose,
             ),
       // Compiled plugins only: it takes a request no device or task token signed (../routes/gatewayRoutes.ts).

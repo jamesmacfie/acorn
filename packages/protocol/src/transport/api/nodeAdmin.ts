@@ -14,6 +14,7 @@ export const corePairRequestsRoute = '/v1/core/pair/requests'
 export const corePairRequestRoute = (requestId: string) => `${corePairRequestsRoute}/${encodeURIComponent(requestId)}`
 export const coreDevicesRoute = '/v1/core/devices'
 export const coreDeviceRoute = (deviceId: string) => `/v1/core/devices/${encodeURIComponent(deviceId)}`
+export const coreDeviceShellAccessRoute = (deviceId: string) => `${coreDeviceRoute(deviceId)}/shell-access`
 
 // Settings → Security and backup, and Settings → Audit log (docs/security/audit.md § Audit, § Filesystem and backup).
 //

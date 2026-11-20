@@ -23,6 +23,12 @@ export const requireDevice = createMiddleware<AppEnv>(async (c, next) => {
   await next()
 })
 
+// A phone a computer hasn't given shell access. `phoneRules` holds it to its screens, and a plugin whose
+// routes it reaches checks this before work that could run a program on the Node
+// (docs/relay/phone-channel/phone-devices.md § Shell access).
+export const isPhoneWithoutShell = (principal: Principal | null | undefined): boolean =>
+  principal?.deviceKind === 'phone' && !principal.shellAccess
+
 // The rule on its own, for the one caller that has a principal but no request: a scheduled plugin run
 // has neither (server/pluginHost/scheduleRun.ts) and must answer this question the same way a route does.
 export const principalMayUseProviderCredential = (principal: Principal | null | undefined): boolean =>

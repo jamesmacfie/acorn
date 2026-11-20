@@ -41,7 +41,11 @@ export const trellisPlugin = (dataDir: string): NodePlugin => ({
           loadTask: (taskId) => ctx.core.tasks.load(taskId),
         }),
       ),
-      { prefix: '', note: '/apps — what cards, the Apps pane, and the Apps source read and change' },
+      {
+        prefix: '',
+        note: '/apps — what cards, the Apps pane, and the Apps source read and change',
+        phone: ['PUT /apps/:appId/state', 'PUT /apps/:appId/session'],
+      },
     )
     // Archive keeps a task's apps where they are, so restore brings them back at the head they had.
     // The dialog says so, and offers to publish the ones the project doesn't have yet.

@@ -17,7 +17,7 @@ import type { ExternalRef } from '@acorn/protocol/integrations.ts'
 import { externalRefForConnection, getConnection } from '../../integrations/connections'
 import { providerRefusal } from '../../integrations/respondProvider'
 import { isProviderOperationError, ProviderOperationError } from '../../integrations/types'
-import { isTaskConfined, mayActOnTask, ownerId } from '../../middleware/requireUser'
+import { isPhoneWithoutShell, isTaskConfined, mayActOnTask, ownerId } from '../../middleware/requireUser'
 import { integrationProviderRegistry } from '../../integrations/registry'
 import { warmItemDetails } from '../../integrations/itemDetail'
 import { getProject, githubFacet, projectRepository, type ProjectRow } from '../../projects/projects'
@@ -272,6 +272,10 @@ export const tasks = new Hono<AppEnv>()
       if (own?.projectId !== seed.projectId || seed.baseCommit !== undefined || seed.skipSetup)
         return respondError(c, 403, 'forbidden')
     }
+    // A phone without shell access makes a task whose worktree runs no setup script, because the worktree
+    // can check out anyone's change request (docs/relay/phone-channel/phone-devices.md § What a phone
+    // device may do).
+    if (isPhoneWithoutShell(c.get('principal'))) seed.skipSetup = true
     const project = await getProject(db, seed.projectId)
     if (!project) return respondError(c, 404, 'not_found', ['No such project.'])
     const requested = requestedChangeRequest(seed)

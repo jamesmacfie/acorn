@@ -7,6 +7,7 @@ import {
   pairingClaimSchema,
   pairingDecisionSchema,
   pairRequestSchema,
+  shellAccessRequestSchema,
   type DevicesResponse,
   type NodeInfo,
   type PairingAsk,
@@ -196,6 +197,14 @@ export function pairingRoutes(): { open: Hono<AppEnv>; core: Hono<AppEnv> } {
       // existed. Revoking an already-revoked one is a 204.
       const existed = await c.env.DEVICES.revoke(c.req.param('id'), auditActor(c))
       return existed ? c.body(null, 204) : respondError(c, 404, 'not_found', ['No such device.'])
+    })
+    // A phone never reaches this, because `phoneRules` refuses every devices route to a phone, so a phone
+    // can't give itself shell access (docs/relay/phone-channel/phone-devices.md § Shell access).
+    .put('/devices/:id/shell-access', async (c) => {
+      const parsed = shellAccessRequestSchema.safeParse(await c.req.json().catch(() => null))
+      if (!parsed.success) return respondError(c, 400, 'bad_request', ['Send { "granted": true } or false.'])
+      const changed = await c.env.DEVICES.setShellAccess(c.req.param('id'), parsed.data.granted, auditActor(c))
+      return changed ? c.body(null, 204) : respondError(c, 404, 'not_found', ['No paired phone has that ID.'])
     })
 
   return { open, core }

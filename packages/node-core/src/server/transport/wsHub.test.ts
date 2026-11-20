@@ -33,6 +33,10 @@ type TestStreamMsg = Parameters<StreamSink>[0]
 
 const INTERNAL = 'internal-token-xyz'
 const DEVICE_TOKEN = 'acorn_dt_stub'
+// A phone's device, `d2`. `phoneShell` says whether a computer gave it shell access.
+const PHONE_TOKEN = 'acorn_dt_phone_stub'
+let phoneShell: boolean
+let shellListeners: Array<(deviceId: string) => void>
 
 let server: Server
 let host: string
@@ -48,6 +52,7 @@ let devices: DeviceService
 const stubDevices = (): DeviceService => ({
   issue: () => Promise.reject(new Error('not used')),
   authenticate: async (bearer) => {
+    if (bearer === PHONE_TOKEN) return { deviceId: 'd2', kind: 'phone', ...(phoneShell ? { shellAccess: true } : {}) }
     if (bearer !== DEVICE_TOKEN) return null
     // The stub mirrors the real service's single-null contract: a revoked device authenticates as
     // nothing, so "refused at upgrade" is the same code path as "unknown token".
@@ -65,7 +70,14 @@ const stubDevices = (): DeviceService => ({
       revokedListeners = revokedListeners.filter((l) => l !== listener)
     }
   },
-  isActive: async (id) => active.get(id) === true,
+  isActive: async (id) => id === 'd2' || active.get(id) === true,
+  setShellAccess: async () => true,
+  onShellAccessChanged: (listener) => {
+    shellListeners.push(listener)
+    return () => {
+      shellListeners = shellListeners.filter((l) => l !== listener)
+    }
+  },
 })
 
 const listen = (s: Server) => new Promise<void>((r) => s.listen(0, '127.0.0.1', r))
@@ -78,6 +90,8 @@ beforeEach(async () => {
   origin = `http://${host}`
   active = new Map([['d1', true]])
   revokedListeners = []
+  phoneShell = false
+  shellListeners = []
   devices = stubDevices()
   // 20ms sweep everywhere: the interval is injected rather than faked, so the sweep runs for real and
   // the assertion is about the socket closing, not about a timer having been scheduled.
@@ -438,6 +452,61 @@ describe('wsHub heartbeat', () => {
     wsBroadcast({ channel: 'term:status' })
     await waitFor(() => got.length >= 1, 'the socket to still be receiving')
     ws.close()
+  })
+})
+
+// A phone's app runs on the account website's origin, so a phone without shell access may only watch
+// (docs/relay/phone-channel/phone-devices.md § Shell access).
+describe('a phone on the hub', () => {
+  const phoneHeaders = () => ({ host, authorization: `Bearer ${PHONE_TOKEN}` })
+  const handlers = (inputs: string[], attached: string[]) =>
+    setStreamHandlers({
+      input: (_id, data) => inputs.push(data),
+      attach: (id) => attached.push(id),
+      detach: () => {},
+      streamTaskId: () => 'task-1',
+    })
+
+  it('watches a terminal but can’t type into it, or open the editor’s or Docker’s terminals', async () => {
+    const inputs: string[] = []
+    const attached: string[] = []
+    handlers(inputs, attached)
+    const opened: string[] = []
+    for (const prefix of ['editor', 'docker', 'memory'])
+      registerWsChannelHandler(prefix, { onFrame: (frame) => opened.push(frame.channel), onDisconnect: () => {} })
+    const ws = await open(phoneHeaders())
+    ws.send(JSON.stringify({ channel: 'term:input', id: SESSION, data: 'id\n' }))
+    ws.send(JSON.stringify({ channel: 'editor:pty:open', ptyId: 'p', taskId: 't', path: 'a' }))
+    ws.send(JSON.stringify({ channel: 'docker:exec:open', execId: 'e', ref: 'c' }))
+    ws.send(JSON.stringify({ channel: 'memory:editor:open', id: 'm', body: '' }))
+    ws.send(JSON.stringify({ channel: 'docker:logs:attach', id: 'c' }))
+    ws.send(JSON.stringify({ channel: 'term:attach', id: SESSION }))
+    // Frames are handled in order, so once the last one lands the earlier ones were dropped.
+    await waitFor(() => attached.length === 1, 'the attach')
+    expect(inputs).toEqual([])
+    expect(opened).toEqual(['docker:logs:attach'])
+    ws.close()
+  })
+
+  it('types into a terminal once a computer gives it shell access', async () => {
+    phoneShell = true
+    const inputs: string[] = []
+    handlers(inputs, [])
+    const ws = await open(phoneHeaders())
+    ws.send(JSON.stringify({ channel: 'term:input', id: SESSION, data: 'id\n' }))
+    await waitFor(() => inputs.length === 1, 'the input')
+    expect(inputs).toEqual(['id\n'])
+    ws.close()
+  })
+
+  it('closes the phone’s sockets when its shell access changes, and no one else’s', async () => {
+    const phone = await open(phoneHeaders())
+    const desktop = await open(authHeaders())
+    const gone = closed(phone)
+    for (const listener of shellListeners) listener('d2')
+    await gone
+    expect(desktop.readyState).toBe(WebSocket.OPEN)
+    desktop.close()
   })
 })
 

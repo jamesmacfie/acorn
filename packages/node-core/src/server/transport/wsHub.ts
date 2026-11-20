@@ -122,6 +122,7 @@ type Conn = {
   // than discarded at the door: this is what onConnect and mayDriveStream need to enforce task scope
   // (docs/security/transport-and-auth.md § Transport and auth).
   internal?: InternalClaims
+  phoneWithoutShell?: true
   missedPongs: number
   // Streams this connection has asked the engine to pause, and whether it has already told the client
   // that non-stream frames are being shed. Both are cleared when the socket drains or closes.
@@ -365,7 +366,9 @@ export type WsAuthDeps = {
 
 // What a successful upgrade resolved to. `deviceId` is what makes revocation actionable later: a
 // socket holds no bearer to re-present, so the connection has to remember which device it belongs to.
-type Authorized = { deviceId: string | null; internal?: InternalClaims }
+// `phoneWithoutShell` holds a phone a computer hasn't given shell access to the frames that only watch
+// (./wsViewerDispatch.ts).
+type Authorized = { deviceId: string | null; internal?: InternalClaims; phoneWithoutShell?: true }
 
 // Exported for the one property a loopback test socket can't reach: an internal token from a remote peer.
 export async function authorizeWsUpgrade(req: IncomingMessage, deps: WsAuthDeps): Promise<Authorized | null> {
@@ -375,7 +378,11 @@ export async function authorizeWsUpgrade(req: IncomingMessage, deps: WsAuthDeps)
     // A bearer that fails does not fall through to the internal token: presenting a credential and
     // having it rejected is a rejection, not an invitation to try the next mechanism.
     const authenticated = await deps.devices.authenticate(bearer.slice('Bearer '.length).trim())
-    return authenticated ? { deviceId: authenticated.deviceId } : null
+    if (!authenticated) return null
+    return {
+      deviceId: authenticated.deviceId,
+      ...(authenticated.kind === 'phone' && !authenticated.shellAccess ? { phoneWithoutShell: true as const } : {}),
+    }
   }
   const token = req.headers['x-acorn-internal']
   // HMAC-verified, not compared with `===`, which would leak the token's length and a prefix-match
@@ -395,6 +402,7 @@ function onConnect(ws: HubSocket, authorized: Authorized, mark: number, multiple
     deviceId: authorized.deviceId,
     seq: 0,
     internal: authorized.internal,
+    phoneWithoutShell: authorized.phoneWithoutShell,
     missedPongs: 0,
     held: new Set(),
     shedding: false,
@@ -461,6 +469,8 @@ export function attachWsHub(server: Server, deps: WsAuthDeps): WsHub {
   }
   // Immediate path: the revoke that happened in this process tells us directly.
   const offRevoked = deps.devices.onRevoked(dropDevice)
+  // The grant is read once, when a socket joins, so a change closes the phone's sockets and it rejoins.
+  const offShellAccess = deps.devices.onShellAccessChanged(dropDevice)
   // Backstop for long-lived streams (docs/api-reference/transport.md § Pairing, docs/security/transport-and-auth.md § Transport and
   // auth). It covers a revoke this hub never heard about, another process, or a listener registered
   // after the revoke, which is exactly the case a live socket cannot detect since it holds no bearer
@@ -557,6 +567,7 @@ export function attachWsHub(server: Server, deps: WsAuthDeps): WsHub {
     server.off('upgrade', onUpgrade)
     clearInterval(sweep)
     offRevoked()
+    offShellAccess()
     for (const socket of pending) socket.destroy()
     pending.clear()
     for (const conn of [...conns]) conn.ws.terminate()

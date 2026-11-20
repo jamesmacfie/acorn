@@ -374,6 +374,7 @@ node: gitText
 node: interactiveProfile
 node: invalidateWorktreeStatus
 node: isDir
+node: isPhoneWithoutShell
 node: isProviderOperationError
 node: isRecord
 node: isRepoConfigTrustError

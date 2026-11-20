@@ -17,6 +17,9 @@ import { REFERENCE_EVENT_READ, sessionReferenceContext } from '../sessions/sessi
 // The runtime throws plain Errors and has no idea it is behind HTTP, so the mapping goes by message
 // shape. An unmatched error rethrows and becomes a 500, which is the honest answer for a bug.
 function bridgeFailure(error: unknown): never {
+  // Something a phone needs shell access for (`PhoneShellRequiredError`), matched by name like the next.
+  if (error instanceof Error && error.name === 'PhoneShellRequiredError')
+    throw new BridgeError(403, 'phone_refused', error.message)
   // The secret gate's refusal (`SecretPublicationRefused`), matched by
   // shape so this bridge does not load the checker. Its message names rules and positions, never a value.
   if (error instanceof Error && 'refusal' in error) throw new BridgeError(409, 'secret_check_blocked', error.message)
@@ -174,9 +177,9 @@ export function managedAgentsBridge(
     cancelTurn: (sessionId, turnId) => guarded(() => runtime.cancelTurn(sessionId, turnId)),
     steerTurn: (sessionId, turnId) => guarded(() => runtime.steerTurn(sessionId, turnId)),
     cancelSubagent: (sessionId, subagentId) => guarded(() => runtime.cancelSubagent(sessionId, subagentId)),
-    resolveRequest: (sessionId, requestId, resolution, idempotencyKey) =>
-      guarded(() => runtime.resolveRequest(sessionId, requestId, resolution, idempotencyKey)),
-    patchSession: (sessionId, patch) => guarded(() => runtime.patchSession(sessionId, patch)),
+    resolveRequest: (sessionId, requestId, resolution, idempotencyKey, options) =>
+      guarded(() => runtime.resolveRequest(sessionId, requestId, resolution, idempotencyKey, options)),
+    patchSession: (sessionId, patch, options) => guarded(() => runtime.patchSession(sessionId, patch, options)),
     fork: (sessionId, title) => guarded(() => runtime.fork(sessionId, title)),
     btw: (sessionId, requestedConfigOptions) => guarded(() => runtime.btw(sessionId, requestedConfigOptions)),
     compact: (sessionId) => guarded(() => runtime.compact(sessionId)),

@@ -67,6 +67,7 @@ import { agentTurnInputText, buildForkContext } from './runtimeContext'
 import type { InstructionAdmission } from './instructionAdmission'
 import { InstructionAdmissionError } from './instructionAdmissionError'
 import { executionPolicyRefusal } from './executionPolicy'
+import { PhoneShellRequiredError, phoneTurnRefusal } from './phoneTurns'
 import type { SessionGoalGeneration } from './sessionGoalGeneration'
 import {
   mayBeUsageLimit,
@@ -1123,6 +1124,11 @@ export class ManagedAgentEngine {
         const refusal = executionPolicyRefusal(await this.store.requireSession(session.id))
         if (refusal) throw new Error(refusal)
       }
+      // A phone without shell access sent this turn, so it runs only where each command waits for a person.
+      if (turn.effectivePolicy.fromPhoneWithoutShell === true) {
+        const refusal = phoneTurnRefusal(await this.store.requireSession(session.id), turn)
+        if (refusal) throw new Error(refusal)
+      }
       const sent = await this.prepareSend(session, turn.id, input, generation)
       if (!sent || !this.processes.owns(generation)) return false
       // What memory changed since the session was last told, as a part for this turn (./memoryChanges.ts).
@@ -1288,6 +1294,9 @@ export class ManagedAgentEngine {
     if (queued.status !== 'queued') throw new Error('Only a queued turn can be steered.')
     // A workflow, delegation, or plugin waits on its own turn id to settle, and a steered turn never does.
     if (queued.source !== 'interactive') throw new Error('Only a message you sent can be steered.')
+    // Steered input reaches the running turn without passing dispatch, so the phone check runs here too.
+    const phoneRefusal = phoneTurnRefusal(session, queued)
+    if (phoneRefusal) throw new PhoneShellRequiredError(phoneRefusal)
     const live = this.processes.current(sessionId)
     const activeTurnId = live?.activeTurnId
     if (!live || !activeTurnId || session.runtimeState === 'cancelling') return queued

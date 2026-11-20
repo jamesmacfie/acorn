@@ -65,6 +65,14 @@ with the impostor and sends it their work. Four things bound that:
 - **The service stores no task content.** Its tables hold accounts, Node labels, fingerprints, and relay
   routes.
 
+**The account website serves the phone app, so a breach of it can act as every paired phone.** The
+phone's device token sits where any script on the website's origin can use it. Changed files on the
+website could read what a phone reads and make the writes a phone may make
+([what a phone device may do](../relay/phone-channel/phone-devices.md#what-a-phone-device-may-do)). They can't run a
+command on a Node, open a terminal, or approve an agent's command, unless the owner gave that phone
+[shell access](../relay/phone-channel/phone-devices.md#shell-access) from a computer. A phone with shell access is a
+terminal on the Node for whoever controls the website.
+
 Signing out deletes the connection on that Node and turns remote access off first. It doesn't revoke
 a device token, because device tokens don't depend on the account.
 

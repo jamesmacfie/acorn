@@ -1,9 +1,10 @@
 # The phone channel
 
 This page covers how a phone's browser reaches a Node through a relay: the encrypted channel, the Node's
-channel key, the messages, the device each phone gets, and what a phone's device may not do. Read it
-before you change the phone app's transport, the Node's channel endpoint, or the phone device rules. It's
-part of [the relay](../relay.md), and [the mobile web app](../mobile.md) owns the app itself.
+channel key, the messages, and the previews. [Phone devices](./phone-channel/phone-devices.md) covers
+what a phone's device may do and shell access. Read this page before you change the phone app's
+transport or the Node's channel endpoint. It's part of [the relay](../relay.md), and
+[the mobile web app](../mobile.md) owns the app itself.
 
 ## What it does
 
@@ -76,34 +77,16 @@ feed closes at once, and a feed that falls behind holds a terminal's output back
 The phone reads the `seq` of each frame. A gap means frames were lost, so it opens a new channel and
 refetches.
 
-## A device for each phone
+## Phone devices
 
-A phone pairs by approval, as a laptop does ([pairing by approval](../api-reference/transport.md#pairing-by-approval)):
-it asks with an account assertion, a paired device shows the same three words, and **Allow** hands the
-phone a token. The first phone pairs at home, approved on the Node's own computer.
+<a id="a-device-for-each-phone"></a>
+<a id="what-a-phone-device-may-do"></a>
+<a id="shell-access"></a>
 
-A device paired through a channel is marked `kind: "phone"`, whatever it calls itself, because the Node
-knows which door it came through. The phone keeps its token in IndexedDB, encrypted with AES-GCM under a
-key the browser made and won't hand over, so a copy of the browser's storage holds ciphertext. That
-doesn't protect against script running in the app. A phone names itself from its browser and a short
-random tag, such as "iPhone Safari 1a2b", so the device list and the audit log tell phones apart.
-
-## What a phone device may do
-
-A phone's device may not call these routes. The Node answers `403 phone_refused`, from
-`server/middleware/phoneRules.ts`, and a test pins the list:
-
-- Opening a pairing window, and everything under `/v1/core/devices`. Answering a pairing request is
-  allowed.
-- Every `POST`, `PUT`, `PATCH`, or `DELETE` under `/v1/core/plugins`, so a plugin write added later is
-  refused too.
-- Backup and restore, security settings, `PUT /v1/core/node/reach`, and `POST /v1/core/node/stop`.
-
-A phone's device that nobody uses for 30 days is revoked the next time it asks. Revoke one phone from
-**Settings → Nodes** on a computer, which lists each device. The others keep working.
-
-The list is a denylist because the phone draws the desktop's own panes, which read most of the Node's
-routes. An allowlist would be stricter, and it needs every route those panes use named first.
+Each phone pairs by approval and gets a device of its own, marked `kind: "phone"`. The phone app runs on
+the account website's origin, so the Node holds a phone to its screens, and nothing a phone sends runs a
+program on the Node until a computer gives it shell access. [Phone devices](./phone-channel/phone-devices.md)
+has the rules, the agent policy, and the grant.
 
 ## Previews
 
@@ -170,8 +153,9 @@ reload, only from the page's own origin.
 ## Trust
 
 - **The website serves the code.** The account website could ship a phone app that reads what the phone
-  reads. That's true of any web app. Someone would have to change the served files on purpose, and the
-  change would be visible in them.
+  reads, and that does what the phone may do. That's true of any web app. Someone would have to change
+  the served files on purpose, and the change would be visible in them. That's why a phone runs nothing
+  on a Node until a computer gives it [shell access](./phone-channel/phone-devices.md#shell-access).
 - **The account vouches for the key.** A breached account service could list a Node with an impostor's key.
   A phone that pairs with it would send the impostor its work. It still couldn't get into the real Node.
 - **A phone can approve a pairing.** Raising a request from another computer needs the owner's account
