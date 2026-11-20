@@ -2,7 +2,7 @@ import { randomUUID } from 'node:crypto'
 import type { SlackDelivery } from '@acorn/protocol/account.ts'
 import type { SlackRuntime } from './runtime'
 import type { Mode, Thread } from './store'
-import { firstLine, installId, REACTIONS, stableId, withoutMention } from './text'
+import { firstLine, installId, REACTIONS, stableId, threadLine, withoutMention } from './text'
 import type { Turns } from './turns'
 
 // What arrives from Slack, by the conversation rules (docs/integrations/slack/conversation-rules.md § When the bot acts):
@@ -20,18 +20,8 @@ const REMEMBER_ACTION = 'acorn_project_remember'
 
 export function slackInbound(rt: SlackRuntime, turns: Turns, onClick?: (payload: Payload) => Promise<boolean>) {
   const { store } = rt
-  const names = new Map<string, string>()
-
-  // A guest's name, read once per user from Slack.
-  async function nameOf(teamId: string, userId: string): Promise<string> {
-    const key = `${teamId}:${userId}`
-    if (!names.has(key)) {
-      const info = await rt.call(teamId, 'users.info', { user: userId })
-      const user = info?.user as { profile?: { display_name?: string }; real_name?: string; name?: string } | undefined
-      names.set(key, user?.profile?.display_name || user?.real_name || user?.name || userId)
-    }
-    return names.get(key)!
-  }
+  // Whether the owner let other people's thread messages reach the agent here, with `/acorn guests on`.
+  const guestsOn = async (teamId: string, channel: string) => !!(await store.channel(teamId, channel))?.guests
 
   async function event(envelope: Payload): Promise<void> {
     const teamId = installId(envelope)
@@ -72,18 +62,20 @@ export function slackInbound(rt: SlackRuntime, turns: Turns, onClick?: (payload:
         await rt.react(teamId, channel, ts, null, REACTIONS.received)
         return turns.pump(thread)
       }
-      await store.insertMessage({
-        teamId,
-        channelId: channel,
-        ts,
-        threadId: thread.id,
-        userId: event.user,
-        userName: await nameOf(teamId, event.user),
-        text,
-        role: 'guest',
-        status: 'waiting',
-        createdAt: at,
-      })
+      // Without the owner's opt-in, a guest's text isn't kept, so no later turn can read it.
+      if (await guestsOn(teamId, channel))
+        await store.insertMessage({
+          teamId,
+          channelId: channel,
+          ts,
+          threadId: thread.id,
+          userId: event.user,
+          userName: '',
+          text,
+          role: 'guest',
+          status: 'waiting',
+          createdAt: at,
+        })
       if (mention && !(JSON.parse(thread.notedGuests) as string[]).includes(event.user)) {
         await store.noteGuest(thread, event.user)
         await rt.ephemeral(
@@ -148,8 +140,9 @@ export function slackInbound(rt: SlackRuntime, turns: Turns, onClick?: (payload:
       return
     }
     const id = `${teamId}:${channel}:${ts}`
-    // Mentioned partway through a thread: read it once, for the first turn.
-    const history = threadTs !== ts ? await readHistory(teamId, channel, threadTs, ts) : null
+    // Mentioned partway through a thread where the owner opted in: read it once, for the first turn.
+    const history =
+      threadTs !== ts && (await guestsOn(teamId, channel)) ? await readHistory(teamId, channel, threadTs, ts) : null
     await store.insertThread({
       id,
       teamId,
@@ -208,7 +201,7 @@ export function slackInbound(rt: SlackRuntime, turns: Turns, onClick?: (payload:
         typeof message.user !== 'string'
       )
         continue
-      lines.push(`${await nameOf(teamId, message.user)}: ${String(message.text ?? '')}`)
+      lines.push(threadLine(message.user, String(message.text ?? '')))
     }
     return lines.length ? lines.join('\n') : null
   }
@@ -358,8 +351,22 @@ export function slackInbound(rt: SlackRuntime, turns: Turns, onClick?: (payload:
         `This ${dm ? 'DM' : 'channel'} uses ${current} mode. In tasks mode, each new thread is a task of its own, with a branch. In conversation mode, each new thread is a session in one shared task, in the project folder. Change it with \`/acorn mode tasks\` or \`/acorn mode conversation\`.`,
       )
     }
+    if (verb === 'guests') {
+      if (argument === 'on' || argument === 'off') {
+        await store.setChannel(teamId, channel, { guests: argument === 'on' })
+        return say(
+          argument === 'on'
+            ? 'Your agent now reads other people’s replies in its threads here, and a thread’s earlier messages when you mention it partway through. It treats them as untrusted, and every command still waits for your approval.'
+            : 'Your agent no longer reads other people’s messages here. Only yours reach it.',
+        )
+      }
+      const on = !!(await store.channel(teamId, channel))?.guests
+      return say(
+        `Your agent ${on ? 'reads' : 'doesn’t read'} other people’s messages in its threads here. Change it with \`/acorn guests on\` or \`/acorn guests off\`. Anyone in the channel can write those messages, so turn it on only where you trust everyone who can post.`,
+      )
+    }
     return say(
-      'Mention @acorn, or DM it, to start an agent on your Node. `/acorn project <name>` sets this channel’s project. `/acorn mode tasks|conversation` sets how new threads work. Only your replies run as turns; anyone else’s are context.',
+      'Mention @acorn, or DM it, to start an agent on your Node. `/acorn project <name>` sets this channel’s project. `/acorn mode tasks|conversation` sets how new threads work. Only your replies run as turns. `/acorn guests on` lets your agent read anyone else’s replies too.',
     )
   }
 

@@ -10,7 +10,7 @@ sources:
   - plugins/slack/src/server/inbound.ts
   - plugins/slack/src/server/turns.ts
   - plugins/slack/src/server/approvals.ts
-checked: '31ff472da'
+checked: '7e2406848'
 ---
 
 import PluginFacts from '../../../../components/PluginFacts.astro'
@@ -31,8 +31,8 @@ Open **Settings** > **Connections** > **Slack** and click **Link Slack**. Open t
 sign in with Slack. The page finds the link once it reaches your Node, and shows the workspace and the
 Slack user it names. Click **Confirm** if that's you, or **Not me, unlink** if it isn't. Slack can't
 start anything on your Node until you confirm. If the link later names a different Slack user, you
-confirm again. Only your own Slack user starts turns on your Node. Anyone else's reply in your thread
-reaches the agent as context with your next message.
+confirm again. Only your own Slack user starts turns on your Node. By default the agent reads nothing
+anyone else writes in your thread.
 
 Every command an agent runs from Slack waits for your approval. A Claude Code session switches to
 **Default** mode, even if you usually run it in **Auto**. Codex can't start from Slack, because acorn
@@ -51,6 +51,11 @@ prompt, and with the switch on, approve what it runs.
 - **`/acorn project <name>`** sets the project for the channel or DM. With none set, the bot asks you
   to pick one.
 - **`/acorn mode tasks`** or **`/acorn mode conversation`** chooses how new threads work there.
+- **`/acorn guests on`** lets the agent read other people's replies in its threads there, and the
+  thread's earlier messages when you mention it partway through. It reads them as untrusted, by Slack
+  user ID, and every command still waits for your approval. Anyone who can post in the channel can
+  write that text, Slack Connect guests included, so turn it on only where you trust them.
+  **`/acorn guests off`** turns it off again.
 
 A reaction on your message shows where the turn is: 👀 received, ⏳ working, ✋ waiting for you, ✅ done,
 ❌ failed. A status line in the thread names what the agent is doing, and the answer posts as a reply of

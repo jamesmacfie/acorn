@@ -21,7 +21,8 @@ export const slackLinks = sqliteTable('slack_links', {
 
 // A channel's or DM's project and mode, set with `/acorn project` and `/acorn mode`. A channel with no
 // row takes the defaults: conversation for a DM, tasks for a channel. `name` is what a slash command
-// told us, for the posts and the composer note, since events carry only the ID.
+// told us, for the posts and the composer note, since events carry only the ID. `guests` is the
+// owner's `/acorn guests on`: only then do other people's thread messages reach the agent.
 export const slackChannels = sqliteTable(
   'slack_channels',
   {
@@ -30,6 +31,7 @@ export const slackChannels = sqliteTable(
     name: text('name'),
     projectId: text('project_id'),
     mode: text('mode', { enum: ['tasks', 'conversation'] }),
+    guests: integer('guests', { mode: 'boolean' }).notNull().default(false),
   },
   (table) => [primaryKey({ columns: [table.teamId, table.channelId] })],
 )
@@ -95,7 +97,8 @@ export const slackMessages = sqliteTable(
     ts: text('ts').notNull(),
     threadId: text('thread_id'),
     userId: text('user_id').notNull(),
-    // The sender's Slack display name, for the context a guest's reply becomes.
+    // The owner's Slack display name. Empty for anyone else, because a display name proves nothing and
+    // the agent reads others by their user ID.
     userName: text('user_name').notNull(),
     text: text('text').notNull(),
     role: text('role', { enum: ['owner', 'guest'] }).notNull(),

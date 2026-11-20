@@ -1,0 +1,1 @@
+ALTER TABLE `slack_channels` ADD `guests` integer DEFAULT false NOT NULL;

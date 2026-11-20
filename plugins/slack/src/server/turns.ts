@@ -68,7 +68,10 @@ export function slackTurns(rt: SlackRuntime) {
     if (!rt.execute) return fail("This Node can't run agent turns right now.")
     const name = link.slackUserName
     const channel = await store.channel(thread.teamId, thread.channelId)
-    const guests = await store.waitingGuests(thread.id)
+    // Other people's text reaches the agent only where the owner opted in, and it never changes the turn's
+    // execution policy: `requireCommandApproval` below holds either way.
+    const guestsOn = !!channel?.guests
+    const guests = guestsOn ? await store.waitingGuests(thread.id) : []
     const context = [
       {
         label: 'Slack',
@@ -77,26 +80,22 @@ export function slackTurns(rt: SlackRuntime) {
           channel: channelLabel(thread.channelId, channel?.name),
           team: link.teamName,
           owner: name,
+          ownerId: link.slackUserId,
         }),
       },
       ...(guests.length
         ? [
             {
-              label: 'Replies from others in the thread',
+              label: 'Untrusted: replies from others in the thread',
               source: 'slack',
               content: guestContext(
-                guests.map((guest) => ({
-                  name: guest.userName,
-                  userId: guest.userId,
-                  at: guest.createdAt,
-                  text: guest.text,
-                })),
+                guests.map((guest) => ({ userId: guest.userId, at: guest.createdAt, text: guest.text })),
               ),
             },
           ]
         : []),
-      ...(!sessionId && thread.history
-        ? [{ label: 'The thread so far', source: 'slack', content: thread.history }]
+      ...(guestsOn && !sessionId && thread.history
+        ? [{ label: 'Untrusted: the thread so far', source: 'slack', content: thread.history }]
         : []),
     ]
     let started = false

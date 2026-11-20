@@ -38,7 +38,7 @@ Node routes on the configured account origin, and refuses redirects. Loaded plug
 | A top-level message to @acorn in a conversation channel | An agent session in the channel's task |
 | The thread under that message | The conversation with that session |
 | A message from the owner | A turn in that session |
-| A message from anyone else in the thread | Context on the owner's next turn, with who wrote it |
+| A message from anyone else in the thread | Nothing, unless the owner ran `/acorn guests on` there. Then it's untrusted context on the owner's next turn, named by Slack user ID |
 
 A thread belongs to the Node of the person who started it. A local Node has one owner, and only that
 owner's Slack user starts or steers turns.
@@ -99,8 +99,9 @@ checks is refused, and the session list shows the session "by slack". Each turn 
 even when the owner's default is Auto, and a harness that can't show it asks, Codex included, is
 refused ([session control](../managed-agents/session-control.md#running-a-turn-from-a-plugin)). The
 prompt is the owner's words.
-The Slack rules, guests' replies, and a thread's earlier messages go in `context`, which the model reads
-as information. Turns run one at a time per session, for up to four hours each.
+The Slack rules go in `context`, which the model reads as information. So do guests' replies and a
+thread's earlier messages, but only in a channel where the owner opted in, labelled as untrusted
+([the owner and everyone else](./slack/conversation-rules.md#the-owner-and-everyone-else)). Turns run one at a time per session, for up to four hours each.
 
 Answers post from `plugin:agents:turn-changed` and `agents.reviewInput.v1`, not from the call's return
 value, so a Slack turn, a turn typed in Acorn, and a turn a restart interrupted take one path. The first

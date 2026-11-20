@@ -94,10 +94,14 @@ export function slackStore(db: PluginDatabase) {
         .from(slackChannels)
         .where(and(eq(slackChannels.teamId, teamId), eq(slackChannels.channelId, channelId)))
         .get()) ?? null,
-    setChannel: (teamId: string, channelId: string, patch: Partial<Pick<Channel, 'name' | 'projectId' | 'mode'>>) =>
+    setChannel: (
+      teamId: string,
+      channelId: string,
+      patch: Partial<Pick<Channel, 'name' | 'projectId' | 'mode' | 'guests'>>,
+    ) =>
       db
         .insert(slackChannels)
-        .values({ teamId, channelId, name: null, projectId: null, mode: null, ...patch })
+        .values({ teamId, channelId, name: null, projectId: null, mode: null, guests: false, ...patch })
         .onConflictDoUpdate({ target: [slackChannels.teamId, slackChannels.channelId], set: patch }),
     channelTask: async (teamId: string, channelId: string, projectId: string) =>
       (await db
