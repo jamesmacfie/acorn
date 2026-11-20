@@ -135,6 +135,13 @@ beforeAll(async () => {
     url: `http://localhost:${dev.port}`,
   })
   expect(recipe.status).toBe(200)
+  // Remote access alone orders no certificate and opens no preview. Previews have a switch of their own.
+  const before = await openPreview()
+  expect(before.status).toBe(503)
+  expect(before.json).toMatchObject({ error: { code: 'preview_unavailable', details: { reason: 'off' } } })
+  expect(account.challenges().size).toBe(0)
+  expect(acme.issued()).toBe(0)
+  expect((await ask(home, 'PUT', '/previews', { enabled: true })).status).toBe(200)
 }, 180_000)
 
 afterAll(async () => {

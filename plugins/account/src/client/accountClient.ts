@@ -14,3 +14,10 @@ export const setRemoteAccess = (enabled: boolean): Promise<AccountState['remoteA
     headers: { 'content-type': 'application/json' },
     body: JSON.stringify({ enabled }),
   })
+
+export const setPreviews = (enabled: boolean): Promise<AccountState['remoteAccess']> =>
+  writeJson(accountRoute('/previews'), {
+    method: 'PUT',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify({ enabled }),
+  })

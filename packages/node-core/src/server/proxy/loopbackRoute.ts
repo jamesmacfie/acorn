@@ -32,7 +32,7 @@ const MOVED = 'This task’s app stopped or moved to another port. Open the prev
 
 // Why a preview can't open, for a person. The reason itself rides in the error's details for a client to act on.
 const UNAVAILABLE: Record<PreviewUnavailable, string> = {
-  off: 'Turn on Remote access on this Node to see previews on a phone.',
+  off: 'Turn on Remote access and Phone previews in this Node’s account settings to see previews on a phone.',
   unsupported: 'The account service this Node uses has no preview domain.',
   starting: 'This Node is still getting its certificate for previews. Try again in a minute.',
   expired: "This Node's certificate for previews ran out and couldn't be renewed.",

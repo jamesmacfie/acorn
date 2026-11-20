@@ -7,7 +7,7 @@ sources:
   - packages/node-core/src/server/storage/backup.ts
   - packages/client-core/src/features/settings/SecuritySettings.tsx
   - scripts/verify-backup.mjs
-checked: 07aa959a0
+checked: '8e31dd3dc'
 ---
 
 A backup saves a Node's databases to one file on the Node's machine: your workspaces, projects, tasks,

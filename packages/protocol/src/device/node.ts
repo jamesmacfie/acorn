@@ -64,6 +64,10 @@ export const nodeIdentitySchema = z.object({
   // that account's service signs with (docs/account-api.md). It's no grant: the Node uses it only to
   // check that an assertion names its owner.
   owner: z.strictObject({ accountId: z.string().min(1), keys: accountKeysSchema }).optional(),
+  // The owner agreed to show task apps on a phone (docs/relay/phone-channel.md § Previews). Absent means
+  // no preview code runs, even with a relay: a preview's name sits under a domain the account service
+  // controls, so that service can read what passes through it.
+  previews: z.literal(true).optional(),
 })
 
 export type NodeIdentity = z.infer<typeof nodeIdentitySchema>

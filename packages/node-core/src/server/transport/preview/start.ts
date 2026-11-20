@@ -25,7 +25,8 @@ export type PreviewOptions = {
 }
 
 // A Node's previews, from the certificate to the server that answers on their names. Loaded by the listener
-// only when Remote access is on and an account service is named, so a Node without them carries none of it.
+// only when Remote access is on, an account service is named, and the owner turned previews on, so a Node
+// without them carries none of it.
 export function startPreview(options: PreviewOptions): PreviewHandle {
   const grants = new PreviewGrants()
   const server = createPreviewServer({ grants, ownPort: options.ownPort })

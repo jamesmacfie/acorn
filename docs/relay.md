@@ -145,6 +145,11 @@ key to any Node's TLS, so it can't read routes, bodies, tokens, or terminal outp
 gives away who connected when, not what they did. On a preview domain it also sees each server name, which
 holds the Node's label and the preview's random one.
 
+Previews are the exception. A browser pins no Node key, and accepts any certificate a public authority issues
+for the preview's name. A relay working with whoever runs the preview domain's DNS can get one and read the
+preview, its key and its cookie included. That's why previews have a switch of their own, off by default
+([who can read a preview](./relay/phone-channel.md#who-can-read-a-preview)).
+
 In self-hosted mode, a holder of the credential can register any route. That can take a route from your Node, which is a
 denial of service, but not an impersonation: the client pins the Node's certificate, and a different
 Node fails the pin as `identity_mismatch`. A first pairing is as safe as the owner's comparison of the

@@ -24,7 +24,7 @@ registering the plugin's routes.
 | Slack gateway | Part of the service, with its own API: Slack events in, Slack calls out ([the Slack gateway API](./account-api/slack-gateway.md)). |
 
 A device token still decides who gets into a Node. A ticket gets a client to the Node, and the account
-service can't approve a pairing or read traffic.
+service can't approve a pairing or read relayed traffic, except a phone's [preview](./relay/phone-channel.md#who-can-read-a-preview).
 
 ## Version and shape
 
@@ -168,6 +168,8 @@ in: no request leaves the Node, and no timer runs. Its routes load on their firs
   every stream it carries at once, forgets the relay and owner, and removes the Node from the account.
   A Node that can't reach the service still turns off, and the page says the account wasn't told.
   Signing out turns it off first.
+- **Phone previews.** A second switch, off until the owner turns it on (`PUT /v1/p/account/previews`).
+  It records `previews` in `node.json`, needs remote access (`409 remote_access_off`), and goes off with it.
 - **Tickets.** `POST /v1/p/account/tickets` on the local Node asks the service for a ticket for another
   Node of the same account. A client's custody calls it before it opens a relayed stream and keeps the
   ticket in memory. It asks again when a minute is left.

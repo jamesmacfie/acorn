@@ -27,7 +27,7 @@ export function blocker(c: Context<AppEnv>): string | undefined {
 }
 
 export function remoteAccessState(c: Context<AppEnv>): AccountState['remoteAccess'] {
-  const { relay, owner } = readNodeRelay(c.env.DATA_DIR)
+  const { relay, owner, previews } = readNodeRelay(c.env.DATA_DIR)
   const state = c.env.RELAY?.state()
   const blocked = blocker(c)
   return {
@@ -36,7 +36,16 @@ export function remoteAccessState(c: Context<AppEnv>): AccountState['remoteAcces
     connected: state?.connected ?? false,
     ...(state?.since ? { since: state.since } : {}),
     ...(blocked ? { blocked } : {}),
+    previews: !!previews,
   }
+}
+
+// Phone previews, a switch of their own under remote access. A preview's name sits under a domain the
+// account service controls, so that service could get a certificate for it and read the page on its way
+// (docs/relay/phone-channel.md § Previews). Reaching the Node from a phone is no agreement to that.
+export async function setPreviews(c: Context<AppEnv>, enabled: boolean): Promise<void> {
+  recordNodeRelay(c.env.DATA_DIR, { previews: enabled || undefined })
+  await c.env.RELAY?.applyPreviews()
 }
 
 // Register the Node, record what the service answered, and start the tunnel. Registering twice is fine:
@@ -58,7 +67,7 @@ export async function turnOn(c: Context<AppEnv>, account: { id: string }): Promi
 export async function turnOff(c: Context<AppEnv>): Promise<TurnedOff> {
   const { relay, owner } = readNodeRelay(c.env.DATA_DIR)
   if (!relay || !owner) return { accountNotified: true }
-  recordNodeRelay(c.env.DATA_DIR, { relay: undefined, owner: undefined })
+  recordNodeRelay(c.env.DATA_DIR, { relay: undefined, owner: undefined, previews: undefined })
   await c.env.RELAY?.apply(undefined)
   const token = await providerCredential(c, ACCOUNT_PROVIDER)
   if (!token) return { accountNotified: false }

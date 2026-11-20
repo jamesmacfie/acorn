@@ -6,6 +6,7 @@ import { join } from 'node:path'
 import { seedTlsCert } from '../../testkit/tls.ts'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { openDataRoot, type DataRoot } from '../storage/dataRoot'
+import { recordNodeRelay } from '../storage/nodeRelay'
 import { makeRuntime, startListener, type Listener } from './listener'
 import { disposeWsHub } from './wsHub'
 import { mintInternalToken } from '../auth/internalTokens'
@@ -196,6 +197,7 @@ describe('the loopback TLS listener', () => {
   // A preview needs an account service to name its domain and publish its challenge, so a Node with relay
   // settings and no service serves none, and says so when asked to open one.
   it('starts previews with the tunnel only when an account service is named, and stops them with it', async () => {
+    recordNodeRelay(root!.dir, { previews: true })
     const runtime = makeRuntime(root!)
     opened.push(runtime.DB)
     listener = await startListener(runtime, root!)
@@ -227,6 +229,45 @@ describe('the loopback TLS listener', () => {
       await runtime.RELAY!.apply(undefined)
       expect(preview.close).toHaveBeenCalledOnce()
       expect(runtime.PREVIEWS!.open(request)).toEqual({ unavailable: 'off' })
+    } finally {
+      delete process.env.ACORN_ACCOUNT_URL
+    }
+  }, 30_000)
+
+  // Remote access lets a phone reach the Node. A preview puts a task's app behind a name the account service
+  // can get a certificate for too, so it waits for its own switch (docs/relay/phone-channel.md § Previews).
+  it('runs no previews with Remote access on until the previews switch is on, and keeps the tunnel as it flips', async () => {
+    vi.mocked(startPreview).mockClear()
+    const runtime = makeRuntime(root!)
+    opened.push(runtime.DB)
+    listener = await startListener(runtime, root!)
+    const settings = { url: 'ws://127.0.0.1:9', credential: 'relay-credential' }
+    const request = { deviceId: 'phone', ancestor: undefined, port: 3000, target: async () => 3000 }
+    process.env.ACORN_ACCOUNT_URL = 'http://127.0.0.1:9'
+    try {
+      await runtime.RELAY!.apply(settings)
+      expect(runtime.RELAY!.state()).toEqual({ connected: false })
+      expect(startPreview).not.toHaveBeenCalled()
+      expect(runtime.PREVIEWS!.open(request)).toEqual({ unavailable: 'off' })
+      // The tunnel still takes the kind, and a stream that arrives finds nothing and closes.
+      const stream = { destroy: vi.fn() }
+      vi.mocked(startRelayTunnel).mock.calls.at(-1)![5]!(stream as never)
+      expect(stream.destroy).toHaveBeenCalledOnce()
+
+      const tunnels = vi.mocked(startRelayTunnel).mock.calls.length
+      recordNodeRelay(root!.dir, { previews: true })
+      await runtime.RELAY!.applyPreviews()
+      expect(startPreview).toHaveBeenCalledOnce()
+      const preview = vi.mocked(startPreview).mock.results[0]!.value
+      runtime.PREVIEWS!.open(request)
+      expect(preview.open).toHaveBeenCalledWith(request)
+
+      recordNodeRelay(root!.dir, { previews: undefined })
+      await runtime.RELAY!.applyPreviews()
+      expect(preview.close).toHaveBeenCalledOnce()
+      expect(runtime.PREVIEWS!.open(request)).toEqual({ unavailable: 'off' })
+      expect(vi.mocked(startRelayTunnel).mock.calls.length).toBe(tunnels)
+      expect(runtime.RELAY!.state()).toEqual({ connected: false })
     } finally {
       delete process.env.ACORN_ACCOUNT_URL
     }

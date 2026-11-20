@@ -64,7 +64,11 @@ and its public keys. The Node records them in `node.json` as `relay` and `owner`
 at once, without a restart. At every later boot the listener reads the same `relay` setting, so the
 tunnel starts with no account code running.
 
-Turning it off stops the tunnel and every stream it carries, deletes `relay` and `owner`, and removes the
+Under it, **Phone previews** is a second switch, off by default
+([previews on a phone](./phone-channel.md#previews)). Turning it on records `previews` in `node.json` and
+starts the Node's previews without touching the tunnel.
+
+Turning it off stops the tunnel and every stream it carries, deletes `relay`, `owner`, and `previews`, and removes the
 Node from the account. The Node stops at once even when the account service can't be reached. In that
 case the account page says so, and the Node stays listed until it's removed on the account website.
 

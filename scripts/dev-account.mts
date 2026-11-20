@@ -46,7 +46,9 @@ console.log(
 )
 console.log('')
 console.log(`Start a Node or a session with: ACORN_ACCOUNT_URL=${account.url}`)
-console.log('Then open Settings > Account, sign in, and turn on Remote access. Press Ctrl+C to stop.')
+console.log(
+  'Then open Settings > Account, sign in, and turn on Remote access, and Phone previews to try previews. Press Ctrl+C to stop.',
+)
 console.log(
   `Slack: link from Settings > Slack, then send a mention with: curl -X POST ${account.url}/_test/slack/mention -d '{"teamId":"T0ACORNDEV","channel":"C0GENERAL","user":"U0OWNER","text":"hello"}'. GET ${account.url}/_test/slack/calls lists what the Node sent back.`,
 )

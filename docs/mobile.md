@@ -119,7 +119,8 @@ account service. Run these first, each in its own terminal:
    ([test an account service](./account-api/testing.md)). Set `ACORN_ACCOUNT_URL` for `dev:mobile` if the
    stand-in runs elsewhere.
 2. A Node with **Remote access** on, such as `ACORN_ACCOUNT_URL=http://127.0.0.1:48781 pnpm dev:agent --
-   --session phone`. Open Settings → Account, sign in, and turn it on.
+   --session phone`. Open Settings → Account, sign in, and turn it on. Turn on **Phone previews** too to try
+   the Preview pane.
 
 `ACORN_MOBILE_PORT` moves the dev server, and `ACORN_MOBILE_HOST` makes it listen for another computer.
 `pnpm --filter @acorn/mobile build` writes `apps/mobile/dist` and `apps/mobile/dist-sandbox`, and checks the

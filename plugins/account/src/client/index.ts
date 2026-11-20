@@ -20,7 +20,12 @@ export const accountClientPlugin: ClientPlugin = {
       keywords: ['sign in', 'relay', 'remote access', 'another network'],
       sections: [
         { id: 'account', label: 'Account', rows: ['Sign in', 'Signed in as'] },
-        { id: 'remote-access', label: 'Remote access', rows: ['Remote access'], keywords: ['relay'] },
+        {
+          id: 'remote-access',
+          label: 'Remote access',
+          rows: ['Remote access', 'Phone previews'],
+          keywords: ['relay', 'preview'],
+        },
       ],
       component: AccountSettings,
     })

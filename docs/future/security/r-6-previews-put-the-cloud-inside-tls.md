@@ -1,3 +1,63 @@
+> **Completion note, November 20, 2026.** Bounded on the Acorn side, on branch
+> `phase-r-6-previews-keep-the-cloud-outside-tls`. The finding is latent, and no Node change makes a browser
+> pin a key, so this is a guard and a documented boundary, not a redesign.
+>
+> What landed:
+>
+> - Previews have their own switch, off by default. `node.json` gets an optional `previews: true`
+>   (`nodeIdentitySchema`). The account plugin answers `PUT /v1/p/account/previews` with `{ enabled }`. It's for
+>   paired devices only. A task token gets `403`, and a phone without shell access gets R-1's
+>   `403 phone_refused`, because the plugin names no phone writes. Turning it on with remote access off answers
+>   `409 remote_access_off`. Turning remote access off, or signing out, clears it, and turning remote access
+>   on again leaves it off.
+> - While the switch is off, the Node runs no preview code. `relayControl` in `listener.ts` starts
+>   `startPreview` only with relay settings, an account service, and `previews` in `node.json`. So the Node
+>   orders no certificate, publishes no DNS challenge, and destroys any preview stream the relay offers.
+>   `PREVIEWS.open` answers `off`. `RelayControl.applyPreviews()` starts or stops previews to match the file
+>   without restarting the tunnel, so a desktop that flips the switch through the relay keeps its connection.
+> - **Settings → Account** shows a **Phone previews** switch under **Remote access** while that's on. Its text
+>   says the account service can read a preview and use the app. The `off` message on the phone names both
+>   switches.
+> - Docs: `phone-channel.md` § Previews has the switch and a "Who can read a preview" section. `relay.md`
+>   § What the relay can and can't see, `control-plane.md` § The account service, `account-api.md`, and
+>   `account-api/previews.md` no longer say the service and relay can't read preview traffic. `relay/accounts.md`,
+>   `data-root.md`, `mobile.md`, `mobile/phone-setup.md`, the `dev:account` hint, and the site's Account,
+>   Machines, and environment variables pages describe the switch. The other pages `stale` listed don't describe
+>   previews or `node.json`'s relay fields, so I marked them checked without changes.
+> - Tests: `listener.test.ts` turns remote access on with an account service and the switch off, and checks
+>   that `PREVIEWS.open` answers `off`, no preview starts, and a preview stream is destroyed. It then flips the
+>   switch on and off with no new tunnel. It fails on the old code. `plugins/account/src/server/routes.test.ts`
+>   covers the default, the `409`, the flip, the task token's `403`, and clearing with remote access.
+>   `apps/relay/src/previewEndToEnd.test.ts` checks, through a real relay and account stub, that remote access
+>   alone gets `503 off` with no challenge published and no certificate issued, then turns previews on.
+>
+> Decisions and deviations:
+>
+> - The switch lives in `node.json` beside `relay` and `owner`, not in the database, because the listener reads
+>   it at boot before any plugin runs.
+> - A Node whose relay is set by hand, in the environment or `node.json`, has no Remote access switch, so it
+>   turns previews on by writing `"previews": true` into `node.json`. The docs say so.
+> - The `off` reason still covers "no remote access", "no account service", and "switch off". I didn't add a
+>   reason, because the pane only shows the message.
+> - I didn't build the optional certificate-log watcher. It detects the attack and doesn't stop it.
+> - Size: the Node service bundle grows by 579 B, from 1,970,326 B to 1,970,905 B. That's the listener's
+>   on/off path and the account route.
+>
+> For later phases: L-2 is still open, and the finding makes it a precondition for the hosted service serving
+> previews. With this change, an agent that steals the relay credential can still order a certificate from the
+> account service directly. The switch only stops the Node from doing so. Any new caller of `RelayControl` must
+> supply `applyPreviews`.
+>
+> What acorn-cloud would still need:
+>
+> - Before it serves previews, refuse `PUT /account/v1/preview/challenge` unless the owner turned previews on.
+>   For example, the Node could report the switch with its registration, or the account website could hold its
+>   own copy. Today a stolen relay credential is enough.
+> - Say on the account website, where a person turns on remote access or opens a preview, that the service can
+>   read previews.
+> - Optional: watch certificate transparency logs for the preview domain and alert on a certificate no Node
+>   ordered.
+
 # R-6: Previews put the account service inside the encryption
 
 Found November 20, 2026, in a read-only security review of `jamesmacfie/acorn` at `31ff472da` and

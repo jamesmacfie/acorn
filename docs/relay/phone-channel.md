@@ -92,9 +92,11 @@ has the rules, the agent policy, and the grant.
 
 A task's running app reaches a phone as a page the phone's browser loads from the Node itself, because a
 page can't come from bytes on this channel: a page on the app's address would run with the phone's
-session. The page is a frame of the phone app, on a name of its own, over TLS that the Node ends. The relay
+session. The page is a frame of the phone app, on a name of its own, over TLS that the Node ends. An honest relay
 passes the bytes on by name and reads only the server name in the first record
-([the relay's preview listener](../../apps/relay/PROTOCOL.md#preview-streams)).
+([the relay's preview listener](../../apps/relay/PROTOCOL.md#preview-streams)). Unlike the phone's channel, the
+browser pins no key of the Node's. It trusts any certificate a public authority issues for the name, so whoever
+runs the preview domain can read the page. [Who can read a preview](#who-can-read-a-preview) says what that risks.
 
 | Part | Where it lives |
 | --- | --- |
@@ -110,7 +112,13 @@ SHA-256 of `acorn-preview-node:` and the Node's ID. The account service, the rel
 compute it. `<preview>` is 32 random hex characters for one open preview. Neither names a task, because the
 relay sees the name, and a certificate log publishes the Node's.
 
-**The certificate.** A Node with Remote access on and `ACORN_ACCOUNT_URL` set orders a wildcard certificate
+**The switch.** Previews are off until the owner turns on **Phone previews**, under **Remote access** in
+**Settings → Account** (`PUT /v1/p/account/previews`, for a paired device only). The Node records `previews` in
+`node.json`. Turning Remote access off turns previews off as well, and turning it on again leaves them off. While the
+switch is off, the Node orders no certificate, publishes no challenge, and refuses every preview stream the relay
+offers. A Node whose relay is set by hand turns previews on by writing `"previews": true` into `node.json`.
+
+**The certificate.** A Node with Remote access and **Phone previews** on and `ACORN_ACCOUNT_URL` set orders a wildcard certificate
 for `*.<node>.<preview domain>` over ACME with a DNS-01 challenge. It asks the account service where
 previews are served and which authority to use, and has the service publish the challenge's TXT record
 ([the account API](../account-api/previews.md)). The key is made on the Node and never leaves it. The Node
@@ -128,7 +136,7 @@ A task's token gets `403`. The task has to have an address on the Node's own loo
 otherwise). The preview shows the port that address names when it opens. Once the address moves to another
 port, the Node answers `502` on that name, and the pane, which hears the address change, opens another
 preview. Its new name is a new origin, so the page that was open can't read the new port. While the Node can't serve one it answers `503 preview_unavailable`, with the reason in
-`details.reason`: `off` (no Remote access), `unsupported` (the service has no preview domain), `starting`
+`details.reason`: `off` (no Remote access, or **Phone previews** off), `unsupported` (the service has no preview domain), `starting`
 (no certificate yet), or `expired` (it ran out and couldn't be renewed).
 
 **Who may load it.** The first request, `GET /__acorn/preview?key=…`, spends the one-time key, sets a
@@ -150,7 +158,27 @@ The proxy connects only to the Node's own loopback, refuses the Node's port,
 follows no redirect, drops `Authorization` and the grant cookie, and takes a WebSocket upgrade, for hot
 reload, only from the page's own origin.
 
-**What the relay learns.** The Node's label, the random preview label, and when each connection opened.
+**What the relay learns.** An honest relay learns the Node's label, the random preview label, and when each
+connection opened. A relay working with whoever runs the preview domain's DNS can learn everything, as the next
+section says.
+
+### Who can read a preview
+
+The account service names the preview domain and the certificate authority, and publishes the DNS answer that
+proves the name. It can publish that answer for a key of its own too, and get a second valid certificate for the
+Node's names. The relay, run by the same party, routes by server name, so it could end the browser's TLS itself.
+The browser shows nothing unusual. From there it reads the one-time key and the cookie, and replays them to the
+Node, which proxies to the task's app from loopback. A dev tool that trusts local callers trusts that one.
+
+No change on the Node makes a browser pin a key, so Acorn bounds the exposure instead:
+
+- Previews have their own switch, off by default, as above.
+- A preview shows one port, the one its address named when it opened.
+- The reach is the task's app. No route of the Node's own answers on a preview name.
+- A grant lasts 12 hours and ends when the Node restarts.
+- Every certificate issued for a Node's names appears in public certificate logs, under the Node's label.
+
+Turn previews on only for an account service you trust with what the app shows and does.
 
 ## Trust
 

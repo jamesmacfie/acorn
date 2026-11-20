@@ -11,7 +11,7 @@ sources:
   - packages/client-core/src/host/chrome/ChromeSourcePanel.tsx
   - plugins/github/src/client/PullList.tsx
   - plugins/git/src/client/WorktreeBrowse.tsx
-checked: '3c529e16d'
+checked: '8e31dd3dc'
 ---
 
 This page covers creating a task, from scratch or from a pull request or issue, how and where its Git

@@ -52,6 +52,11 @@ it can't do is approve a pairing or read relayed traffic. A relay forwards TLS t
 impostor Node fails the pin as `identity_mismatch` unless the person pairs with it after comparing the
 wrong identity words.
 
+**Previews are the exception, so they're off until the owner turns them on.** A phone's browser pins no
+key for a preview. The service controls the preview domain's DNS, so it can get a certificate for a
+Node's preview names and read the page, its key and its cookie, then use the task's app as the owner
+([who can read a preview](../relay/phone-channel.md#who-can-read-a-preview)).
+
 A Node the account lists is checked against the fingerprint the account vouches for, which a breached
 service chooses. It could list a relay of its own, forward a pairing ask to the real Node, and collect
 the device token once the owner allows it. So an ask from another computer shows identity words at both

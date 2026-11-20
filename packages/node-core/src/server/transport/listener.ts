@@ -2,6 +2,7 @@ import { createAdaptorServer, type Http2Bindings, type HttpBindings, type Server
 import type { NodeKeys, ServiceEndpoint } from '@acorn/protocol/serviceProtocol.ts'
 import { createServer as createHttpsServer } from 'node:https'
 import type { ChannelSocket } from '@acorn/channel/secure.ts'
+import type { Duplex } from 'node:stream'
 import type { DeviceService } from '../auth/deviceTokens'
 import { execFileSync } from 'node:child_process'
 import { join, resolve } from 'node:path'
@@ -9,10 +10,11 @@ import { createApp } from '../index'
 import { makeBindings, type RuntimeBindings } from '../bindings'
 import { CapabilityRegistry } from '../pluginHost/capabilities'
 import { type DataRoot } from '../storage/dataRoot'
+import { readNodeRelay } from '../storage/nodeRelay'
 import { resolveDatabasePath } from '../storage/paths'
 import { configuredPort, devDataDir } from './listenerConfig'
 import { advertisedHosts } from './advertise'
-import { accountServiceUrl, relaySettings, type RelayControl } from './relaySettings'
+import { accountServiceUrl, relaySettings, type RelayControl, type RelaySettings } from './relaySettings'
 import { ensureCert } from './tls'
 import { attachWsHub, disposeWsHub, type WsHub } from './wsHub'
 import type { PreviewControl } from './preview/previewControl'
@@ -200,7 +202,7 @@ export function startListener(
       const { control, previews } = relayControl(
         server as unknown as import('node:https').Server,
         allowedHosts,
-        root.nodeId,
+        root,
         serveBrowser(root, hub, (request) =>
           Promise.resolve(
             fetch(request, { incoming: { socket: {} }, browserChannel: true } as unknown as HttpBindings),
@@ -235,42 +237,53 @@ export function startListener(
 // Start and stop this listener's relay tunnel, and the previews that ride on it. Changes run one at a time,
 // because the tunnel's module loads on demand and a quick off-then-on mustn't leave two tunnels holding one
 // route. Previews need an account service to name their domain and publish their DNS challenge, so they run
-// only with `ACORN_ACCOUNT_URL` set.
+// only with `ACORN_ACCOUNT_URL` set, and only while node.json's `previews` switch is on. That service can
+// get a certificate for a preview's name too, so a relay alone is no consent to them.
 function relayControl(
   server: import('node:https').Server,
   allowedHosts: Set<string>,
-  nodeId: string,
+  root: Pick<DataRoot, 'dir' | 'nodeId'>,
   serveBrowser: (socket: ChannelSocket, host: string) => void,
   previewOptions: { dir: string; ownPort: number; devices: DeviceService },
 ): { control: RelayControl; previews: PreviewControl } {
+  let settings: RelaySettings | undefined
   let tunnel: RelayTunnel | undefined
   let preview: PreviewHandle | undefined
   let queue = Promise.resolve()
+  const restartPreviews = async () => {
+    preview?.close()
+    preview = undefined
+    const accountUrl = accountServiceUrl()
+    if (settings && accountUrl && readNodeRelay(root.dir).previews)
+      preview = (await import('./preview/start')).startPreview({
+        ...previewOptions,
+        nodeId: root.nodeId,
+        accountUrl,
+        credential: settings.credential,
+      })
+  }
   const control: RelayControl = {
-    apply: (settings) =>
+    apply: (next) =>
       (queue = queue.then(async () => {
         tunnel?.close()
-        preview?.close()
-        tunnel = preview = undefined
-        if (!settings) return
-        const accountUrl = accountServiceUrl()
-        if (accountUrl)
-          preview = (await import('./preview/start')).startPreview({
-            ...previewOptions,
-            nodeId,
-            accountUrl,
-            credential: settings.credential,
-          })
-        const running = preview
+        tunnel = undefined
+        settings = next
+        await restartPreviews()
+        if (!next) return
+        // A preview stream that arrives while the switch is off finds nothing to answer it.
+        const servePreview = accountServiceUrl()
+          ? (stream: Duplex) => (preview ? preview.serve(stream) : stream.destroy())
+          : undefined
         tunnel = (await import('./relayTunnel')).startRelayTunnel(
           server,
-          settings,
-          nodeId,
+          next,
+          root.nodeId,
           allowedHosts,
           serveBrowser,
-          running && ((stream) => running.serve(stream)),
+          servePreview,
         )
       })),
+    applyPreviews: () => (queue = queue.then(restartPreviews)),
     state: () => tunnel?.state(),
   }
   return { control, previews: { open: (request) => preview?.open(request) ?? { unavailable: 'off' } } }

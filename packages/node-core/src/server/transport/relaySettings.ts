@@ -19,9 +19,11 @@ export function relaySettings(root: Pick<DataRoot, 'relay'>): RelaySettings | un
 }
 
 // What the listener lets the account plugin do to a running Node's tunnel. `apply` waits until the
-// change has happened. `state` is undefined while no tunnel runs.
+// change has happened. `applyPreviews` starts or stops previews to match node.json's `previews`, and leaves
+// the tunnel, and every connection on it, as it is. `state` is undefined while no tunnel runs.
 export type RelayControl = {
   apply(settings: RelaySettings | undefined): Promise<void>
+  applyPreviews(): Promise<void>
   state(): RelayState | undefined
 }
 

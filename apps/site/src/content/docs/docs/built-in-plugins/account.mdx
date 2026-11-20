@@ -9,7 +9,7 @@ sources:
   - plugins/account/src/node/index.ts
   - plugins/account/src/server/routes.ts
   - plugins/account/src/server/remoteAccess.ts
-checked: '84e7ddfef'
+checked: '8e31dd3dc'
 ---
 
 import PluginFacts from '../../../../components/PluginFacts.astro'
@@ -19,7 +19,7 @@ your Node there. A client on another network can then reach the Node through a r
 an open port.
 
 <PluginFacts id="account">
-  <Fragment slot="adds">**Settings** > **Machines** > **Account**, with **Sign in**, **Sign out**, and the **Remote access** switch.</Fragment>
+  <Fragment slot="adds">**Settings** > **Machines** > **Account**, with **Sign in**, **Sign out**, and the **Remote access** and **Phone previews** switches.</Fragment>
   <Fragment slot="needs">A build of acorn that has an account service to talk to. A build with none says so on the page and offers no sign-in.</Fragment>
   <Fragment slot="reach">The account service, and the relay it names once you turn on remote access. Nothing is contacted until you sign in.</Fragment>
 </PluginFacts>
@@ -43,6 +43,17 @@ page says which one and since when. Turning it off ends the connection and every
 once, and removes the Node from your account. Signing out turns it off first.
 
 Remote access doesn't let anyone in. A client still pairs with a code and uses its own device
-credential, and the account service can't approve a pairing or read what crosses the relay.
+credential, and the account service can't approve a pairing or read what crosses the relay. Phone
+previews are the one exception, below.
 
 If the Node's environment or `node.json` already names a relay, the switch is off and says why.
+
+## Turn on phone previews
+
+With remote access on, **Phone previews** lets a phone show a task's running app. It's off until you
+turn it on, and turning remote access off turns it off too.
+
+Each preview gets a public web address under a domain the account service controls. A browser trusts any
+certificate a public authority issues for that address, so whoever runs the account service could get one,
+read the page as it passes through the relay, and use the app as you. Turn previews on only if you trust
+the account service with what your app shows and does.

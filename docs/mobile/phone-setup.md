@@ -107,8 +107,9 @@ set one up:
    all that stops a page in a preview sending its own frame to another site, including one on the phone's network.
    Name no other host.
 
-A Node needs Remote access on, so that it has a relay credential, and `ACORN_ACCOUNT_URL`, the account service
-it signed in to.
+A Node needs Remote access on, so that it has a relay credential, **Phone previews** on, and `ACORN_ACCOUNT_URL`,
+the account service it signed in to. Whoever runs the account service can read previews
+([who can read a preview](../relay/phone-channel.md#who-can-read-a-preview)).
 
 ## Try the sandbox
 

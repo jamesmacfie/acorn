@@ -7,9 +7,13 @@ import { activeNodeId, createDeviceFlow, createSettingSave } from '@acorn/plugin
 import { Alert, Button, Checkbox, CodeBlock, SettingRow, SettingsSection, Text } from '@acorn/plugin-api/ui'
 import { safeVerificationUrl } from '@acorn/protocol/externalUrl.ts'
 import type { AccountState } from '../shared/state'
-import { fetchAccountState, setRemoteAccess, signOut } from './accountClient'
+import { fetchAccountState, setPreviews, setRemoteAccess, signOut } from './accountClient'
 
 const REFRESH_WHILE_CONNECTING_MS = 2_000
+
+// What turning previews on puts at risk, said where the switch is (docs/relay/phone-channel.md § Previews).
+const PREVIEWS_TEXT =
+  'Open a task’s app on a phone. Each preview gets a public web address under a domain the account service controls, so whoever runs that service could read the page and use the app as you.'
 
 const connectionText = (remote: AccountState['remoteAccess']): string => {
   if (remote.blocked) return remote.blocked
@@ -36,6 +40,7 @@ export default function AccountSettings() {
   const refresh = () => client.invalidateQueries({ queryKey: key })
   const deviceFlow = createDeviceFlow(() => 'account', refresh)
   const remoteSave = createSettingSave()
+  const previewsSave = createSettingSave()
   const signOutSave = createSettingSave()
 
   return (
@@ -123,24 +128,41 @@ export default function AccountSettings() {
       <SettingsSection id="remote-access" label="Remote access">
         <Show when={state.data}>
           {(current) => (
-            <SettingRow
-              label="Remote access"
-              description={connectionText(current().remoteAccess)}
-              error={remoteSave.error()}
-            >
-              <Checkbox
-                switch
-                ariaLabel="Remote access"
-                checked={current().remoteAccess.enabled}
-                disabled={!current().account || (!current().remoteAccess.enabled && !!current().remoteAccess.blocked)}
-                onChange={(enabled) =>
-                  void remoteSave.run(async () => {
-                    await setRemoteAccess(enabled)
-                    await refresh()
-                  })
-                }
-              />
-            </SettingRow>
+            <>
+              <SettingRow
+                label="Remote access"
+                description={connectionText(current().remoteAccess)}
+                error={remoteSave.error()}
+              >
+                <Checkbox
+                  switch
+                  ariaLabel="Remote access"
+                  checked={current().remoteAccess.enabled}
+                  disabled={!current().account || (!current().remoteAccess.enabled && !!current().remoteAccess.blocked)}
+                  onChange={(enabled) =>
+                    void remoteSave.run(async () => {
+                      await setRemoteAccess(enabled)
+                      await refresh()
+                    })
+                  }
+                />
+              </SettingRow>
+              <Show when={current().remoteAccess.enabled}>
+                <SettingRow label="Phone previews" description={PREVIEWS_TEXT} error={previewsSave.error()}>
+                  <Checkbox
+                    switch
+                    ariaLabel="Phone previews"
+                    checked={current().remoteAccess.previews}
+                    onChange={(enabled) =>
+                      void previewsSave.run(async () => {
+                        await setPreviews(enabled)
+                        await refresh()
+                      })
+                    }
+                  />
+                </SettingRow>
+              </Show>
+            </>
           )}
         </Show>
       </SettingsSection>

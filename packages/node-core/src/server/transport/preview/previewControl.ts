@@ -12,7 +12,7 @@ export type PreviewRequest = {
   target(): Promise<number | null>
 }
 
-// `off`: this Node has no Remote access or no account service. `unsupported`: the service has no preview
+// `off`: this Node has no Remote access, no account service, or its previews switch is off. `unsupported`: the service has no preview
 // domain. `starting`: no certificate yet. `expired`: it ran out and couldn't be renewed.
 export type PreviewUnavailable = 'off' | 'unsupported' | 'starting' | 'expired'
 export type PreviewOpened = { url: string } | { unavailable: PreviewUnavailable }

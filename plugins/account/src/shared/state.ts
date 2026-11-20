@@ -14,6 +14,8 @@ export type AccountState = {
     since?: number
     /** Why the switch can't be turned on: another relay is already set for this Node. */
     blocked?: string
+    /** The owner agreed to show task apps on a phone. Off until they turn it on, and off again with remote access. */
+    previews: boolean
   }
 }
 

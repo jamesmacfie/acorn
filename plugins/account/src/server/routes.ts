@@ -17,14 +17,14 @@ import type { AccountState } from '../shared/state'
 import { accountApi, AccountApiError } from './accountApi'
 import { accountUrl } from './config'
 import { ACCOUNT_PROVIDER } from './provider'
-import { blocker, remoteAccessState, turnOff, turnOn } from './remoteAccess'
+import { blocker, remoteAccessState, setPreviews, turnOff, turnOn } from './remoteAccess'
 
 // The account plugin's routes, under /v1/p/account. Every one is for a paired device: signing in is a
 // person at a keyboard, and a task's agent token must not be able to sign the Node in to its own account
 // or ask for a relay ticket (the confused deputy `plugins/github`'s device routes close the same way).
 
 const pollBody = z.strictObject({ deviceCode: z.string().min(1) })
-const remoteAccessBody = z.strictObject({ enabled: z.boolean() })
+const switchBody = z.strictObject({ enabled: z.boolean() })
 
 // What the service refused with, in the plugin's terms.
 const refusal = (c: Parameters<typeof respondError>[0], error: AccountApiError) =>
@@ -89,7 +89,7 @@ export const accountRoutes = () =>
       }
     })
     .put('/remote-access', async (c) => {
-      const body = remoteAccessBody.safeParse(await c.req.json().catch(() => null))
+      const body = switchBody.safeParse(await c.req.json().catch(() => null))
       if (!body.success) return respondError(c, 400, 'bad_request')
       if (!body.data.enabled) return c.json(await turnOff(c))
       const blocked = blocker(c)
@@ -103,6 +103,15 @@ export const accountRoutes = () =>
       } catch (error) {
         return error instanceof AccountApiError ? refusal(c, error) : providerError(c, error)
       }
+    })
+    // Turning it on needs remote access, and turning remote access off turns it off again.
+    .put('/previews', async (c) => {
+      const body = switchBody.safeParse(await c.req.json().catch(() => null))
+      if (!body.success) return respondError(c, 400, 'bad_request')
+      if (body.data.enabled && !remoteAccessState(c).enabled)
+        return respondError(c, 409, 'remote_access_off', ['Turn on remote access first.'])
+      await setPreviews(c, body.data.enabled)
+      return c.json(remoteAccessState(c))
     })
     // Signing out ends remote access first, so a Node that was reachable doesn't stay so with nobody
     // signed in to say so.

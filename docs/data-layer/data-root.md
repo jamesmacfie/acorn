@@ -37,7 +37,8 @@ modes on Windows, where they're advisory.
 ## `node.json`
 
 `node.json` stores the stable Node ID, its creation time, the last-bound port, the operator's
-`advertiseHost` answer, the relay settings someone wrote by hand ([the relay](../relay.md#the-node)), and,
+`advertiseHost` answer, the relay settings someone wrote by hand ([the relay](../relay.md#the-node)), the
+owner's `previews` switch ([previews on a phone](../relay/phone-channel.md#previews)), and,
 only on a provisioned Node, the attachment record naming its control plane
 ([node enrollment](../node-enrollment.md#the-attachment-record)). It holds no certificate material,
 which lives in `tls/`, and no protocol version. Its schema ignores unknown keys, so a field can be

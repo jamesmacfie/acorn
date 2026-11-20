@@ -28,7 +28,7 @@ covers:
   - telemetry
   - sentry-telemetry
   - storage
-checked: '6342cfd0e'
+checked: '8e31dd3dc'
 ---
 
 This page lists every setting in **Settings** > **Machines**. **Nodes** is stored on **This device**,
@@ -64,6 +64,7 @@ Signs this Node in to an account service, and turns on remote access ([Account](
 | **Sign in** | Shows a code to approve in a browser. Hidden once someone is signed in, and when this build has no account service. | Node | Signed out |
 | **Sign out** | Ends the sign-in on this Node, and turns remote access off first. | Node | |
 | **Remote access** | Registers this Node with the account and connects it to a relay, so a client on another network can reach it. Off while nobody is signed in. | Node | Off |
+| **Phone previews** | Lets a phone show a task's running app through the relay. The account service can read what a preview shows. Shown while remote access is on, and turned off with it. | Node | Off |
 
 ## Security and backup
 

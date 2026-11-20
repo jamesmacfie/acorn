@@ -30,12 +30,15 @@ let account: AccountStub
 let dataDir: string
 // What the listener's relay control would be told, in order.
 let applied: ({ url: string; credential: string } | undefined)[]
+// How many times the listener was told to bring its previews in line with node.json.
+let previewApplies: number
 
 beforeEach(async () => {
   harness = makeTestDb()
   account = await startAccountStub()
   dataDir = mkdtempSync(join(tmpdir(), 'acorn-account-'))
   applied = []
+  previewApplies = 0
   vi.stubEnv('ACORN_ACCOUNT_URL', account.url)
   vi.stubEnv('ACORN_RELAY_URL', '')
   vi.stubEnv('ACORN_RELAY_CREDENTIAL', '')
@@ -57,7 +60,11 @@ const env = () =>
     DATA_DIR: dataDir,
     NODE_ID,
     NODE_FINGERPRINT: 'ab'.repeat(32),
-    RELAY: { apply: async (settings: never) => void applied.push(settings), state: () => undefined },
+    RELAY: {
+      apply: async (settings: never) => void applied.push(settings),
+      applyPreviews: async () => void previewApplies++,
+      state: () => undefined,
+    },
     ...testSecretEnv('0'.repeat(64)),
   }) as unknown as Env
 
@@ -87,7 +94,7 @@ describe('signing in', () => {
     expect(await state()).toEqual({
       configured: true,
       account: null,
-      remoteAccess: { enabled: false, connected: false },
+      remoteAccess: { enabled: false, connected: false, previews: false },
     })
   })
 
@@ -125,6 +132,7 @@ describe('signing in', () => {
       ['GET', '/state'],
       ['POST', '/auth/device/start'],
       ['PUT', '/remote-access'],
+      ['PUT', '/previews'],
       ['POST', '/tickets'],
     ] as const)
       expect((await call(method, path, method === 'GET' ? undefined : {}, task)).status).toBe(403)
@@ -188,6 +196,52 @@ describe('remote access', () => {
     expect(readNodeRelay(dataDir)).toEqual({})
     expect(account.nodes()).toEqual([])
     expect((await state()).account).toBeNull()
+  })
+})
+
+// A phone reaching the Node is one agreement. A task's app behind a public name, under a domain the account
+// service controls, is another (docs/relay/phone-channel.md § Previews).
+describe('phone previews', () => {
+  it('stays off when remote access turns on', async () => {
+    await signIn()
+    await call('PUT', '/remote-access', { enabled: true })
+    expect((await state()).remoteAccess.previews).toBe(false)
+    expect(readNodeRelay(dataDir).previews).toBeUndefined()
+    expect(previewApplies).toBe(0)
+  })
+
+  it('needs remote access to turn on', async () => {
+    await signIn()
+    const on = await call('PUT', '/previews', { enabled: true })
+    expect(on.status).toBe(409)
+    expect(readNodeRelay(dataDir).previews).toBeUndefined()
+    expect(previewApplies).toBe(0)
+  })
+
+  it('turns on and off with its own switch, and leaves the tunnel alone', async () => {
+    await signIn()
+    await call('PUT', '/remote-access', { enabled: true })
+    const on = await call('PUT', '/previews', { enabled: true })
+    expect(on.status).toBe(200)
+    expect(await on.json()).toMatchObject({ enabled: true, previews: true })
+    expect(readNodeRelay(dataDir).previews).toBe(true)
+    expect(previewApplies).toBe(1)
+
+    const off = await call('PUT', '/previews', { enabled: false })
+    expect(await off.json()).toMatchObject({ enabled: true, previews: false })
+    expect(readNodeRelay(dataDir).previews).toBeUndefined()
+    expect(previewApplies).toBe(2)
+    expect(applied).toHaveLength(1)
+  })
+
+  it('goes off with remote access, and stays off when remote access comes back', async () => {
+    await signIn()
+    await call('PUT', '/remote-access', { enabled: true })
+    await call('PUT', '/previews', { enabled: true })
+    await call('PUT', '/remote-access', { enabled: false })
+    expect(readNodeRelay(dataDir)).toEqual({})
+    await call('PUT', '/remote-access', { enabled: true })
+    expect((await state()).remoteAccess.previews).toBe(false)
   })
 })
 

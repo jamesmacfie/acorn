@@ -3,7 +3,11 @@
 This page covers the two routes a Node calls to serve a task's app to a phone's browser under a preview
 domain, and what a service must do for them. Read it before you build a service that offers previews. It's
 part of [the account API](../account-api.md), and [previews on a phone](../relay/phone-channel.md#previews)
-covers what the Node does with them.
+covers what the Node does with them. A Node calls neither until its owner turns on **Phone previews**.
+
+A service that offers previews can read them. It publishes the DNS answer for the domain, so it can get a
+certificate for any Node's preview names, and the relay it runs could end a browser's TLS with it. Say so to
+the people who turn previews on ([who can read a preview](../relay/phone-channel.md#who-can-read-a-preview)).
 
 ## The domain
 
