@@ -33,14 +33,25 @@ async function connect(dispatch: (request: Request) => Promise<Response>) {
   const { identity, publicKey } = await channelIdentity()
   const { hub, joined } = fakeHub()
   const [phoneSocket, nodeSocket] = socketPair()
-  const served = serveChannel(nodeSocket, { identity, host: HOST, dispatch, hub })
+  // The device service's revoke notice, which a test sends by hand.
+  const listeners = new Set<(deviceId: string) => void>()
+  const devices = {
+    onRevoked(listener: (deviceId: string) => void) {
+      listeners.add(listener)
+      return () => listeners.delete(listener)
+    },
+  }
+  const revoke = (deviceId: string) => {
+    for (const listener of listeners) listener(deviceId)
+  }
+  const served = serveChannel(nodeSocket, { identity, host: HOST, dispatch, hub, devices })
   const phone = await openChannel(phoneSocket, publicKey)
   const send = (message: ChannelClientMessage, body?: Uint8Array) => phone.write(encodeChannelMessage(message, body))
   const next = async () => {
     const envelope = decodeChannelMessage((await phone.read())!, channelNodeMessageSchema)
     return envelope!
   }
-  return { phone, send, next, joined, served }
+  return { phone, send, next, joined, served, revoke }
 }
 
 describe('the Node end of a phone channel', () => {
@@ -174,6 +185,40 @@ describe('the Node end of a phone channel', () => {
     await served
     expect(closed).toBe(1)
     expect(feed.readyState).not.toBe(feed.OPEN)
+    expect(await phone.read()).toBeNull()
+  })
+
+  it('closes when a device one of its requests named is revoked, and stops the request still running', async () => {
+    const PHONE = '6f1c2b8e-3a4d-4e5f-8a9b-0c1d2e3f4a5b'
+    const token = `acorn_dt_${PHONE}_${'a'.repeat(43)}`
+    let started!: () => void
+    const running = new Promise<void>((resolve) => (started = resolve))
+    let aborted = false
+    const { phone, send, next, served, revoke } = await connect(async (request) => {
+      if (request.headers.get('authorization') === `Bearer ${token}`) {
+        started()
+        return new Promise((_resolve, reject) =>
+          request.signal.addEventListener('abort', () => ((aborted = true), reject(new Error('aborted')))),
+        )
+      }
+      return new Response('ok')
+    })
+    await send({
+      type: 'request',
+      id: 'r1',
+      method: 'GET',
+      path: '/v1/slow',
+      headers: { authorization: `Bearer ${token}` },
+    })
+    await running
+    // Another device's revoke leaves it open.
+    revoke('another-device')
+    await send({ type: 'ping' })
+    expect((await next()).message.type).toBe('pong')
+
+    revoke(PHONE)
+    await served
+    expect(aborted).toBe(true)
     expect(await phone.read()).toBeNull()
   })
 

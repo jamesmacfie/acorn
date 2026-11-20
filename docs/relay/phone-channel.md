@@ -72,8 +72,8 @@ device token in `authorization`. Authentication and routes run unchanged. The No
 describe the phone's connection and any `x-acorn-internal` header, and it never treats a channel as a
 loopback peer, so the routes that trust a caller on this computer refuse it.
 
-An answer holds at most 16 MiB. The event feed joins the same hub a WebSocket does, so a revoked device's
-feed closes at once, and a feed that falls behind holds a terminal's output back instead of dropping it.
+An answer holds at most 16 MiB. Revoking the device a request's token names closes the whole channel. The
+event feed shares the WebSocket hub, so a slow feed holds a terminal's output back instead of dropping it.
 The phone reads the `seq` of each frame. A gap means frames were lost, so it opens a new channel and
 refetches.
 

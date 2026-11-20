@@ -1,7 +1,7 @@
 import { createServer, type Server } from 'node:https'
 import type { IncomingMessage } from 'node:http'
 import type { Duplex } from 'node:stream'
-import { getRequestListener } from '@hono/node-server'
+import { getRequestListener, type HttpBindings } from '@hono/node-server'
 import { parsePreviewName } from '@acorn/protocol/relay.ts'
 import { proxyHttp, proxyUpgrade, type LoopbackProxyOptions } from '../../proxy/loopbackProxy'
 import type { PreviewCertificate } from './certificate'
@@ -44,12 +44,21 @@ export type PreviewServer = {
   install(certificate: PreviewCertificate): void
   /** A browser's TLS connection, from a `preview` stream. */
   serve(connection: Duplex): void
+  /** Close every connection a page opened on a grant that's gone, such as a revoked device's. */
+  closeUngranted(): void
   close(): void
 }
 
 export function createPreviewServer(options: { grants: PreviewGrants; ownPort: number }): PreviewServer {
   let certificate: PreviewCertificate | undefined
   let server: Server | undefined
+  // Each connection a page made, by the grant that let it in. A WebSocket and a streamed answer outlive
+  // the request that checked the grant, so they're closed when it goes.
+  const held = new Map<Duplex, string>()
+  const hold = (connection: Duplex, grantId: string): void => {
+    if (!held.has(connection)) connection.once('close', () => held.delete(connection))
+    held.set(connection, grantId)
+  }
 
   const plain = (status: number, text: string, headers: Record<string, string> = {}): Response =>
     new Response(text, {
@@ -86,7 +95,7 @@ export function createPreviewServer(options: { grants: PreviewGrants; ownPort: n
     })
   }
 
-  async function onRequest(request: Request): Promise<Response> {
+  async function onRequest(request: Request, connection: Duplex): Promise<Response> {
     const found = grantFor({ host: request.headers.get('host') ?? '', cookie: request.headers.get('cookie') })
     // A name nobody opened is the same bare refusal as one that never existed.
     if (!found) return plain(403, 'Forbidden')
@@ -102,6 +111,7 @@ export function createPreviewServer(options: { grants: PreviewGrants; ownPort: n
           'content-security-policy': policy,
         },
       })
+    hold(connection, found.grant.id)
     const proxy = await proxyOptions(found, policy)
     if (!proxy)
       return plain(502, 'This task’s app stopped or moved to another port. Open the preview again.', {
@@ -133,6 +143,7 @@ export function createPreviewServer(options: { grants: PreviewGrants; ownPort: n
       void socket.end(`HTTP/1.1 ${status}\r\nConnection: close\r\nContent-Length: 0\r\n\r\n`)
     const found = grantFor({ host: req.headers.host, cookie: req.headers.cookie })
     if (!found?.cookie || req.headers.origin !== `https://${found.host}`) return refuse('403 Forbidden')
+    hold(socket, found.grant.id)
     const proxy = await proxyOptions(found, previewPolicy(found.host, found.grant.ancestor))
     if (!proxy) return refuse('502 Bad Gateway')
     await proxyUpgrade(req, socket, head, proxy)
@@ -141,7 +152,7 @@ export function createPreviewServer(options: { grants: PreviewGrants; ownPort: n
   function create(current: PreviewCertificate): Server {
     const created = createServer(
       { key: current.keyPem, cert: current.certPem, ALPNProtocols: ['http/1.1'] },
-      getRequestListener(onRequest),
+      getRequestListener((request, env) => onRequest(request, (env as HttpBindings).incoming.socket)),
     )
     created.on('upgrade', (req, socket, head) => void onUpgrade(req, socket, head).catch(() => socket.destroy()))
     created.on('clientError', (_error, socket) => socket.destroy())
@@ -157,6 +168,9 @@ export function createPreviewServer(options: { grants: PreviewGrants; ownPort: n
     serve(connection) {
       if (server) server.emit('connection', connection)
       else connection.destroy()
+    },
+    closeUngranted() {
+      for (const [connection, grantId] of held) if (!options.grants.get(grantId)) connection.destroy()
     },
     close() {
       server?.closeAllConnections()

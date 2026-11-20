@@ -41,7 +41,10 @@ export function startPreview(options: PreviewOptions): PreviewHandle {
       server.install(next)
     },
   })
-  const offRevoked = options.devices.onRevoked((deviceId) => grants.revokeDevice(deviceId))
+  const offRevoked = options.devices.onRevoked((deviceId) => {
+    grants.revokeDevice(deviceId)
+    server.closeUngranted()
+  })
 
   return {
     serve: (stream) => server.serve(stream),

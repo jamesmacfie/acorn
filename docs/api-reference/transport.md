@@ -123,9 +123,9 @@ These limits apply:
   first second. The request says when it came from another computer, and the dialog says so. The
   terminal client shows the same request in its confirmation, which starts on **Cancel** and denies.
 
-`DELETE /v1/core/devices/:id` closes that device's open WebSocket connections at once, because a live
-socket holds no bearer to recheck. A device may revoke itself. Every paired device already has full
-owner authority, so there is no separate guard against self-revocation.
+`DELETE /v1/core/devices/:id` closes that device's event sockets, phone channel, and proxied loopback and
+preview connections at once, because a live connection holds no bearer to recheck. A device may revoke
+itself. Every paired device already has full owner authority, so there is no self-revocation guard.
 
 A device paired through a phone's channel is marked `kind: "phone"` in `GET /v1/core/devices`, whatever it
 calls itself. So is a device a phone allowed, whatever connection claimed it. The Node answers such a

@@ -7,6 +7,7 @@ import {
   type ChannelClientMessage,
   type ChannelNodeMessage,
 } from '@acorn/protocol/channel.ts'
+import { namedDevice, type DeviceService } from '../auth/deviceTokens'
 import { createLogger } from '../telemetry/logger'
 import type { HubSocket, WsHub } from './wsHub'
 
@@ -28,6 +29,7 @@ export type ChannelHost = {
   /** An ordinary call to the Node's router, from a peer that isn't on this computer. */
   dispatch(request: Request): Promise<Response>
   hub: WsHub
+  devices: Pick<DeviceService, 'onRevoked'>
 }
 
 // What describes the phone's connection and not the request, or would let a phone claim to be something it
@@ -166,6 +168,12 @@ export async function serveChannel(socket: ChannelSocket, host: ChannelHost): Pr
   }
   const requests = new Map<string, AbortController>()
   let feed: ChannelFeed | undefined
+  // Every device a request's token named, taken before the request runs. Revoking one closes the channel,
+  // which stops its requests still running. The hub closes the event feed by itself.
+  const named = new Set<string>()
+  const offRevoked = host.devices.onRevoked((deviceId) => {
+    if (named.has(deviceId)) channel.close()
+  })
   // One message at a time goes into the stream, so two answers can't interleave.
   let writes: Promise<unknown> = Promise.resolve()
   const post: Post = (message, body) => {
@@ -196,6 +204,8 @@ export async function serveChannel(socket: ChannelSocket, host: ChannelHost): Pr
       } catch {
         return void post({ type: 'failure', id, code: 'bad_request', message: 'The Node refused that request.' })
       }
+      const deviceId = namedDevice(request.headers.get('authorization'))
+      if (deviceId) named.add(deviceId)
       const response = await host.dispatch(request)
       const bytes = await readLimited(response, CHANNEL_MAX_MESSAGE_BYTES - 64 * 1024)
       if (!bytes)
@@ -242,6 +252,7 @@ export async function serveChannel(socket: ChannelSocket, host: ChannelHost): Pr
   }
 
   for (let bytes = await channel.read(); bytes; bytes = await channel.read()) receive(bytes)
+  offRevoked()
   feed?.closed()
   for (const controller of requests.values()) controller.abort()
 }

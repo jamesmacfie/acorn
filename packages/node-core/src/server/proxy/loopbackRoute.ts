@@ -1,3 +1,5 @@
+import type { EventEmitter } from 'node:events'
+import type { Duplex } from 'node:stream'
 import type { Context } from 'hono'
 import { z } from 'zod'
 import type { AppEnv } from '../middleware/auth'
@@ -82,14 +84,27 @@ export async function serveLoopback(
   if (c.req.header(PINNED_PORT_HEADER) !== String(port)) return respondError(c, 502, 'preview_moved', [MOVED])
   const { proxyHttp, proxyUpgrade } = await import('./loopbackProxy')
   const options = { port, ownPort, publicOrigin: c.req.header('origin') ?? '', mount: mounted }
+  // Revoking the device ends what it has open here: a live reload socket, or an answer still streaming.
+  const deviceId = c.get('principal')?.deviceId
+  const closeOnRevoke = (socket: Duplex, until: EventEmitter): void => {
+    if (socket.destroyed) return
+    const off = c.env.DEVICES.onRevoked((revoked) => {
+      if (revoked === deviceId) socket.destroy()
+    })
+    until.once('close', off)
+  }
   // A dev server's live reload socket. The caller is a paired device, such as the desktop's helper, which
   // holds the token a page can't send and checks the page's origin itself.
   const upgrade = c.env.upgrade
   if (upgrade) {
     upgrade.taken = true
+    closeOnRevoke(upgrade.socket, upgrade.socket)
     await proxyUpgrade(c.env.incoming!, upgrade.socket, upgrade.head, options)
     return c.body(null)
   }
+  // Only until this answer ends, because the connection may carry the device's later requests, such as
+  // the one that revokes it.
+  if (c.env.outgoing) closeOnRevoke(c.env.incoming!.socket, c.env.outgoing)
   return proxyHttp(c.req.raw, options)
 }
 

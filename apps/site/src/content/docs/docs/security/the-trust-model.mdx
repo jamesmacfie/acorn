@@ -8,7 +8,7 @@ sources:
   - docs/security/node-plugin-security.md
   - docs/security/plugin-client-sandbox.md
   - docs/security/plugin-node-realm.md
-checked: '1b62b6dfb'
+checked: 'f4e54230f'
 ---
 
 import Specimen from '../../../../components/Specimen.astro'
@@ -35,8 +35,8 @@ setting, and approve every request.
 - **In the desktop app**, the window that draws acorn never holds the device token. A separate helper
   process holds it and makes every request. A plugin's code, or a web page in the preview, never sees
   it.
-- **Unpairing** removes the token from the device. **Revoking** makes the Node refuse it, closes its
-  open connections, and fails its requests in flight.
+- **Unpairing** removes the token from the device. **Revoking** makes the Node refuse it, and closes
+  its open connections, the ones to a preview's app included.
 
 ## Your Nodes
 

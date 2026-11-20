@@ -203,7 +203,7 @@ export function startListener(
         server as unknown as import('node:https').Server,
         allowedHosts,
         root,
-        serveBrowser(root, hub, (request) =>
+        serveBrowser(root, hub, runtime.DEVICES, (request) =>
           Promise.resolve(
             fetch(request, { incoming: { socket: {} }, browserChannel: true } as unknown as HttpBindings),
           ),
@@ -294,11 +294,12 @@ function relayControl(
 function serveBrowser(
   root: DataRoot,
   hub: WsHub,
+  devices: DeviceService,
   dispatch: (request: Request) => Promise<Response>,
 ): (socket: ChannelSocket, host: string) => void {
   return (socket, host) =>
     void Promise.all([import('./channel'), import('./channelKey')]).then(([{ serveChannel }, { ensureChannelKey }]) =>
-      serveChannel(socket, { identity: ensureChannelKey(root.dir), host, dispatch, hub }),
+      serveChannel(socket, { identity: ensureChannelKey(root.dir), host, dispatch, hub, devices }),
     )
 }
 

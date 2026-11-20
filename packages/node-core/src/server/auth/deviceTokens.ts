@@ -18,6 +18,11 @@ import { recordAudit, type AuditActor } from '../audit'
 // rather than trimmed into a valid-looking token.
 const TOKEN_RE = /^acorn_dt_([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})_([A-Za-z0-9_-]{43})$/
 
+// The device an `Authorization` header's token names, whether or not it would authenticate. A connection
+// that remembers it can close when that device is revoked.
+export const namedDevice = (authorization: string | null | undefined): string | undefined =>
+  authorization?.startsWith('Bearer ') ? TOKEN_RE.exec(authorization.slice('Bearer '.length).trim())?.[1] : undefined
+
 const LAST_SEEN_THROTTLE_MS = 5 * 60_000
 
 // How long a resolved bearer is answered from memory instead of from SQLite. Without it every
@@ -57,8 +62,8 @@ export type DeviceService = {
   // A revoke that arrived over HTTP should say which device asked, because "which of my machines
   // unpaired this one?" is the question the trail exists to answer.
   revoke(id: string, actor?: AuditActor): Promise<boolean>
-  // Fires after a successful revoke so live sockets for that device close immediately
-  // (docs/api-reference/transport.md § Pairing: "open sockets are closed").
+  // Fires after a successful revoke so what that device has open closes at once: event sockets, a phone's
+  // channel, and proxied loopback and preview connections (docs/api-reference/transport.md § Pairing).
   onRevoked(listener: (deviceId: string) => void): () => void
   // Give a phone shell access, or take it away (docs/relay/phone-channel/phone-devices.md § Shell access). False when
   // the device doesn't exist, is revoked, or isn't a phone.

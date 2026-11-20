@@ -1,3 +1,4 @@
+import { createServer as createHttpServer } from 'node:http'
 import { request as httpsRequest } from 'node:https'
 import { createServer as createNetServer } from 'node:net'
 import { mkdtempSync, readFileSync, rmSync } from 'node:fs'
@@ -384,6 +385,68 @@ describe('the loopback TLS listener', () => {
       expect(await open('/v1/p/preview/tasks/t1/proxy/hmr', { ...device, host: 'elsewhere.test' })).toBe('refused 403')
     } finally {
       removePluginRoutes('preview')
+      await new Promise((resolve) => dev.close(resolve))
+    }
+  }, 20_000)
+
+  it('closes a revoked device’s live reload socket and streamed answer on a loopback route, within a second', async () => {
+    // A dev server whose event stream never ends, with a live reload socket beside it.
+    const dev = createHttpServer((_req, res) => {
+      res.writeHead(200, { 'content-type': 'text/event-stream' })
+      res.write('data: hello\n\n')
+    })
+    const reloads = new WebSocketServer({ server: dev })
+    await new Promise<void>((resolve) => dev.listen(0, '127.0.0.1', resolve))
+    const devPort = (dev.address() as import('node:net').AddressInfo).port
+    const mount = '/v1/p/preview/tasks/:taskId/proxy'
+    registerRoute({
+      plugin: 'preview',
+      prefix: '/tasks/:taskId/proxy',
+      router: new Hono<AppEnv>().all('/*', (c) => serveLoopback(c, mount, async () => devPort)),
+    })
+    try {
+      const runtime = makeRuntime(root!)
+      opened.push(runtime.DB)
+      listener = await startListener(runtime, root!)
+      const url = `127.0.0.1:${listener.endpoint.port}/v1/p/preview/tasks/t1/proxy`
+      const headersFor = (token: string) => ({
+        authorization: `Bearer ${token}`,
+        'x-acorn-preview-port': String(devPort),
+      })
+      const reload = async (token: string) => {
+        const socket = new WebSocket(`wss://${url}/hmr`, { ca: [listener!.certPem], headers: headersFor(token) })
+        socket.on('error', () => {})
+        await new Promise((resolve) => socket.once('open', resolve))
+        return socket
+      }
+      const phone = await runtime.DEVICES.issue('phone')
+      const laptop = await runtime.DEVICES.issue('laptop')
+      const phoneSocket = await reload(phone.token)
+      const laptopSocket = await reload(laptop.token)
+      const stream = await new Promise<import('node:http').IncomingMessage>((resolve) =>
+        httpsRequest(
+          `https://${url}/events`,
+          { ca: [listener!.certPem], headers: headersFor(phone.token), agent: false },
+          resolve,
+        ).end(),
+      )
+      stream.on('error', () => {})
+      await new Promise((resolve) => stream.once('data', resolve))
+
+      const closed = Promise.all([
+        new Promise((resolve) => phoneSocket.once('close', resolve)),
+        new Promise((resolve) => stream.once('close', resolve)),
+      ])
+      await runtime.DEVICES.revoke(phone.device.id)
+      const late = new Promise((_resolve, reject) =>
+        setTimeout(() => reject(new Error('still open after 1s')), 1000).unref(),
+      )
+      await Promise.race([closed, late])
+      expect(laptopSocket.readyState).toBe(WebSocket.OPEN)
+    } finally {
+      removePluginRoutes('preview')
+      for (const socket of reloads.clients) socket.terminate()
+      dev.closeAllConnections()
       await new Promise((resolve) => dev.close(resolve))
     }
   }, 20_000)

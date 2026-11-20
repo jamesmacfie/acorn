@@ -438,7 +438,7 @@ function onConnect(ws: HubSocket, authorized: Authorized, mark: number, multiple
 
 // Terminate every socket belonging to a revoked device. `terminate()` rather than `close()`: an
 // invalidated credential must not keep a socket alive for a graceful closing handshake
-// (docs/api-reference/transport.md § Pairing: "open sockets are closed, in-flight requests fail").
+// (docs/api-reference/transport.md § Pairing).
 function dropDevice(deviceId: string): void {
   for (const conn of [...conns]) {
     if (conn.deviceId === deviceId) conn.ws.terminate()

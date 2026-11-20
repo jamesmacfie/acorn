@@ -32,8 +32,11 @@ route or a socket channel. It's part of the [security model](../security.md).
   Node enforces the 8 MiB ceiling before parsing. Upgrade, lookup, and handler failures stay inside
   their connection. A failed activity lookup closes the affected sockets. Disconnect cleanup runs
   every owner's hook on its own, including hooks that reject.
-- Revoking a device closes its live sockets and fails its in-flight requests. A device may revoke
-  its own row, which is the same as unpairing itself.
+- Revoking a device closes what it has open: its event sockets, a phone's channel with every request
+  still running on it, and the live reload sockets and streamed answers it opened through a loopback
+  route or a phone preview. Its next request fails to authenticate. A plain request to the Node that's
+  already running finishes, so a device may revoke its own row, which is the same as unpairing itself,
+  and still get the answer.
 - A bearer that authenticated is remembered for 60 seconds, keyed by the SHA-256 of the whole token
   (`packages/node-core/src/server/auth/deviceTokens.ts`). Only a token that resolved is remembered,
   so a wrong secret or an unknown id reads the row every time. **Revoking a device drops its entries
