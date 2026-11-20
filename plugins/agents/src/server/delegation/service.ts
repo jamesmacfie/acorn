@@ -23,9 +23,11 @@ import { assistantResult, parseStructuredResult } from '../sessions/resultContra
 import {
   assertBoundedDelegationConfig,
   assertDelegationResultSchema,
+  delegatedExecutionCeiling,
   delegatedToolCeiling,
   sessionMayDelegate,
 } from './policy'
+import { agentChosenOptions, executionPolicyOptionId, executionPolicyRefusal } from '../sessions/executionPolicy'
 import { foldReadableEvents, type AgentReadResult } from './readProjection'
 import { DelegationReports, delegatedTurn, turnResultSchema } from './reports'
 import { AgentDelegationStore, DelegationLimitError, type AgentSpawn } from './store'
@@ -240,6 +242,13 @@ export class AgentDelegationService {
       throw new ToolError('conflict', `The child session cannot accept a turn while it is ${session.runtimeState}.`)
     }
     if (input.configOptions && Object.keys(input.configOptions).length) {
+      const { refused } = agentChosenOptions(session.config.configOptions, input.configOptions)
+      if (refused.length) {
+        throw new ToolError(
+          'bad_request',
+          `An agent can choose only a child's model and reasoning, and this child offers ${refused.join(', ')} as neither.`,
+        )
+      }
       const [active, queued] = await Promise.all([
         this.runtime.store.activeTurn(session.id),
         this.runtime.store.nextQueuedTurn(session.id),
@@ -249,7 +258,11 @@ export class AgentDelegationService {
       }
       await this.runtime.applyRequestedConfig(session.id, input.configOptions)
     }
-    const cursor = (await this.runtime.store.requireSession(session.id)).lastEventSeq
+    const current = await this.runtime.store.requireSession(session.id)
+    // Dispatch checks again, but a child already past its ceiling gets no turn queued at all.
+    const refusal = executionPolicyRefusal(current)
+    if (refusal) throw new ToolError('conflict', refusal)
+    const cursor = current.lastEventSeq
     const first = await this.runtime.store.firstTurn(session.id)
     const baseCommit = first?.effectivePolicy.baseCommit
     const turn = await this.runtime.enqueueTurn(session.id, {
@@ -336,9 +349,27 @@ export class AgentDelegationService {
         : context.toolCeiling,
       input.toolCeiling,
     )
+    // Refused here for the harnesses whose setting Acorn knows. Any other option that isn't a model or
+    // reasoning choice is dropped once the child lists its own (`agentChosenOptions`).
+    const policyOption = executionPolicyOptionId(provider.id)
+    if (policyOption && input.configOptions && Object.hasOwn(input.configOptions, policyOption)) {
+      throw new ToolError(
+        'bad_request',
+        `An agent can choose only a child's model and reasoning. Leave '${policyOption}' out, and the child starts on the owner's setting.`,
+      )
+    }
     // Resolve before reserving the worktree so retries keep the same model and effort snapshot.
-    const configOptions = spawnConfigOptions(defaults, provider.id, caller.managedSession, input.configOptions, custom)
-    if (Object.keys(configOptions).length) input = { ...input, configOptions }
+    const ownerOptions = spawnConfigOptions(defaults, provider.id, caller.managedSession, custom)
+    const executionCeiling = delegatedExecutionCeiling(caller.managedSession, provider.id, ownerOptions)
+    const agentOptions =
+      input.configOptions && Object.keys(input.configOptions).length ? input.configOptions : undefined
+    // What the turn records it was asked for. The session applies each part with its own authority.
+    const turnOptions = { ...ownerOptions, ...agentOptions }
+    const childOptions = {
+      ...(Object.keys(ownerOptions).length ? { requestedConfigOptions: ownerOptions } : {}),
+      ...(agentOptions ? { agentConfigOptions: agentOptions } : {}),
+      ...(executionCeiling !== undefined ? { executionCeiling } : {}),
+    }
     let reserved: ReturnType<AgentDelegationStore['reserveShared']>
     try {
       reserved =
@@ -359,7 +390,9 @@ export class AgentDelegationService {
                 toolCeiling,
                 ...(input.resultSchema ? { resultSchema: input.resultSchema } : {}),
                 ...(input.checks ? { checks: input.checks } : {}),
-                ...(input.configOptions ? { configOptions: input.configOptions } : {}),
+                ...(Object.keys(ownerOptions).length ? { configOptions: ownerOptions } : {}),
+                ...(agentOptions ? { agentConfigOptions: agentOptions } : {}),
+                ...(executionCeiling !== undefined ? { executionCeiling } : {}),
                 ...(custom ? { customAgentId: custom.id } : {}),
                 ...(account ? { account } : {}),
               },
@@ -402,7 +435,7 @@ export class AgentDelegationService {
             delegationSpawnId: reserved.spawn.id,
             toolCeiling,
             ...(input.resultSchema ? { resultSchema: input.resultSchema } : {}),
-            ...(input.configOptions ? { requestedConfigOptions: input.configOptions } : {}),
+            ...childOptions,
           },
         },
         `delegation:${reserved.spawn.id}:session`,
@@ -422,7 +455,7 @@ export class AgentDelegationService {
               toolCeiling,
               ...(input.resultSchema ? { resultSchema: input.resultSchema } : {}),
               ...(input.checks ? { checks: input.checks } : {}),
-              ...(input.configOptions ? { configOptions: input.configOptions } : {}),
+              ...(Object.keys(turnOptions).length ? { configOptions: turnOptions } : {}),
             }),
           )),
           source: 'delegation',

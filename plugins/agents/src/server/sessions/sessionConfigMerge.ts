@@ -10,6 +10,10 @@ const serverOwnedKeys = [
   'workflowRunId',
   'workflowStepId',
   'delegationSpawnId',
+  // The widest execution policy a delegated child may run at, and the options its parent agent asked
+  // for, kept apart from the owner's so only the model and reasoning among them apply.
+  'executionCeiling',
+  'agentConfigOptions',
   // The loaded plugin that started the session through `agents.sessionExecute`.
   'startedByPlugin',
   'customAgent',

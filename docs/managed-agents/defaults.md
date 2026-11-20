@@ -72,7 +72,9 @@ The **Spawned agents** section sets defaults for `agent_spawn` children, worktre
 **Inherit from parent** copies the parent's harness, model, and effort at spawn time, and is the
 default. **Use explicit defaults** stores a harness and per-provider model and effort in `spawned`.
 Spawn-call overrides beat custom-agent options, which beat these defaults. Model and effort inherit
-only within the same provider. Permission and mode options don't inherit.
+only within the same provider. Permission and mode options don't inherit. A mode you pin here is
+your choice for the child, so it can run wider than the agent that started it
+([execution policy](./delegation.md#execution-policy)).
 [Orchestration tools](../agent-tools/orchestration.md#managed-session-orchestration) owns the spawn
 contract.
 

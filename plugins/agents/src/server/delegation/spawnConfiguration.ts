@@ -11,12 +11,15 @@ export function spawnProfileId(
   return requested ?? custom?.profileId ?? (defaults.mode === 'explicit' ? defaults.profileId : null) ?? parentProfileId
 }
 
-/** Snapshot only model and reasoning. Permission and collaboration modes are separate authority. */
+/**
+ * The options the owner chose for a child: their saved spawn defaults or a custom agent's. Inheriting
+ * from the parent snapshots only its model and reasoning, because permission and collaboration modes
+ * are separate authority. The calling agent's own picks are kept apart (`agentConfigOptions`).
+ */
 export function spawnConfigOptions(
   defaults: SpawnedAgentDefaults,
   providerId: string,
   parent: AgentSession | null,
-  requested: Record<string, string> | undefined,
   custom: CustomAgent | null,
 ): Record<string, string> {
   let base: Record<string, string> = {}
@@ -30,5 +33,5 @@ export function spawnConfigOptions(
       ),
     )
   }
-  return { ...base, ...custom?.options, ...requested }
+  return { ...base, ...custom?.options }
 }

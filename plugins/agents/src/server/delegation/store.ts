@@ -41,7 +41,10 @@ export type AgentSpawnProvisioning = {
   toolCeiling: ToolCeiling
   resultSchema?: object
   checks?: AgentCheck[]
+  // The owner's options for the child, then its parent agent's, which apply only as a model or reasoning.
   configOptions?: Record<string, string>
+  agentConfigOptions?: Record<string, string>
+  executionCeiling?: number
   customAgentId?: string
   // The parent's account, when the child runs on the parent's harness (docs/managed-agents/accounts.md).
   account?: string

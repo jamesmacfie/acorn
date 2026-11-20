@@ -20,6 +20,7 @@ import { sessionMcpSelection, type AgentSessionMcp } from '../../shared/mcpServe
 import { customAgentRegistry, readCustomAgents } from '../customAgents'
 import { customAgentSnapshot, sessionCustomAgent, type CustomAgent } from '../../shared/customAgents'
 import { delegatedToolCeiling } from '../delegation/policy'
+import { agentChosenOptions } from './executionPolicy'
 import { parseToolCeiling } from '@acorn/protocol/toolPolicy.ts'
 import { SessionTitleGeneration } from './sessionTitleGeneration'
 import { SessionDefaultsCommands } from './sessionDefaultsCommands'
@@ -65,6 +66,14 @@ async function* givingWay<T>(items: Iterable<T>): AsyncGenerator<T> {
  * same list, so only a forged or stale answer fails here, and it fails before the claim: the request
  * stays open and nothing reaches the provider. A request that offered no buttons is left alone.
  */
+/** The string entries of a stored options record, or none when it isn't one. */
+const stringValues = (value: unknown): Record<string, string> =>
+  value && typeof value === 'object' && !Array.isArray(value)
+    ? Object.fromEntries(
+        Object.entries(value).filter((entry): entry is [string, string] => typeof entry[1] === 'string'),
+      )
+    : {}
+
 const assertOfferedOption = (request: AgentRequest, resolution: unknown): void => {
   const optionId =
     typeof resolution === 'object' && resolution != null ? (resolution as { optionId?: unknown }).optionId : undefined
@@ -591,13 +600,23 @@ export class ManagedAgentRuntime {
       // rest of its source's config and continues at the settings its source was running.
       const startsFromAgent = !!sessionCustomAgent(session.config) && !session.parentSessionId
       if (session.kind === 'delegated' || session.origin || startsFromAgent) {
-        const requested = session.config.requestedConfigOptions
-        if (requested && typeof requested === 'object' && !Array.isArray(requested)) {
-          const values = Object.fromEntries(
-            Object.entries(requested).filter((entry): entry is [string, string] => typeof entry[1] === 'string'),
-          )
-          await this.sessionDefaults.applyRequested(session.id, values, signal)
+        const owner = stringValues(session.config.requestedConfigOptions)
+        // The parent agent's own picks go on top of the owner's, limited to the model and reasoning.
+        const asked = stringValues(session.config.agentConfigOptions)
+        let chosen: Record<string, string> = {}
+        if (Object.keys(asked).length) {
+          const { config } = await this.store.requireSession(session.id)
+          const { allowed, refused } = agentChosenOptions(config.configOptions, asked)
+          chosen = allowed
+          if (refused.length) {
+            await this.engine.record(session.id, null, {
+              type: 'diagnostic',
+              level: 'warning',
+              message: `The agent that started this one can choose only its model and reasoning, so ${refused.join(', ')} kept this session's own setting.`,
+            })
+          }
         }
+        await this.sessionDefaults.applyRequested(session.id, { ...owner, ...chosen }, signal)
       }
       signal.throwIfAborted()
       await this.engine.completeSessionReadiness(session.id)

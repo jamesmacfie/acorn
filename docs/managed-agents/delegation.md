@@ -62,6 +62,34 @@ still being created. The child's tool ceiling is the intersection of the parent'
 any narrower one asked for at spawn, and a configuration update can't widen or remove it. A child
 stopped for being idle stops counting toward the 12.
 
+## Execution policy
+
+A child runs no wider than the agent that started it. Every harness setting for how much the agent
+does before a person approves it has a rank, on one scale shared across harnesses:
+
+| Rank | Claude Code `mode` | Codex `permissions` |
+| --- | --- | --- |
+| 0. A person approves each command, or it doesn't run | `plan`, `dontAsk`, `default` | |
+| 1. Edits run unasked, or commands run in a read-only sandbox | `acceptEdits` | `:read-only` |
+| 2. Commands run unasked, checked by a classifier or a workspace sandbox | `auto` | `:workspace` |
+| 3. Commands run unasked with neither | `bypassPermissions` | `:danger-full-access` |
+
+At spawn, the child records an `executionCeiling`: the rank of the parent's own setting. When your
+spawn defaults or the custom agent pin a wider value for the child, that rank wins, because you chose
+it. The calling agent can't raise it, because its `configOptions` set only the model and reasoning
+([choose the child's harness and model](../agent-tools/orchestration.md#choose-the-childs-harness-and-model)).
+
+Before the engine sends any turn that a person didn't type into the child, it reads the child's
+current setting. It refuses the turn when that setting ranks above the ceiling, or when the harness
+reports no setting the table knows. The turn fails with the reason and never reaches the harness.
+`agent_prompt` runs the same check first, so a child past its ceiling gets no turn queued. A person
+who widens a child's mode stops its delegated turns until the mode comes back down.
+
+A parent that reports no known setting gives its child no ceiling. A terminal agent is one, because
+Acorn can't read a terminal's mode. Such a child runs on the harness's own setting and your defaults,
+and the calling agent still can't change its mode. The code is
+`plugins/agents/src/server/sessions/executionPolicy.ts`.
+
 ## Lineage in the Agent pane
 
 A managed child records `parentSessionId` and the parent's active `parentTurnId`. A child owned by a

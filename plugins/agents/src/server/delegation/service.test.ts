@@ -205,7 +205,7 @@ describe('agent delegation service', () => {
         configOptions: [
           { id: 'model', category: 'model', currentValue: 'parent-model' },
           { id: 'reasoning', category: 'reasoning', currentValue: 'high' },
-          { id: 'permissions', category: 'permission', currentValue: 'full' },
+          { id: 'permissions', category: 'permission', currentValue: ':workspace' },
           { id: 'mode', category: 'mode', currentValue: 'plan' },
         ],
       })
@@ -216,6 +216,8 @@ describe('agent delegation service', () => {
       const child = await sessions.requireSession(result.sessionId!)
       expect(child.profileId).toBe('codex')
       expect(child.config.requestedConfigOptions).toEqual({ model: 'parent-model', reasoning: 'high' })
+      // The parent's sandboxed workspace profile is the most the child may run at.
+      expect(child.config.executionCeiling).toBe(2)
       expect((await sessions.turn(result.turnId!))?.effectivePolicy.configOptions).toEqual({
         model: 'parent-model',
         reasoning: 'high',
@@ -253,7 +255,9 @@ describe('agent delegation service', () => {
     )
     const override = await sessions.requireSession(requested.sessionId!)
     expect(override.profileId).toBe('codex')
-    expect(override.config.requestedConfigOptions).toEqual({ model: 'requested-codex', reasoning: 'high' })
+    // The owner's saved options and the calling agent's are kept apart, and the agent's apply on top.
+    expect(override.config.requestedConfigOptions).toEqual({ model: 'saved-codex', reasoning: 'medium' })
+    expect(override.config.agentConfigOptions).toEqual({ model: 'requested-codex', reasoning: 'high' })
   })
 
   it('does not carry provider-specific parent options into another harness', async () => {
@@ -273,7 +277,9 @@ describe('agent delegation service', () => {
       },
       context(parent.taskId, parent.id),
     )
-    expect((await sessions.requireSession(result.sessionId!)).config.requestedConfigOptions).toEqual({ model: 'opus' })
+    const child = (await sessions.requireSession(result.sessionId!)).config
+    expect(child.requestedConfigOptions).toBeUndefined()
+    expect(child.agentConfigOptions).toEqual({ model: 'opus' })
   })
 
   it('starts a custom agent by name, with its options and a ceiling no wider than its own', async () => {
@@ -310,8 +316,9 @@ describe('agent delegation service', () => {
       expect.any(String),
     )
     const child = await sessions.requireSession(result.sessionId!)
-    // The caller's own choice for this child wins over the agent's.
-    expect(child.config.requestedConfigOptions).toEqual({ reasoning: 'high', model: 'gpt-codex-mini' })
+    // The caller's own model choice applies on top of the custom agent's.
+    expect(child.config.requestedConfigOptions).toEqual({ reasoning: 'high', model: 'gpt-codex' })
+    expect(child.config.agentConfigOptions).toEqual({ model: 'gpt-codex-mini' })
     expect(child.config.toolCeiling).toEqual({ allow: ['agent_spawn', 'agent_read', 'task_context'], maxRisk: 'read' })
 
     await expect(
@@ -877,6 +884,13 @@ describe('agent delegation service', () => {
   it('applies narrowed provider options only with an idle queue and records a per-turn result contract', async () => {
     const { parent, child } = await spawnChild()
     await sessions.cancelTurn(child.turnId!)
+    const started = await sessions.requireSession(child.sessionId!)
+    await sessions.patchSession(child.sessionId!, {
+      config: {
+        ...started.config,
+        configOptions: [{ id: 'model', label: 'Model', category: 'model', currentValue: 'default', values: [] }],
+      },
+    })
     const schema = {
       type: 'object',
       properties: { answer: { type: 'number' } },

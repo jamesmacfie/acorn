@@ -80,7 +80,9 @@ export class WorktreeProvisioning {
               toolCeiling: plan.toolCeiling,
               ...(plan.checks ? { checks: plan.checks } : {}),
               ...(plan.resultSchema ? { resultSchema: plan.resultSchema } : {}),
-              ...(plan.configOptions ? { configOptions: plan.configOptions } : {}),
+              ...(plan.configOptions || plan.agentConfigOptions
+                ? { configOptions: { ...plan.configOptions, ...plan.agentConfigOptions } }
+                : {}),
             },
           ),
         )),
@@ -107,5 +109,7 @@ const sessionInput = (spawn: AgentSpawn, plan: AgentSpawnProvisioning): CreateAg
     toolCeiling: plan.toolCeiling,
     ...(plan.resultSchema ? { resultSchema: plan.resultSchema } : {}),
     ...(plan.configOptions ? { requestedConfigOptions: plan.configOptions } : {}),
+    ...(plan.agentConfigOptions ? { agentConfigOptions: plan.agentConfigOptions } : {}),
+    ...(plan.executionCeiling !== undefined ? { executionCeiling: plan.executionCeiling } : {}),
   },
 })

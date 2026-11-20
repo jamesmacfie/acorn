@@ -42,6 +42,14 @@ spawn defaults. Inheritance copies model and reasoning only, and not across harn
 drawer parent has no live model, so it passes only its harness. The ledger records the resolved
 settings, so recovery keeps them. An unsupported value puts a warning in the child's transcript.
 
+A call's `configOptions`, on `agent_spawn` and `agent_prompt` alike, set only a model or reasoning
+option. A mode or permission option stays the owner's, so the tool refuses one with `bad_request`
+before it queues a turn. `agent_spawn` refuses the harness's known policy option, `mode` for Claude
+Code and `permissions` for Codex. Any other option the child doesn't list as a model or reasoning
+choice is dropped when the child starts, with a warning in its transcript. `agent_prompt` checks
+against the options the child lists. The child also runs no wider than its parent
+([execution policy](../managed-agents/delegation.md#execution-policy)).
+
 `agent` names a [custom agent](../managed-agents/custom-agents.md) by name or ID. The agent picks the
 harness, so naming a different `profileId` beside it is refused. Its options override the spawn
 defaults, the call's `configOptions` apply on top, and its tool ceiling narrows between the caller's

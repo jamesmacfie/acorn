@@ -66,6 +66,7 @@ import type { PluginNotice } from '@acorn/protocol/notices.ts'
 import { agentTurnInputText, buildForkContext } from './runtimeContext'
 import type { InstructionAdmission } from './instructionAdmission'
 import { InstructionAdmissionError } from './instructionAdmissionError'
+import { executionPolicyRefusal } from './executionPolicy'
 import type { SessionGoalGeneration } from './sessionGoalGeneration'
 import {
   mayBeUsageLimit,
@@ -1116,6 +1117,12 @@ export class ManagedAgentEngine {
         text: agentTurnInputText({ ...turn, input }),
         ...(turn.continuationInput || turn.source === 'goal' ? { automatic: true } : {}),
       })
+      // The ceiling is fixed at creation, but the mode may have changed since the turn was queued, so
+      // the check reads the session again. A turn a person typed is theirs to send at the mode they see.
+      if (turn.source !== 'interactive' && session.config.executionCeiling !== undefined) {
+        const refusal = executionPolicyRefusal(await this.store.requireSession(session.id))
+        if (refusal) throw new Error(refusal)
+      }
       const sent = await this.prepareSend(session, turn.id, input, generation)
       if (!sent || !this.processes.owns(generation)) return false
       // What memory changed since the session was last told, as a part for this turn (./memoryChanges.ts).
