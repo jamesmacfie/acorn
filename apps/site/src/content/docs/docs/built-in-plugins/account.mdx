@@ -9,7 +9,7 @@ sources:
   - plugins/account/src/node/index.ts
   - plugins/account/src/server/routes.ts
   - plugins/account/src/server/remoteAccess.ts
-checked: '8e31dd3dc'
+checked: 'd3093a7d4'
 ---
 
 import PluginFacts from '../../../../components/PluginFacts.astro'
@@ -40,7 +40,8 @@ it ends when you click **Sign out**.
 
 Turn on **Remote access** to register this Node with your account. The Node connects to a relay, and the
 page says which one and since when. Turning it off ends the connection and every stream through it at
-once, and removes the Node from your account. Signing out turns it off first.
+once, and removes the Node from your account. Signing out turns it off first and unpairs every phone,
+because a phone reaches the Node only through your account. Computers stay paired.
 
 Remote access doesn't let anyone in. A client still pairs with a code and uses its own device
 credential, and the account service can't approve a pairing or read what crosses the relay. Phone

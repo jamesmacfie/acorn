@@ -168,7 +168,7 @@ in: no request leaves the Node, and no timer runs. Its routes load on their firs
   `relay.json`, and starts the relay tunnel without a restart. Turning it off stops the tunnel and
   every stream it carries at once, forgets the relay and owner, and removes the Node from the account.
   A Node that can't reach the service still turns off, and the page says the account wasn't told.
-  Signing out turns it off first.
+  Signing out turns it off first and revokes every phone's device.
 - **Phone previews.** A second switch, off until the owner turns it on (`PUT /v1/p/account/previews`).
   It records `previews` in `node.json`, needs remote access (`409 remote_access_off`), and goes off with it.
 - **Tickets.** `POST /v1/p/account/tickets` on the local Node asks the service for a ticket for another

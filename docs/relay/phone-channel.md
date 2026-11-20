@@ -194,6 +194,7 @@ Turn previews on only for an account service you trust with what the app shows a
 - **A phone can approve a pairing.** Raising a request from another computer needs the owner's account
   assertion, and a phone holds the account's session as well as its device token. Someone holding an
   unlocked phone could pair a new computer, which then gets [a phone's
-  limits](./phone-channel/phone-devices.md#a-device-a-phone-approved). Revoke a lost phone from a computer, and the 30-day limit ends one nobody uses.
+  limits](./phone-channel/phone-devices.md#a-device-a-phone-approved). Revoke a lost phone from a computer, or sign out to revoke every phone, and the
+  30-day limit ends one nobody uses.
 - **A Node answers as data.** A channel's answers reach the app's code as bytes, never as a page on the
   app's address, so a loaded plugin's HTML can't run with the phone's session.

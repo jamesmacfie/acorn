@@ -72,7 +72,9 @@ agent's commands. That's Claude Code's `default`, `plan`, or `dontAsk` mode, ran
   rewrite a queued message.
 
 A phone's device that nobody uses for 30 days is revoked the next time it asks. Revoke one phone from
-**Settings → Nodes** on a computer, which lists each device. The others keep working.
+**Settings → Nodes** on a computer, which lists each device. The others keep working. Signing out of the
+account revokes every phone, because none can reach the Node without it. Turning remote access off
+alone keeps them.
 
 ## A device a phone approved
 

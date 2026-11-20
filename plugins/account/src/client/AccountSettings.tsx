@@ -103,7 +103,7 @@ export default function AccountSettings() {
                 {(account) => (
                   <SettingRow
                     label="Signed in as"
-                    description={`${account().name}. Signing out also turns remote access off.`}
+                    description={`${account().name}. Signing out also turns remote access off and unpairs every phone.`}
                     error={signOutSave.error()}
                   >
                     <Button

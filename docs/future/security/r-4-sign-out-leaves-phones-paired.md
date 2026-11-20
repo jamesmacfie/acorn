@@ -1,3 +1,41 @@
+> **Completion note, November 20, 2026.** Fixed on the Acorn side, on branch
+> `phase-r-4-signing-out-unpairs-phones`.
+>
+> What landed:
+>
+> - `POST /v1/p/account/sign-out` revokes every active device with `kind: "phone"` after `turnOff` and
+>   after it deletes the sign-in connection. It goes through `DEVICES.revoke`, so each revoke clears the
+>   auth cache, audits `device.revoked` against the device that signed out, and fires `onRevoked`, which
+>   closes the phone's live sockets. Computers stay paired. A phone revoked earlier isn't touched again.
+> - Turning **Remote access** off without signing out keeps phones. I took the doc's "keep" choice,
+>   because the owner may turn it back on a minute later.
+> - The **Signed in as** row in **Settings → Account** says signing out unpairs every phone.
+> - Docs: `security/control-plane.md` drops the claim that sign-out revokes no device and says what it
+>   does now. `relay/phone-channel/phone-devices.md`, the Trust section of `relay/phone-channel.md`, and
+>   `account-api.md` (still 200 lines) match. The site's account plugin page and **Settings → Machines**
+>   page match, and `stale --mark` records both.
+> - Tests: `plugins/account/src/server/routes.test.ts` pairs a laptop, a phone, and an already revoked
+>   phone, signs out, and checks that only the active phone is revoked, by the signed-in device. It fails
+>   on the old route. A second case checks that turning remote access off revokes nothing.
+>
+> Decisions and deviations:
+>
+> - Sign-out doesn't clear shell access grants with `setShellAccess`, as R-1's note suggested it might.
+>   A revoked device can't authenticate, so its grant can never be used, and a phone paired again gets a
+>   fresh row with no grant.
+> - The route test uses a stand-in `DEVICES` with `list` and `revoke`. The plugin testkit doesn't export
+>   node-core's `deviceService`, and `deviceTokens.test.ts` already covers what `revoke` does.
+> - A phone without shell access can't call sign-out, because the account plugin names no phone writes.
+>   A phone with shell access can, and it revokes itself along with the rest.
+> - Size: the account routes load lazily, so the Node service bundle stays at 1,971,488 B.
+> - I didn't run the live check in `pnpm dev:agent` with a paired phone.
+>
+> For later phases: R-5 should know that sign-out now revokes phones in a batch, so whatever it closes on
+> revoke, such as proxied preview sockets, will close for every phone at sign-out too. Anything else that
+> should end a phone's device can use the same `DEVICES.list` and `DEVICES.revoke` loop.
+>
+> What acorn-cloud would still need: nothing for this fix.
+
 # R-4: Signing out of the account leaves phone devices paired
 
 Found November 20, 2026, in a read-only security review of `jamesmacfie/acorn` at `90b9e61e3`.

@@ -84,8 +84,10 @@ command on a Node, open a terminal, or approve an agent's command, unless the ow
 [shell access](../relay/phone-channel/phone-devices.md#shell-access) from a computer. A phone with shell access is a
 terminal on the Node for whoever controls the website.
 
-Signing out deletes the connection on that Node and turns remote access off first. It doesn't revoke
-a device token, because device tokens don't depend on the account.
+Signing out deletes the connection on that Node, turns remote access off first, and revokes every phone's
+device. A phone reaches the Node only through the account, so an owner who signs out of a breached
+account cuts off every phone, a stolen one included. Computers stay paired. Turning remote access off
+without signing out keeps phones, because the owner may turn it back on a minute later.
 
 **A Node that linked Slack takes prompts from the service.** The Slack gateway delivers through the
 relay with a gateway token, which opens one route, the Slack plugin's ([gateway routes](../authentication/gateway-routes.md)).

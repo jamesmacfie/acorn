@@ -114,9 +114,14 @@ export const accountRoutes = () =>
       return c.json(remoteAccessState(c))
     })
     // Signing out ends remote access first, so a Node that was reachable doesn't stay so with nobody
-    // signed in to say so.
+    // signed in to say so. It then unpairs every phone: a phone reaches the Node only through the account,
+    // and an owner signing out of a breached account means to cut phones off, not to have a stolen phone
+    // token work again once remote access is back on. Turning remote access off alone keeps them.
     .post('/sign-out', async (c) => {
       const result = await turnOff(c)
+      const actor = { actor: 'device', actorId: c.get('principal')?.deviceId ?? null } as const
+      for (const device of await c.env.DEVICES.list())
+        if (device.kind === 'phone' && device.revokedAt === null) await c.env.DEVICES.revoke(device.id, actor)
       for (const connection of await listProviderConnections(c.env.DB, ownerId(c), ACCOUNT_PROVIDER))
         await disconnectConnection(c.env.DB, ownerId(c), connection.id)
       return c.json(result)

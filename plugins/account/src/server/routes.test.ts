@@ -32,6 +32,9 @@ let dataDir: string
 let applied: ({ url: string; credential: string } | undefined)[]
 // How many times the listener was told to bring its previews in line with node.json.
 let previewApplies: number
+// The Node's paired devices, and who revoked which.
+let devices: { id: string; kind?: 'phone'; revokedAt: number | null }[]
+let revokedBy: Record<string, unknown>
 
 beforeEach(async () => {
   harness = makeTestDb()
@@ -39,6 +42,8 @@ beforeEach(async () => {
   dataDir = mkdtempSync(join(tmpdir(), 'acorn-account-'))
   applied = []
   previewApplies = 0
+  devices = []
+  revokedBy = {}
   vi.stubEnv('ACORN_ACCOUNT_URL', account.url)
   vi.stubEnv('ACORN_RELAY_URL', '')
   vi.stubEnv('ACORN_RELAY_CREDENTIAL', '')
@@ -64,6 +69,14 @@ const env = () =>
       apply: async (settings: never) => void applied.push(settings),
       applyPreviews: async () => void previewApplies++,
       state: () => undefined,
+    },
+    DEVICES: {
+      list: async () => devices,
+      revoke: async (id: string, actor: unknown) => {
+        devices = devices.map((device) => (device.id === id ? { ...device, revokedAt: 2 } : device))
+        revokedBy[id] = actor
+        return true
+      },
     },
     ...testSecretEnv('0'.repeat(64)),
   }) as unknown as Env
@@ -196,6 +209,32 @@ describe('remote access', () => {
     expect(readNodeRelay(dataDir)).toEqual({})
     expect(account.nodes()).toEqual([])
     expect((await state()).account).toBeNull()
+  })
+
+  // A phone reaches the Node only through the account, so signing out of a breached account must cut it off.
+  it('unpairs every phone on sign-out, and leaves computers paired', async () => {
+    devices = [
+      { id: 'laptop', revokedAt: null },
+      { id: 'phone', kind: 'phone', revokedAt: null },
+      { id: 'old-phone', kind: 'phone', revokedAt: 1 },
+    ]
+    await signIn()
+    await call('PUT', '/remote-access', { enabled: true })
+    expect((await call('POST', '/sign-out')).status).toBe(200)
+    expect(devices).toEqual([
+      { id: 'laptop', revokedAt: null },
+      { id: 'phone', kind: 'phone', revokedAt: 2 },
+      { id: 'old-phone', kind: 'phone', revokedAt: 1 },
+    ])
+    expect(revokedBy).toEqual({ phone: { actor: 'device', actorId: 'd1' } })
+  })
+
+  it('keeps phones paired when only remote access turns off', async () => {
+    devices = [{ id: 'phone', kind: 'phone', revokedAt: null }]
+    await signIn()
+    await call('PUT', '/remote-access', { enabled: true })
+    await call('PUT', '/remote-access', { enabled: false })
+    expect(revokedBy).toEqual({})
   })
 })
 
