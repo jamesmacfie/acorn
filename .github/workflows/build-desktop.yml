@@ -6,16 +6,12 @@ name: Build the desktop app
 # Called by ci.yml for `v*` tags and manual dispatches, after the Linux suite passes for the same
 # commit. Ordinary pushes get the unsigned desktop suite there instead of an installer.
 #
-# The signing secrets are optional here so a missing key reaches the check step below, which says how
-# to create one, rather than failing the call with a bare "secret required" error. The Sentry ones are
-# optional because a fork has neither, and builds without them.
+# The updater key never reaches this workflow, because every step here runs repository code. The build
+# leaves the updater payloads unsigned, and ci.yml's sign-desktop job signs a tag's artifacts. The
+# Sentry secrets are optional because a fork has neither, and builds without them.
 on:
   workflow_call:
     secrets:
-      TAURI_SIGNING_PRIVATE_KEY:
-        required: false
-      TAURI_SIGNING_PRIVATE_KEY_PASSWORD:
-        required: false
       ACORN_SENTRY_DSN:
         required: false
       SENTRY_AUTH_TOKEN:
@@ -35,18 +31,15 @@ jobs:
             artifacts: |
               apps/desktop/src-tauri/target/release/bundle/dmg/*.dmg
               apps/desktop/src-tauri/target/release/bundle/macos/*.app.tar.gz
-              apps/desktop/src-tauri/target/release/bundle/macos/*.app.tar.gz.sig
           - os: windows-latest
             artifact: acorn-windows-x64
             artifacts: |
               apps/desktop/src-tauri/target/release/bundle/nsis/*-setup.exe
-              apps/desktop/src-tauri/target/release/bundle/nsis/*-setup.exe.sig
           # Arm64 is what Parallels runs on an Apple silicon Mac, and Linux has no built-in x64 emulation.
           - os: ubuntu-24.04
             artifact: acorn-linux-x64
             artifacts: &appimage |
               apps/desktop/src-tauri/target/release/bundle/appimage/*.AppImage
-              apps/desktop/src-tauri/target/release/bundle/appimage/*.AppImage.sig
           - os: ubuntu-24.04-arm
             artifact: acorn-linux-arm64
             artifacts: *appimage
@@ -63,11 +56,6 @@ jobs:
       - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
         with:
           persist-credentials: false
-      - name: Require the updater signing key
-        env:
-          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
-        run: test -n "$TAURI_SIGNING_PRIVATE_KEY" || { echo "::error::Set the TAURI_SIGNING_PRIVATE_KEY repo secret. Generate a keypair with \`pnpm --filter @acorn/desktop exec tauri signer generate\` and put its public half in apps/desktop/src-tauri/tauri.conf.json."; exit 1; }
-
       # WebKitGTK and the libraries Tauri links on Linux (tauri.app/start/prerequisites). libdbus is
       # for the keychain's Secret Service backend.
       - name: Install the Linux build libraries
@@ -154,11 +142,7 @@ jobs:
         run: pnpm --filter @acorn/desktop run test:built
 
       - name: Build and verify the bundle
-        # The public half is baked into tauri.conf.json; updater artifacts require this key.
-        # dist also runs repository build commands, so this entire step must be trusted.
         env:
-          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
-          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
           # Linux only: stops the AppImage tool stripping the binaries it packs. It still rewrites
           # their library search path, so the verify step checks Node by version, not by digest.
           NO_STRIP: 'true'
@@ -173,22 +157,3 @@ jobs:
           # setting from quietly restoring the 90-day default for every installer.
           retention-days: 1
 
-  # Gate 1 of docs/shell.md § Signing gates and the updater. A tag builds and keeps its
-  # artifacts through the job above; publishing them as a release is refused while the build is
-  # ad-hoc signed, because a public download that Gatekeeper blocks and an updater payload nobody can
-  # install are worse than no release at all. Turning this on is: buy a Developer ID, add the
-  # certificate and notarization secrets, sign and notarize inside the same `tauri build` pass, then
-  # replace this step with the publish.
-  publish:
-    needs: bundle
-    if: startsWith(github.ref, 'refs/tags/v')
-    runs-on: ubuntu-latest
-    steps:
-      - name: Refuse to publish an ad-hoc signed build
-        # Through the environment, never interpolated into the script: a tag name is attacker-supplied
-        # text as far as this shell is concerned.
-        env:
-          TAG: ${{ github.ref_name }}
-        run: |
-          echo "::error::$TAG built successfully and its artifacts are attached to this run, but publishing is gated on Apple Developer ID signing and notarization (docs/shell.md § Signing gates and the updater)."
-          exit 1

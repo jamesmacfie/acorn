@@ -1,8 +1,5 @@
 {
   "$schema": "https://raw.githubusercontent.com/tauri-apps/tauri/dev/crates/tauri-config-schema/schema.json",
   "productName": "acorn dev",
-  "identifier": "com.acorn.desktop.dev",
-  "bundle": {
-    "createUpdaterArtifacts": false
-  }
+  "identifier": "com.acorn.desktop.dev"
 }

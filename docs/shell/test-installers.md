@@ -7,7 +7,7 @@ bundle configuration. It's part of [desktop shell](../shell.md), next to
 
 ## Windows
 
-The Windows job uploads `acorn-windows-x64`, an NSIS setup executable and its updater signature, and
+The Windows job uploads `acorn-windows-x64`, an unsigned NSIS setup executable, and
 the macOS job uploads `acorn-dmg`. Both belong to the Actions run, and nothing publishes a GitHub
 release. Windows Authenticode signing isn't configured.
 

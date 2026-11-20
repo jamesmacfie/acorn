@@ -828,13 +828,14 @@ mod tests {
     /// Leave `signingIdentity` out and Tauri signs nothing: the `.app` carries only the linker's mark
     /// on one binary and seals no resources, and `codesign --verify` says so. Ad-hoc signing is the
     /// floor; a Developer ID replaces the string and notarization joins the same pass. Updater
-    /// artifacts are signed from the first release even with no endpoint, so turning updates on later
-    /// is configuration rather than a re-release.
+    /// payloads are signed from the first release even with no endpoint, so turning updates on later
+    /// is configuration rather than a re-release. The release job signs them after the build, because
+    /// with `createUpdaterArtifacts` on, Tauri refuses to build without the private key.
     #[test]
-    fn the_bundle_is_signed_and_its_updater_artifacts_are_too() {
+    fn the_bundle_is_signed_and_its_updater_key_is_built_in() {
         let config: serde_json::Value = serde_json::from_str(include_str!("../tauri.conf.json")).expect("the bundle config is JSON");
         assert_eq!(config["bundle"]["macOS"]["signingIdentity"], serde_json::json!("-"), "the macOS bundle must be at least ad-hoc signed");
-        assert_eq!(config["bundle"]["createUpdaterArtifacts"], serde_json::json!(true));
+        assert_eq!(config["bundle"]["createUpdaterArtifacts"], serde_json::json!(false), "a build must not need the updater's private key");
         let pubkey = config["plugins"]["updater"]["pubkey"].as_str().unwrap_or_default();
         assert!(!pubkey.is_empty(), "an updater artifact nothing can verify is worse than none");
     }

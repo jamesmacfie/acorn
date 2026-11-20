@@ -25,7 +25,6 @@ export function verifyLinuxBundle(pkg, bundle) {
   const images = readdirSync(dir).filter((name) => name.endsWith('.AppImage'))
   if (images.length !== 1) throw new Error(`Expected exactly one AppImage in ${dir}, found ${images.length}.`)
   const image = join(dir, images[0])
-  if (!existsSync(`${image}.sig`)) throw new Error(`${image} has no updater signature.`)
 
   // Unpack the actual AppImage outside the checkout, for the same reason the Windows check installs
   // its installer: a boot from staged files can resolve a missing package from the development tree.

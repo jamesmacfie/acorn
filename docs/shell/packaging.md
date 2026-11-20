@@ -76,14 +76,16 @@ detects missing artifacts, not stale ones, and `package.json` holds the build or
 
 `apps/desktop/scripts/verify-bundle.mjs` runs last. It compares every staged file against the same
 path inside the `.app` by digest, and checks the code signature, the bundled runtime's version, the
-updater artifact and its signature, and the DMG. The packaged runtime is checked by the version it
+updater payload, and the DMG. The packaged runtime is checked by the version it
 prints from running JavaScript, because signing rewrites every Mach-O file. `--version` alone isn't
 enough: it answers before V8 starts, so it passes a runtime that macOS won't let compile code.
 
 `bundle.macOS.signingIdentity` is `"-"`, because without an identity Tauri runs no `codesign` pass and
-`codesign --verify` rejects the result. `createUpdaterArtifacts` is on and the updater public key is
-built in, so every release is signed and turning updates on later is configuration. No updater plugin
-is compiled in and no endpoint is set. A Rust test fails if any of the three goes missing.
+`codesign --verify` rejects the result. The updater public key is built in, and a tag's signing job
+signs every updater payload for it, so turning updates on later is configuration. `createUpdaterArtifacts`
+is off, because with it on Tauri won't build without the private key, so dist makes the macOS payload,
+`acorn.app.tar.gz`, itself. No updater plugin is compiled in and no endpoint is set. A Rust test checks
+the identity, the key, and that setting.
 
 Tauri signs with the hardened runtime, which blocks V8's compiled code unless the signature grants it.
 `bundle.macOS.entitlements` points at `apps/desktop/src-tauri/entitlements.plist`, which grants JIT
@@ -133,10 +135,16 @@ Both workflows grant the repository token only `contents: read`, and checkout do
 credentials. Pull requests and pushes to main run the unsigned suites in `.github/workflows/ci.yml`.
 The bundle workflow runs only when `ci.yml` calls it.
 
-The bundle job passes `TAURI_SIGNING_PRIVATE_KEY` only to its required-key check and the distribution
-step, and `TAURI_SIGNING_PRIVATE_KEY_PASSWORD` only to distribution. The distribution command runs
-repository build commands before signing, so those commands share the signing environment and must be
-trusted.
+No build holds the updater key. Every step of `.github/workflows/build-desktop.yml` runs repository
+code, so it gets no signing secret, and a manual dispatch uploads unsigned installers and payloads.
+For a `v*` tag, `sign-desktop` in `ci.yml` then signs the payloads in the `release` environment. It's
+the only job that names the key. A job hands every secret it names to its runner, where any step could
+read it, so this job runs no repository code. It checks out two JSON files, signs with the locked Tauri
+CLI through `npx`, and checks each signature with `minisign` against the public key in
+`tauri.conf.json`. `tools/arch/desktopSigning.test.mjs` checks this wiring.
+
+The key and its password must be `release` environment secrets, because a branch that edits `ci.yml`
+can read any repository secret. In the repository settings, limit that environment to `v*` tags.
 
 Action references use full commit hashes with version comments. To update one, check the release
 commit upstream, review the change, and update the hash and comment together. The Rust toolchain
@@ -184,9 +192,9 @@ install: the plugin buffers whole downloads in memory, can't abort or resume, an
 verify SHA-256 and minisign against the built-in public key before install.
 
 The updater private key was generated on August 23, 2026, with no passphrase, on one machine. It
-belongs in a password manager and in the `TAURI_SIGNING_PRIVATE_KEY` repository secret. Losing it means
-installs with the built-in public key can never update, and the only fix is a new key pair and a
-manual reinstall. The workflow refuses to start without the secret.
+belongs in a password manager and in the `TAURI_SIGNING_PRIVATE_KEY` secret of the `release`
+environment. Losing it means installs with the built-in public key can never update, and the only fix
+is a new key pair and a manual reinstall. A tag's signing job fails without the secret.
 
 Two release gates belong to a person: [the smoke checklist](../testing/smoke-checklist.md), run against
 the DMG on a clean machine, and a developer soak period. Nothing ships until both pass.

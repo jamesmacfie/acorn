@@ -2,7 +2,8 @@ name: Lint and test
 
 # The Linux suite gates every run. The unsigned macOS desktop suite runs on pull requests and main
 # pushes. Installers and Node archives are built only for `v*` tags and manual dispatches, through
-# build-desktop.yml and build-node.yml, and only after the Linux suite passes for the same commit.
+# build-desktop.yml and build-node.yml, and only after the Linux suite passes for the same commit. Only
+# a tag's installers are signed for the updater, by sign-desktop, after they're built.
 on:
   pull_request:
   push:
@@ -170,10 +171,85 @@ jobs:
     if: startsWith(github.ref, 'refs/tags/v') || github.event_name == 'workflow_dispatch'
     uses: ./.github/workflows/build-desktop.yml
     secrets:
-      TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
-      TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
       ACORN_SENTRY_DSN: ${{ secrets.ACORN_SENTRY_DSN }}
       SENTRY_AUTH_TOKEN: ${{ secrets.SENTRY_AUTH_TOKEN }}
+
+  # Signs a tag's updater payloads after package built them. The key is a secret of the release
+  # environment, whose rules admit only `v*` tags, so a manual build of a branch never holds it. A job
+  # hands every secret it names to its runner, where any step could read it, so this job runs no
+  # repository code. It checks out two JSON files and signs with a pinned Tauri CLI.
+  sign-desktop:
+    needs: package
+    if: startsWith(github.ref, 'refs/tags/v')
+    runs-on: ubuntu-24.04
+    environment: release
+    steps:
+      # Data only: the version each signature names, and the public key installed apps trust.
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
+        with:
+          persist-credentials: false
+          sparse-checkout: |
+            apps/desktop/package.json
+            apps/desktop/src-tauri/tauri.conf.json
+          sparse-checkout-cone-mode: false
+      - uses: actions/download-artifact@634f93cb2916e3fdff6788551b99b062d0335ce0 # v5
+        with:
+          pattern: acorn-{dmg,windows-*,linux-*}
+          path: bundles
+      - name: Sign the updater payloads
+        env:
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
+          npm_config_ignore_scripts: 'true'
+        # Keep the CLI version equal to @tauri-apps/cli in pnpm-lock.yaml. The architecture tests check it.
+        run: |
+          set -euo pipefail
+          shopt -s globstar nullglob
+          test -n "$TAURI_SIGNING_PRIVATE_KEY" || { echo "::error::Set TAURI_SIGNING_PRIVATE_KEY as a secret of the release environment. Generate a keypair with \`pnpm --filter @acorn/desktop exec tauri signer generate\` and put its public half in apps/desktop/src-tauri/tauri.conf.json."; exit 1; }
+          version=$(jq -er .version apps/desktop/package.json)
+          payloads=(bundles/**/*.app.tar.gz bundles/**/*-setup.exe bundles/**/*.AppImage)
+          test ${#payloads[@]} -gt 0 || { echo "::error::The package job uploaded no updater payloads."; exit 1; }
+          for payload in "${payloads[@]}"; do
+            npx --yes @tauri-apps/cli@2.12.3 signer sign --app-version "$version" "$payload" </dev/null
+          done
+      # Fails the release unless every signature verifies against the key the app has built in.
+      - name: Check the signatures against the built-in public key
+        run: |
+          set -euo pipefail
+          shopt -s globstar nullglob
+          sudo apt-get update
+          sudo apt-get install -y minisign
+          jq -er .plugins.updater.pubkey apps/desktop/src-tauri/tauri.conf.json | base64 -d > "$RUNNER_TEMP/updater.pub"
+          for payload in bundles/**/*.app.tar.gz bundles/**/*-setup.exe bundles/**/*.AppImage; do
+            base64 -d < "$payload.sig" > "$RUNNER_TEMP/payload.minisig"
+            minisign -V -p "$RUNNER_TEMP/updater.pub" -m "$payload" -x "$RUNNER_TEMP/payload.minisig"
+          done
+      - uses: actions/upload-artifact@330a01c490aca151604b8cf639adc76d48f6c5d4 # v5
+        with:
+          name: acorn-updater-signatures
+          path: bundles/**/*.sig
+          if-no-files-found: error
+          retention-days: 1
+
+  # Gate 1 of docs/shell.md § Signing gates and the updater. A tag builds, signs, and keeps its
+  # artifacts through the jobs above; publishing them as a release is refused while the build is
+  # ad-hoc signed, because a public download that Gatekeeper blocks and an updater payload nobody can
+  # install are worse than no release at all. Turning this on is: buy a Developer ID, add the
+  # certificate and notarization secrets, sign and notarize inside the same `tauri build` pass, then
+  # replace this step with the publish.
+  publish-desktop:
+    needs: sign-desktop
+    if: startsWith(github.ref, 'refs/tags/v')
+    runs-on: ubuntu-latest
+    steps:
+      - name: Refuse to publish an ad-hoc signed build
+        # Through the environment, never interpolated into the script: a tag name is attacker-supplied
+        # text as far as this shell is concerned.
+        env:
+          TAG: ${{ github.ref_name }}
+        run: |
+          echo "::error::$TAG built successfully and its artifacts are attached to this run, but publishing is gated on Apple Developer ID signing and notarization (docs/shell.md § Signing gates and the updater)."
+          exit 1
 
   # The Node-only archives and container image, on the installers' triggers and behind the same gate.
   package-node:

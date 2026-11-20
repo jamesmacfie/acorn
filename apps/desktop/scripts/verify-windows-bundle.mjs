@@ -11,7 +11,6 @@ export function verifyWindowsBundle(pkg, bundle) {
   const installers = readdirSync(nsis).filter((name) => name.endsWith('-setup.exe'))
   if (installers.length !== 1) throw new Error(`Expected exactly one Windows setup installer in ${nsis}, found ${installers.length}.`)
   const installer = join(nsis, installers[0])
-  if (!existsSync(`${installer}.sig`)) throw new Error(`${installer} has no updater signature.`)
 
   // Install the actual NSIS output outside the checkout. A boot from staged files can accidentally
   // resolve a missing native package from the development node_modules and pass.

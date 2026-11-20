@@ -97,7 +97,7 @@ jobs:
 
   # A tag attaches every archive and its checksum to the tag's GitHub release, so a machine can download
   # one with curl long after the run's artifacts expire, with a provenance attestation for each. The
-  # installers stay off it until they're signed (build-desktop.yml's publish job).
+  # installers stay off it until they're signed (ci.yml's publish-desktop job).
   # It runs when an archive job fails too, because an archive is uploaded only after its smoke test
   # passes, so one platform's failure leaves the others' release files out for no reason. Run again for
   # the same tag, it adds the missing platforms and never replaces a published file.

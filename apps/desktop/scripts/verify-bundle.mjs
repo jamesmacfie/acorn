@@ -74,12 +74,12 @@ try {
   fail(`codesign rejected the bundle: ${error.stderr?.toString().trim() || error.message}`)
 }
 
-// Generated from the first release even with no updater endpoint, so turning updates on later is
-// configuration rather than a re-release (docs/shell/packaging.md § Build and packaging).
+// Built unsigned from the first release even with no updater endpoint, so turning updates on later is
+// configuration rather than a re-release. The release job signs it (docs/shell/packaging.md § CI
+// permissions and signing credentials).
 const updater = readdirSync(join(bundle, 'macos')).filter((name) => name.endsWith('.app.tar.gz'))
-if (updater.length === 0) fail('no updater artifact was produced; `bundle.createUpdaterArtifacts` should be on.')
-else if (!existsSync(join(bundle, 'macos', `${updater[0]}.sig`))) fail(`${updater[0]} has no minisign signature beside it.`)
-else console.log(`[verify] updater artifact: ${updater[0]} and its signature`)
+if (updater.length !== 1) fail(`expected exactly one updater payload in ${join(bundle, 'macos')}, found ${updater.length}.`)
+else console.log(`[verify] updater payload: ${updater[0]}`)
 
 const dmg = existsSync(join(bundle, 'dmg')) ? readdirSync(join(bundle, 'dmg')).filter((name) => name.endsWith('.dmg')) : []
 if (dmg.length !== 1) fail(`expected exactly one DMG in ${join(bundle, 'dmg')}, found ${dmg.length}.`)
