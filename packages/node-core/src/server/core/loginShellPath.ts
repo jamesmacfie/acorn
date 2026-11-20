@@ -25,6 +25,7 @@ const PROBE_TIMEOUT_MS = 5_000
 const CACHE_FILE = 'login-shell-path.json'
 
 let pending: Promise<unknown> | null = null
+let refresh: (() => Promise<void>) | null = null
 
 /** Start the probe, and hold spawns on it unless the data root has the last launch's answer for this
  *  shell. Answers the probe, which never rejects, so the boot can time when it settled. A no-op
@@ -42,26 +43,36 @@ export function startLoginShellPath(dataDir: string, shell: string, probe: () =>
   const file = join(dataDir, CACHE_FILE)
   const cached = readCachedPath(file, shell)
   if (cached) process.env.PATH = cached
-  const settled = (async () => {
-    let path: string
-    try {
-      path = await probe()
-    } catch (error) {
-      log.warn(
-        `login-shell PATH probe failed; keeping ${cached ? 'cached' : 'inherited'} PATH: ${describeError(error).message}`,
-      )
-      return
-    }
-    if (!path) return
-    process.env.PATH = path
-    try {
-      writePrivateAtomic(file, `${JSON.stringify({ shell, path, readAt: new Date().toISOString() }, null, 2)}\n`)
-    } catch (error) {
-      log.warn(`could not save the login-shell PATH; the next launch probes again: ${describeError(error).message}`)
-    }
-  })()
+  let running: Promise<void> | null = null
+  refresh = () => {
+    if (running) return running
+    running = (async () => {
+      const path = await probe()
+      if (!path) throw new Error('Login-shell PATH is empty. Check startup files.')
+      process.env.PATH = path
+      try {
+        writePrivateAtomic(file, `${JSON.stringify({ shell, path, readAt: new Date().toISOString() }, null, 2)}\n`)
+      } catch (error) {
+        log.warn(`could not save the login-shell PATH; the next launch probes again: ${describeError(error).message}`)
+      }
+    })().finally(() => {
+      running = null
+    })
+    return running
+  }
+  const settled = refresh().catch((error) => {
+    log.warn(
+      `login-shell PATH probe failed; keeping ${cached ? 'cached' : 'inherited'} PATH: ${describeError(error).message}`,
+    )
+  })
   if (!cached) holdSpawnsUntil(settled)
   return settled
+}
+
+/** Re-read a packaged Mac's login-shell PATH before explicit provider discovery. Standalone Nodes
+ *  retain the environment their service manager supplied. A failed refresh preserves the last PATH. */
+export async function refreshLoginShellPath(): Promise<void> {
+  if (refresh) await refresh()
 }
 
 /** Hold every process this node spawns until `work` settles. `startLoginShellPath` is the one caller

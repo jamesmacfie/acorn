@@ -497,6 +497,7 @@ describe('Codex collaboration modes', () => {
   it('advertises modes and sends each selected preset with complete settings', async () => {
     const { events, handle } = await start()
     const metadata = events.find((event) => event.type === 'session_metadata')
+    expect(metadata).toMatchObject({ executable: { path: '/tmp/codex-test', version: 'codex-cli test' } })
     expect(
       metadata?.type === 'session_metadata' ? metadata.configOptions?.find((option) => option.id === 'mode') : null,
     ).toMatchObject({

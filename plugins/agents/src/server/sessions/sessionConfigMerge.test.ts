@@ -4,6 +4,7 @@ import { mergeSessionConfigChange, retainSessionAuthority } from './sessionConfi
 describe('session configuration merge', () => {
   it('retains admitted identity and authority during replacement and ignores invented identity', () => {
     const identity = {
+      executable: { path: '/bin/codex', version: 'codex-cli 0.171.0' },
       initialAttendance: 'autonomous',
       workflowRunId: 'run',
       workflowStepId: 'step',

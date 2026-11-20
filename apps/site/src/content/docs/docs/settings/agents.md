@@ -30,7 +30,7 @@ covers:
   - agent-mcp-servers
   - agent-limits
   - memory
-checked: '266ec702a'
+checked: '90b9e61e3'
 ---
 
 This page lists every setting in **Settings** > **Agents**. Every page here is stored on the Node, so
@@ -62,7 +62,12 @@ each one.
 | **Provider**, under **Inline diff chats** | The harness, model, and effort for a chat from a diff line. | Node | The first installed harness |
 | **Tool call display** | **Start collapsed**, **Start expanded**, or **Carry my last one forward**. | This device | Start collapsed |
 
+The **Harnesses** section above lists each CLI's resolved path and version. **Refresh harnesses**
+checks again and, on a packaged Mac Node, reloads your login shell's `PATH` first. The refresh icon
+in the Agent pane's **New** menu does the same. A running session keeps its CLI; open **Session actions** > **Agent executable** to compare it with the installed copy.
+
 ## Custom agents
+
 
 Saved starts for a session ([Custom agents](/docs/agents/custom-agents/)). **New agent** opens the
 form, which saves only with **Save**.

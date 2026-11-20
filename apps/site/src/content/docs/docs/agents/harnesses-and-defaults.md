@@ -14,7 +14,7 @@ sources:
   - plugins/agents/src/client/settings/startupContext.ts
   - plugins/agents/src/client/sessions/toolFoldPrefs.ts
   - packages/client-core/src/features/settings/models/generatePick.ts
-checked: '70489f534'
+checked: '90b9e61e3'
 ---
 
 This page covers the harnesses acorn runs, how it finds each one and its login, and every default on
@@ -41,7 +41,7 @@ The Node looks for each CLI on its own `PATH`: `claude` for Claude Code and `cod
 desktop app on macOS reads your login shell's `PATH` first, so a CLI installed through Homebrew or a
 version manager is found even though the app wasn't started from a terminal.
 
-The **Harnesses** section lists each harness with **Installed** or **Not installed**. A missing one
+The **Harnesses** section shows each CLI's path, version, and **Installed** or **Not installed** status. A missing one
 says why, such as `codex is not available on PATH.`, and its card in the Agent pane can't be picked.
 acorn downloads nothing.
 
@@ -49,7 +49,15 @@ The CLI must be on the computer that runs the Node. For a remote or standalone N
 in to Claude Code or Codex on that computer, not on the one in front of you.
 
 After you install or sign in to a CLI, no restart is needed. The next session start checks again, and
-**Refresh** in the **New** menu checks at once.
+the refresh icon in **New** or **Refresh harnesses** in Settings checks at once. On a packaged Mac
+Node, refreshing also reloads your login shell's `PATH` before checking the CLIs.
+
+If you use nvm, each Node version has separate global npm packages. A standalone Codex installation
+outside those version folders avoids updating a different copy from the one acorn uses.
+
+Open **Session actions** > **Agent executable** to compare its CLI path and version with the
+installed CLI. **Agent executable changed** means discovery found a different path or version.
+Start a new session to use it and load its model list. A running session keeps its CLI and model list.
 
 ## Logins and accounts
 

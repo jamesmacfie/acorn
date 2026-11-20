@@ -63,6 +63,7 @@ import { emptyAgentPricingPreferences } from '../../shared/pricing'
 import { sameSessionHeaderProps, sessionHeaderContext } from './sessionHeaderContext'
 import { backgroundCommandsFor, restsWithBackgroundWork } from './taskBackgroundCommands'
 import SessionSummaryModal from './SessionSummaryModal'
+import SessionExecutableInfo, { SessionExecutableNotice } from './SessionExecutableInfo'
 import { AGENT_PANE_ID } from '../../shared/paneIdentity'
 import { requestSessionMarks } from './sessionMarks'
 import { accountIcon, accountLabel, sessionAccount } from '../../shared/accounts'
@@ -422,8 +423,8 @@ export function AgentDetailHeader(props: { task: Task; model: AgentPaneModel }) 
           tools={
             <IconButton
               icon="refresh-cw"
-              title="Refresh provider health"
-              label="Refresh provider health"
+              title="Refresh agent executables and health"
+              label="Refresh agent executables and health"
               onPress={() => void model.refreshProviders()}
             />
           }
@@ -444,6 +445,7 @@ type SessionChip = { id: string; icon: string; label: string; title?: string; pr
 // The session actions an archived task keeps, because they only read or relabel what is stored. Fork,
 // retry, compact and the terminal hand-offs all start a harness, and the task has no worktree for one.
 const READS_STORED_SESSION: ReadonlySet<string> = new Set([
+  'executable',
   'regenerate-title',
   'rename',
   'copy-id',
@@ -497,6 +499,23 @@ function AgentSessionDialogs(props: { task: Task; model: AgentPaneModel }) {
   const model = props.model
   return (
     <>
+      <Show when={model.dialog()?.kind === 'executable' ? model.dialog()!.session : undefined}>
+        {(session) => (
+          <Modal title="Agent executable" onDismiss={() => model.setDialog(null)} size="md">
+            <Modal.Body>
+              <SessionExecutableInfo
+                session={session()}
+                provider={model.providers().find((provider) => provider.id === session().providerId)}
+              />
+            </Modal.Body>
+            <Modal.Actions>
+              <Button variant="ghost" onPress={() => model.setDialog(null)}>
+                Close
+              </Button>
+            </Modal.Actions>
+          </Modal>
+        )}
+      </Show>
       <Show when={model.dialog()?.kind === 'summary' ? model.dialog()!.session : undefined} keyed>
         {(session) => <SessionSummaryModal session={session} onDismiss={() => model.setDialog(null)} />}
       </Show>
@@ -582,6 +601,14 @@ export default function AgentPaneDetail(props: { task: Task; model: AgentPaneMod
   return (
     <>
       <AgentDetailHeader task={props.task} model={model} />
+      <Show when={model.selected()}>
+        {(session) => (
+          <SessionExecutableNotice
+            session={session()}
+            provider={model.providers().find((provider) => provider.id === session().providerId)}
+          />
+        )}
+      </Show>
       <Show when={model.error()}>{(message) => <Alert>{message()}</Alert>}</Show>
       {/* The transcript, the queue and the composer, addressed by session id alone. The run pane
           draws the same three through a capability, so a session reads the same way wherever you

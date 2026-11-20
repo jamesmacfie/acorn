@@ -10,6 +10,7 @@ import { createIdentityService, type IdentityService } from './identity'
 import { createModelService, type ModelService, type PluginGenerateTextRequest } from './models'
 import { createPrefService, type PrefService } from './prefs'
 import * as proc from './proc'
+import { refreshLoginShellPath, spawnsReady } from './loginShellPath'
 import { SecretService } from './secrets'
 import { createTaskService, type CompiledTaskService, type TaskService } from './tasks'
 import { createProjectService, type CompiledProjectService, type ProjectService } from './projectRefs'
@@ -99,6 +100,8 @@ export type CoreServices = {
 
 /** First-party orchestration seams that never cross the loaded-plugin boundary. */
 export type CompiledCoreServices = Omit<CoreServices, 'tasks' | 'projects' | 'models'> & {
+  /** Node-owned executable discovery. Never granted to loaded plugins. */
+  processEnvironment: { ready(): Promise<void>; refresh(): Promise<void> }
   /** Registered names and risk tiers for diagnostics, bounded by owner preferences and session policy. */
   agentTools?: { catalog(): Promise<Array<{ name: string; risk: import('@acorn/protocol/api.ts').ToolRisk }>> }
   /** Bounded passive plugin facts, read from the plugin state bridge when called. */
@@ -167,6 +170,7 @@ export function createCoreServices(options: {
       module.createSecretPublicationGate({ db: options.db, prefs, identity }),
     ))
   return {
+    processEnvironment: { ready: spawnsReady, refresh: refreshLoginShellPath },
     agentToolProvenance: { verify: verifyAgentToolProvenance },
     agentTools: {
       catalog: async () =>

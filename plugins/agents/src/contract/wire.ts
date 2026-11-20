@@ -392,6 +392,7 @@ export type AgentNormalizedEvent =
   | {
       type: 'session_metadata'
       providerSessionRef?: string
+      executable?: AgentExecutable
       configOptions?: AgentConfigOption[]
       commands?: AgentCommandDescriptor[]
       skills?: AgentSkillDescriptor[]
@@ -465,6 +466,8 @@ type BtwOrigin = { kind: 'btw'; sourceSessionId: string }
 
 /** Why a session exists apart from the managed-sessions list. Readers narrow on `kind`. */
 export type AgentSessionOrigin = InlineDiffOrigin | BtwOrigin
+
+export type AgentExecutable = { path: string; version?: string }
 
 export type AgentSession = {
   id: string

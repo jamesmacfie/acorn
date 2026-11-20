@@ -269,6 +269,14 @@ export async function startAcpSession(
   launch: AcpLaunch,
   own: (stop: () => Promise<void>) => void,
 ): Promise<AgentDriverSession> {
+  const executable = launch.executable
+    ? {
+        path: launch.executable,
+        version: await measureAgentStartup(options, 'provider.probe', async () =>
+          (await import('./authProbe')).probeExecutableVersion(launch.executable!),
+        ),
+      }
+    : undefined
   // Read the spec here, not through `this` below. The returned literal's methods rebind `this` to
   // the literal.
   const { id, label, quirks, promptQueueing } = spec
@@ -490,6 +498,7 @@ export async function startAcpSession(
     options.onEvent({
       type: 'session_metadata',
       providerSessionRef: providerSessionRef ?? undefined,
+      executable,
       configOptions: normalizeAcpConfig(configOptions),
     }),
   )

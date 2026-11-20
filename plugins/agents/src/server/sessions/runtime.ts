@@ -120,8 +120,13 @@ export class ManagedAgentRuntime {
     this.instructionAdmission = engine.instructionAdmission
     this.mcpReviews = engine.mcpReviews
     this.registry = options.registry ?? agentDriverRegistry
-    this.providers = new ProviderCatalogue(this.registry, engine.store, engine.accounts, engine.shutdownSignal, () =>
-      options.publish?.({ channel: 'agent:providers-changed' }),
+    this.providers = new ProviderCatalogue(
+      this.registry,
+      engine.store,
+      engine.accounts,
+      engine.shutdownSignal,
+      options.core.processEnvironment,
+      () => options.publish?.({ channel: 'agent:providers-changed' }),
     )
     this.core = options.core
     this.db = options.db

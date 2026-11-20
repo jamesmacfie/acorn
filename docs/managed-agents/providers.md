@@ -23,7 +23,12 @@ Callers that arrive meanwhile share that probe. Three reads wait for a fresh pro
 
 - The first read after boot.
 - A read after a harness was added, removed, or had its factory replaced.
-- `?force=true`, which the **New** menu's **Refresh** button sends.
+- `?force=true`, which the **New** menu's refresh button and **Settings → Agents → Refresh harnesses** send.
+
+A forced read reloads the packaged Mac Node's login-shell `PATH` before it probes the harnesses.
+Concurrent shell refreshes share one probe. A failed shell refresh reports the failure and keeps the
+working `PATH` and its disk cache. Standalone Nodes keep the environment supplied by their launcher
+or service manager. Ordinary provider reads wait for the first uncached boot probe before discovery.
 
 A session start or a delegated spawn that the cached answer would refuse probes once more first, so
 installing or signing in to a CLI needs no Node restart. Custom agents, MCP servers, and session
@@ -36,6 +41,24 @@ readiness and configuration.
 
 The client reads the list through the shared `['agents', 'providers']` query
 (`plugins/agents/src/client/providersClient.ts`), fresh for a minute.
+
+### Executable paths and versions
+
+**Settings → Agents → Harnesses** shows the executable path and version that discovery resolved.
+Each Codex or ACP session records the CLI it launches in its `session_metadata` event. The store
+merges this into `config.executable`, independently of model, command, and skill updates. **Session actions → Agent executable** shows that launch record beside the installed CLI.
+Sessions recorded without it show that the executable is unknown until they reconnect.
+
+After discovery finds a different path or version, a running managed session shows **Agent executable
+changed**. Start a session to use the installed CLI and load its model list. Refresh does not replace
+a running process or change its model choices. Stopped and archived sessions show their launch
+details without a restart notice.
+
+With nvm, each Node version has separate global npm packages. Updating Codex under one Node version
+can leave the login shell's copy unchanged. Prefer one installation outside those version folders,
+such as the [official standalone Codex installation](https://learn.chatgpt.com/docs/codex/cli).
+Remove duplicate npm installations after verifying the standalone command, and check that both the
+login shell and project shell resolve the same executable.
 
 ## Plan usage
 

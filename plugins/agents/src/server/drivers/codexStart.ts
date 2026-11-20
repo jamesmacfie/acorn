@@ -104,6 +104,7 @@ export async function startCodexSession(
   options: AgentDriverStartOptions,
   executable: string,
   own: (stop: () => Promise<void>) => void,
+  executableVersion?: string,
 ): Promise<AgentDriverSession> {
   let threadId = options.session.providerSessionRef
   const resuming = threadId != null
@@ -447,6 +448,7 @@ export async function startCodexSession(
     options.onEvent({
       type: 'session_metadata',
       providerSessionRef: threadId,
+      executable: { path: executable, version: executableVersion },
       configOptions,
       skills: codexSkillsFromResponse(skills),
     }),

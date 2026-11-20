@@ -119,6 +119,6 @@ export class CodexAgentDriver implements AgentDriver {
 
     const { startCodexSession } = await measure('driver.load', () => import('./codexStart'))
     options.signal?.throwIfAborted()
-    return startCodexSession(options, descriptor.executable, own)
+    return startCodexSession(options, descriptor.executable, own, descriptor.executableVersion)
   }
 }

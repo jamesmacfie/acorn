@@ -18,6 +18,7 @@ const mocks = vi.hoisted(() => ({
       label: 'Claude Code',
       installed: true,
       executableVersion: '2.1.0',
+      executable: '/home/owner/.local/bin/claude',
       authenticated: true,
       diagnostics: [],
       configOptions: [],
@@ -35,6 +36,8 @@ const mocks = vi.hoisted(() => ({
     },
   ],
   saveStartup: vi.fn(async (_client: unknown, _on: boolean) => true),
+  providerRead: vi.fn(),
+  cacheWrite: vi.fn(),
 }))
 vi.mock('@tanstack/solid-query', () => ({
   createQuery: (options: () => { queryKey: readonly string[] }) => ({
@@ -58,7 +61,7 @@ vi.mock('@tanstack/solid-query', () => ({
       return mocks.prefs
     },
   }),
-  useQueryClient: () => ({}),
+  useQueryClient: () => ({ setQueryData: mocks.cacheWrite }),
 }))
 vi.mock('./startupContext', async (importOriginal) => ({
   ...(await importOriginal<typeof import('./startupContext')>()),
@@ -66,7 +69,10 @@ vi.mock('./startupContext', async (importOriginal) => ({
 }))
 vi.mock('../sessions/managedClient', () => ({
   managedAgentApi: {
-    providers: async () => mocks.providers,
+    providers: async (force?: boolean) => {
+      mocks.providerRead(force)
+      return mocks.providers
+    },
   },
 }))
 
@@ -83,6 +89,8 @@ const row = (label: string) =>
 beforeEach(() => {
   mocks.prefs = {}
   mocks.saveStartup.mockClear()
+  mocks.providerRead.mockClear()
+  mocks.cacheWrite.mockClear()
   host = document.createElement('div')
   document.body.append(host)
   dispose = render(() => <AgentSessionDefaultsSettings />, host)
@@ -96,7 +104,17 @@ describe('the harnesses and defaults page', () => {
   it('says which harnesses this machine can run', async () => {
     await settle()
     expect(row('Claude Code')?.textContent).toContain('Version 2.1.0.')
+    expect(row('Claude Code')?.textContent).toContain('/home/owner/.local/bin/claude')
     expect(row('Codex')?.querySelector('[aria-label="Not installed"]')).not.toBeNull()
+  })
+
+  it('refreshes harness discovery and shares the result with other provider pickers', async () => {
+    await settle()
+    const refresh = [...host.querySelectorAll('button')].find((button) => button.textContent === 'Refresh harnesses')!
+    refresh.click()
+    await settle()
+    expect(mocks.providerRead).toHaveBeenLastCalledWith(true)
+    expect(mocks.cacheWrite).toHaveBeenCalledWith(['agents', 'providers'], mocks.providers)
   })
 
   it("shows a signed-out account's sign-in command", async () => {

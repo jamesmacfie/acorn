@@ -4,6 +4,7 @@ const owns = (value: Record<string, unknown>, key: string): boolean => Object.pr
 
 // Written by admission or a dedicated authority operation, not generic provider configuration.
 const serverOwnedKeys = [
+  'executable',
   'toolCeiling',
   'mcpServers',
   'workflowRunId',

@@ -73,6 +73,30 @@ describe('the providers answer', () => {
     expect(driver.pending).toHaveLength(0)
   })
 
+  it('reloads the process environment before a forced probe, preserving the cache when reload fails', async () => {
+    const original = await warm()
+    let finish!: () => void
+    ctx.core.processEnvironment.refresh = vi.fn(
+      () =>
+        new Promise<void>((resolve) => {
+          finish = resolve
+        }),
+    )
+    const refreshing = runtime.providers.list(true)
+    expect(ctx.core.processEnvironment.refresh).toHaveBeenCalledOnce()
+    expect(driver.pending).toHaveLength(0)
+    finish()
+    await vi.waitFor(() => expect(driver.pending).toHaveLength(1))
+    driver.answer()
+    await refreshing
+    ctx.core.processEnvironment.refresh = async () => {
+      throw new Error('shell unavailable')
+    }
+    await expect(runtime.providers.list(true)).rejects.toThrow('shell unavailable')
+    expect(await runtime.providers.list()).toEqual(original)
+    expect(driver.pending).toHaveLength(0)
+  })
+
   it('answers a second call inside the window without probing', async () => {
     const answered = await warm()
     vi.advanceTimersByTime(10_000)

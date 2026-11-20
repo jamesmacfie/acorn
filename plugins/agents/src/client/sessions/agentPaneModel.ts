@@ -69,7 +69,10 @@ export type SessionAction = {
  *  `window.confirm` are unstyled in the shell and suppressed outright in a sandboxed frame, so both
  *  are dialogs. The session travels with the dialog, because the sidebar's row menu can act on a
  *  session that is not the open one. */
-export type AgentDialog = { kind: 'rename' | 'archive' | 'summary' | 'session-id'; session: AgentSession }
+export type AgentDialog = {
+  kind: 'rename' | 'archive' | 'summary' | 'session-id' | 'executable'
+  session: AgentSession
+}
 
 /** Nothing to lose by archiving: no turns and an empty draft. The task context the composer attaches
  *  on its own does not count as input. An unloaded snapshot means we cannot tell, so we ask. */
@@ -491,6 +494,12 @@ export function createAgentPaneModel(task: Task, pane: PaneModelContext) {
       },
       { id: 'rename', label: 'Rename session', icon: 'pencil', run: () => sessionAction(session, 'rename') },
       { id: 'copy-id', label: 'Copy session ID', icon: 'copy', run: () => sessionAction(session, 'copy-id') },
+      {
+        id: 'executable',
+        label: 'Agent executable',
+        icon: 'info',
+        run: () => setDialog({ kind: 'executable', session }),
+      },
       {
         id: 'summarize',
         label: 'Summarize run…',

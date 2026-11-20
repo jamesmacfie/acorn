@@ -98,6 +98,9 @@ export class AcpDriver implements AgentDriver {
       installed: launch.diagnostics.length === 0,
       authenticated: launch.executable && this.spec.probeAuth ? await this.spec.probeAuth(launch.executable) : null,
       ...(launch.executable ? { executable: launch.executable } : {}),
+      ...(launch.executable
+        ? { executableVersion: await (await import('./authProbe')).probeExecutableVersion(launch.executable) }
+        : {}),
       statusAuthority: 'protocol',
       capabilities: [
         ...harnessCapabilities(this.spec.quirks),

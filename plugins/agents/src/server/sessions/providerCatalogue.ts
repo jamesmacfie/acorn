@@ -36,6 +36,7 @@ export class ProviderCatalogue {
     private readonly accounts: Pick<AgentAccounts, 'list' | 'home' | 'defaultAccount' | 'details' | 'showAs'>,
     // The runtime's shutdown. Once it aborts, every probe is refused and nothing is cached.
     private readonly shutdown: AbortSignal,
+    private readonly environment: { ready(): Promise<void>; refresh(): Promise<void> },
     private readonly onChanged: () => void = () => {},
   ) {
     shutdown.addEventListener(
@@ -49,6 +50,8 @@ export class ProviderCatalogue {
   }
 
   async list(force = false): Promise<AgentProviderDescriptor[]> {
+    if (force) await this.environment.refresh()
+    else await this.environment.ready()
     const cached = this.cache
     if (!force && cached && cached.generation === this.registry.generation) {
       if (Date.now() - cached.probedAt > PROVIDER_FRESH_MS) void this.probeProviders(false).catch(() => undefined)

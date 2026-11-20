@@ -161,6 +161,9 @@ export function boundProviderEvent(event: AgentNormalizedEvent, secretValues: It
       return {
         ...event,
         providerSessionRef: sliceText(event.providerSessionRef, 2_000),
+        executable: event.executable
+          ? { path: event.executable.path.slice(0, 4_096), version: sliceText(event.executable.version, 500) }
+          : undefined,
         configOptions: event.configOptions?.slice(0, 100).map(boundedConfig),
         commands: boundedCommands(event.commands),
         skills: boundedSkills(event.skills),

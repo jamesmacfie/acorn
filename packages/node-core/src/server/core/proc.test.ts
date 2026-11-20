@@ -5,7 +5,7 @@ import { getPriority, tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { promisify } from 'node:util'
 import { afterAll, afterEach, describe, expect, it } from 'vitest'
-import { holdSpawnsUntil, startLoginShellPath } from './loginShellPath'
+import { holdSpawnsUntil, refreshLoginShellPath, startLoginShellPath } from './loginShellPath'
 import { brokerEnv, runProcess, runProcessOrThrow } from './proc'
 
 const exec = promisify(execFile)
@@ -335,6 +335,35 @@ describe('the cached login-shell PATH', () => {
     fail(new Error('no login shell here'))
     await settled
     expect(await printPath()).toBe('/cached/bin:/usr/bin:/bin')
+    expect(readFileSync(join(root, 'login-shell-path.json'), 'utf8')).toBe(cache)
+  })
+
+  it('reloads the shell PATH on explicit refresh and shares concurrent refreshes', async () => {
+    let path = '/before/bin:/usr/bin:/bin'
+    let calls = 0
+    const root = rootWith()
+    await startLoginShellPath(root, '/bin/zsh', async () => {
+      calls += 1
+      return path
+    })
+    path = '/after/bin:/usr/bin:/bin'
+    await Promise.all([refreshLoginShellPath(), refreshLoginShellPath()])
+    expect(calls).toBe(2)
+    expect(await printPath()).toBe(path)
+    expect(JSON.parse(readFileSync(join(root, 'login-shell-path.json'), 'utf8')).path).toBe(path)
+  })
+
+  it('reports a failed explicit refresh without replacing the working PATH or its cache', async () => {
+    let path = '/working/bin:/usr/bin:/bin'
+    const root = rootWith()
+    await startLoginShellPath(root, '/bin/zsh', async () => {
+      if (!path) throw new Error('shell failed')
+      return path
+    })
+    const cache = readFileSync(join(root, 'login-shell-path.json'), 'utf8')
+    path = ''
+    await expect(refreshLoginShellPath()).rejects.toThrow('shell failed')
+    expect(await printPath()).toBe('/working/bin:/usr/bin:/bin')
     expect(readFileSync(join(root, 'login-shell-path.json'), 'utf8')).toBe(cache)
   })
 

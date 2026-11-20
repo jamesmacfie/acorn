@@ -65,9 +65,9 @@ when it answers, about two seconds into the next launch, and until then a tool i
 as missing. Only a launch with no usable file, the first or the first after a shell change, makes
 `runProcess` and `runHeadless` wait (`packages/node-core/src/server/core/loginShellPath.ts`).
 
-A terminal session runs `$SHELL -lc`, which reads the profile itself. The managed-agent drivers in
-`plugins/agents/src/server/` call `spawn` directly, so on a first launch they can see the inherited
-`PATH`. Move them onto `spawnsReady()` if that shows up as a missing-binary report.
+A terminal session runs `$SHELL -lc`, which reads the profile itself. Agent provider discovery waits
+on `spawnsReady()`. Its [explicit refresh](./managed-agents/providers.md#providers) reloads the packaged
+Mac's login-shell `PATH` through the compiled-only `core.processEnvironment` facet.
 
 `[service:boot] <label> +<offset>ms (<step>ms)` prints one line per step, always, so a slow bind says so
 without anyone asking. Read the labels as wall-clock slices: with plugins initializing together, a

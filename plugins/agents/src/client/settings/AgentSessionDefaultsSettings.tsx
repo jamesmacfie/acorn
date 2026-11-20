@@ -1,5 +1,5 @@
 import { createQuery, useQueryClient } from '@tanstack/solid-query'
-import { createMemo, createResource, For, Show } from 'solid-js'
+import { createMemo, createResource, createSignal, For, Show } from 'solid-js'
 import {
   createSettingSave,
   effectiveModelPick,
@@ -10,6 +10,7 @@ import {
 } from '@acorn/plugin-api/client'
 import {
   Alert,
+  Button,
   Checkbox,
   Icon,
   Inline,
@@ -31,6 +32,7 @@ import {
   type AgentSessionDefaults,
 } from '../../shared/sessionDefaults'
 import { managedAgentApi } from '../sessions/managedClient'
+import { refreshAgentProviders } from '../providersClient'
 import ProviderGlyph from '../sessions/ProviderGlyph'
 import { advertisedOptionsByProvider } from './agentConfigOptions'
 import { agentSessionDefaultsOptions, writeAgentSessionDefaults } from './sessionDefaultsClient'
@@ -52,6 +54,7 @@ const harnessState = (provider: AgentProviderDescriptor): string | undefined => 
   const parts = [
     provider.executableVersion ? `Version ${provider.executableVersion}.` : '',
     provider.authenticated === false ? 'Not signed in.' : '',
+    provider.executable ?? '',
   ]
   return parts.filter(Boolean).join(' ') || undefined
 }
@@ -72,7 +75,21 @@ export default function AgentSessionDefaultsSettings(props: { context?: PageCont
   const stored = createQuery(() => agentSessionDefaultsOptions())
   // It only fills in choices, so a node that does not answer leaves them empty rather than taking the
   // page down with it.
-  const [providers] = createResource(() => managedAgentApi.providers().catch(() => undefined))
+  const [providers, { mutate: setProviders }] = createResource(() => managedAgentApi.providers().catch(() => undefined))
+  const [refreshing, setRefreshing] = createSignal(false)
+  const [refreshError, setRefreshError] = createSignal('')
+  const refreshHarnesses = async () => {
+    if (refreshing()) return
+    setRefreshing(true)
+    setRefreshError('')
+    try {
+      setProviders(await refreshAgentProviders(queryClient))
+    } catch (error) {
+      setRefreshError(error instanceof Error ? error.message : 'Unable to refresh agent executables.')
+    } finally {
+      setRefreshing(false)
+    }
+  }
   const prefs = createQuery(() => prefsOptions(true))
   const modelStatus = createQuery(() => modelBackendsOptions(true))
   const backends = () => modelStatus.data?.backends ?? []
@@ -146,6 +163,10 @@ export default function AgentSessionDefaultsSettings(props: { context?: PageCont
         label="Harnesses"
         help="The agent command-line tools this computer can run. Plugins can add more."
       >
+        <Button busy={refreshing()} disabled={providers.loading} onPress={() => void refreshHarnesses()}>
+          Refresh harnesses
+        </Button>
+        <Show when={refreshError()}>{(message) => <Alert>{message()}</Alert>}</Show>
         <For
           each={providers() ?? []}
           fallback={

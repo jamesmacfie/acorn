@@ -205,6 +205,7 @@ export class AgentStore {
               ...(event.configOptions ? { configOptions: event.configOptions } : {}),
               ...(event.commands ? { commands: event.commands } : {}),
               ...(event.skills ? { skills: event.skills } : {}),
+              ...(event.executable ? { executable: event.executable } : {}),
             })
           : projection.configJson
       // The subagent roster projected onto the row in the same transaction as the event insert, so a
