@@ -116,6 +116,13 @@ owner's click counts, and only on a card from a thread made under the current li
 on, the card links to Acorn. Any other kind of request asks the
 owner to answer in Acorn.
 
+Each request posts one card, and the Node keeps a `slack_cards` row for it: the install, channel,
+message, thread, session, and link. A click answers only the request whose card sits at the message it
+came from, and the button's value must name that same request. The plugin reads the approvals choice
+from that card's own link, and only while the link, thread, and session still match. The first answer
+marks the card used, so later clicks change nothing. The row survives a restart, so a click on an older
+card goes through the same checks, and an answer given in Acorn still updates the card.
+
 ## Room for forks and several agents
 
 The plugin keeps a thread's sessions as a list, and keys turns, status lines, answers, reactions, and

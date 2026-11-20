@@ -137,3 +137,25 @@ export const slackTurns = sqliteTable(
   },
   (table) => [index('slack_turns_posted_idx').on(table.posted)],
 )
+
+// The approval card posted for a permission request, one per request. A click answers only the request
+// on the card it came from: the install, channel, and message must match a row, and the row's link must
+// still be current. `answered` makes the card single-use, and the row outlives a restart.
+export const slackCards = sqliteTable(
+  'slack_cards',
+  {
+    requestId: text('request_id').primaryKey(),
+    sessionId: text('session_id').notNull(),
+    threadId: text('thread_id').notNull(),
+    teamId: text('team_id').notNull(),
+    linkId: text('link_id').notNull(),
+    channelId: text('channel_id').notNull(),
+    messageTs: text('message_ts').notNull(),
+    answered: integer('answered', { mode: 'boolean' }).notNull().default(false),
+    createdAt: integer('created_at').notNull(),
+  },
+  (table) => [
+    uniqueIndex('slack_cards_message_idx').on(table.teamId, table.channelId, table.messageTs),
+    index('slack_cards_thread_idx').on(table.threadId),
+  ],
+)

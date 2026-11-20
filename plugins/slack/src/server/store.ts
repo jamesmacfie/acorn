@@ -2,6 +2,7 @@ import { randomUUID } from 'node:crypto'
 import { and, asc, eq, inArray, lte, max } from 'drizzle-orm'
 import type { PluginDatabase } from '@acorn/plugin-api/node'
 import {
+  slackCards,
   slackChannels,
   slackChannelTasks,
   slackLinks,
@@ -21,6 +22,7 @@ export type Channel = typeof slackChannels.$inferSelect
 export type Thread = typeof slackThreads.$inferSelect
 export type Message = typeof slackMessages.$inferSelect
 export type Turn = typeof slackTurns.$inferSelect
+type Card = typeof slackCards.$inferSelect
 export type Mode = Thread['mode']
 
 export type SlackStore = ReturnType<typeof slackStore>
@@ -253,6 +255,31 @@ export function slackStore(db: PluginDatabase) {
         .get()) ?? null,
     unpostedTurns: () => db.select().from(slackTurns).where(eq(slackTurns.posted, false)).all(),
 
+    // --- Approval cards ---
+    card: async (requestId: string): Promise<Card | null> =>
+      (await db.select().from(slackCards).where(eq(slackCards.requestId, requestId)).get()) ?? null,
+    /** The card at this Slack message, or null for any message the plugin didn't post a card as. */
+    cardAt: async (teamId: string, channelId: string, messageTs: string): Promise<Card | null> =>
+      (await db
+        .select()
+        .from(slackCards)
+        .where(
+          and(eq(slackCards.teamId, teamId), eq(slackCards.channelId, channelId), eq(slackCards.messageTs, messageTs)),
+        )
+        .get()) ?? null,
+    insertCard: (row: typeof slackCards.$inferInsert) => db.insert(slackCards).values(row).onConflictDoNothing(),
+    /** Take the card's one answer. False when another click already took it. */
+    claimCard: async (requestId: string): Promise<boolean> =>
+      (
+        await db
+          .update(slackCards)
+          .set({ answered: true })
+          .where(and(eq(slackCards.requestId, requestId), eq(slackCards.answered, false)))
+          .returning({ requestId: slackCards.requestId })
+      ).length > 0,
+    releaseCard: (requestId: string) =>
+      db.update(slackCards).set({ answered: false }).where(eq(slackCards.requestId, requestId)),
+
     // --- Removal ---
     /** A deleted task's threads and everything under them. Returns how many threads went. */
     async purgeTasks(taskIds: string[]): Promise<number> {
@@ -263,6 +290,7 @@ export function slackStore(db: PluginDatabase) {
         .all()
       const ids = threads.map((thread) => thread.id)
       if (ids.length) {
+        await db.delete(slackCards).where(inArray(slackCards.threadId, ids))
         await db.delete(slackTurns).where(inArray(slackTurns.threadId, ids))
         await db.delete(slackMessages).where(inArray(slackMessages.threadId, ids))
         await db.delete(slackThreadSessions).where(inArray(slackThreadSessions.threadId, ids))

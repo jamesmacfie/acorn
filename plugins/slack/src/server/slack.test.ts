@@ -132,8 +132,13 @@ async function harness(options: { approvals?: boolean; linked?: boolean } = {}) 
     },
   })
   const turnEngine = slackTurns(rt)
-  const approvals = slackApprovals(rt, turnEngine)
-  const inbound = slackInbound(rt, turnEngine, approvals.click)
+  let approvals = slackApprovals(rt, turnEngine)
+  let inbound = slackInbound(rt, turnEngine, approvals.click)
+  /** A Node restart: the database stays, and everything the plugin held in memory goes. */
+  const restart = () => {
+    approvals = slackApprovals(rt, turnEngine)
+    inbound = slackInbound(rt, turnEngine, approvals.click)
+  }
 
   // The queue runs work as promises resolve; wait until it and the turns it starts have nothing left.
   const idle = async () => {
@@ -223,7 +228,12 @@ async function harness(options: { approvals?: boolean; linked?: boolean } = {}) 
     )
     await idle()
   }
-  const click = async (action: Record<string, unknown>, user = OWNER, state: object = {}) => {
+  const click = async (
+    action: Record<string, unknown>,
+    user = OWNER,
+    state: object = {},
+    payload: Record<string, unknown> = {},
+  ) => {
     await rt.serial(() =>
       inbound.receive({
         eventId: `click${++ts}`,
@@ -238,6 +248,7 @@ async function harness(options: { approvals?: boolean; linked?: boolean } = {}) 
           trigger_id: `t${ts}`,
           state,
           actions: [{ action_ts: `${ts}.1`, ...action }],
+          ...payload,
         },
       }),
     )
@@ -246,9 +257,14 @@ async function harness(options: { approvals?: boolean; linked?: boolean } = {}) 
   return {
     store,
     rt,
-    inbound,
+    get inbound() {
+      return inbound
+    },
     turnEngine,
-    approvals,
+    get approvals() {
+      return approvals
+    },
+    restart,
     calls,
     released,
     executions,
@@ -679,6 +695,18 @@ describe('approvals', () => {
       }),
     )
   }
+  /** A click on the card posted for `req-1`, as Slack sends it from that message. */
+  const answer = async (
+    h: Awaited<ReturnType<typeof harness>>,
+    action_id: string,
+    options: { user?: string; value?: string; payload?: Record<string, unknown> } = {},
+  ) => {
+    const posted = await h.store.card('req-1')
+    await h.click({ action_id, value: options.value ?? 'session-1|req-1' }, options.user, undefined, {
+      container: { channel_id: CHANNEL, message_ts: posted?.messageTs },
+      ...options.payload,
+    })
+  }
   const card = (h: Awaited<ReturnType<typeof harness>>) =>
     h.calls.filter((call) => call.method === 'chat.postMessage').at(-1)!.args.blocks as {
       type: string
@@ -698,14 +726,14 @@ describe('approvals', () => {
         .at(-1)!
         .elements!.map((element) => element.action_id),
     ).toEqual(['acorn_approve', 'acorn_deny'])
-    await h.click({ action_id: 'acorn_approve', value: 'session-1|req-1' }, GUEST)
+    await answer(h, 'acorn_approve', { user: GUEST })
     expect(h.calls.at(-1)).toMatchObject({
       method: 'chat.postEphemeral',
       args: { user: GUEST, text: 'Only James can answer this.' },
     })
     expect(h.answers).toEqual([])
-    await h.click({ action_id: 'acorn_approve', value: 'session-1|req-1' })
-    await h.click({ action_id: 'acorn_approve', value: 'session-1|req-1' })
+    await answer(h, 'acorn_approve')
+    await answer(h, 'acorn_approve')
     expect(h.answers).toHaveLength(1)
     expect(h.answers[0]).toMatchObject({ sessionId: 'session-1', requestId: 'req-1', decision: 'allow' })
     expect(
@@ -723,7 +751,7 @@ describe('approvals', () => {
     ])
     await h.store.setApprovals(TEAM, true)
     h.requests[0]!.status = 'resolved'
-    await h.click({ action_id: 'acorn_deny', value: 'session-1|req-1' })
+    await answer(h, 'acorn_deny')
     expect(h.calls.at(-1)).toMatchObject({ method: 'respond', args: { body: { text: 'Answered in Acorn.' } } })
     expect(h.answers).toEqual([])
   })
@@ -745,9 +773,99 @@ describe('approvals', () => {
     )
     expect(h.calls.at(-1)).toMatchObject({ method: 'chat.update', args: { text: 'Expired.', blocks: [] } })
     expect(h.reactions().at(-1)).toBe(`+${REACTIONS.running}`)
-    await h.click({ action_id: 'acorn_approve', value: 'session-1|req-1' })
+    await answer(h, 'acorn_approve')
     expect(h.calls.at(-1)).toMatchObject({ method: 'respond', args: { body: { text: 'Expired.' } } })
     expect(h.answers).toEqual([])
+  })
+
+  it('answers only the request on the card the click came from', async () => {
+    const h = await harness({ approvals: true })
+    await withProject(h)
+    const mentioned = await h.mention('test it')
+    await pending(h)
+    const posted = (await h.store.card('req-1'))!
+    expect(posted).toMatchObject({ teamId: TEAM, channelId: CHANNEL, sessionId: 'session-1', answered: false })
+    // Another message in the thread, the right message with another request in the button, and the right
+    // message from another channel.
+    await h.click(
+      { action_id: 'acorn_approve', value: 'session-1|req-1' },
+      OWNER,
+      {},
+      { container: { channel_id: CHANNEL, message_ts: mentioned } },
+    )
+    await answer(h, 'acorn_approve', { value: 'session-1|req-2' })
+    await answer(h, 'acorn_approve', { payload: { container: { channel_id: DM, message_ts: posted.messageTs } } })
+    await h.click({ action_id: 'acorn_approve', value: 'session-1|req-1' })
+    expect(h.answers).toEqual([])
+    expect(h.methods().filter((method) => method === 'respond' || method === 'chat.postEphemeral')).toEqual([])
+    await answer(h, 'acorn_approve')
+    expect(h.answers).toEqual([expect.objectContaining({ requestId: 'req-1', decision: 'allow' })])
+  })
+
+  it("answers nothing from another install, and reads approvals from the request's own link", async () => {
+    const h = await harness()
+    await withProject(h)
+    await h.mention('test it')
+    await pending(h)
+    // The same owner linked a second install with approvals on. Its click reaches this card's message.
+    await h.store.confirmLink({ ...OWNER_LINK, teamId: 'T2' }, true)
+    await answer(h, 'acorn_approve', { payload: { team: { id: 'T2' } } })
+    expect(h.answers).toEqual([])
+    expect(h.methods().filter((method) => method === 'respond' || method === 'chat.postEphemeral')).toEqual([])
+    await answer(h, 'acorn_approve')
+    expect(h.calls.at(-1)).toMatchObject({
+      method: 'chat.postEphemeral',
+      args: { text: expect.stringMatching(/^Answering approvals from Slack is off/) },
+    })
+    expect(h.answers).toEqual([])
+  })
+
+  it('keeps the card across a restart: one answer, a mismatch still refused, and Acorn’s answer still shown', async () => {
+    const h = await harness({ approvals: true })
+    await withProject(h)
+    await h.mention('test it')
+    await pending(h)
+    h.restart()
+    await answer(h, 'acorn_approve', { value: 'session-1|req-2' })
+    expect(h.answers).toEqual([])
+    await answer(h, 'acorn_deny')
+    expect(h.answers).toEqual([expect.objectContaining({ requestId: 'req-1', decision: 'deny' })])
+    // The request reads pending a moment longer; the answered card still takes no second answer.
+    h.requests[0]!.status = 'pending'
+    h.restart()
+    await answer(h, 'acorn_approve')
+    expect(h.answers).toHaveLength(1)
+    expect(h.calls.filter((call) => call.method === 'respond')).toHaveLength(1)
+
+    // A card that Acorn answers after a restart still says so.
+    const other = await harness({ approvals: true })
+    await withProject(other)
+    await other.mention('test it')
+    await pending(other)
+    other.restart()
+    other.requests[0]!.status = 'resolved'
+    await other.rt.serial(() =>
+      other.approvals.requestChanged({
+        taskId: '',
+        sessionId: 'session-1',
+        requestId: 'req-1',
+        kind: 'permission',
+        status: 'resolved',
+      }),
+    )
+    expect(other.calls.at(-1)).toMatchObject({
+      method: 'chat.update',
+      args: { ts: (await other.store.card('req-1'))!.messageTs, text: 'Answered in Acorn.' },
+    })
+  })
+
+  it('posts one card for a request, however often its event repeats', async () => {
+    const h = await harness({ approvals: true })
+    await withProject(h)
+    await h.mention('test it')
+    await pending(h)
+    await pending(h)
+    expect(h.posts().filter((text) => text === 'The agent asks: Run a command')).toHaveLength(1)
   })
 
   it('asks the owner to answer any other kind of request in Acorn', async () => {

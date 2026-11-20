@@ -13,11 +13,6 @@ const DENY = 'acorn_deny'
 
 export function slackApprovals(rt: SlackRuntime, turns: Turns) {
   const { store } = rt
-  // Cards posted by this process, by request, so an answer in Acorn can say so on the card. A card from
-  // before a restart says so on its next click instead.
-  const cards = new Map<string, { teamId: string; channel: string; ts: string }>()
-  // Requests answered from Slack, so a second quick click doesn't overwrite the first one's line.
-  const answered = new Set<string>()
 
   const time = (at: number) => new Date(at).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })
 
@@ -36,12 +31,12 @@ export function slackApprovals(rt: SlackRuntime, turns: Turns) {
       if (!link) return
       if (event.status !== 'pending') {
         await turns.waiting(event.sessionId, false)
-        const card = cards.get(event.requestId)
-        cards.delete(event.requestId)
-        if (card && !answered.has(event.requestId))
+        // A card Slack answered already says who answered it.
+        const card = await store.card(event.requestId)
+        if (card && !card.answered)
           await rt.call(card.teamId, 'chat.update', {
-            channel: card.channel,
-            ts: card.ts,
+            channel: card.channelId,
+            ts: card.messageTs,
             text: event.status === 'expired' ? 'Expired.' : 'Answered in Acorn.',
             blocks: [],
           })
@@ -61,7 +56,8 @@ export function slackApprovals(rt: SlackRuntime, turns: Turns) {
       const request = (await rt.requests?.list({ taskId: thread.taskId, sessionId: event.sessionId }))?.find(
         (row) => row.requestId === event.requestId,
       )
-      if (!request) return
+      // A request posts one card, so a repeated event can't leave a second card that answers it.
+      if (!request || (await store.card(event.requestId))) return
       const folder = await rt.tasks.folder(thread.taskId)
       const title = await rt.safeText(request.title, folder)
       const detail = request.detail ? await rt.safeText(request.detail, folder) : ''
@@ -98,7 +94,16 @@ export function slackApprovals(rt: SlackRuntime, turns: Turns) {
         ],
       })
       if (typeof posted?.ts === 'string')
-        cards.set(event.requestId, { teamId: thread.teamId, channel: thread.channelId, ts: posted.ts })
+        await store.insertCard({
+          requestId: event.requestId,
+          sessionId: event.sessionId,
+          threadId: thread.id,
+          teamId: thread.teamId,
+          linkId: link.linkId,
+          channelId: thread.channelId,
+          messageTs: posted.ts,
+          createdAt: rt.now(),
+        })
     },
 
     /** A click on a card's button. False for a click that isn't one, so the caller can try another handler. */
@@ -107,12 +112,19 @@ export function slackApprovals(rt: SlackRuntime, turns: Turns) {
       if (action?.action_id !== APPROVE && action?.action_id !== DENY) return false
       const teamId = installId(payload)
       const user = String((payload.user as Payload).id)
-      const channel = String((payload.container as Payload).channel_id)
-      const [sessionId = '', requestId = ''] = String(action.value ?? '').split('|')
+      const container = (payload.container ?? {}) as Payload
+      const channel = String(container.channel_id)
       const replace = (text: string) =>
         rt.call(teamId, 'respond', { url: payload.response_url, body: { replace_original: true, text } })
-      const link = await store.link(teamId)
-      if (!link) return true
+      // The click answers the request on the card it came from, by the card this Node posted at that
+      // message. The button's own value must name the same request, and the card's link, thread, and
+      // session must still hold. Anything else answers nothing.
+      const card = await store.cardAt(teamId, channel, String(container.message_ts))
+      if (!card || String(action.value ?? '') !== `${card.sessionId}|${card.requestId}`) return true
+      const { sessionId, requestId } = card
+      const link = await store.linkOf(card)
+      const thread = await store.threadOfSession(sessionId)
+      if (!link || thread?.id !== card.threadId || thread.linkId !== card.linkId || !rt.requestAnswer) return true
       if (user !== link.slackUserId) {
         await rt.ephemeral(teamId, channel, user, `Only ${link.slackUserName} can answer this.`)
         return true
@@ -126,11 +138,8 @@ export function slackApprovals(rt: SlackRuntime, turns: Turns) {
         )
         return true
       }
-      if (answered.has(requestId)) return true
-      const thread = await store.threadOfSession(sessionId)
-      // A card counts only under the link its thread was made under, so a click from another team, or
-      // from before an unlink or a relink, answers nothing.
-      if (!thread || thread.linkId !== link.linkId || !rt.requestAnswer) return true
+      // A second quick click mustn't overwrite the first one's line.
+      if (card.answered) return true
       const request = (await rt.requests?.list({ taskId: thread.taskId, sessionId }))?.find(
         (row) => row.requestId === requestId,
       )
@@ -138,7 +147,7 @@ export function slackApprovals(rt: SlackRuntime, turns: Turns) {
         await replace(!request || request.status === 'expired' ? 'Expired.' : 'Answered in Acorn.')
         return true
       }
-      answered.add(requestId)
+      if (!(await store.claimCard(requestId))) return true
       const decision = action.action_id === APPROVE ? 'allow' : 'deny'
       const result = await rt.requestAnswer.answer({
         taskId: thread.taskId,
@@ -148,7 +157,7 @@ export function slackApprovals(rt: SlackRuntime, turns: Turns) {
         idempotencyKey: String(action.action_ts ?? payload.trigger_id),
       })
       if (!result.ok) {
-        answered.delete(requestId)
+        await store.releaseCard(requestId)
         await replace(
           result.reason === 'not-pending'
             ? 'Answered in Acorn.'
@@ -156,7 +165,6 @@ export function slackApprovals(rt: SlackRuntime, turns: Turns) {
         )
         return true
       }
-      cards.delete(requestId)
       await replace(`${decision === 'allow' ? 'Approved' : 'Denied'} by ${link.slackUserName}, ${time(rt.now())}`)
       return true
     },
