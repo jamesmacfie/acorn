@@ -15,9 +15,10 @@ export const accountPlugin = (): NodePlugin => ({
       nodes: async () => (await import('../server/service')).serviceNodes(ctx),
       url: async (path) => (await import('../server/service')).serviceUrl(path),
     })
+    // No phone may change these, even with shell access: they decide who else can reach this Node.
     ctx.routes.register(
       lazyRouter(async () => (await import('../server/routes')).accountRoutes()),
-      { prefix: '', note: 'sign-in, remote access, and relay tickets' },
+      { prefix: '', note: 'sign-in, remote access, and relay tickets', phone: 'refused' },
     )
     // Offered only where there is an account service to list from, as the sign-in is. Listing makes no
     // request until someone has signed in.

@@ -74,6 +74,28 @@ describe('the built-in plugins’ phone writes', () => {
     expect(pluginPhoneAccess(method, path)).toBe('write')
   })
 
+  // These decide who else can reach the Node, so the phone rules refuse them to a phone with shell access
+  // too (packages/node-core/src/server/middleware/phoneRules.ts).
+  it.each([
+    ['PUT', '/v1/p/account/remote-access'],
+    ['PUT', '/v1/p/account/previews'],
+    ['POST', '/v1/p/account/sign-out'],
+    ['POST', '/v1/p/account/tickets'],
+    ['POST', '/v1/p/account/auth/device/start'],
+    ['POST', '/v1/p/account/auth/device/poll'],
+    ['POST', '/v1/p/slack/link'],
+    ['POST', '/v1/p/slack/confirm'],
+    ['POST', '/v1/p/slack/unlink'],
+    ['PUT', '/v1/p/slack/approvals'],
+  ])('refuses %s %s to every phone', (method, path) => {
+    expect(pluginPhoneAccess(method, path)).toBe('refused')
+  })
+
+  it('leaves reading the account and Slack settings open', () => {
+    expect(pluginPhoneAccess('GET', '/v1/p/account/state')).toBeNull()
+    expect(pluginPhoneAccess('GET', '/v1/p/slack/state')).toBeNull()
+  })
+
   it('refuses reads through the preview proxy, which reaches the task’s app on this computer', () => {
     expect(pluginPhoneAccess('GET', '/v1/p/preview/tasks/abc/proxy/__open-in-editor')).toBe('loopback')
     expect(pluginPhoneAccess('POST', '/v1/p/preview/tasks/abc/proxy/api/run')).toBe('loopback')

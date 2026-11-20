@@ -51,9 +51,10 @@ type PluginRouteOptions = {
   // task-scoped sub-resources. The effective mount is /v1/p/<plugin><prefix>.
   prefix?: string
   note?: string
-  // The writes here that a phone without shell access may make (`PhoneWrite`). Built-in plugins only:
-  // the host drops it for a loaded plugin, whose writes need shell access.
-  phone?: readonly PhoneWrite[]
+  // The writes here that a phone without shell access may make (`PhoneWrite`), or `refused` when no
+  // phone may write here, shell access or not. Built-in plugins only: the host drops it for a loaded
+  // plugin, whose writes need shell access.
+  phone?: readonly PhoneWrite[] | 'refused'
 }
 
 // What a fetch-shaped route handler learns about the caller. The identity projection is plain data, and

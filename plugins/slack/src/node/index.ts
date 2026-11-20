@@ -16,9 +16,10 @@ export const slackPlugin = (): NodePlugin => ({
     let started: Promise<SlackPlugin> | undefined
     const slack = () => (started ??= import('../server/plugin').then(({ startSlack }) => startSlack(ctx)))
     ctx.routes.gateway(async (request) => (await slack()).gateway(request))
+    // No phone may change these, even with shell access: a link with approvals on lets a Slack user in.
     ctx.routes.register(
       lazyRouter(async () => (await slack()).settings),
-      { prefix: '', note: 'Settings → Slack: linking and the approvals choice' },
+      { prefix: '', note: 'Settings → Slack: linking and the approvals choice', phone: 'refused' },
     )
     for (const channel of [
       'plugin:agents:turn-changed',

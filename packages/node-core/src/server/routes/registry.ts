@@ -27,14 +27,14 @@ const PLUGIN_ID_RE = /^[a-z][a-z0-9-]*$/
 // cross the worker boundary (docs/security/plugin-storage-and-supply-chain.md § Design rules).
 // Everything downstream, the mount path, the auth envelope, per-plugin removal, is identical.
 //
-// `phone` names the writes under the mount that a phone without shell access may make, and `loopback`
-// marks a mount that reaches one of this Node's loopback ports. The phone rules read both
-// (../middleware/phoneRules.ts).
+// `phone` names the writes under the mount that a phone without shell access may make, or is `refused`
+// when no phone may write there at all, and `loopback` marks a mount that reaches one of this Node's
+// loopback ports. The phone rules read both (../middleware/phoneRules.ts).
 export type RouteContribution = {
   plugin: string
   prefix: string
   note?: string
-  phone?: readonly PhoneWrite[]
+  phone?: readonly PhoneWrite[] | 'refused'
   loopback?: true
 } & ({ router: Hono<AppEnv>; fetch?: never } | { fetch: PluginFetchHandler; router?: never })
 
@@ -108,16 +108,23 @@ function phonePathPattern(mount: string, path: string): RegExp {
 /**
  * How the phone rules treat a request under a plugin's namespace, for a path already decoded and
  * normalized: `write` when a contribution names it as a phone write, `loopback` when it reaches a loopback
- * mount, which a phone without shell access may only open, and null otherwise.
+ * mount, which a phone without shell access may only open, `refused` for a write under a mount no phone
+ * may write to, and null otherwise.
  */
-export function pluginPhoneAccess(method: string, path: string): 'write' | 'loopback' | null {
+export function pluginPhoneAccess(method: string, path: string): 'write' | 'loopback' | 'refused' | null {
   for (const contribution of registry.list()) {
-    if (!contribution.loopback) continue
+    if (contribution.phone !== 'refused' && !contribution.loopback) continue
     const mount = routeMountPath(contribution)
+    const under = phonePathPattern(mount, '').test(path) || phonePathPattern(mount, '/*').test(path)
+    if (contribution.phone === 'refused') {
+      if (under && PHONE_WRITE_METHODS.includes(method)) return 'refused'
+      continue
+    }
     if (method === 'POST' && phonePathPattern(mount, '/__acorn/open').test(path)) return 'write'
-    if (phonePathPattern(mount, '').test(path) || phonePathPattern(mount, '/*').test(path)) return 'loopback'
+    if (under) return 'loopback'
   }
   for (const contribution of registry.list()) {
+    if (contribution.phone === 'refused') continue
     for (const write of contribution.phone ?? []) {
       const [writeMethod, writePath] = write.split(' ', 2) as [string, string]
       const methods = writeMethod === '*' ? PHONE_WRITE_METHODS : [writeMethod]

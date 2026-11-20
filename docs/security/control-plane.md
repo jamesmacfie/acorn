@@ -82,7 +82,8 @@ website could read what a phone reads and make the writes a phone may make
 ([what a phone device may do](../relay/phone-channel/phone-devices.md#what-a-phone-device-may-do)). They can't run a
 command on a Node, open a terminal, or approve an agent's command, unless the owner gave that phone
 [shell access](../relay/phone-channel/phone-devices.md#shell-access) from a computer. A phone with shell access is a
-terminal on the Node for whoever controls the website.
+terminal on the Node for whoever controls the website. Even so, no phone can sign the Node in or out,
+turn remote access on or off, or change a Slack link or the Slack approvals choice.
 
 Signing out deletes the connection on that Node, turns remote access off first, and revokes every phone's
 device. A phone reaches the Node only through the account, so an owner who signs out of a breached

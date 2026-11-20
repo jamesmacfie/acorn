@@ -32,6 +32,10 @@ No phone may call these routes:
 - Every `POST`, `PUT`, `PATCH`, or `DELETE` under `/v1/core/plugins`, so a plugin write added later is
   refused too.
 - Backup and restore, security settings, `PUT /v1/core/node/reach`, and `POST /v1/core/node/stop`.
+- Every write under `/v1/core/integrations`, and every write under a plugin mount registered with
+  `phone: 'refused'`. The account plugin's sign-in, sign-out, remote access, phone previews, and relay
+  tickets, and the Slack plugin's links and approvals, are refused this way. They decide who else can
+  reach the Node, and a Slack link would outlive the phone. A phone can still read them.
 
 Until a computer gives it [shell access](#shell-access), a phone may also only:
 
@@ -49,7 +53,7 @@ Until a computer gives it [shell access](#shell-access), a phone may also only:
 Everything else needs shell access, including any route added later. That leaves out terminals and their
 input, run targets, task setup and teardown scripts (so making a task runs no setup, and archiving or
 restoring one needs shell access), and config trust. It also leaves out project, workspace, preference,
-schedule, integration, and node provider writes. And it leaves out file edits, Docker actions,
+schedule, and node provider writes. And it leaves out file edits, Docker actions,
 workflow definitions, gates, and retries, agent tools, MCP servers, and custom agents. Every loaded
 plugin's writes need it too, so the Database, API, Linear, and Rollbar panes are read-only on a phone
 without it.

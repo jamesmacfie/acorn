@@ -17,6 +17,7 @@ describe('what no phone may do', () => {
       'Backup and restore',
       'Security settings',
       'Stopping the Node',
+      'Connections',
     ])
   })
 
@@ -48,6 +49,10 @@ describe('what no phone may do', () => {
     ['PUT', '/v1/core/security/secret-publication'],
     ['PUT', '/v1/core/node/reach'],
     ['POST', '/v1/core/node/stop'],
+    ['POST', '/v1/core/integrations'],
+    ['PUT', '/v1/core/integrations/abc'],
+    ['PATCH', '/v1/core/integrations/abc'],
+    ['DELETE', '/v1/core/integrations/abc'],
   ])('refuses %s %s, even with shell access', (method, path) => {
     expect(phoneRefusal(method, path)).toMatch(ADMIN)
     expect(phoneRefusal(method, path, true)).toMatch(ADMIN)
@@ -103,7 +108,6 @@ describe('what a phone may do without shell access', () => {
     ['POST', '/v1/core/schedules'],
     ['POST', '/v1/core/schedules/abc/run'],
     ['POST', '/v1/core/nodes/create'],
-    ['POST', '/v1/core/integrations'],
   ])('refuses %s %s', (method, path) => {
     expect(phoneRefusal(method, path)).toMatch(NEEDS_SHELL)
     expect(phoneRefusal(method, path, true)).toBeNull()
@@ -164,6 +168,20 @@ describe('what a phone may do without shell access', () => {
       expect(phoneRefusal('POST', '/v1/p/other/tasks/abc/notes')).toMatch(NEEDS_SHELL)
     })
 
+    it('refuses every write under a mount registered as refused, even with shell access', () => {
+      release.push(registerRoute({ plugin: 'acme', prefix: '', router, phone: 'refused' }))
+      for (const [method, path] of [
+        ['PUT', '/v1/p/acme/remote-access'],
+        ['POST', '/v1/p/acme/sign-out'],
+        ['DELETE', '/v1/p/ACME/links/abc/'],
+      ]) {
+        expect(phoneRefusal(method, path)).toMatch(ADMIN)
+        expect(phoneRefusal(method, path, true)).toMatch(ADMIN)
+      }
+      expect(phoneRefusal('GET', '/v1/p/acme/state', true)).toBeNull()
+      expect(phoneRefusal('POST', '/v1/p/acmex/anything', true)).toBeNull()
+    })
+
     it('refuses even a read through a loopback mount, apart from opening a preview', () => {
       release.push(registerRoute({ plugin: 'acme', prefix: '/tasks/:taskId/proxy', router, loopback: true }))
       expect(phoneRefusal('GET', '/v1/p/acme/tasks/abc/proxy')).toMatch(NEEDS_SHELL)
@@ -200,6 +218,24 @@ describe('as middleware', () => {
 
   it('lets a phone reach what it may', async () => {
     expect(await (await appFor(phone).request('/v1/core/tasks')).text()).toBe('reached')
+  })
+
+  it('refuses a phone with shell access the settings that decide who can reach the Node', async () => {
+    const granted: Principal = { ...phone, shellAccess: true }
+    const release = registerRoute({ plugin: 'acme', prefix: '', router: new Hono<AppEnv>(), phone: 'refused' })
+    try {
+      for (const [method, path] of [
+        ['PUT', '/v1/p/acme/remote-access'],
+        ['POST', '/v1/core/integrations'],
+      ]) {
+        expect(await refusal(await appFor(granted).request(path, { method }))).toMatchObject({
+          status: 403,
+          body: { error: { code: 'phone_refused' } },
+        })
+      }
+    } finally {
+      release.dispose()
+    }
   })
 
   it('lets a phone with shell access open a terminal', async () => {

@@ -8,6 +8,8 @@ import type { AppEnv } from './auth'
 // the phone. A phone is therefore held to its screens, and a test pins each list:
 //
 // - `PHONE_REFUSED` is refused to every phone: who can get in, which plugins run, and the Node itself.
+//   So is every write under a plugin mount registered with `phone: 'refused'`, such as the account's
+//   sign-in and remote access and Slack's links and approvals.
 // - Until a computer gives it shell access, a phone may only read and make the writes its panes make
 //   that can't run a program on this computer: core's in `PHONE_ALLOWED`, and a plugin's where its route
 //   registration names them (`PhoneWrite`). Anything else needs shell access, including every route
@@ -32,6 +34,8 @@ export const PHONE_REFUSED: readonly PhoneRoute[] = [
   { family: 'Security settings', path: /^\/v1\/core\/security(\/|$)/ },
   { family: 'Security settings', methods: ['PUT'], path: /^\/v1\/core\/node\/reach$/ },
   { family: 'Stopping the Node', methods: ['POST'], path: /^\/v1\/core\/node\/stop$/ },
+  // Connections hold credentials, and the account's is what lets the relay reach this Node.
+  { family: 'Connections', methods: WRITES, path: /^\/v1\/core\/integrations(\/|$)/ },
 ]
 
 // Paths here are in the normalized form `phoneRefusal` matches: decoded and in lower case. Reads
@@ -76,8 +80,9 @@ export function phoneRefusal(method: string, path: string, shellAccess = false):
   const upper = method.toUpperCase()
   const refused = PHONE_REFUSED.find((route) => matches(route, upper, normalized))
   if (refused) return `${refused.family} isn’t available from a phone. Use Acorn on your computer.`
-  if (shellAccess) return null
   const plugin = normalized.startsWith(`${PLUGIN_NAMESPACE}/`) ? pluginPhoneAccess(upper, normalized) : null
+  if (plugin === 'refused') return 'That setting isn’t available from a phone. Use Acorn on your computer.'
+  if (shellAccess) return null
   if (plugin === 'write') return null
   if (plugin === 'loopback' || !PHONE_ALLOWED.some((route) => matches(route, upper, normalized)))
     return PHONE_NEEDS_SHELL

@@ -1,3 +1,52 @@
+> **Completion note, November 21, 2026.** Fixed on the Acorn side, on branch
+> `phase-r-7-phone-rules-cover-plugin-routes-and-the-socket`.
+>
+> R-1 had already closed most of this for a phone without shell access. Its allowlist covers `/v1/p`,
+> the account and Slack plugins name no phone writes, and the event feed drops `term:input` and every
+> `docker:exec:*` frame from such a phone. What R-1 left open was a phone with shell access. It could
+> still sign the Node in or out, turn remote access on or off, ask for relay tickets, change connections,
+> and make a Slack link with approvals on. Those decide who else can reach the Node, so they now refuse
+> every phone.
+>
+> What landed:
+>
+> - A built-in plugin can register a route with `phone: 'refused'`. `pluginPhoneAccess` in
+>   `routes/registry.ts` answers `refused` for any `POST`, `PUT`, `PATCH`, or `DELETE` under that mount,
+>   and `phoneRefusal` refuses it before it looks at shell access. Reads stay open.
+> - The account plugin and the Slack plugin register their settings routes with `phone: 'refused'`. That
+>   covers sign-in, sign-out, remote access, phone previews, relay tickets, Slack link, confirm, unlink,
+>   and approvals, and any write either plugin adds later.
+> - `PHONE_REFUSED` has a new family, `Connections`, for every write under `/v1/core/integrations`.
+> - Tests: `phoneRules.test.ts` covers the connections writes, a fake plugin with `phone: 'refused'`, and
+>   the middleware's `403 phone_refused` for a phone with shell access.
+>   `apps/node/test/integration/auth/phoneRoutes.test.ts` checks the real account and Slack routes,
+>   including the four the verification section names.
+> - Docs: `relay/phone-channel/phone-devices.md` lists the refused writes, and `security/control-plane.md`
+>   says a phone with shell access still can't change them.
+>
+> Decisions and deviations:
+>
+> - I didn't refuse `EXECUTION_ROUTES` to every phone. R-1 chose a per-phone shell grant for those, and a
+>   phone with shell access is meant to run commands.
+> - The socket needed no change. R-1 carries `phoneWithoutShell` from `authorizeWsUpgrade` onto the
+>   connection and drops shell frames in `wsViewerDispatch.ts`. Its test is in `wsHub.test.ts`, not
+>   `wsHubSecurity.test.ts`. No socket frame reaches anything `PHONE_REFUSED` covers. A phone with shell
+>   access typing into a terminal is what the grant is for.
+> - A phone with shell access can no longer sign out, which R-4 and R-5 describe it doing. It still
+>   reads every setting.
+> - The integration test calls `pluginPhoneAccess` only, because node-core is at its 70-export cap and
+>   `phoneRules` isn't exported.
+> - The Node service bundle grows by 295 B, from 1,971,928 B to 1,972,223 B.
+> - I didn't run the live check with a paired phone.
+>
+> For later phases: a built-in plugin whose writes decide who can reach the Node should register with
+> `phone: 'refused'`. A loaded plugin can't, because the host drops `phone` for it, and its writes need
+> shell access anyway.
+>
+> What acorn-cloud would still need: the Slack link page (`acorn-cloud:src/slack/gateway.ts`) asks for the
+> link's code and no account session. A link started from a computer can still be finished by whoever
+> sees that code. X-1's confirmation step on a paired device limits this on the Acorn side.
+
 # R-7: The phone's refusal list skips plugin routes and the event socket
 
 Found November 20, 2026, in a read-only security review of `jamesmacfie/acorn` at `31ff472da` and
