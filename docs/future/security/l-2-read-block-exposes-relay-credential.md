@@ -80,6 +80,8 @@ Do the first one before the preview routes ship.
 ## Related
 
 - [L-1](./l-1-loaded-plugin-makes-trusted-projects.md), the other local finding.
+- [R-6](./r-6-previews-put-the-cloud-inside-tls.md): the Node's preview code exists at `31ff472da`, so
+  the condition above for medium is met once an account service serves previews.
 - The Node's remote access findings: [R-1](./r-1-account-website-runs-code-through-a-phone.md),
   [R-2](./r-2-account-service-relays-a-pairing-and-keeps-the-token.md),
   [X-1](./x-1-account-takeover-to-slack-agent-turns.md), [R-4](./r-4-sign-out-leaves-phones-paired.md),
