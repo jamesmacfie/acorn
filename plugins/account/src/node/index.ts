@@ -11,7 +11,8 @@ export const accountPlugin = (): NodePlugin => ({
   init: (ctx) => {
     ctx.providers.connection(accountProvider())
     ctx.capabilities.provide(ACCOUNT_SERVICE, {
-      fetch: async (path, init) => (await import('../server/service')).serviceFetch(ctx, path, init),
+      slackGateway: async (request) => (await import('../server/service')).slackGatewayFetch(ctx, request),
+      nodes: async () => (await import('../server/service')).serviceNodes(ctx),
       url: async (path) => (await import('../server/service')).serviceUrl(path),
     })
     ctx.routes.register(

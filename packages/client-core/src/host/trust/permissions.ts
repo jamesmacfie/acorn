@@ -35,6 +35,7 @@ import {
   pluginWebviewGrants,
 } from '@acorn/protocol/plugin/grants.ts'
 import { describeCadence } from '@acorn/protocol/schedules.ts'
+import type { LoadedPluginCapabilityId } from '@acorn/protocol/plugin/ids.ts'
 import { DATA_FEED_LIMITS } from '@acorn/protocol/eventFeeds.ts'
 import { formatChord } from '../../features/tasks/paneShortcuts'
 import { describeChannel } from '../frames/channels'
@@ -108,9 +109,11 @@ const NODE_CORE_DESCRIPTIONS: Readonly<Record<string, GrantDescription>> = {
   },
 }
 
-// The capabilities that act on something the owner is doing rather than read it, in the host's words.
-// Any other id keeps the generic line.
-const CAPABILITY_DESCRIPTIONS: Readonly<Record<string, GrantDescription>> = {
+// Every capability acorn's own plugins publish to loaded plugins, in the host's words. The record type
+// makes a newly published id a compile error until it has a sentence here. A built-in's other
+// capabilities are refused to a loaded plugin, so an id missing from this table can only be another
+// installed plugin's, whose own prompt said what it can do.
+const CAPABILITY_DESCRIPTIONS: Readonly<Record<LoadedPluginCapabilityId, GrantDescription>> = {
   'agents.sessionExecute': {
     text: 'Run turns in your agent sessions, which spends their usage and lets them act in the task',
     icon: 'bot',
@@ -122,7 +125,40 @@ const CAPABILITY_DESCRIPTIONS: Readonly<Record<string, GrantDescription>> = {
     icon: 'sliders-horizontal',
     high: true,
   },
+  'agents.turns': { text: 'See when your agent sessions’ turns start and finish, without their messages', icon: 'bot' },
+  'agents.requests': { text: 'See the questions and approvals your agent sessions are waiting on', icon: 'bot' },
+  'agents.sessions': { text: 'See each task’s agent sessions', icon: 'bot' },
+  'agents.reviewInput.v1': {
+    text: 'Read a finished turn’s message, its context, and the agent’s reply',
+    icon: 'messages-square',
+    high: true,
+  },
+  'agents.activity.v1': {
+    text: 'See which tools and subagents your agent sessions use, without their input or output',
+    icon: 'activity',
+  },
+  'agents.draftAttachments': {
+    text: 'Read and change the images in a message you haven’t sent yet',
+    icon: 'image',
+  },
+  'agents.transcriptMedia': { text: 'Read the files and images your agent sessions sent or made', icon: 'image' },
+  'editor.files': { text: 'Read files in your task worktrees', icon: 'file-text' },
+  'browser.captures': { text: 'See which browser captures a task kept', icon: 'image' },
+  'github.mirror': {
+    text: 'Read the GitHub repositories and pull requests acorn keeps for you, including private ones',
+    icon: 'git-pull-request',
+    high: true,
+  },
+  'memory.library': { text: 'Read your saved project and private memories', icon: 'brain', high: true },
+  'preview.urls': { text: 'See each task’s preview address', icon: 'globe' },
+  'workflows.gates': { text: 'See which workflow steps are waiting for your approval', icon: 'list-checks' },
 }
+
+const describeCapability = (id: string): GrantDescription =>
+  (CAPABILITY_DESCRIPTIONS as Readonly<Record<string, GrantDescription>>)[id] ?? {
+    text: `Use capability ${id} from another installed plugin`,
+    icon: 'puzzle',
+  }
 
 // One line for everything this acorn could not name.
 //
@@ -179,9 +215,7 @@ export const nodePermissionLines = (permissions: NodePluginPermissions): Permiss
       }),
     ),
     ...core,
-    ...permissions.node.capabilities.map((id) =>
-      line(`node.capability:${id}`, CAPABILITY_DESCRIPTIONS[id] ?? { text: `Use capability ${id}`, icon: 'puzzle' }),
-    ),
+    ...permissions.node.capabilities.map((id) => line(`node.capability:${id}`, describeCapability(id))),
     ...(ignored ? [ignoredLine('node.ignored', ignored, 'node permission')] : []),
   ]
 }

@@ -6,10 +6,11 @@ import type { PrefService } from '../core/prefs'
 import type { ProjectService } from '../core/projectRefs'
 import { dataSourceFor } from '../core/data'
 import type { CapabilityId, CapabilityRegistry } from '../pluginHost/capabilities'
+import type { PluginCapabilities } from '../pluginHost/types'
 import { codeHostFor } from '../pluginHost/codeHosts'
 import type { NodePermissions } from './manifest'
 import { MAX_PLUGIN_STATE_BYTES, pluginStateKey } from '@acorn/protocol/plugin/state.ts'
-import { BIND_CAPABILITY_CALLER } from '@acorn/protocol/plugin/ids.ts'
+import { BIND_CAPABILITY_CALLER, LOADED_PLUGIN_CAPABILITY_IDS } from '@acorn/protocol/plugin/ids.ts'
 import { connectionProviderRegistry } from '../integrations/connectionProviders/registry'
 import { SIMPLE_FACETS } from './coreFacets'
 export { NODE_CORE_FACETS } from './coreFacets'
@@ -183,25 +184,32 @@ const boundToCaller = <T>(impl: T | undefined, pluginId: string): T | undefined 
   (impl as { [BIND_CAPABILITY_CALLER]?: (caller: string) => T } | undefined)?.[BIND_CAPABILITY_CALLER]?.(pluginId) ??
   impl
 
+// A loaded plugin resolves a capability only when its manifest declared the id and the id is either
+// one acorn publishes to loaded plugins or one another loaded plugin provided. A built-in's other
+// capabilities read as absent whatever the manifest says, because they act with authority the trust
+// prompt can't describe, such as starting a process or borrowing the owner's account sign-in.
+const PUBLISHED: ReadonlySet<string> = new Set(LOADED_PLUGIN_CAPABILITY_IDS)
+
 export function scopeCapabilities(
   registry: CapabilityRegistry,
   declared: readonly string[],
   pluginId: string,
-): Pick<CapabilityRegistry, 'provide' | 'get' | 'require' | 'ids'> {
-  const allowed = new Set(declared)
+): PluginCapabilities {
+  const allowed = (id: string) => declared.includes(id) && (PUBLISHED.has(id) || registry.providedByLoadedPlugin(id))
+  const resolve = <T>(id: CapabilityId<T>) => (allowed(id) ? boundToCaller(registry.get(id), pluginId) : undefined)
   return {
     provide: (id, impl) => {
       if (!id.startsWith(`${pluginId}.`) && !HOST_OWNED_CAPABILITY_IDS.includes(id)) {
         throw new Error(`plugin '${pluginId}' may only provide capabilities under '${pluginId}.', not '${id}'`)
       }
-      return registry.provide(id, impl)
+      return registry.provide(id, impl, 'loaded')
     },
-    get: <T>(id: CapabilityId<T>) => (allowed.has(id) ? boundToCaller(registry.get(id), pluginId) : undefined),
+    get: resolve,
     require: <T>(id: CapabilityId<T>): T => {
-      const impl = allowed.has(id) ? boundToCaller(registry.get(id), pluginId) : undefined
+      const impl = resolve(id)
       if (impl === undefined) throw new Error(`Required capability not provided: ${id}`)
       return impl
     },
-    ids: () => registry.ids().filter((id) => allowed.has(id)),
+    ids: () => registry.ids().filter(allowed),
   }
 }

@@ -1,6 +1,5 @@
 import { Hono } from 'hono'
 import { z } from 'zod'
-import { accountPaths, listNodesResponseSchema } from '@acorn/protocol/account.ts'
 import { type AppEnv, readNodeRelay, requireDevice, respondError } from '@acorn/plugin-api/node'
 import { AccountNotSignedInError, type AccountService } from '@acorn/plugin-account/contract/service.ts'
 import type { SlackState } from '../shared/state'
@@ -60,10 +59,7 @@ export function settingsRoutes(deps: {
         // Another Node's label, for "Slack work goes to Mac Studio".
         const labels = new Map<string, string>()
         if (links.some((link) => link.nodeId !== c.env.NODE_ID)) {
-          const listed = listNodesResponseSchema.safeParse(
-            await (await service.fetch(accountPaths.nodes)).json().catch(() => null),
-          )
-          for (const node of listed.success ? listed.data.nodes : []) labels.set(node.nodeId, node.label)
+          for (const node of await service.nodes().catch(() => [])) labels.set(node.nodeId, node.label)
         }
         return c.json({
           signedIn: true,

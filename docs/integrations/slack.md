@@ -26,7 +26,8 @@ Slack ◄──Web API── the gateway ◄──POST /slack/v1/calls── plu
 The gateway answers Slack, finds the Node, and posts the event through the relay to the Node's
 [gateway route](../authentication/gateway-routes.md). The plugin answers at once and does the work
 after, in order. To answer, it asks the gateway to make a Slack call, through the account plugin's
-`account.service` capability.
+`account.service` capability. That capability sends the owner's access token only to the gateway's
+Node routes on the configured account origin, and refuses redirects. Loaded plugins can't resolve it.
 
 | Slack | Acorn |
 | --- | --- |

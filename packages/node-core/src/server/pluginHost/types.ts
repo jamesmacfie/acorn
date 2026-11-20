@@ -21,7 +21,7 @@ import type { PluginSkillRegistry } from './skills'
 import type { TaskCheck } from './taskChecks'
 import type { SearchProvider } from './search'
 import type { AppEnv, Principal } from '../middleware/auth'
-import type { CapabilityRegistry, Disposable } from './capabilities'
+import type { CapabilityId, CapabilityRegistry, Disposable } from './capabilities'
 import type { StreamHandlers, WsChannelHandler } from '../transport/wsHub'
 import type { WsServerFrame } from '@acorn/protocol/ws.ts'
 import type { NodeEventChannel } from '@acorn/protocol/nodeEvents.ts'
@@ -418,7 +418,10 @@ export type CompiledPluginBroadcast = PluginBroadcast & {
 
 // The registry as plugins may use it. Structural rather than the class itself, because a loaded plugin
 // receives a filtered wrapper (server/plugins/permissions.ts).
-type PluginCapabilities = Pick<CapabilityRegistry, 'provide' | 'get' | 'require' | 'ids'>
+// The registry's `provide` without its `from` argument: the host decides which tier a provider is.
+export type PluginCapabilities = Pick<CapabilityRegistry, 'get' | 'require' | 'ids'> & {
+  provide<T>(id: CapabilityId<T>, impl: T): Disposable
+}
 
 // Host-bound storage, for both tiers. The host binds the database filename to the plugin id. A loaded
 // plugin opens and migrates that exact file inside its isolated realm; a built-in does so in the host.

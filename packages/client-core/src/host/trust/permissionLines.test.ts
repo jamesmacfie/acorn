@@ -61,18 +61,18 @@ describe('the two permission groups', () => {
       'Run commands on the node',
       'Open unrestricted network connections',
       'Reach ntfy.sh',
-      'Use capability docker.compose',
+      'Use capability docker.compose from another installed plugin',
       '1 node permission request this version of acorn does not recognise (ignored)',
     ])
     expect(texts(uiPermissionLines(all))).toEqual(['Read tasks', 'Receive task archive events'])
   })
 
-  it('names session control in the host’s words, as high, and keeps other capabilities generic', () => {
+  it('names every capability acorn publishes in its own words, and any other as another plugin’s', () => {
     const lines = nodePermissionLines(
       permissions({
         node: {
           core: [],
-          capabilities: ['agents.sessionControl', 'agents.activity.v1'],
+          capabilities: ['agents.sessionControl', 'agents.activity.v1', 'memory.library', 'acme-data.deploys'],
           secrets: false,
           exec: false,
           net: [],
@@ -85,7 +85,9 @@ describe('the two permission groups', () => {
         text: 'Stop your agent sessions’ turns, and change their model, reasoning effort, and other options, which changes what they spend',
         high: true,
       },
-      { text: 'Use capability agents.activity.v1', high: false },
+      { text: 'See which tools and subagents your agent sessions use, without their input or output', high: false },
+      { text: 'Read your saved project and private memories', high: true },
+      { text: 'Use capability acme-data.deploys from another installed plugin', high: false },
     ])
   })
 

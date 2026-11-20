@@ -10,7 +10,7 @@ import {
   type SlackGatewayError as GatewayRefusalBody,
   type SlackLink,
 } from '@acorn/protocol/account.ts'
-import type { AccountService } from '@acorn/plugin-account/contract/service.ts'
+import type { AccountService, SlackGatewayRequest } from '@acorn/plugin-account/contract/service.ts'
 
 // The hosted Slack gateway as this Node calls it (docs/account-api/slack-gateway.md § Calls from a Node),
 // through the account plugin's sign-in. The Node holds no Slack token: each Slack call is the gateway's,
@@ -37,13 +37,13 @@ export type SlackGateway = {
 }
 
 export function slackGateway(service: AccountService): SlackGateway {
-  async function request<S extends z.ZodType>(method: string, path: string, schema: S, body?: unknown) {
-    const response = await service.fetch(path, {
-      method,
-      headers: { 'content-type': 'application/json' },
-      ...(body === undefined ? {} : { body: JSON.stringify(body) }),
-      signal: AbortSignal.timeout(15_000),
-    })
+  async function request<S extends z.ZodType>(
+    method: SlackGatewayRequest['method'],
+    path: string,
+    schema: S,
+    body?: unknown,
+  ) {
+    const response = await service.slackGateway({ method, path, body, signal: AbortSignal.timeout(15_000) })
     const json: unknown = response.status === 204 ? undefined : await response.json().catch(() => undefined)
     if (!response.ok) {
       const refusal = slackGatewayErrorSchema.safeParse(json)

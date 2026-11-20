@@ -41,6 +41,16 @@ real constants.
 A capability a manifest didn't grant reads as absent through `get`, the same as a disabled provider.
 `require` throws.
 
+A loaded plugin resolves a built-in plugin's capability only when its id is in
+`LOADED_PLUGIN_CAPABILITY_IDS` (`packages/protocol/src/plugin/ids.ts`). It resolves an id another
+loaded plugin provided by declaring it. Every other built-in capability reads as absent to a loaded
+plugin, whatever its manifest says. That covers `terminal.sessions`, `terminal.sendToAgent`, and
+`terminal.runTargets`, which start processes as the Node's owner, and `account.service`, which carries
+the owner's account sign-in. The trust prompt describes every published id in its own words
+(`packages/client-core/src/host/trust/permissions.ts`), so a new published id needs a sentence there.
+A capability that acts for the owner, such as `agents.sessionExecute`, gets the caller bound as the
+next paragraph says.
+
 A provider that has to know which plugin called sets a function under `BIND_CAPABILITY_CALLER` from
 `@acorn/protocol/plugin/ids.ts`. A loaded plugin's `get` then returns that function's result for the
 plugin's own id, so the caller never names itself. `agents.sessionControl` uses it to name the plugin
@@ -48,8 +58,9 @@ that changed a session's model, and `agents.sessionExecute` to name the plugin t
 ([session control](../managed-agents/session-control.md#who-called)).
 
 `CapabilityCatalogue` in `acorn-plugin-types` lists every id the first-party plugins publish, with its
-signature. Most ids are declared in `plugins/*/src/contract/` modules a loaded plugin can't import, so
-the catalogue is how an outside author learns what exists.
+signature. The private ones are marked deprecated there, and its `contract.test.ts` holds the rest to
+`LOADED_PLUGIN_CAPABILITY_IDS`. Most ids are declared in `plugins/*/src/contract/` modules a loaded
+plugin can't import, so the catalogue is how an outside author learns what exists.
 
 ## Client capabilities
 

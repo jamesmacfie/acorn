@@ -12,6 +12,7 @@ import type { ExternalItemStore } from '@acorn/node-core/server/integrations'
 import type { CapabilityId } from '@acorn/node-core/server/pluginHost/capabilities.ts'
 import type { ModelProviderAdapter } from '@acorn/node-core/server/modelProviders'
 import type * as Published from './public.ts'
+import type { LoadedPluginCapabilityId } from '@acorn/protocol/plugin/ids.ts'
 import type { DataValue, VersionedDataValue } from '@acorn/protocol/dataValues.ts'
 import type { DataSchema } from '@acorn/protocol/dataSchemas.ts'
 import type { DataBinding, DataField, DataPredicate } from '@acorn/protocol/dataBindings.ts'
@@ -243,39 +244,23 @@ it('leaves most of the surface compared, not substituted', () => {
   expect(published.length - HOLES.context.length).toBe(13)
 })
 
-it('names every capability the first-party plugins publish', () => {
-  // The discovery half of the capability work: these ids are declared in
-  // `plugins/*/src/contract/` modules a loaded plugin cannot import.
-  const ids: Array<keyof Published.CapabilityCatalogue> = [
-    'agents.sessionExecute',
-    'agents.sessionControl',
-    'agents.profiles',
-    'agents.runtime',
-    'agents.turns',
-    'agents.requests',
-    'agents.sessions',
-    'agents.reviewInput.v1',
-    'agents.activity.v1',
-    'agents.draftAttachments',
-    'agents.transcriptMedia',
-    'agents.harnessRegistry',
-    'core.taskWorktreeCreated',
-    'editor.files',
-    'terminal.sessions',
-    'terminal.sendToAgent',
-    'terminal.runTargets',
-    'notes.store',
-    'notes.seedTask',
-    'memory.library',
-    'browser.captures',
-    'github.mirror',
-    'preview.urls',
-    'workflows.runner',
-    'workflows.gates',
-    'workflows.notices',
-  ]
-  expect(new Set(ids).size).toBe(26)
-})
+// The catalogue's ids, less the ones marked private, are the host's list of what a loaded plugin may
+// resolve (LOADED_PLUGIN_CAPABILITY_IDS). A new catalogue id is published or named private here.
+type PrivateCatalogueId =
+  | 'agents.runtime'
+  | 'agents.harnessRegistry'
+  | 'core.taskWorktreeCreated'
+  | 'terminal.sessions'
+  | 'terminal.sendToAgent'
+  | 'terminal.runTargets'
+  | 'notes.store'
+  | 'notes.seedTask'
+  | 'workflows.runner'
+  | 'workflows.notices'
+const _catalogue: Mutual<Exclude<keyof Published.CapabilityCatalogue, PrivateCatalogueId>, LoadedPluginCapabilityId> = [
+  true,
+  true,
+]
 
 it('keeps every published declaration module free of runtime statements', () => {
   const src = dirname(fileURLToPath(import.meta.url))

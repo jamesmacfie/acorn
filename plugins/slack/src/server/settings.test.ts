@@ -43,10 +43,10 @@ const newStore = () => slackStore(makeTestNodeContext({ plugin: { name: 'slack' 
 /** Settings → Slack's routes on a device's request, with the gateway reporting `links`. */
 function settings(links: () => Promise<SlackLink[]>, store = newStore()) {
   const service = {
-    fetch: async () =>
-      Response.json({
-        nodes: [{ nodeId: OTHER_NODE, label: 'Mac Studio', fingerprint: 'a'.repeat(64), relayUrl: 'wss://relay.test' }],
-      }),
+    slackGateway: async () => Response.json({}),
+    nodes: async () => [
+      { nodeId: OTHER_NODE, label: 'Mac Studio', fingerprint: 'a'.repeat(64), relayUrl: 'wss://relay.test' },
+    ],
     url: async () => '',
   }
   const routes = settingsRoutes({

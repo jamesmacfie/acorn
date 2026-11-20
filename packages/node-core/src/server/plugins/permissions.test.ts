@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from 'vitest'
 import { MAX_PLUGIN_STATE_BYTES } from '@acorn/protocol/plugin/state.ts'
 import { CapabilityRegistry, capabilityId } from '../pluginHost/capabilities'
+import { LOADED_PLUGIN_CAPABILITY_IDS } from '@acorn/protocol/plugin/ids.ts'
 import { AGENTS_HARNESS_REGISTRY } from '../pluginHost/harnesses'
 import type { CoreServices } from '../core'
 import { pluginManifestSchema, type NodePermissions } from './manifest'
@@ -313,10 +314,12 @@ describe('scopeCapabilities', () => {
   const greet = capabilityId<() => string>('test.greet')
   const other = capabilityId<() => string>('test.other')
 
+  // Both provided by a loaded plugin, which another loaded plugin resolves by declaring.
   const registry = () => {
     const real = new CapabilityRegistry()
-    real.provide(greet, () => 'hi')
-    real.provide(other, () => 'nope')
+    const provider = scopeCapabilities(real, [], 'test')
+    provider.provide(greet, () => 'hi')
+    provider.provide(other, () => 'nope')
     return real
   }
 
@@ -361,6 +364,34 @@ describe('scopeCapabilities', () => {
     for (const id of HOST_OWNED_CAPABILITY_IDS) {
       expect(() => scopeCapabilities(real, [], 'ntfy').provide(capabilityId(id), () => 'ok')).not.toThrow()
     }
+  })
+
+  it("reads a built-in's capability as absent unless acorn publishes it to loaded plugins", () => {
+    const real = new CapabilityRegistry()
+    const sessions = capabilityId<{ spawn(): void }>('terminal.sessions')
+    const profiles = capabilityId<{ list(): string[] }>('agents.profiles')
+    real.provide(sessions, { spawn: () => {} })
+    real.provide(profiles, { list: () => [] })
+    const scoped = scopeCapabilities(real, ['terminal.sessions', 'agents.profiles'], 'ntfy')
+    expect(scoped.get(sessions)).toBeUndefined()
+    expect(() => scoped.require(sessions)).toThrow(/Required capability/)
+    expect(scoped.get(profiles)).toBeDefined()
+    expect(scoped.ids()).toEqual(['agents.profiles'])
+  })
+
+  it('forgets that a loaded plugin provided an id once it disposes it', () => {
+    const real = new CapabilityRegistry()
+    const mine = capabilityId<() => string>('test.mine')
+    scopeCapabilities(real, [], 'test')
+      .provide(mine, () => 'loaded')
+      .dispose()
+    real.provide(mine, () => 'compiled')
+    expect(scopeCapabilities(real, ['test.mine'], 'other').get(mine)).toBeUndefined()
+  })
+
+  it('publishes none of the capabilities that start processes or carry the account sign-in', () => {
+    for (const id of ['terminal.sessions', 'terminal.sendToAgent', 'terminal.runTargets', 'account.service'])
+      expect(LOADED_PLUGIN_CAPABILITY_IDS).not.toContain(id)
   })
 
   it('names the same host-owned capability the host actually declares', () => {

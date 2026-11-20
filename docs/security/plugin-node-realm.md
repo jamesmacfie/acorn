@@ -18,7 +18,9 @@ pinned in `node-runtime.json`.
 ## Rung 1: permission-shaped context
 
 The host builds a loaded plugin's `NodePluginContext` from its manifest's `permissions.node` block. An
-undeclared capability id returns `undefined` from `capabilities.get`. An undeclared `CoreServices`
+undeclared capability id returns `undefined` from `capabilities.get`, and so does a built-in plugin's
+capability that acorn doesn't publish to loaded plugins, such as terminal sessions or the account
+service ([capability ids](../plugins/collaboration.md#capability-ids)). An undeclared `CoreServices`
 facet is absent from `ctx.core`. `secrets` and `exec`, the process broker, are gated one by one and
 off by default. `ctx.events.streams()` and `channel()` are never present for a loaded plugin. Built-ins
 keep the full context.

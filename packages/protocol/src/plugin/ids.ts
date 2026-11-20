@@ -21,3 +21,29 @@ export type ExtensionPointId<T> = string & { readonly __entry?: (value: T) => vo
 /** `<ownerPluginId>:<pointId>`, the same shape the client's points take. The owner half is checked
  *  against the declaring plugin at `open`, so a package cannot open a point under a stranger's name. */
 export const extensionPointId = <T>(id: string): ExtensionPointId<T> => id as ExtensionPointId<T>
+
+/** The capabilities acorn's own plugins publish to loaded plugins. A loaded plugin resolves a
+ *  capability another loaded plugin provides by declaring it, but a built-in plugin's capability only
+ *  when its id is here. The rest stay private to compiled code: terminal sessions and run targets start
+ *  processes as the Node's owner, and the account service carries the owner's sign-in. The trust
+ *  prompt describes each id here in its own words (docs/plugins/collaboration.md § Capability ids). */
+export const LOADED_PLUGIN_CAPABILITY_IDS = [
+  'agents.sessionExecute',
+  'agents.sessionControl',
+  'agents.profiles',
+  'agents.turns',
+  'agents.requests',
+  'agents.sessions',
+  'agents.reviewInput.v1',
+  'agents.activity.v1',
+  'agents.draftAttachments',
+  'agents.transcriptMedia',
+  'editor.files',
+  'browser.captures',
+  'github.mirror',
+  'memory.library',
+  'preview.urls',
+  'workflows.gates',
+] as const
+
+export type LoadedPluginCapabilityId = (typeof LOADED_PLUGIN_CAPABILITY_IDS)[number]

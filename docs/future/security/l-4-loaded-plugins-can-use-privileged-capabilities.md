@@ -1,3 +1,55 @@
+> **Completion note, November 20, 2026.** Fixed on the Acorn side, on branch
+> `phase-l-4-loaded-plugins-lose-privileged-capabilities`.
+>
+> What landed:
+>
+> - `LOADED_PLUGIN_CAPABILITY_IDS` in `packages/protocol/src/plugin/ids.ts` is the explicit list of
+>   built-in capabilities a loaded plugin may resolve. `scopeCapabilities` resolves a declared id only
+>   when it's on that list or another loaded plugin provided it. `CapabilityRegistry.provide` records
+>   which ids a loaded plugin provided, and `dispose` clears the record. Every other built-in id reads
+>   as absent through `get` and `ids`, and `require` throws. That covers `terminal.sessions`,
+>   `terminal.sendToAgent`, `terminal.runTargets`, `account.service`, `agents.harnessRegistry`,
+>   `agents.requestAnswer`, `database.query`, and the internal reconcile hooks.
+> - The trust prompt has a sentence for every published id. Its table is typed as a record over the
+>   list, so publishing an id without a sentence fails the build. Reads of message text, memories,
+>   and the GitHub mirror are marked high. An id off the list reads "Use capability X from another
+>   installed plugin", because only another loaded plugin can supply one.
+> - `account.service` has no generic `fetch`. It offers `slackGateway({ method, path, body, signal })`,
+>   `nodes()`, and `url(path)`. `slackGateway` checks the path before it borrows the token: it must
+>   resolve on the configured account origin, parse back to the same path, and match one of the Slack
+>   gateway's Node routes. The request goes out with `redirect: 'error'`. The Slack plugin uses these
+>   methods.
+> - `apps/node/test/integration/pluginSystem/loadedCapabilities.test.ts` boots the real account plugin,
+>   a built-in stand-in under the real terminal ids, and two loaded plugins through `initPlugins`. A
+>   loaded plugin that declares all four private ids resolves none of them, and no stand-in or network
+>   call runs. A published id and another loaded plugin's id still resolve. The test fails with the
+>   check removed. `plugins/account/src/server/service.test.ts` uses a fake `fetch` to show that seven
+>   refused destinations borrow no token and send nothing. These include another origin, `//host`,
+>   relay tickets, a `..` path, and a query string.
+>
+> Decisions and deviations:
+>
+> - The public list is the old catalogue less what starts processes, carries a credential, writes
+>   into another plugin's state, or is a host-internal hook. The reads behind the event table in
+>   `docs/plugins/events.md` stay public, as do `agents.draftAttachments` and the two caller-bound
+>   agent capabilities. `notes.store` is private because it writes notes that agents read.
+> - I didn't raise `PLUGIN_API_MAJOR`. Doing so would stop every installed plugin from loading. The ten
+>   private ids stay in `CapabilityCatalogue`, marked `@deprecated` as private, so the published
+>   surface snapshot is unchanged. Most were `HostOwned`, so their shape was never promised. A loaded
+>   plugin that used one gets `undefined` from `get`, or an init failure on its roster row from
+>   `require`. `contract.test.ts` holds the catalogue, less the named private ids, to the host's list.
+> - Only `agents.sessionExecute` and `agents.sessionControl` act for the owner, and both were already
+>   caller-bound. I didn't bind the read capabilities or `agents.draftAttachments`, whose change shows
+>   in the composer before the person sends.
+> - A loaded plugin can still fill `agents.harnessRegistry`, and another loaded plugin that declares it
+>   then resolves it. That was outside this finding.
+>
+> For later phases: `apps/relay/src/slackGateway.test.ts` fails two cases, the mention and the
+> non-owner `/acorn` note, on this branch and on its base `f1527a029`. The test never confirms the
+> Slack link, which X-1 made mandatory. Nothing here caused it.
+>
+> What acorn-cloud would still need: nothing. The gateway routes and the nodes list are unchanged.
+
 # L-4. Loaded plugins can use privileged host capabilities
 
 Found November 20, 2026, in Acorn at `90b9e61e3`. Severity is high. The missing capability

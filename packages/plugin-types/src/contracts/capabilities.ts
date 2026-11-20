@@ -28,7 +28,8 @@ export type CapabilityId<T> = string & { readonly __signature?: (value: T) => vo
  *
  * An id you provide must start with `<yourPluginId>.`, the same binding the host applies to your
  * routes, schedules and data sources. An id you did not declare in `permissions.node.capabilities`
- * reads as absent, exactly as if the plugin providing it were disabled. */
+ * reads as absent, exactly as if the plugin providing it were disabled. So does a first-party id
+ * marked deprecated in `CapabilityCatalogue`. */
 export type PluginCapabilities = {
   provide<T>(id: CapabilityId<T>, impl: T): Disposable
   get<T>(id: CapabilityId<T>): T | undefined
@@ -38,7 +39,9 @@ export type PluginCapabilities = {
 }
 // ── The capability id catalogue ───────────────────────────────────────────────────────────────────
 
-/** Every capability the first-party plugins publish, with its signature.
+/** Every capability the first-party plugins publish, with its signature. A loaded plugin can resolve
+ *  only the ones not marked deprecated. The deprecated ones, such as terminal sessions, are private to
+ *  acorn's own plugins and read as absent whatever a manifest declares.
  *
  * These are declared in `plugins/*​/src/contract/` modules a loaded plugin cannot import,
  * which is why the catalogue is here. Consuming one means naming its id in
@@ -47,11 +50,11 @@ export type PluginCapabilities = {
  * degrade around it.
  *
  * A map rather than exported constants, because this package has no runtime: an `import
- * { NOTES_STORE }` that resolved to nothing at run time would be a worse trap than a cast. Write the
+ * { EDITOR_FILES }` that resolved to nothing at run time would be a worse trap than a cast. Write the
  * one line the cast needs and keep it beside your other ids:
  *
- *     const NOTES_STORE = 'notes.store' as CapabilityIdOf<'notes.store'>
- *     const notes = ctx.capabilities.get(NOTES_STORE)
+ *     const EDITOR_FILES = 'editor.files' as CapabilityIdOf<'editor.files'>
+ *     const files = ctx.capabilities.get(EDITOR_FILES)
  *
  * The signature is the call acorn promises; each provider's contract module holds the rest. */
 export type CapabilityCatalogue = {
@@ -63,7 +66,8 @@ export type CapabilityCatalogue = {
   /** Stop a session's turn, or pick one of the values its harness advertised for an option such as the
    *  model or reasoning effort. The host binds your plugin id, which the transcript names. */
   'agents.sessionControl': AgentSessionControl
-  /** Ask the agent runtime to reconcile after a restart. */
+  /** Ask the agent runtime to reconcile after a restart.
+   *  @deprecated Private to acorn's own plugins. Reads as absent to a loaded plugin. */
   'agents.runtime': { reconcile(): Promise<void> }
   /** Read durable turn lifecycle state within one task, without prompt or transcript content. */
   'agents.turns': HostOwned<'plugins/agents/contract/lifecycle.AgentTurnsCapability'>
@@ -83,21 +87,28 @@ export type CapabilityCatalogue = {
   /** Read one attachment a session's turn sent, or one artifact it produced, after the agents plugin
    *  checks it belongs to that session and task. Read-only, capped at 12 MiB, never a path. */
   'agents.transcriptMedia': TranscriptMediaCapability
-  /** The host-declared slot whichever plugin owns agent sessions fills. */
+  /** The host-declared slot whichever plugin owns agent sessions fills.
+   *  @deprecated Private to acorn's own plugins. Reads as absent to a loaded plugin. */
   'agents.harnessRegistry': HostOwned<'node-core/server/plugin/harnesses.HarnessRegistry'>
-  /** The host-declared hook fired when a task's worktree first exists. */
+  /** The host-declared hook fired when a task's worktree first exists.
+   *  @deprecated Private to acorn's own plugins. Reads as absent to a loaded plugin. */
   'core.taskWorktreeCreated': (taskId: string, worktreePath: string) => void | Promise<void>
   /** Read one file of a task's worktree as bytes, confined to the worktree and capped at 12 MiB. */
   'editor.files': EditorFilesCapability
-  /** Read and steer this node's terminal sessions. */
+  /** Read and steer this node's terminal sessions.
+   *  @deprecated Private to acorn's own plugins. Reads as absent to a loaded plugin. */
   'terminal.sessions': HostOwned<'plugins/terminal/contract/sessions.TerminalSessions'>
-  /** Push text into a running agent session's PTY. */
+  /** Push text into a running agent session's PTY.
+   *  @deprecated Private to acorn's own plugins. Reads as absent to a loaded plugin. */
   'terminal.sendToAgent': HostOwned<'plugins/terminal/contract/sendToAgent.TerminalSendToAgent'>
-  /** Start, stop and inspect a task's run targets. */
+  /** Start, stop and inspect a task's run targets.
+   *  @deprecated Private to acorn's own plugins. Reads as absent to a loaded plugin. */
   'terminal.runTargets': HostOwned<'plugins/terminal/contract/runTargets.TerminalRunTargets'>
-  /** Read and write task, workspace and global notes. */
+  /** Read and write task, workspace and global notes.
+   *  @deprecated Private to acorn's own plugins. Reads as absent to a loaded plugin. */
   'notes.store': HostOwned<'plugins/notes/contract/store.NotesStoreCapability'>
-  /** Seed a new task's notes from its linked external items. */
+  /** Seed a new task's notes from its linked external items.
+   *  @deprecated Private to acorn's own plugins. Reads as absent to a loaded plugin. */
   'notes.seedTask': HostOwned<'plugins/notes/contract/store.SeedTaskNotes'>
   /** Read the project or private memory library without exposing file paths or recall bookkeeping. */
   'memory.library': HostOwned<'plugins/memory/contract/library.MemoryLibraryCapability'>
@@ -107,12 +118,14 @@ export type CapabilityCatalogue = {
   'github.mirror': HostOwned<'plugins/github/contract/mirror.GithubMirrorCapability'>
   /** Read the node-owned preview home selected from recipe, run target, or project config. */
   'preview.urls': HostOwned<'plugins/preview/contract/urls.PreviewUrlsCapability'>
-  /** Ask the workflow runner to reconcile after a restart. */
+  /** Ask the workflow runner to reconcile after a restart.
+   *  @deprecated Private to acorn's own plugins. Reads as absent to a loaded plugin. */
   'workflows.runner': { reconcile(): Promise<void> }
   /** Rebuild a task's pending workflow approval inbox. */
   'workflows.gates': HostOwned<'plugins/workflows/contract/events.WorkflowGatesCapability'>
   /** The per-step event stream behind the run panel. For a bell row, use `events.notice`, which is
-   *  core's and works with workflows disabled. */
+   *  core's and works with workflows disabled.
+   *  @deprecated Private to acorn's own plugins. Reads as absent to a loaded plugin. */
   'workflows.notices': {
     stepEvent(runId: string, stepId: string, event: unknown): void
   }

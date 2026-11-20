@@ -17,20 +17,30 @@ export { capabilityId, type CapabilityId } from '@acorn/protocol/plugin/ids.ts'
 
 export class CapabilityRegistry {
   readonly #impls = new Map<string, unknown>()
+  // Ids a loaded plugin provided. Another loaded plugin may resolve these by declaration alone, because
+  // they carry only the authority the provider's own trust prompt disclosed.
+  readonly #fromLoaded = new Set<string>()
 
   // Providing twice is a programming error for the same reason the client Registry throws: the winner
   // would depend on plugin init order, which nothing guarantees.
-  provide<T>(id: CapabilityId<T>, impl: T): Disposable {
+  provide<T>(id: CapabilityId<T>, impl: T, from: 'compiled' | 'loaded' = 'compiled'): Disposable {
     if (this.#impls.has(id)) throw new Error(`Capability already provided: ${id}`)
     this.#impls.set(id, impl)
+    if (from === 'loaded') this.#fromLoaded.add(id)
     let disposed = false
     return {
       dispose: () => {
         if (disposed) return
         disposed = true
-        if (this.#impls.get(id) === impl) this.#impls.delete(id)
+        if (this.#impls.get(id) !== impl) return
+        this.#impls.delete(id)
+        this.#fromLoaded.delete(id)
       },
     }
+  }
+
+  providedByLoadedPlugin(id: string): boolean {
+    return this.#fromLoaded.has(id)
   }
 
   // Optional by default: an absent capability means "that plugin is disabled", which consumers degrade
