@@ -106,7 +106,7 @@ export async function startAccountStub(options: AccountStubOptions = {}): Promis
   const browserSessions = new Map<string, Account>()
   const registered = new Map<string, Registered>()
   const revoked = new Set<string>()
-  let relayUrl = 'ws://relay.invalid'
+  let relayUrl = 'wss://relay.invalid'
   let baseUrl = ''
   let preview: PreviewResponse | undefined = {
     domain: 'preview.acorn.test',

@@ -8,6 +8,7 @@ import {
   RELAY_TLS_STREAM,
   relayHost,
   relayRouteIdSchema,
+  relayUrlIsPrivate,
   relayUrls,
   type RelayRoute,
 } from '@acorn/protocol/relay.ts'
@@ -45,8 +46,6 @@ export class RelayAgent extends HttpsAgent {
 // What a stream presents to the relay: the credential typed into the address, as in self-hosted mode,
 // or else a ticket for the account.
 // A ticket doesn't go over plain `ws://` to another computer.
-const LOOPBACK = new Set(['127.0.0.1', 'localhost', '[::1]'])
-
 export const relayCredentialFor = (
   credential: string | undefined,
   relay: RelayRoute,
@@ -55,10 +54,9 @@ export const relayCredentialFor = (
   if (credential !== undefined) return Promise.resolve(credential)
   if (!ticketFor)
     return Promise.reject(new Error('This relay address has no credential, and nothing here can get a ticket for it.'))
-  const { protocol, hostname } = new URL(relay.url)
-  return protocol === 'ws:' && !LOOPBACK.has(hostname)
-    ? Promise.reject(new Error('An account ticket needs a wss:// relay address, so it stays private.'))
-    : ticketFor(relay)
+  return relayUrlIsPrivate(relay.url)
+    ? ticketFor(relay)
+    : Promise.reject(new Error('An account ticket needs a wss:// relay address, so it stays private.'))
 }
 
 // The relay answers the upgrade only once the Node has opened its end, so an open WebSocket is a stream

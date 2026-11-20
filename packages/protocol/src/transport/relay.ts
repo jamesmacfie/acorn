@@ -18,6 +18,13 @@ export const relayRouteSchema = z.strictObject({
 })
 export type RelayRoute = z.infer<typeof relayRouteSchema>
 
+// Whether a secret sent to this relay address, a ticket or a credential, stays off the network in the
+// clear: `wss://`, or plain `ws://` to a relay on this computer, as the dev relay is.
+export const relayUrlIsPrivate = (url: string): boolean => {
+  const { protocol, hostname } = new URL(url)
+  return protocol === 'wss:' || (protocol === 'ws:' && ['127.0.0.1', 'localhost', '[::1]'].includes(hostname))
+}
+
 // A node's address as a person reads and types it: its relay route when it has one, without the
 // credential the typed form carries, or else its endpoint.
 export const nodeAddress = (node: { endpoint: string; relay?: RelayRoute }): string =>

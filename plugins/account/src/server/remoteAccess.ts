@@ -7,6 +7,7 @@ import {
   recordNodeRelay,
   type AppEnv,
 } from '@acorn/plugin-api/node'
+import { relayUrlIsPrivate } from '@acorn/protocol/relay.ts'
 import type { AccountState, TurnedOff } from '../shared/state'
 import { accountApi, AccountApiError } from './accountApi'
 import { accountUrl } from './config'
@@ -58,6 +59,9 @@ export async function turnOn(c: Context<AppEnv>, account: { id: string }): Promi
     fingerprint: c.env.NODE_FINGERPRINT,
     channelKey: channelPublicKey(c.env.DATA_DIR),
   })
+  // The tunnel sends the credential on every connection, so it goes to plain `ws://` on this computer only,
+  // the rule a client keeps for its tickets. A `ws://` relay typed into node.json is the owner's own choice.
+  if (!relayUrlIsPrivate(relay.url)) throw new AccountApiError(502, 'insecure_relay')
   recordNodeRelay(c.env.DATA_DIR, { relay, owner: { accountId: account.id, keys } })
   await c.env.RELAY?.apply(readNodeRelay(c.env.DATA_DIR).relay)
 }

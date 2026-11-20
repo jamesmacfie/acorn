@@ -66,6 +66,11 @@ and its public keys. The Node records them as `relay` and `owner` in the data ro
 that an older Node recorded in `node.json` into `relay.json`. At every later boot the listener reads the same `relay` setting, so the
 tunnel starts with no account code running.
 
+The Node keeps the rule a client keeps for tickets. It sends its credential to a `ws://` relay only on
+this computer, so an account service that names a `ws://` relay elsewhere gets nothing. The switch
+answers `502 account_unavailable` and records nothing. A `ws://` relay set in `node.json` or the
+environment is the owner's own choice, and still works.
+
 Under it, **Phone previews** is a second switch, off by default
 ([previews on a phone](./phone-channel.md#previews)). Turning it on records `previews` in `node.json` and
 starts the Node's previews without touching the tunnel.

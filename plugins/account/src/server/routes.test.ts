@@ -1,4 +1,4 @@
-import { mkdtempSync, rmSync, writeFileSync } from 'node:fs'
+import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { Hono } from 'hono'
@@ -172,6 +172,29 @@ describe('remote access', () => {
       { nodeId: NODE_ID, fingerprint: 'ab'.repeat(32), channelKey: channelPublicKey(dataDir) },
     ])
     expect((await state()).remoteAccess).toMatchObject({ enabled: true, relayUrl: 'wss://relay.example.test' })
+  })
+
+  // The tunnel sends the relay credential on every connection, so a plain ws:// relay elsewhere would show
+  // it to the network. The dev flows' relay is plain ws:// on this computer.
+  it('refuses a relay the account service names over plain ws:// to another computer', async () => {
+    await signIn()
+    account.setRelayUrl('ws://relay.example.com')
+    const on = await call('PUT', '/remote-access', { enabled: true })
+    expect(on.status).toBe(502)
+    expect(await on.json()).toMatchObject({
+      error: { code: 'account_unavailable', message: expect.stringContaining('wss://') },
+    })
+    expect(readNodeRelay(dataDir)).toEqual({})
+    expect(readFileSync(join(dataDir, 'node.json'), 'utf8')).not.toContain('relay')
+    expect(applied).toEqual([])
+  })
+
+  it('accepts a plain ws:// relay on this computer', async () => {
+    await signIn()
+    account.setRelayUrl('ws://127.0.0.1:48782')
+    expect((await call('PUT', '/remote-access', { enabled: true })).status).toBe(200)
+    expect(readNodeRelay(dataDir).relay?.url).toBe('ws://127.0.0.1:48782')
+    expect(applied).toHaveLength(1)
   })
 
   it('turns off at once, forgets the relay and owner, and removes the Node from the account', async () => {

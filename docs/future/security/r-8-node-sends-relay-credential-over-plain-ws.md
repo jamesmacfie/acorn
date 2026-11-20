@@ -1,3 +1,45 @@
+> **Completion note, November 21, 2026.** Fixed on the Acorn side, on branch
+> `phase-r-8-relay-credential-never-goes-over-plain-ws`.
+>
+> What landed:
+>
+> - `relayUrlIsPrivate` in `@acorn/protocol/relay.ts` holds the one rule: a secret goes to a `wss://`
+>   relay, or to a `ws://` relay on `127.0.0.1`, `localhost`, or `[::1]`. The client's
+>   `relayCredentialFor` and the Node's `turnOn` both call it, so the two rules can't drift apart.
+> - `turnOn` checks the relay address in the registration answer before it records anything. A `ws://`
+>   address for another computer throws `AccountApiError(502, 'insecure_relay')`, and the route answers
+>   `502 account_unavailable` with a message that names `wss://`. Nothing reaches `relay.json` or
+>   `node.json`, and the tunnel doesn't start.
+> - `relaySettings` is unchanged, so a `ws://` relay that the owner writes in `node.json` or the
+>   environment still works.
+> - The stand-in account service answers `wss://relay.invalid` by default instead of `ws://relay.invalid`,
+>   to match the hosted service. Every relay test and `pnpm dev:account` set a `ws://127.0.0.1` address,
+>   and those still pass.
+> - Tests: `plugins/account/src/server/routes.test.ts` answers a registration with `ws://relay.example.com`
+>   and expects `502 account_unavailable`, an empty `readNodeRelay`, no relay in `node.json`, and no
+>   tunnel. It fails on the old code. A second case accepts `ws://127.0.0.1:48782`. The custody test for
+>   `relayCredentialFor` already covers the client side and still passes.
+> - Docs: `relay/accounts.md` § Remote access states the Node's rule. The site's account plugin page says
+>   the switch stays off for such a relay, and `stale --mark` records it. `account-api.md` stays at 200
+>   lines.
+>
+> Decisions and deviations:
+>
+> - The refusal comes after the service has registered the Node, so the service keeps a registration
+>   with a credential the Node never used. I didn't call `remove`, because the doc asks only for the
+>   refusal, and turning the switch on again against a fixed service replaces the credential.
+> - `apps/relay/src/remoteAccess.test.ts` read `owner` from `node.json`, which L-2 moved to `relay.json`,
+>   so one case failed on this branch before my change. I pointed both of its reads at `relay.json`.
+> - Size: the account routes load lazily, so the Node service bundle stays at 1,972,223 B.
+> - I didn't run a live check in `pnpm dev:agent`.
+>
+> For later phases: R-9 can use `relayUrlIsPrivate` if it needs the same loopback rule for an address.
+> The rule for a plain `http` account service, in `accountUrl` and `accountServiceUrl`, is a separate
+> copy that I left alone.
+>
+> What acorn-cloud would still need: nothing for this fix. The hosted service has to keep answering with
+> a `wss://` relay address, or every Node refuses to turn on remote access.
+
 # R-8: The Node sends its relay credential to a plain `ws://` relay the account service names
 
 Found November 20, 2026, in a read-only security review of `jamesmacfie/acorn` at `31ff472da`.

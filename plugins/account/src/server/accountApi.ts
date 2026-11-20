@@ -18,12 +18,12 @@ import {
 // schema the API publishes, so a service that drifts from it fails here, with its status and code,
 // rather than as an undefined deep inside a route.
 
-// What a service refused with, or `unavailable` when it didn't answer or answered with something that
-// isn't the API.
+// What a service refused with, `unavailable` when it didn't answer or answered with something that
+// isn't the API, or `insecure_relay` when it named a relay the Node won't send its credential to.
 export class AccountApiError extends Error {
   constructor(
     readonly status: number,
-    readonly code: AccountError['error'] | 'unavailable',
+    readonly code: AccountError['error'] | 'unavailable' | 'insecure_relay',
   ) {
     super(`The account service answered ${status} ${code}.`)
   }

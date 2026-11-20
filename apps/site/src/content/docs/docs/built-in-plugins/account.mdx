@@ -9,7 +9,7 @@ sources:
   - plugins/account/src/node/index.ts
   - plugins/account/src/server/routes.ts
   - plugins/account/src/server/remoteAccess.ts
-checked: 'd3093a7d4'
+checked: 'c9f832ec3'
 ---
 
 import PluginFacts from '../../../../components/PluginFacts.astro'
@@ -47,7 +47,9 @@ Remote access doesn't let anyone in. A client still pairs with a code and uses i
 credential, and the account service can't approve a pairing or read what crosses the relay. Phone
 previews are the one exception, below.
 
-If the Node's environment or `node.json` already names a relay, the switch is off and says why.
+If the Node's environment or `node.json` already names a relay, the switch is off and says why. If the
+account service names a relay without `wss://` on another computer, the switch stays off and says so,
+because the Node's relay credential would cross the network unencrypted.
 
 ## Turn on phone previews
 

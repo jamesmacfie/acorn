@@ -60,9 +60,9 @@ describe('remote access between two Nodes on one account', () => {
     await waitFor(async () => (await ask(home, 'GET', '/state')).json?.remoteAccess.connected === true, 'the relay')
     expect(relayLog).toContain(`route ${home.handshake.nodeId} connected`)
     expect(account.nodes()).toMatchObject([{ nodeId: home.handshake.nodeId }])
-    const identity = JSON.parse(readFileSync(join(home.dir, 'node.json'), 'utf8'))
-    expect(identity.owner.accountId).toBeTruthy()
-    expect(identity.relay.url).toBe(`ws://127.0.0.1:${relay.port}`)
+    const recorded = JSON.parse(readFileSync(join(home.dir, 'relay.json'), 'utf8'))
+    expect(recorded.owner.accountId).toBeTruthy()
+    expect(recorded.relay.url).toBe(`ws://127.0.0.1:${relay.port}`)
   }, 60_000)
 
   let paired: ReturnType<typeof toBrokerNode>
@@ -107,9 +107,9 @@ describe('remote access between two Nodes on one account', () => {
     await waitFor(() => relayLog.includes(`route ${home.handshake.nodeId} disconnected`), 'the relay to notice')
     await waitFor(() => away.statuses.at(-1)?.state !== 'online', 'the other Node to lose it')
     expect(account.nodes()).toEqual([])
-    const identity = JSON.parse(readFileSync(join(home.dir, 'node.json'), 'utf8'))
-    expect(identity.relay).toBeUndefined()
-    expect(identity.owner).toBeUndefined()
+    const recorded = JSON.parse(readFileSync(join(home.dir, 'relay.json'), 'utf8'))
+    expect(recorded.relay).toBeUndefined()
+    expect(recorded.owner).toBeUndefined()
     // The Node still works locally.
     expect(
       (await home.broker.fetch(home.handshake.nodeId, { requestId: 'local', path: '/v1/core/tasks' })).status,

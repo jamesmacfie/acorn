@@ -34,7 +34,11 @@ const refusal = (c: Parameters<typeof respondError>[0], error: AccountApiError) 
       ? respondError(c, 404, 'not_found', ['The account service doesn’t know that Node.'])
       : error.code === 'conflict'
         ? respondError(c, 409, 'conflict', ['Another account owns this Node.'])
-        : respondError(c, 502, 'account_unavailable', ['The account service didn’t answer as expected.'])
+        : error.code === 'insecure_relay'
+          ? respondError(c, 502, 'account_unavailable', [
+              'The account service named a relay without wss://, so this Node won’t send it its credential.',
+            ])
+          : respondError(c, 502, 'account_unavailable', ['The account service didn’t answer as expected.'])
 
 export const accountRoutes = () =>
   new Hono<AppEnv>()
