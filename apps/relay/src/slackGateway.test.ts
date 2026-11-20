@@ -7,7 +7,7 @@ import { startRelay, type Relay } from './relay'
 
 // The Slack gateway end to end (docs/account-api/slack-gateway.md): the stand-in gateway and its fake
 // Slack, a relay that checks tickets, and a real Node that signed in, turned on remote access, and linked
-// Slack from Settings → Slack. A mention reaches the Node's gateway route through the relay with a real
+// and confirmed Slack from Settings → Slack. A mention reaches the Node's gateway route through the relay with a real
 // gateway token, and the Node's answers come back as Slack calls the gateway checked against its grants.
 
 let account: AccountStub
@@ -43,15 +43,20 @@ describe('Slack through the relay', () => {
     expect(account.requests().filter((line) => line.includes('/slack/'))).toEqual([])
   }, 180_000)
 
-  it('links from Settings → Slack, and the link reaches the Node', async () => {
-    const started = await slack(node, 'POST', '/link', { approvals: false })
+  it('links from Settings → Slack, and the link counts once the device confirms its Slack user', async () => {
+    const started = await slack(node, 'POST', '/link', {})
     expect(started.status).toBe(200)
     expect((await fetch(`${started.json!.url}?team=${TEAM}&user=U0OWNER&name=owner`)).status).toBe(200)
-    const state = await slack(node, 'GET', '/state')
-    expect(state.json).toMatchObject({
+    const link = { teamId: TEAM, teamName: 'Relay Test', slackUserName: 'owner', slackUserId: 'U0OWNER', here: true }
+    expect((await slack(node, 'GET', '/state')).json).toMatchObject({
       signedIn: true,
       remoteAccess: true,
-      links: [{ teamId: TEAM, teamName: 'Relay Test', slackUserName: 'owner', here: true, approvals: false }],
+      links: [{ ...link, confirmed: false, approvals: false }],
+    })
+    const confirmed = await slack(node, 'POST', '/confirm', { teamId: TEAM, slackUserId: 'U0OWNER', approvals: false })
+    expect(confirmed.status).toBe(200)
+    expect((await slack(node, 'GET', '/state')).json).toMatchObject({
+      links: [{ ...link, confirmed: true, approvals: false }],
     })
   }, 60_000)
 
