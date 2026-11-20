@@ -36,8 +36,8 @@ export type ProjectCloneInput = {
   // Written to the row as soon as it has its folder, before the run reports finished.
   fields?: Omit<ProjectUpdateRefInput, 'path'>
   // False for a URL the owner pasted (docs/workspaces-and-tasks/projects.md § Untrusted projects).
-  // Omitted means trusted, which is what an importer's clone stays. A loaded plugin's clone is always
-  // untrusted, and so is one that fills a placeholder, because the row's folder changed.
+  // Omitted means trusted, which is what an importer's clone stays, into a new row or a placeholder. A
+  // loaded plugin's clone is always untrusted.
   trusted?: boolean
 }
 
@@ -170,6 +170,9 @@ async function cloneAndRegister(
 }
 
 async function register(target: string, input: ProjectCloneInput, context: CloneContext): Promise<string> {
+  // Leave to manage projects isn't leave to run their code, so a loaded plugin's clone is never trusted.
+  const trusted = context.holder === undefined ? input.trusted : false
+  let projectId: string
   if (input.fillProjectId) {
     const filled = await updateProjectRef(
       context.db,
@@ -178,21 +181,22 @@ async function register(target: string, input: ProjectCloneInput, context: Clone
       context.holder,
     )
     if (!filled) throw new Error('The project this clone was for no longer exists.')
-    return filled.id
+    projectId = filled.id
+  } else {
+    const created = await createProject(
+      context.db,
+      { path: target, name: input.name, workspaceId: input.workspaceId, trusted },
+      context.ownerId,
+    )
+    if (!created.ok) throw new Error(created.reason)
+    projectId = created.project.id
+    if (input.fields) await updateProjectRef(context.db, projectId, input.fields, context.holder)
   }
-  // Leave to manage projects isn't leave to run their code, so a loaded plugin's clone is never trusted.
-  const trusted = context.holder === undefined ? input.trusted : false
-  const created = await createProject(
-    context.db,
-    { path: target, name: input.name, workspaceId: input.workspaceId, trusted },
-    context.ownerId,
-  )
-  if (!created.ok) throw new Error(created.reason)
-  // A row that already named this empty folder was trusted for whatever used to be there.
-  if (trusted === false && created.project.trusted)
-    await context.db.update(schema.projects).set({ trusted: false }).where(eq(schema.projects.id, created.project.id))
-  if (input.fields) await updateProjectRef(context.db, created.project.id, input.fields, context.holder)
-  return created.project.id
+  // The filled placeholder, or a row that already named this empty folder, was trusted for whatever
+  // used to be there.
+  if (trusted === false)
+    await context.db.update(schema.projects).set({ trusted: false }).where(eq(schema.projects.id, projectId))
+  return projectId
 }
 
 /** The run's state, after waiting up to `waitMs`, capped at CLONE_RUN_WAIT_MS, for it to finish. */

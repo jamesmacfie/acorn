@@ -249,15 +249,32 @@ describe('createProject / detectProject', () => {
     expect(await createProjectRef(testDb.db, { name: 'built', path: builtIn })).toMatchObject({ trusted: true })
   })
 
-  it('untrusts a trusted placeholder that any caller maps onto a folder', async () => {
-    // A placeholder a built-in made before this rule is trusted, and holds no checkout yet.
-    const placeholder = await createProjectRef(testDb.db, { name: 'web', github: { owner: 'acme', name: 'web' } })
-    expect(placeholder.trusted).toBe(true)
-    const folder = join(dir, 'mapped')
-    mkdirSync(folder)
-    expect(await updateProjectRef(testDb.db, placeholder.id, { path: folder }, 'loaded')).toMatchObject({
-      path: folder,
+  it("keeps a placeholder's trust for a built-in's first folder, and drops it for the route or a plugin", async () => {
+    // A built-in's placeholder is trusted and holds no checkout yet.
+    const placeholder = (name: string) => createProjectRef(testDb.db, { name, github: { owner: 'acme', name } })
+    const folder = (name: string) => {
+      mkdirSync(join(dir, name))
+      return join(dir, name)
+    }
+    const builtIn = await placeholder('built-in')
+    expect(builtIn.trusted).toBe(true)
+    expect(await updateProjectRef(testDb.db, builtIn.id, { path: folder('built-in') })).toMatchObject({
+      trusted: true,
+    })
+    // Once it has a folder, even a built-in's move needs fresh trust.
+    expect(await updateProjectRef(testDb.db, builtIn.id, { path: folder('built-in-moved') })).toMatchObject({
       trusted: false,
+    })
+
+    const loaded = await placeholder('loaded')
+    expect(await updateProjectRef(testDb.db, loaded.id, { path: folder('loaded') }, 'loaded')).toMatchObject({
+      trusted: false,
+    })
+    // The route: a plugin frame's request can't be told from the owner's.
+    const routed = await placeholder('routed')
+    expect(await patchProject(testDb.db, routed.id, { path: folder('routed') })).toMatchObject({
+      ok: true,
+      project: { trusted: false },
     })
   })
 

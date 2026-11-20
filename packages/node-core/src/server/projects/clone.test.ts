@@ -102,12 +102,32 @@ describe('clone runs', () => {
     if (!started.ok) throw new Error(started.error)
     const run = await finish(started.cloneId)
     expect(run).toEqual({ state: 'finished', result: { ok: true, projectId: placeholder.id } })
-    // The placeholder was trusted with no checkout, so the folder it now names needs the owner's trust.
+    // A built-in importer's fill is the owner's import, like its clone into a new row.
     expect(await getProject(t.db, placeholder.id)).toMatchObject({
       path: join(parent(), 'checkout'),
       repoExternalId: '42',
-      trusted: false,
+      trusted: true,
     })
+  })
+
+  it.each([
+    ['a loaded plugin', {}, 'loaded'],
+    ['a built-in that asks for an untrusted clone', { trusted: false as const }, undefined],
+  ])('fills a placeholder untrusted for %s', async (_who, extra, holder) => {
+    const placeholder = await createProjectRef(t.db, {
+      name: 'web',
+      repository: { host: 'example.com', path: 'acme/web' },
+    })
+    const started = await startCloneRun(
+      { url: `file://${origin}`, parentDir: parent(), fillProjectId: placeholder.id, ...extra },
+      { db: t.db, ownerId: '', protocols, holder },
+    )
+    if (!started.ok) throw new Error(started.error)
+    expect(await finish(started.cloneId)).toEqual({
+      state: 'finished',
+      result: { ok: true, projectId: placeholder.id },
+    })
+    expect((await getProject(t.db, placeholder.id))?.trusted).toBe(false)
   })
 
   it("makes a loaded plugin's clone untrusted, even when it asks for trust", async () => {

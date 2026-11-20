@@ -409,6 +409,8 @@ export async function patchProject(
   id: string,
   patch: PatchProjectInput,
   ownerId = '',
+  // For a built-in's call alone. The route can't set it: a plugin frame's request looks like the owner's.
+  { firstFolderKeepsTrust = false } = {},
 ): Promise<CreateProjectResult> {
   const project = await getProject(db, id)
   if (!project) return { ok: false, reason: 'No such project.' }
@@ -455,7 +457,7 @@ export async function patchProject(
     set.path = patch.path
     // Trust covers the folder the owner reviewed. A plugin's request through this route looks like the
     // owner's own, so every move waits for a device to trust the new folder.
-    if (patch.path !== project.path) set.trusted = false
+    if (patch.path !== project.path && !(firstFolderKeepsTrust && project.path === null)) set.trusted = false
   }
   if (Object.keys(set).length === 0) return { ok: true, project }
   db.transaction((tx) => {
@@ -546,7 +548,10 @@ export async function updateProjectRef(
     if (patch.path === null) {
       await db.update(schema.projects).set({ path: null, updatedAt: Date.now() }).where(eq(schema.projects.id, id))
     } else {
-      const result = await patchProject(db, id, { path: patch.path })
+      // A built-in importer filling a placeholder is the owner's import, like its clone into a new row.
+      const result = await patchProject(db, id, { path: patch.path }, '', {
+        firstFolderKeepsTrust: holder === undefined,
+      })
       if (!result.ok) throw new Error(result.reason)
       // A deferred importer project may be mapped to a plain folder before its remote is available.
       // `detectProject` clears disk-derived facets for that folder; preserve the explicit importer

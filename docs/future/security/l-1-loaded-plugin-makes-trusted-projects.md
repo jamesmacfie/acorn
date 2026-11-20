@@ -9,10 +9,11 @@
 >   that's already a project comes back unchanged, because its contents are the ones the owner trusted.
 > - A loaded plugin's clone is untrusted, even if the call asks for `trusted: true`.
 >   `clone.ts` `register` reads `context.holder` and ignores the input's flag for a plugin.
-> - Any folder change resets trust. `patchProject` sets `trusted: false` whenever `path` differs from the
+> - A folder change resets trust. `patchProject` sets `trusted: false` whenever `path` differs from the
 >   stored one, null included. That one place covers `PATCH /v1/core/projects/:id`, a loaded plugin's
->   `update`, and a clone that fills a placeholder. The owner trusts the new folder through the existing
->   device-only `POST /v1/core/projects/:id/trust`.
+>   `update`, and a loaded plugin's clone that fills a placeholder. The one exception is a built-in's
+>   `updateProjectRef` giving a placeholder its first folder (see the follow-up below). The owner trusts
+>   a new folder through the existing device-only `POST /v1/core/projects/:id/trust`.
 > - Client plugins get the same rule. A bridge table rule can now carry `fixedBody`, which holds
 >   fields the broker writes over a frame's JSON body. `POST /v1/core/projects` uses it to send
 >   `trusted: false`, so a frame can't leave the flag out or set it to true. The route accepts
@@ -21,8 +22,11 @@
 >   the plugin adds or moves stay untrusted until you trust them. The plugin contract's comments
 >   (`coreProjects.ts`), `projects.md`, `clone-runs.md`, and `loaded-plugins.md` say the same.
 > - Tests: `projects.test.ts` covers a move, a same-folder patch, plugin and built-in creates, and a
->   trusted placeholder mapped by a plugin. `clone.test.ts` covers a loaded plugin's clone asking for
->   trust, and a placeholder fill. `routes/projects/projects.test.ts` covers the owner's create, a
+>   placeholder's first folder from a built-in (trusted), a plugin, and the route (untrusted).
+>   `clone.test.ts` covers a loaded plugin's clone asking for trust, and placeholder fills by a
+>   built-in, by a loaded plugin, and by a built-in asking for `trusted: false`.
+>   `apps/node` `importerClones.test.ts` holds a filled placeholder trusted for all three importers.
+>   `routes/projects/projects.test.ts` covers the owner's create, a
 >   frame's create, and a refused `trusted: true`, plus a move and then a device trust.
 >   `broker.test.ts` shows the bridge forces the flag, even over a frame's `true`.
 >   `permissions.test.ts` shows the holder reaches `create`. `plugins/agents` `runtime.test.ts` uses the
@@ -31,11 +35,19 @@
 >
 > Decisions and deviations:
 >
-> - The reset applies to every caller, including the owner's own folder change in Settings and a
->   built-in importer that fills a placeholder. The Node can't tell a plugin frame's request from the
+> - The reset applies to every route caller, including the owner's own folder change in Settings,
+>   even for a placeholder's first folder. The Node can't tell a plugin frame's request from the
 >   owner's, because both carry the device's credential, and the finding asks a device to confirm the
->   changed checkout. An importer clone into a new row stays trusted, as before. No built-in creates a
->   placeholder today, so the fill case only meets older rows.
+>   changed checkout.
+> - Follow-up, November 20, 2026: a built-in importer's fill of a placeholder stays trusted, like its
+>   clone into a new row. Both come from the owner's same import flow, and a placeholder had no folder
+>   for anyone to have trusted. `patchProject` takes `firstFolderKeepsTrust`, which only
+>   `updateProjectRef` sets, and only with no holder. So the fill keeps the row's flag: a loaded
+>   plugin's placeholder was created untrusted and stays that way. The route never sets it. Once a
+>   project has a folder, even a built-in's move resets trust. `register` in `clone.ts` now applies
+>   `trusted: false` after a fill as well as after a create, so a built-in that asks for an untrusted
+>   clone gets one either way. I found no security reason to keep the fill untrusted. A caller that can
+>   reach a built-in import route can already import into a new trusted row.
 > - I forced the flag in the broker instead of stamping a frame header. A header would have to pass
 >   through the desktop broker, the relay, and every host's transport. The body rewrite stays inside
 >   client-core's bridge, which every host shares.

@@ -52,8 +52,8 @@ path-less row a folder in Settings → Overview to repair it.
 Each project is trusted or untrusted (`projects.trusted`). A URL clone you paste starts untrusted,
 and so does any project a plugin adds or clones: `projects:write` never runs code, and the bridge
 sends a frame's `POST /v1/core/projects` with `trusted: false`. Folder adds, `acorn project add`,
-built-in importer clones, and older projects stay trusted. A new folder, even a placeholder's first,
-untrusts the project. Until you trust it, nothing its repository ships runs. Agents can read it.
+built-in importer clones and fills, and older projects stay trusted. Other folder changes, even a
+placeholder's first, untrust it. Until trusted, nothing its repository ships runs. Agents can read it.
 
 | Path | In an untrusted project |
 | --- | --- |
