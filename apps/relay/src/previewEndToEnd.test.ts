@@ -230,6 +230,30 @@ describe('a preview through the relay', () => {
     }
   })
 
+  it('refuses an open preview once the task’s address moves to another port, and opens another on a new name', async () => {
+    const other = createServer((_req, res) => res.end('another service on this computer'))
+    await new Promise<void>((resolve) => other.listen(0, '127.0.0.1', resolve))
+    const recipe = (port: number) =>
+      request(home, 'POST', '/v1/p/preview/tasks/t1/recipe-url', { url: `http://localhost:${port}` })
+    cleanup.push(() => other.close())
+    const { address } = await openPreview()
+    const cookie = cookieFrom(await browse(address))
+    expect((await browse(new URL('/', address).href, { cookie })).text).toContain(DEV_PAGE)
+
+    expect((await recipe((other.address() as AddressInfo).port)).status).toBe(200)
+    const moved = await browse(new URL('/', address).href, { cookie })
+    expect(moved.status).toBe(502)
+    expect(moved.text).not.toContain('another service')
+
+    const reopened = await openPreview()
+    expect(new URL(reopened.address).hostname).not.toBe(new URL(address).hostname)
+    const page = await browse(new URL('/', reopened.address).href, {
+      cookie: cookieFrom(await browse(reopened.address)),
+    })
+    expect(page.text).toBe('another service on this computer')
+    await recipe(dev.port)
+  })
+
   it('shows the relay nothing but TLS', async () => {
     const seen = Buffer.concat(wire.recorded).toString('latin1')
     expect(wire.recorded[0]![0]).toBe(0x16)

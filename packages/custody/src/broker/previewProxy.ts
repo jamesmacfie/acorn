@@ -11,12 +11,17 @@ import type { PreviewTransport } from './nodeBroker'
 
 export type PreviewListener = {
   origin: string
+  /** The dev server's port the Node named when this listener opened. The listener shows that port only. */
+  port: number
   /** The first address to load, which sets the cookie and goes on to `path` on this origin. */
   entry(path?: string): string
   close(): Promise<void>
 }
 
 const ENTRY_PATH = '/__acorn/preview'
+// Sent with every request, so the Node refuses one once the task's address names another port. The page
+// keeps this listener's origin, so it must never see a second service on it (`serveLoopback`).
+const PINNED_PORT_HEADER = 'x-acorn-preview-port'
 const COOKIE = 'acorn-preview'
 // Dev servers inject inline scripts and evaluate modules, so the script sources are wide. Everything the page
 // can send a request to is its own origin, which is this listener.
@@ -65,9 +70,13 @@ const startPath = (path: string | null): string => (path && /^\/(?![/\\])/.test(
 
 /**
  * Start one preview's listener. `route` is the Node's loopback route for the task, such as
- * `/v1/p/preview/tasks/t1/proxy`.
+ * `/v1/p/preview/tasks/t1/proxy`, and `port` is the one its `__acorn/port` named.
  */
-export async function openPreviewListener(transport: PreviewTransport, route: string): Promise<PreviewListener> {
+export async function openPreviewListener(
+  transport: PreviewTransport,
+  route: string,
+  port: number,
+): Promise<PreviewListener> {
   const secret = randomBytes(32).toString('base64url')
   let host = ''
   // Upgraded sockets have left the server's own count, so closing it doesn't close them.
@@ -110,7 +119,10 @@ export async function openPreviewListener(transport: PreviewTransport, route: st
     if (!admitted(req)) return refuse(403, 'This preview belongs to the acorn window that opened it.')
     const target = nodePath(req.url)
     if (!target) return refuse(400, 'That address is outside this preview.')
-    const upstream = transport.request(target, { method: req.method ?? 'GET', headers: forwarded(req.headers, false) })
+    const upstream = transport.request(target, {
+      method: req.method ?? 'GET',
+      headers: { ...forwarded(req.headers, false), [PINNED_PORT_HEADER]: String(port) },
+    })
     if (!upstream) return refuse(410, 'This preview’s Node is no longer connected.')
     upstream.once('response', (answer) => {
       const headers: Record<string, string | string[]> = {}
@@ -142,7 +154,10 @@ export async function openPreviewListener(transport: PreviewTransport, route: st
     const target = nodePath(req.url)
     if (!admitted(req) || req.headers.origin !== `http://${host}`) return refuse(403)
     if (!target) return refuse(400)
-    const upstream = transport.request(target, { method: 'GET', headers: forwarded(req.headers, true) })
+    const upstream = transport.request(target, {
+      method: 'GET',
+      headers: { ...forwarded(req.headers, true), [PINNED_PORT_HEADER]: String(port) },
+    })
     if (!upstream) return refuse(410)
     upstream.once('upgrade', (answer, node, nodeHead) => {
       upgraded.add(socket)
@@ -173,11 +188,11 @@ export async function openPreviewListener(transport: PreviewTransport, route: st
     server.once('error', reject)
     server.listen(0, '127.0.0.1', () => resolve())
   })
-  const { port } = server.address() as { port: number }
-  host = `127.0.0.1:${port}`
+  host = `127.0.0.1:${(server.address() as { port: number }).port}`
   const origin = `http://${host}`
   return {
     origin,
+    port,
     entry: (path = '/') => `${origin}${ENTRY_PATH}?key=${secret}&to=${encodeURIComponent(path)}`,
     close: () =>
       new Promise<void>((resolve) => {

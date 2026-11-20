@@ -7,8 +7,14 @@ import { paneRegistry, type Disposable } from '@acorn/plugin-api/testkit/client'
 // browser held back the cookie. It is drawn through the pane registry, as the shell draws it.
 
 const write = vi.fn(async (_url: string, _init: { body?: string; nodeId?: string | null }): Promise<unknown> => ({}))
+// What the pane hears on the preview plugin's frames, such as `url-changed`.
+const frameListeners: ((payload: unknown) => void)[] = []
 vi.mock('@acorn/plugin-api/client', () => ({
   activeNodeId: () => 'node-a',
+  onPluginFrame: (_plugin: string, _channel: string, cb: (payload: unknown) => void) => (
+    frameListeners.push(cb),
+    () => void frameListeners.splice(frameListeners.indexOf(cb), 1)
+  ),
   writeJson: (url: string, init: { body?: string; nodeId?: string | null }) => write(url, init),
 }))
 vi.mock('@acorn/plugin-api/ui', () => ({
@@ -108,6 +114,19 @@ it('offers the preview as a page of its own when the frame says its cookie was r
     '_blank',
     'noopener,noreferrer',
   )
+})
+
+it('opens another preview, on another name, when the task’s address changes', async () => {
+  draw()
+  await vi.waitFor(() => expect(frame()).not.toBeNull(), { timeout: 5_000 })
+  const MOVED = 'https://xyz.def.preview.example/__acorn/preview?key=k2'
+  write.mockResolvedValue({ url: MOVED })
+  for (const listener of frameListeners) listener({ taskId: 'another' })
+  await new Promise((resolve) => setTimeout(resolve, 20))
+  expect(write).toHaveBeenCalledOnce()
+  for (const listener of frameListeners) listener({ taskId: 't1' })
+  await vi.waitFor(() => expect(frame()?.getAttribute('src')).toBe(MOVED))
+  expect(write).toHaveBeenCalledTimes(2)
 })
 
 it("says what the Node said when it can't open a preview, and when there is nothing to open", async () => {

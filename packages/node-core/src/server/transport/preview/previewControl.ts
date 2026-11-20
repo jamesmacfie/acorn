@@ -6,8 +6,10 @@ export type PreviewRequest = {
   deviceId: string | undefined
   /** The origin that will frame the page, or undefined for a page of its own. */
   ancestor: string | undefined
-  /** The dev server's port on this computer, asked for again on each request. */
-  port(): Promise<number | null>
+  /** The dev server's port on this computer when the preview opened. The preview shows that port only. */
+  port: number
+  /** The port the task's address names now, asked for again on each request. */
+  target(): Promise<number | null>
 }
 
 // `off`: this Node has no Remote access or no account service. `unsupported`: the service has no preview

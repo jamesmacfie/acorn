@@ -29,6 +29,7 @@ function app(options: { port: number | null; previews?: PreviewControl; ownPort?
     c.set('principal', ({ device, taskToken, service, none: null } as const)[c.req.header('x-who') as 'device'] ?? null)
     await next()
   })
+  // Read on each request, so a test can move the task's app as a plugin's address would.
   const target = async (params: Record<string, string>) => (params.taskId === 'missing' ? null : options.port)
   // The shape the plugin host mounts: a bare handler that serves every request under the prefix.
   router.route(
@@ -59,17 +60,41 @@ describe('a loopback route', () => {
     expect((await call('/', undefined)).status).toBe(401)
   })
 
-  it('shows a paired device the dev server, below the mount', async () => {
-    const call = app({ port: await devServer() })
-    const answer = await call('/src/main.ts?t=1', 'device')
+  it('shows a paired device the dev server, below the mount, on the port it opened on', async () => {
+    const port = await devServer()
+    const call = app({ port })
+    expect(await (await call('/__acorn/port', 'device')).json()).toEqual({ port })
+    const pinned = { headers: { 'x-acorn-preview-port': String(port) } }
+    const answer = await call('/src/main.ts?t=1', 'device', pinned)
     expect(await answer.text()).toBe('dev server saw /src/main.ts?t=1')
-    expect(await (await call('', 'device')).text()).toBe('dev server saw /')
+    expect(await (await call('', 'device', pinned)).text()).toBe('dev server saw /')
+    expect((await call('/__acorn/port', 'taskToken')).status).toBe(403)
+  })
+
+  it('refuses a device request once the task’s app moves to another port, or that names none', async () => {
+    const first = await devServer()
+    const second = createServer((_req, res) => res.end('the other service'))
+    await new Promise<void>((resolve) => second.listen(0, '127.0.0.1', resolve))
+    try {
+      const options: { port: number | null } = { port: first }
+      const call = app(options)
+      const pinned = { headers: { 'x-acorn-preview-port': String(first) } }
+      expect((await call('/', 'device', pinned)).status).toBe(200)
+      options.port = (second.address() as AddressInfo).port
+      const moved = await call('/', 'device', pinned)
+      expect(moved.status).toBe(502)
+      expect(await moved.json()).toMatchObject({ error: { code: 'preview_moved' } })
+      expect((await call('/', 'device')).status).toBe(502)
+    } finally {
+      second.close()
+    }
   })
 
   it('answers 404 when the plugin has no port, and refuses the Node’s own port', async () => {
     expect((await app({ port: null })('/', 'device')).status).toBe(404)
     const port = await devServer()
-    expect((await app({ port, ownPort: port })('/', 'device')).status).toBe(403)
+    const pinned = { headers: { 'x-acorn-preview-port': String(port) } }
+    expect((await app({ port, ownPort: port })('/', 'device', pinned)).status).toBe(403)
   })
 
   it('opens a preview for the device that asked, framed by the page it names', async () => {
@@ -77,15 +102,16 @@ describe('a loopback route', () => {
     const previews: PreviewControl = {
       open: (request) => (opened.push(request), { url: 'https://abc.def.preview.test/__acorn/preview?key=k' }),
     }
-    const call = app({ port: await devServer(), previews })
+    const devPort = await devServer()
+    const call = app({ port: devPort, previews })
     const answer = await call('/__acorn/open', 'device', {
       method: 'POST',
       body: JSON.stringify({ ancestor: 'https://app.example' }),
     })
     expect(answer.status).toBe(200)
     expect(await answer.json()).toEqual({ url: 'https://abc.def.preview.test/__acorn/preview?key=k' })
-    expect(opened[0]).toMatchObject({ deviceId: 'phone-1', ancestor: 'https://app.example' })
-    expect(await opened[0]!.port()).not.toBeNull()
+    expect(opened[0]).toMatchObject({ deviceId: 'phone-1', ancestor: 'https://app.example', port: devPort })
+    expect(await opened[0]!.target()).toBe(devPort)
   })
 
   it('refuses a frame ancestor that is not an origin', async () => {

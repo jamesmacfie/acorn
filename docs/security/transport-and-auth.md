@@ -127,6 +127,10 @@ agent's sandbox. These answer 403 to a task token:
 `EXECUTION_ROUTES` in `apps/node/test/integration/pluginMountCoverage.test.ts` lists them, and the
 test fails unless `requireDevice` covers each one. Add a route there when it can start a process.
 
+Preview's `POST /tasks/:taskId/recipe-url` is device-only too, though it starts nothing. It sets the
+address the owner's preview shows, and an agent says where its app listens through the run targets
+([loopback routes](../plugins/plugin-api.md#loopback-routes)).
+
 An agent that may run commands outside its harness does so only through an execute-risk tool. A
 session in the [read block](../managed-agents/read-block.md#what-stops-working) gets a token whose
 signed ceiling stops at write tools, because every execute tool runs outside the harness's sandbox.

@@ -13,7 +13,7 @@ export class RendererConnection {
   private readonly nodes = new Set<string>()
   // A remote Node's previews, one listener per task, kept until the pane closes it, the Node is forgotten, or this
   // renderer goes. Held as the promise, so a second open while the first is starting gets the same listener.
-  private readonly previews = new Map<string, { nodeId: string; listener: Promise<PreviewListener> }>()
+  private readonly previews = new Map<string, { nodeId: string; port: number; listener: Promise<PreviewListener> }>()
 
   constructor(private readonly broker: NodeBroker) {}
 
@@ -59,7 +59,9 @@ export class RendererConnection {
     if (nodeId && this.broker.openViewer(nodeId, this.viewerId)) this.nodes.add(nodeId)
   }
 
-  // Idempotent per task, so a pane that asks again keeps its page, and its origin, as they were.
+  // Idempotent per task and port, so a pane that asks again keeps its page, and its origin, as they were. A task
+  // whose app moved to another port gets a new listener, and so a new origin: the Node won't show the old
+  // listener's page another service.
   async openPreview(
     nodeId: string,
     taskId: string,
@@ -67,15 +69,38 @@ export class RendererConnection {
     path: string,
   ): Promise<{ origin: string; entry: string }> {
     if (this.closed) throw new Error('This window has closed.')
+    const port = await this.previewPort(nodeId, route)
+    if (this.closed) throw new Error('This window has closed.')
     const key = `${nodeId}\n${taskId}`
     let preview = this.previews.get(key)
+    if (preview && preview.port !== port) {
+      this.dropPreview(key)
+      preview = undefined
+    }
     if (!preview) {
-      preview = { nodeId, listener: openPreviewListener(this.broker.previewTransport(nodeId), route) }
-      this.previews.set(key, preview)
-      preview.listener.catch(() => this.previews.delete(key))
+      const opened = { nodeId, port, listener: openPreviewListener(this.broker.previewTransport(nodeId), route, port) }
+      this.previews.set(key, opened)
+      opened.listener.catch(() => this.previews.get(key) === opened && this.previews.delete(key))
+      preview = opened
     }
     const listener = await preview.listener
     return { origin: listener.origin, entry: listener.entry(path) }
+  }
+
+  // The port the Node shows for this task's preview now.
+  private async previewPort(nodeId: string, route: string): Promise<number> {
+    const answer = await this.broker.fetch(nodeId, {
+      requestId: randomUUID(),
+      path: `${route}/__acorn/port`,
+      method: 'GET',
+      headers: {},
+    })
+    let port: unknown
+    try {
+      if (answer.status === 200) port = (JSON.parse(new TextDecoder().decode(answer.body)) as { port?: unknown }).port
+    } catch {}
+    if (!Number.isInteger(port)) throw new Error('This task has no app for its Node to show.')
+    return port as number
   }
 
   closePreview(nodeId: string, taskId: string): void {

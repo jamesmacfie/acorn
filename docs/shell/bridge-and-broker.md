@@ -129,9 +129,10 @@ process boundary, except `node-status`, which the fleet list needs for every Nod
 ### Previews
 
 A remote Node's preview reaches a desktop webview through the helper, not the renderer. The renderer's
-`previewProxy.open(nodeId, taskId, path)` sends `preview-open`. The helper starts a listener for that
-task on `127.0.0.1:0` (`packages/custody/src/broker/previewProxy.ts`) and answers `{ origin, entry }`.
-Each preview is its own origin, so one task's page can't call another task's. The listener:
+`previewProxy.open(nodeId, taskId, path)` sends `preview-open`. The helper asks the Node's
+`__acorn/port` which port the task's app is on, starts a listener for that task and port on
+`127.0.0.1:0` (`packages/custody/src/broker/previewProxy.ts`), and answers `{ origin, entry }`. Each
+preview is its own origin, so one task's page can't call another task's. The listener:
 
 - Answers only when `Host` is exactly `127.0.0.1:<port>`, which stops DNS rebinding.
 - Needs its own secret in an `HttpOnly`, `SameSite=Strict` cookie. The entry,
@@ -140,7 +141,9 @@ Each preview is its own origin, so one task's page can't call another task's. Th
 - Adds `default-src 'self' 'unsafe-inline' 'unsafe-eval' data: blob:; connect-src 'self'; form-action 'self';
   base-uri 'self'; object-src 'none'; frame-ancestors 'none'` to every response, beside any policy the app
   sends. Dev servers inject inline scripts and evaluate modules, which is why the script sources are wide.
-- Forwards to the Node's loopback route for the task, `/v1/p/preview/tasks/:taskId/proxy/*`. It refuses
+- Forwards to the Node's loopback route for the task, `/v1/p/preview/tasks/:taskId/proxy/*`, with the
+  port it opened on in `x-acorn-preview-port`. Once the task's app moves to another port, the Node answers
+  `502` ([loopback routes](../plugins/plugin-api.md#loopback-routes)). It refuses
   a path that leaves that route once `..` is resolved. It drops its own cookie, `Authorization`, and
   `x-acorn-internal`, and it doesn't let the app set a cookie with its cookie's name.
 - Streams both ways, so Server-Sent Events reach the page, and takes a WebSocket upgrade from the page's
@@ -151,7 +154,9 @@ WebKit opens six connections to one origin, so a dev build's hundreds of request
 app's own. The broker adds the bearer, which never leaves it. Once the Node is forgotten, revoked, or
 moved to another address or certificate, the listener answers `410`.
 
-`preview-open` is idempotent for a task, so a pane that asks again keeps its page and origin.
+`preview-open` is idempotent for a task and port, so a pane that asks again keeps its page and origin.
+The pane asks again whenever the task's address changes. When the port changed, the helper closes the old
+listener and starts another, on another origin.
 `preview-close`, which the bridge sends when the pane evicts the preview, closes the listener and its
 live reload sockets. So do forgetting the Node and closing the window, because previews belong to the
 renderer connection that opened them (`apps/desktop/src/helper/rendererConnection.ts`).

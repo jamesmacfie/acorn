@@ -141,8 +141,15 @@ plugin supplies the port and nothing else. Core owns the rules (`packages/node-c
   `localhost:<port>`, and rewrites `Origin` and `Referer` from the caller's origin to the dev server's.
 
 Core mounts `/v1/p/<plugin><prefix>/*` for them. It also mounts `POST /v1/p/<plugin><prefix>/__acorn/open`, which opens
-the same port as a preview a phone's browser can load. The preview plugin registers it at
-`/tasks/:taskId/proxy`. A loaded plugin has no `loopback`, the way it has no `register`.
+the same port as a preview a phone's browser can load, and `GET /v1/p/<plugin><prefix>/__acorn/port`, which answers
+`{ "port": <n> }`. The preview plugin registers it at `/tasks/:taskId/proxy`. A loaded plugin has no `loopback`, the
+way it has no `register`.
+
+An open preview shows one port. A phone's preview keeps the port it opened on. A device's proxied request
+must carry `x-acorn-preview-port` with the port its caller opened on. Once `target` names another port, the
+Node answers either one `502`, and the client opens another preview, on another origin. Following the new port instead would
+let a page that's already open, perhaps one an agent wrote, read whatever service the address names next, as the same
+site.
 
 The route takes a WebSocket upgrade for the same caller, and pipes it to the dev server byte for byte. The Node's
 listener hands any upgrade that isn't `/v1/events` to the app like a request, so the Host check, sign-in, and route

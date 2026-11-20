@@ -16,9 +16,13 @@ const open = vi.fn(async (_nodeId: string, _taskId: string, _path: string) => ({
   entry: 'http://127.0.0.1:50000/__acorn/preview?key=k&to=%2F',
 }))
 const blockedListeners: ((state: { taskId: string; url: string }) => void)[] = []
+const frameListeners: ((payload: unknown) => void)[] = []
 vi.mock('@acorn/plugin-api/client', () => ({
   activeNodeId: () => nodeId(),
-  onPluginFrame: () => () => {},
+  onPluginFrame: (_plugin: string, _channel: string, cb: (payload: unknown) => void) => (
+    frameListeners.push(cb),
+    () => void frameListeners.splice(frameListeners.indexOf(cb), 1)
+  ),
   previewProxy: () => ({ open, onBlocked: (cb: never) => (blockedListeners.push(cb), () => {}) }),
   previewTarget: (url: string, nodeId: string | null) => target(url, nodeId),
   readJson: (url: string, options: unknown) => read(url, options),
@@ -111,6 +115,18 @@ it("loads a remote Node's app through its listener, opened once for the task", a
   expect(page().getAttribute('data-refused')).toBe('')
   for (const listener of blockedListeners) listener({ taskId: 'remote', url: 'http://192.168.1.1/' })
   expect(page().getAttribute('data-refused')).toBe('http://192.168.1.1/')
+})
+
+it('opens the listener again when the task’s app moves to another port, keeping the path', async () => {
+  target = (_url, nodeId) => ({ kind: 'proxied', nodeId, path: '/app' })
+  read.mockResolvedValue({ taskId: 'remote', url: 'http://localhost:5173/app', source: 'config' })
+  const Pane = pane()
+  disposers.push(render(() => <Pane task={task('remote')} />, host))
+  await vi.waitFor(() => expect(open).toHaveBeenCalledOnce(), { timeout: 5_000 })
+  read.mockResolvedValue({ taskId: 'remote', url: 'http://localhost:5432/app', source: 'recipe' })
+  for (const listener of frameListeners) listener({ taskId: 'remote' })
+  await vi.waitFor(() => expect(open).toHaveBeenCalledTimes(2))
+  expect(open).toHaveBeenLastCalledWith('node-a', 'remote', '/app')
 })
 
 it('says why a remote address is blocked, and opens nothing', async () => {

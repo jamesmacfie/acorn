@@ -200,7 +200,7 @@ describe('the loopback TLS listener', () => {
     opened.push(runtime.DB)
     listener = await startListener(runtime, root!)
     const settings = { url: 'ws://127.0.0.1:9', credential: 'relay-credential' }
-    const request = { deviceId: 'phone', ancestor: undefined, port: async () => 3000 }
+    const request = { deviceId: 'phone', ancestor: undefined, port: 3000, target: async () => 3000 }
 
     await runtime.RELAY!.apply(settings)
     expect(startPreview).not.toHaveBeenCalled()
@@ -331,10 +331,12 @@ describe('the loopback TLS listener', () => {
           socket.once('unexpected-response', (_req, res) => resolve(`refused ${res.statusCode}`))
           socket.once('error', () => resolve('destroyed'))
         })
-      const device = { authorization: `Bearer ${token}` }
+      const device = { authorization: `Bearer ${token}`, 'x-acorn-preview-port': String(devPort) }
       expect(await open('/v1/p/preview/tasks/t1/proxy/@vite/hmr?token=x', device)).toBe(
         'dev server saw /@vite/hmr?token=x',
       )
+      const moved = { ...device, 'x-acorn-preview-port': String(devPort + 1) }
+      expect(await open('/v1/p/preview/tasks/t1/proxy/hmr', moved)).toBe('refused 502')
       expect(await open('/v1/p/preview/tasks/t1/proxy/hmr', { 'x-acorn-internal': taskToken })).toBe('refused 403')
       expect(await open('/v1/p/preview/tasks/t1/proxy/hmr', {})).toBe('refused 401')
       expect(await open('/v1/p/preview/tasks/t2/proxy/hmr', device)).toBe('refused 404')

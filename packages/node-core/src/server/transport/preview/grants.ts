@@ -18,12 +18,22 @@ export type PreviewGrant = {
   deviceId: string | undefined
   /** The origin allowed to frame the page, or undefined for none. */
   ancestor: string | undefined
-  /** The dev server's port now, since a task's address can change under an open preview. */
-  port(): Promise<number | null>
+  /** The dev server's port when the preview opened. */
+  port: number
+  /** The port the task's address names now. */
+  target(): Promise<number | null>
   /** The secret the browser's cookie holds. */
   cookie: string
   expiresAt: number
 }
+// The port a request may reach: the one the preview opened on, while the task's address still names it. A
+// preview whose address moved is refused, not followed, because the page keeps its origin, and following
+// would let a page an agent wrote read whatever service the address names next. The client opens another
+// preview, on another name.
+export async function pinnedPort(grant: Pick<PreviewGrant, 'port' | 'target'>): Promise<number | null> {
+  return (await grant.target().catch(() => null)) === grant.port ? grant.port : null
+}
+
 type Entry = PreviewGrant & { entryKey: string | undefined; entryExpiresAt: number }
 
 // The hash of each side, so a comparison takes the same time whatever the secrets share.
@@ -38,7 +48,7 @@ export class PreviewGrants {
     this.#now = now
   }
 
-  open(request: Pick<PreviewGrant, 'deviceId' | 'ancestor' | 'port'>): { id: string; entryKey: string } {
+  open(request: Pick<PreviewGrant, 'deviceId' | 'ancestor' | 'port' | 'target'>): { id: string; entryKey: string } {
     this.#sweep()
     // The oldest goes first, which is the first in a Map.
     while (this.#grants.size >= MAX_GRANTS) this.#grants.delete(this.#grants.keys().next().value!)

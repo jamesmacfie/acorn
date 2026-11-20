@@ -1,5 +1,6 @@
 import { createResource, createSignal, Match, onCleanup, Switch } from 'solid-js'
-import { activeNodeId, writeJson, type Task } from '@acorn/plugin-api/client'
+import { activeNodeId, onPluginFrame, writeJson, type Task } from '@acorn/plugin-api/client'
+import { pluginChannel } from '@acorn/protocol/plugin/state.ts'
 import { Button, EmptyState, Rectangle, Spinner } from '@acorn/plugin-api/ui'
 import { previewOpenRoute } from '../shared/api'
 
@@ -61,6 +62,13 @@ export default function PreviewPhonePane(props: { task: Task }) {
   onCleanup(() => window.removeEventListener('message', onMessage))
 
   const retry = () => setAttempt((value) => value + 1)
+  // A preview shows the port it opened on, and the Node refuses it once the app moves. Another preview has
+  // another name, so the page that was open can't read the new one.
+  onCleanup(
+    onPluginFrame('preview', pluginChannel('preview', 'url-changed'), (payload) => {
+      if ((payload as { taskId?: unknown }).taskId === props.task.id) retry()
+    }),
+  )
   // The kit hands over the box and the page draws into it, so the pane writes no markup of its own.
   const mountFrame = (address: string) => (box: HTMLElement) => {
     frame = document.createElement('iframe')

@@ -8,6 +8,8 @@ import { openPreviewListener, PREVIEW_POLICY, type PreviewListener } from './pre
 // One preview's listener in front of a stand-in Node, both real sockets on this computer.
 
 const ROUTE = '/v1/p/preview/tasks/t1/proxy'
+// The dev server's port the Node named when the preview opened.
+const PORT = 5173
 const servers: Server[] = []
 const listeners: PreviewListener[] = []
 afterEach(async () => {
@@ -26,7 +28,10 @@ async function node(handler: (req: IncomingMessage, res: import('node:http').Ser
   })
   servers.push(server)
   const sockets = new WebSocketServer({ server })
-  sockets.on('connection', (socket, req) => socket.send(`node saw ${req.url}`))
+  sockets.on('connection', (socket, req) => {
+    seen.push(req)
+    socket.send(`node saw ${req.url}`)
+  })
   await new Promise<void>((resolve) => server.listen(0, '127.0.0.1', resolve))
   const port = (server.address() as AddressInfo).port
   let live = true
@@ -41,7 +46,7 @@ async function node(handler: (req: IncomingMessage, res: import('node:http').Ser
 }
 
 async function open(transport: PreviewTransport): Promise<PreviewListener> {
-  const listener = await openPreviewListener(transport, ROUTE)
+  const listener = await openPreviewListener(transport, ROUTE, PORT)
   listeners.push(listener)
   return listener
 }
@@ -120,8 +125,18 @@ describe("a remote preview's listener", () => {
     expect(seen[0]!.headers.cookie).toBe('theme=dark')
     expect(seen[0]!.headers.authorization).toBe('Bearer device')
     expect(seen[0]!.headers['x-acorn-internal']).toBeUndefined()
+    expect(seen[0]!.headers['x-acorn-preview-port']).toBe(String(PORT))
     expect(answer.headers['content-security-policy']).toBe(`script-src 'self', ${PREVIEW_POLICY}`)
     expect(answer.headers['set-cookie']).toEqual(['session=1; Path=/'])
+  })
+
+  it('sends the port it opened on, whatever port the page names', async () => {
+    const { transport } = await node((_req, res) => res.end('ok'))
+    const listener = await open(transport)
+    expect(listener.port).toBe(PORT)
+    const cookie = await signIn(listener)
+    await get(`${listener.origin}/`, { cookie, 'x-acorn-preview-port': '5432' })
+    expect(seen[0]!.headers['x-acorn-preview-port']).toBe(String(PORT))
   })
 
   it('refuses a path that would leave the route once resolved', async () => {
@@ -166,6 +181,7 @@ describe("a remote preview's listener", () => {
     expect(await outcome(socket(listener.origin, {}))).toBe('refused 403')
     const live = socket(listener.origin)
     expect(await outcome(live)).toBe(`node saw ${ROUTE}/@vite/hmr?token=1`)
+    expect(seen.at(-1)!.headers['x-acorn-preview-port']).toBe(String(PORT))
     const closed = new Promise((resolve) => live.once('close', resolve))
     await listener.close()
     listeners.length = 0

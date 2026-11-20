@@ -1,3 +1,61 @@
+> **Completion note, November 20, 2026.** Fixed on the Acorn side, on branch
+> `phase-l-6-agents-can-t-retarget-an-open-remote-preview`.
+>
+> What landed:
+>
+> - A phone's preview keeps a port. `PreviewGrant` holds `port`, the number the task's address named when
+>   the preview opened, and `target()`, which reads the address again. `pinnedPort` in `grants.ts` returns
+>   the port only while `target()` still names it. Otherwise the preview server answers `502` on that name.
+>   It never follows the address to the new port.
+> - The device route keeps a port too. `serveLoopback` answers `GET <mount>/__acorn/port` with
+>   `{ "port": n }`. A proxied request, HTTP or WebSocket, must carry `x-acorn-preview-port` with that
+>   number, or the Node answers `502 preview_moved`.
+> - The desktop helper pins its listener. `RendererConnection.openPreview` asks `__acorn/port` first, and
+>   `openPreviewListener` takes the port and writes the header on every request, over any value the page
+>   sent. A task whose port changed gets a new listener on a new origin, and the old one closes. So one
+>   listener shows one port.
+> - Both panes open again when the address changes. The desktop pane keys its listener on the whole
+>   address, not just the path. The phone pane listens for `url-changed` and asks for another preview,
+>   which gets another name.
+> - `POST /v1/p/preview/tasks/:taskId/recipe-url` is device-only. A task token gets
+>   `403 interactive_user_required`.
+> - Tests: `grants.test.ts` and `loopbackRoute.test.ts` open on port A, move the target to B, and expect a
+>   refusal. `listener.test.ts` refuses a WebSocket with a stale pin. `previewProxy.test.ts` checks that the
+>   listener sends its own port over the page's. `rendererConnection.test.ts` gets a new origin after a
+>   move. `plugins/preview/src/node/index.test.ts` expects `403` for a task token and `200` for a device on
+>   `recipe-url`. Both pane tests reopen on `url-changed`. `apps/relay/src/previewEndToEnd.test.ts` moves the
+>   recipe under an open phone preview through a real relay, gets `502` with none of the other service's
+>   text, and then opens a new name that shows it.
+> - Docs: `plugin-api.md` § Loopback routes, `bridge-and-broker.md` § Previews, `phone-channel.md`
+>   § Previews, and `transport-and-auth.md` § Execution routes.
+>
+> Decisions and deviations:
+>
+> - The Node still reads the task's address on each request. It compares the address with the pinned
+>   port, and never proxies to anything else. That's the finding's "answer `502` when it moves".
+> - The helper asks the Node for the port rather than taking it from the renderer. That kept the
+>   plugin-facing `previewProxy.open` signature as it was.
+> - The Node requires the pin header on every device proxy request. An older desktop paired with this
+>   Node sends none, so its remote previews answer `502` until it updates. A newer desktop with an older
+>   remote Node fails to open the preview, because the older Node has no `__acorn/port`. I chose to fail
+>   closed over keeping skewed versions working.
+> - `recipe-url` isn't in `EXECUTION_ROUTES`, because it starts no process and the check is inside the
+>   plugin's fetch handler, which that test can't see. The new plugin test covers it, and
+>   `transport-and-auth.md` names it beside the execution routes.
+> - A page that loses its port shows the Node's `502` text until the pane hears `url-changed`. If the
+>   event is missed, reloading the pane or tapping **Try again** opens a new preview.
+> - I didn't run the live check in `pnpm dev:remote`. The relay end-to-end test covers the phone path,
+>   and `rendererConnection.test.ts` with `listener.test.ts` cover the desktop path in pieces.
+> - Size: the Node service bundle grows by 102 B, from 1,970,224 B to 1,970,326 B.
+> - `stale` lists two site pages, the trust model and the Node context reference. Neither describes the
+>   loopback port or `recipe-url`, so neither changed.
+>
+> For later phases: R-6 is untouched. A new client of a loopback route must ask `__acorn/port` and send
+> `x-acorn-preview-port`, or the Node refuses its proxied requests. R-5 may want to close a pinned
+> listener's sockets on revoke the same way `RendererConnection` closes a moved one.
+>
+> What acorn-cloud would still need: nothing. The relay carries the preview's TLS unchanged.
+
 # L-6: A task agent can point an open remote preview at any local port
 
 Found November 20, 2026, in a read-only security review of `jamesmacfie/acorn` at `31ff472da`.

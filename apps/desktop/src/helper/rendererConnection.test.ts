@@ -264,12 +264,22 @@ describe('renderer socket ownership', () => {
 describe('previews', () => {
   const connection = () => {
     const closed: string[] = []
+    // What each task's `__acorn/port` answers, as the Node would for its address now.
+    const ports = new Map<string, number | null>()
+    const asked: string[] = []
     const broker = {
       previewTransport: (nodeId: string) => ({ request: () => null, close: () => void closed.push(nodeId) }),
+      fetch: async (_nodeId: string, request: { path: string }) => {
+        asked.push(request.path)
+        const port = ports.has(request.path) ? ports.get(request.path) : 5173
+        return port === null
+          ? { status: 404, headers: {}, body: new TextEncoder().encode('{"error":{"code":"no_preview"}}') }
+          : { status: 200, headers: {}, body: new TextEncoder().encode(JSON.stringify({ port })) }
+      },
       abort: () => {},
       closeViewer: () => {},
     }
-    return { owner: new RendererConnection(broker as unknown as NodeBroker), closed }
+    return { owner: new RendererConnection(broker as unknown as NodeBroker), closed, ports, asked }
   }
   const settled = () => new Promise((resolve) => setTimeout(resolve, 20))
 
@@ -280,6 +290,20 @@ describe('previews', () => {
     expect(again.origin).toBe(first.origin)
     expect(again.entry).toMatch(/&to=%2Fapp$/)
     expect((await owner.openPreview('n1', 't2', '/route', '/')).origin).not.toBe(first.origin)
+    owner.close()
+  })
+
+  it('opens another listener, on another origin, once the task’s app moves to another port', async () => {
+    const { owner, closed, ports, asked } = connection()
+    const first = await owner.openPreview('n1', 't1', '/route', '/')
+    expect(asked).toEqual(['/route/__acorn/port'])
+    ports.set('/route/__acorn/port', 5432)
+    const moved = await owner.openPreview('n1', 't1', '/route', '/')
+    expect(moved.origin).not.toBe(first.origin)
+    await settled()
+    expect(closed).toEqual(['n1'])
+    ports.set('/route/__acorn/port', null)
+    await expect(owner.openPreview('n1', 't1', '/route', '/')).rejects.toThrow(/no app/)
     owner.close()
   })
 

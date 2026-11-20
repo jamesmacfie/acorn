@@ -1,10 +1,10 @@
 import { describe, expect, it } from 'vitest'
-import { PreviewGrants } from './grants'
+import { pinnedPort, PreviewGrants } from './grants'
 
 let clock = 1_000_000
 const grants = (): PreviewGrants => new PreviewGrants(() => clock)
 const open = (store: PreviewGrants, deviceId = 'device-a') =>
-  store.open({ deviceId, ancestor: undefined, port: async () => 5173 })
+  store.open({ deviceId, ancestor: undefined, port: 5173, target: async () => 5173 })
 
 describe('preview grants', () => {
   it('trades the entry key once, and refuses a wrong or late one', () => {
@@ -38,6 +38,21 @@ describe('preview grants', () => {
     expect(store.get(kept.id)).toBeDefined()
     clock += 12 * 3600_000 + 1
     expect(store.get(kept.id)).toBeUndefined()
+  })
+
+  it('shows the port it opened on, and refuses once the task’s address names another', async () => {
+    let target: number | null = 5173
+    const store = grants()
+    const { id } = store.open({ deviceId: 'device-a', ancestor: undefined, port: 5173, target: async () => target })
+    const grant = store.get(id)!
+    expect(await pinnedPort(grant)).toBe(5173)
+    target = 5432
+    expect(await pinnedPort(grant)).toBeNull()
+    target = null
+    expect(await pinnedPort(grant)).toBeNull()
+    expect(await pinnedPort({ port: 5173, target: () => Promise.reject(new Error('gone')) })).toBeNull()
+    target = 5173
+    expect(await pinnedPort(grant)).toBe(5173)
   })
 
   it('keeps eight, dropping the oldest', () => {

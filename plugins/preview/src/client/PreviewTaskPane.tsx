@@ -29,23 +29,29 @@ export function PreviewTaskPane(props: { task: Task }) {
 
   // How the Node's address reaches the native webview: as it is for the local Node, through this computer's
   // listener for a remote Node's own loopback, or not at all (docs/shell/webviews.md § The preview URL).
-  const target = createMemo(() => {
+  const address = createMemo(() => {
     if (resolved.error) return null
     const value = resolved.latest
-    const url = value?.origin === owner() && value.state?.taskId === props.task.id ? value.state.url : null
+    return value?.origin === owner() && value.state?.taskId === props.task.id ? value.state.url : null
+  })
+  const target = createMemo(() => {
+    const url = address()
     return url ? previewTarget(url, owner().nodeId) : null
   })
 
   // A remote Node's app opens through a listener, keyed on what it shows, so a refetch that changes nothing keeps
-  // the page as it is.
-  type Proxied = { nodeId: string; taskId: string; path: string }
+  // the page as it is. A new address opens again, because the listener shows one port and a moved app needs
+  // another.
+  type Proxied = { nodeId: string; taskId: string; path: string; address: string }
   const proxied = createMemo(
     (): Proxied | null => {
       const value = target()
-      return value?.kind === 'proxied' ? { nodeId: value.nodeId, taskId: props.task.id, path: value.path } : null
+      return value?.kind === 'proxied'
+        ? { nodeId: value.nodeId, taskId: props.task.id, path: value.path, address: address()! }
+        : null
     },
     null,
-    { equals: (a, b) => a?.nodeId === b?.nodeId && a?.taskId === b?.taskId && a?.path === b?.path },
+    { equals: (a, b) => a?.nodeId === b?.nodeId && a?.taskId === b?.taskId && a?.address === b?.address },
   )
   const [entry, { refetch: reopen }] = createResource(proxied, async (open) => ({
     open,

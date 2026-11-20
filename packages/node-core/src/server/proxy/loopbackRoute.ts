@@ -26,6 +26,10 @@ const openBody = z.strictObject({
     .optional(),
 })
 
+// The port a device's preview listener opened on, sent with each of its requests (`openPreviewListener`).
+const PINNED_PORT_HEADER = 'x-acorn-preview-port'
+const MOVED = 'This task’s app stopped or moved to another port. Open the preview again.'
+
 // Why a preview can't open, for a person. The reason itself rides in the error's details for a client to act on.
 const UNAVAILABLE: Record<PreviewUnavailable, string> = {
   off: 'Turn on Remote access on this Node to see previews on a phone.',
@@ -48,15 +52,20 @@ export async function serveLoopback(
   const params = c.req.param()
   const port = await target(params)
   if (port === null) return respondError(c, 404, 'no_preview')
+  const mounted = mountWith(mount, params)
+
+  // A desktop's listener asks once, when it opens, and then sends the answer with every request.
+  if (c.req.method === 'GET' && c.req.path === `${mounted}/__acorn/port`) return c.json({ port })
 
   // A phone's browser can't send a device token, so it asks for an address it can load by itself.
-  if (c.req.method === 'POST' && c.req.path === `${mountWith(mount, params)}/__acorn/open`) {
+  if (c.req.method === 'POST' && c.req.path === `${mounted}/__acorn/open`) {
     const body = openBody.safeParse(await c.req.json().catch(() => ({})))
     if (!body.success) return respondError(c, 400, 'bad_request')
     const opened = c.env.PREVIEWS?.open({
       deviceId: c.get('principal')?.deviceId,
       ancestor: body.data.ancestor,
-      port: () => target(params),
+      port,
+      target: () => target(params),
     }) ?? { unavailable: 'off' as const }
     return 'url' in opened
       ? c.json({ url: opened.url })
@@ -67,8 +76,12 @@ export async function serveLoopback(
   // socket to read it from, and has no business proxying either.
   const ownPort = c.env.incoming?.socket.localPort
   if (!ownPort) return respondError(c, 501, 'proxy_unavailable')
+  // A page keeps its origin for as long as its listener lives, so the listener shows the port it opened on
+  // and nothing else. Following a moved address would let a page an agent wrote read whatever service the
+  // address names next. The client opens another listener, on another origin, instead.
+  if (c.req.header(PINNED_PORT_HEADER) !== String(port)) return respondError(c, 502, 'preview_moved', [MOVED])
   const { proxyHttp, proxyUpgrade } = await import('./loopbackProxy')
-  const options = { port, ownPort, publicOrigin: c.req.header('origin') ?? '', mount: mountWith(mount, params) }
+  const options = { port, ownPort, publicOrigin: c.req.header('origin') ?? '', mount: mounted }
   // A dev server's live reload socket. The caller is a paired device, such as the desktop's helper, which
   // holds the token a page can't send and checks the page's origin itself.
   const upgrade = c.env.upgrade

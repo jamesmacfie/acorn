@@ -34,6 +34,12 @@ export const previewPlugin = (): NodePlugin => {
           return Response.json(await urls!.forTask(taskId))
         }
         if (match[2] === 'recipe-url' && request.method === 'POST') {
+          // The owner picks a recipe in the pane. An agent says where its app listens through the run targets,
+          // and must not move the address a page it wrote is shown on (docs/security/transport-and-auth.md §
+          // Execution routes).
+          if (context.principal.kind !== 'device') {
+            return Response.json({ error: 'interactive_user_required' }, { status: 403 })
+          }
           const body = (await request.json().catch(() => null)) as { url?: unknown } | null
           if (typeof body?.url !== 'string' || !body.url.trim()) {
             return Response.json({ error: 'bad_request' }, { status: 400 })

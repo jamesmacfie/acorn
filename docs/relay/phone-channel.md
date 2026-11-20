@@ -125,7 +125,9 @@ POST /v1/p/preview/tasks/:taskId/proxy/__acorn/open        { "ancestor": "https:
 ```
 
 A task's token gets `403`. The task has to have an address on the Node's own loopback (`404 no_preview`
-otherwise). While the Node can't serve one it answers `503 preview_unavailable`, with the reason in
+otherwise). The preview shows the port that address names when it opens. Once the address moves to another
+port, the Node answers `502` on that name, and the pane, which hears the address change, opens another
+preview. Its new name is a new origin, so the page that was open can't read the new port. While the Node can't serve one it answers `503 preview_unavailable`, with the reason in
 `details.reason`: `off` (no Remote access), `unsupported` (the service has no preview domain), `starting`
 (no certificate yet), or `expired` (it ran out and couldn't be renewed).
 

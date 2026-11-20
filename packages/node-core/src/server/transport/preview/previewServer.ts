@@ -5,7 +5,7 @@ import { getRequestListener } from '@hono/node-server'
 import { parsePreviewName } from '@acorn/protocol/relay.ts'
 import { proxyHttp, proxyUpgrade, type LoopbackProxyOptions } from '../../proxy/loopbackProxy'
 import type { PreviewCertificate } from './certificate'
-import type { PreviewGrant, PreviewGrants } from './grants'
+import { pinnedPort, type PreviewGrant, type PreviewGrants } from './grants'
 
 // What answers on a Node's preview names (docs/relay/phone-channel.md § Previews). It is a server of its
 // own, fed by `preview` streams and nothing else, so no route of the Node's API can be reached on these
@@ -104,7 +104,9 @@ export function createPreviewServer(options: { grants: PreviewGrants; ownPort: n
       })
     const proxy = await proxyOptions(found, policy)
     if (!proxy)
-      return plain(502, 'This task has no app running on this computer to show.', { 'content-security-policy': policy })
+      return plain(502, 'This task’s app stopped or moved to another port. Open the preview again.', {
+        'content-security-policy': policy,
+      })
     return proxyHttp(request, proxy)
   }
 
@@ -112,7 +114,7 @@ export function createPreviewServer(options: { grants: PreviewGrants; ownPort: n
     found: { grant: PreviewGrant; host: string },
     policy: string,
   ): Promise<LoopbackProxyOptions | undefined> {
-    const port = await found.grant.port().catch(() => null)
+    const port = await pinnedPort(found.grant)
     return port === null
       ? undefined
       : {
