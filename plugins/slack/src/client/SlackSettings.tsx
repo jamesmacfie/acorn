@@ -66,45 +66,47 @@ export default function SlackSettings() {
             <Show
               when={current().links.some((entry) => entry.here)}
               fallback={
-                <SettingRow
-                  label="Link Slack"
-                  description="Mention @acorn in Slack, or DM it, to start an agent here. Only your replies run as turns."
-                  layout={pending() ? 'stacked' : undefined}
-                  error={save.error()}
-                >
-                  <Show
-                    when={pending()}
-                    fallback={
-                      <>
-                        <Checkbox
-                          ariaLabel="Answer approvals from Slack"
-                          label="Answer approvals from Slack"
-                          checked={approvalsOnLink()}
-                          onChange={setApprovalsOnLink}
-                        />
-                        <Text emphasis="muted" wrap>
-                          {RISK}
-                        </Text>
+                <>
+                  <SettingRow
+                    label="Link Slack"
+                    description="Mention @acorn in Slack, or DM it, to start an agent here. Only your replies run as turns."
+                    layout={pending() ? 'stacked' : undefined}
+                    error={save.error()}
+                  >
+                    <Show
+                      when={pending()}
+                      fallback={
                         <Button variant="solid" tone="accent" onPress={link}>
                           Link Slack
                         </Button>
-                      </>
-                    }
-                  >
-                    {(started) => (
-                      <>
-                        <Text wrap>Sign in with Slack at this address. Keep this page open until it finishes.</Text>
-                        <Button href={started().url}>Open Slack sign-in</Button>
-                        <Text emphasis="muted" wrap>
-                          {started().url}
-                        </Text>
-                        <Button variant="ghost" onPress={() => setPending(null)}>
-                          Cancel
-                        </Button>
-                      </>
-                    )}
+                      }
+                    >
+                      {(started) => (
+                        <>
+                          <Text wrap>Sign in with Slack at this address. Keep this page open until it finishes.</Text>
+                          <Button href={started().url}>Open Slack sign-in</Button>
+                          <Text emphasis="muted" wrap>
+                            {started().url}
+                          </Text>
+                          <Button variant="ghost" onPress={() => setPending(null)}>
+                            Cancel
+                          </Button>
+                        </>
+                      )}
+                    </Show>
+                  </SettingRow>
+                  {/* Chosen before linking, so the first approval after the link already follows it. */}
+                  <Show when={!pending()}>
+                    <SettingRow label="Answer approvals from Slack" description={RISK}>
+                      <Checkbox
+                        switch
+                        ariaLabel="Answer approvals from Slack"
+                        checked={approvalsOnLink()}
+                        onChange={setApprovalsOnLink}
+                      />
+                    </SettingRow>
                   </Show>
-                </SettingRow>
+                </>
               }
             >
               <For each={current().links.filter((entry) => entry.here)}>
