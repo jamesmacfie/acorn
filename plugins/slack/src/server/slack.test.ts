@@ -594,6 +594,8 @@ describe('/acorn and the project picker', () => {
     const h = await harness()
     await h.mention('fix it')
     const picker = h.calls.find((call) => call.method === 'chat.postEphemeral')!
+    // In the channel: Slack shows nothing for a thread that holds only a private message.
+    expect(picker.args.thread_ts).toBeUndefined()
     expect(h.executions).toEqual([])
     const select = (picker.args.blocks as { accessory?: { options: { value: string }[] } }[])[0]!.accessory!.options
     const value = select.find((option) => option.value.endsWith('|p-web'))!.value
@@ -605,6 +607,12 @@ describe('/acorn and the project picker', () => {
     })
     expect(h.created[0]!.projectId).toBe('p-web')
     expect((await h.store.channel(TEAM, CHANNEL))?.projectId).toBe('p-web')
+  })
+
+  it('offers the picker in the thread for a mention partway through one', async () => {
+    const h = await harness()
+    await h.mention('look at this', { thread_ts: '100.1' })
+    expect(h.calls.find((call) => call.method === 'chat.postEphemeral')?.args.thread_ts).toBe('100.1')
   })
 
   it("doesn't remember the pick when unticked, and says when it expired", async () => {

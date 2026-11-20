@@ -204,13 +204,16 @@ export function slackInbound(rt: SlackRuntime, turns: Turns, onClick?: (payload:
     projects: { id: string; name: string }[],
     message?: { ts: string; threadTs: string },
   ) {
+    // Slack shows nothing for a thread that holds only a private message, so a note about a fresh mention
+    // goes in the channel. One about a message partway through a thread goes in that thread.
+    const thread = message && message.threadTs !== message.ts ? message.threadTs : undefined
     if (!projects.length) {
       await rt.ephemeral(
         teamId,
         channel,
         user,
         'This Node has no projects with a folder. Add one in Acorn first.',
-        message?.threadTs,
+        thread,
       )
       return
     }
@@ -229,7 +232,7 @@ export function slackInbound(rt: SlackRuntime, turns: Turns, onClick?: (payload:
     await rt.call(teamId, 'chat.postEphemeral', {
       channel,
       user,
-      ...(message ? { thread_ts: message.threadTs } : {}),
+      ...(thread ? { thread_ts: thread } : {}),
       text: 'Which project should this use?',
       blocks: [
         {
