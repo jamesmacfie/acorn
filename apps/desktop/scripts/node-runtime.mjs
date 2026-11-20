@@ -2,10 +2,10 @@ import { createHash } from 'node:crypto'
 import { execFileSync } from 'node:child_process'
 import { chmodSync, copyFileSync, existsSync, mkdirSync, mkdtempSync, readFileSync, renameSync, rmSync, writeFileSync } from 'node:fs'
 import { homedir } from 'node:os'
-import { dirname, resolve } from 'node:path'
+import { basename, dirname, resolve } from 'node:path'
 
-// The pinned Node runtime that rides in the bundle, fetched from nodejs.org and verified against that
-// release's SHASUMS256.txt (docs/shell/packaging.md § Build and packaging).
+// The pinned Node runtime that rides in the bundle, fetched from nodejs.org and verified against the
+// digests node-runtime.json pins for it (docs/shell/packaging.md § Build and packaging).
 //
 // Every machine and every CI run bundles the same verified bytes, so no developer has to switch
 // runtimes to stage a build. A machine pays one download per pin, then hits the cache.
@@ -53,85 +53,71 @@ const download = async (url) => {
 // first on a runner's PATH, and that one does neither.
 export const tar = process.platform === 'win32' ? resolve(process.env.SystemRoot ?? 'C:\\Windows', 'System32/tar.exe') : 'tar'
 
-/// One file from this release, checked against the release's SHASUMS256.txt.
-const verifiedDownload = async (version, file) => {
-  const base = `https://nodejs.org/dist/v${version}`
-  const [shasums, bytes] = await Promise.all([download(`${base}/SHASUMS256.txt`), download(`${base}/${file}`)])
+/// One nodejs.org file for the pin, checked against the digest `node-runtime.json` records for it. The
+/// cache keeps the file itself, so a hit is checked against the same pinned digest as a download. A
+/// digest written beside a cache entry, or a SHASUMS256.txt fetched from the same server, would only
+/// prove the bytes agree with whoever supplied them.
+const verifiedFile = async (pin, file, cacheDir) => {
+  const expected = pin.sha256?.[file]
+  if (!/^[0-9a-f]{64}$/.test(expected ?? '')) {
+    throw new Error(`node-runtime.json has no reviewed sha256 for ${file}. Add it from the signed SHASUMS256.txt.asc for v${pin.version}.`)
+  }
+  const cached = resolve(cacheDir, `v${pin.version}`, file)
+  if (existsSync(cached) && sha256(cached) === expected) return { path: cached, source: 'cache' }
 
-  // The whole point of the exercise: the bytes that go into the bundle are the bytes nodejs.org
-  // published for this release, not whatever a proxy or a half-finished download handed back.
-  const expected = shasums
-    .toString('utf8')
-    .split('\n')
-    .map((line) => line.trim().split(/\s+/))
-    .find(([, name]) => name === file)?.[0]
-  if (!expected) throw new Error(`${base}/SHASUMS256.txt does not list ${file}. Check the pin in node-runtime.json.`)
+  const url = `https://nodejs.org/dist/v${pin.version}/${file}`
+  const bytes = await download(url)
   const actual = createHash('sha256').update(bytes).digest('hex')
-  if (actual !== expected) throw new Error(`${file} failed its checksum: nodejs.org published ${expected}, the download hashes to ${actual}.`)
-  return bytes
+  if (actual !== expected) throw new Error(`${url} failed its checksum: node-runtime.json pins ${expected}, the download hashes to ${actual}.`)
+  // Written beside its final name, because a rename across filesystems fails with EXDEV, as /tmp and
+  // the home folder are in the Linux archive jobs' container.
+  mkdirSync(dirname(cached), { recursive: true })
+  const partial = `${cached}.partial-${process.pid}`
+  writeFileSync(partial, bytes)
+  renameSync(partial, cached)
+  return { path: cached, source: 'nodejs.org' }
 }
 
-/// The extracted `node` binary for this version and triple, from the cache when it is there and intact.
-/// The cache records the digest of the extracted binary rather than the tarball's, so a hit re-verifies
-/// without going back to the network.
-export const cachedRuntime = async (version, triple, cacheDir = CACHE) => {
-  const dist = DIST_NAMES.get(triple)
-  if (!dist) throw new Error(`No nodejs.org build is mapped for ${triple}. Add it to DIST_NAMES, or set ACORN_TARGET_TRIPLE.`)
-  const cached = resolve(cacheDir, `node-v${version}-${triple}`)
-  const digestFile = `${cached}.sha256`
-  if (existsSync(cached) && existsSync(digestFile) && sha256(cached) === readFileSync(digestFile, 'utf8').trim()) {
-    return { path: cached, source: 'cache' }
-  }
-
-  const windows = triple.includes('-windows-')
-  const archive = windows ? `${dist}/node.exe` : `node-v${version}-${dist}.tar.gz`
-  const tarball = await verifiedDownload(version, archive)
-
-  // Scratch sits inside the cache, because a rename across filesystems fails with EXDEV, as /tmp and
-  // the home folder are in the Linux archive jobs' container.
+/// Copies one member of a verified archive out under `name` in the cache, and answers its path. The
+/// copy is written whole and then renamed, so an interrupted stage never leaves a truncated file behind.
+const extracted = (archive, member, stripComponents, cacheDir, name) => {
   mkdirSync(cacheDir, { recursive: true })
   const scratch = mkdtempSync(resolve(cacheDir, '.scratch-runtime-'))
   try {
-    const local = resolve(scratch, windows ? 'node.exe' : archive)
-    writeFileSync(local, tarball)
-    // Only the one file out of ~110 MB of runtime: the bundle ships a binary, not a Node installation.
-    if (!windows) execFileSync('tar', ['-xzf', local, '-C', scratch, '--strip-components=2', `node-v${version}-${dist}/bin/node`])
-    const extracted = resolve(scratch, 'node')
-    if (windows) writeFileSync(extracted, tarball)
-    // Written under its final name only once it is whole, so an interrupted stage cannot leave a
-    // truncated runtime behind that the next run would trust.
-    rmSync(cached, { force: true })
-    renameSync(extracted, cached)
-    writeFileSync(digestFile, sha256(cached))
-    return { path: cached, source: 'nodejs.org' }
+    execFileSync(tar, ['-xzf', archive, '-C', scratch, `--strip-components=${stripComponents}`, member])
+    const target = resolve(cacheDir, name)
+    rmSync(target, { force: true })
+    renameSync(resolve(scratch, basename(member)), target)
+    return target
   } finally {
     rmSync(scratch, { recursive: true, force: true })
   }
 }
 
-/// Node's LICENSE for this version, which a copy of the runtime has to carry. Every release archive holds
-/// the same file and the headers tarball holds none, so it comes from the Linux x64 tarball for any target.
-export const cachedLicense = async (version, cacheDir = CACHE) => {
-  const cached = resolve(cacheDir, `node-v${version}-LICENSE`)
-  if (existsSync(cached)) return cached
-  const dist = `node-v${version}-linux-x64`
-  const tarball = await verifiedDownload(version, `${dist}.tar.gz`)
-  mkdirSync(cacheDir, { recursive: true })
-  const scratch = mkdtempSync(resolve(cacheDir, '.scratch-license-'))
-  try {
-    const local = resolve(scratch, `${dist}.tar.gz`)
-    writeFileSync(local, tarball)
-    execFileSync(tar, ['-xzf', local, '-C', scratch, '--strip-components=1', `${dist}/LICENSE`])
-    renameSync(resolve(scratch, 'LICENSE'), cached)
-    return cached
-  } finally {
-    rmSync(scratch, { recursive: true, force: true })
-  }
+/// The `node` binary for the pin and this triple. It comes out of a verified archive on every call,
+/// because an extracted binary has no published digest to check a cache hit against.
+export const cachedRuntime = async (pin, triple, cacheDir = CACHE) => {
+  const dist = DIST_NAMES.get(triple)
+  if (!dist) throw new Error(`No nodejs.org build is mapped for ${triple}. Add it to DIST_NAMES, or set ACORN_TARGET_TRIPLE.`)
+  // Windows publishes node.exe directly, so the verified file is the binary.
+  if (triple.includes('-windows-')) return verifiedFile(pin, `${dist}/node.exe`, cacheDir)
+  const root = `node-v${pin.version}-${dist}`
+  const { path: archive, source } = await verifiedFile(pin, `${root}.tar.gz`, cacheDir)
+  // Only the one file out of ~110 MB of runtime: the bundle ships a binary, not a Node installation.
+  return { path: extracted(archive, `${root}/bin/node`, 2, cacheDir, `node-v${pin.version}-${triple}`), source }
+}
+
+/// Node's LICENSE for the pin, which a copy of the runtime has to carry. Every release archive holds the
+/// same file and the headers tarball holds none, so it comes from the Linux x64 tarball for any target.
+export const cachedLicense = async (pin, cacheDir = CACHE) => {
+  const root = `node-v${pin.version}-linux-x64`
+  const { path: archive } = await verifiedFile(pin, `${root}.tar.gz`, cacheDir)
+  return extracted(archive, `${root}/LICENSE`, 1, cacheDir, `node-v${pin.version}-LICENSE`)
 }
 
 /// Put the pinned runtime where `bundle.externalBin` resolves it, and answer where that is.
-export const stageNodeRuntime = async ({ pkg, version, triple, cacheDir = CACHE }) => {
-  const { path: runtime, source } = await cachedRuntime(version, triple, cacheDir)
+export const stageNodeRuntime = async ({ pkg, pin, triple, cacheDir = CACHE }) => {
+  const { path: runtime, source } = await cachedRuntime(pin, triple, cacheDir)
   const binary = resolve(pkg, 'src-tauri/binaries', runtimeBinaryName(triple))
   mkdirSync(dirname(binary), { recursive: true })
   // Removed before it is written, never overwritten in place. macOS caches a code signature against the

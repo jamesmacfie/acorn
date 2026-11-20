@@ -260,14 +260,14 @@ async function packPlatformArchive(tree) {
   if (existsSync(spawnHelper)) chmodSync(spawnHelper, 0o755)
 
   const windows = platform.startsWith('win32')
-  const pin = read(join(ROOT, 'node-runtime.json')).version
+  const pin = read(join(ROOT, 'node-runtime.json'))
   const runtime = await cachedRuntime(pin, ARCHIVE_TRIPLES[platform])
   mkdirSync(join(root, 'runtime'))
   const node = join(root, 'runtime', windows ? 'node.exe' : 'node')
   cpSync(runtime.path, node)
   chmodSync(node, 0o755)
   cpSync(await cachedLicense(pin), join(root, 'runtime/LICENSE'))
-  console.log(`[pack-node] Node.js ${pin} for ${platform}, from ${runtime.source}`)
+  console.log(`[pack-node] Node.js ${pin.version} for ${platform}, from ${runtime.source}`)
 
   const launchers = join(ROOT, 'scripts/node-archive')
   mkdirSync(join(root, 'bin'))
@@ -281,7 +281,7 @@ async function packPlatformArchive(tree) {
   const commit = execFileSync('git', ['rev-parse', 'HEAD'], { cwd: ROOT, encoding: 'utf8' }).trim()
   writeFileSync(
     join(root, 'BUILD'),
-    `version=${desktop.version}\ncommit=${commit}\nbuilt=${new Date().toISOString()}\nplatform=${platform}\nnode=${pin}\n`,
+    `version=${desktop.version}\ncommit=${commit}\nbuilt=${new Date().toISOString()}\nplatform=${platform}\nnode=${pin.version}\n`,
   )
 
   // A zip on Windows, where people extract with Explorer. A tarball elsewhere, because it keeps the

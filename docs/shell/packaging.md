@@ -50,13 +50,13 @@ minified files, so it matches the budget check.
 The helper's production bundle enables Oxc minification in `apps/desktop/vite.helper.config.ts`. On
 October 2, 2026, it measured 269,402 B.
 
-`apps/desktop/scripts/stage.mjs` places the service, every core and plugin migration chain, the
-plugin frame stylesheet, and the pinned Node runtime for the bundler. It fetches the runtime from
-nodejs.org and verifies it against that release's `SHASUMS256.txt`, and `node-runtime.json` is the one
-pin both this and `scripts/pack-node.mjs` read. Staging also copies the headless CLI bundle into
-`Resources/cli`. **Settings → Command line** asks the shell to write a launcher into a writable
-directory on the login shell's `PATH` (`cli_install.rs`). The launcher points at that build's Node and
-CLI, and the renderer can't choose a path or command.
+`apps/desktop/scripts/stage.mjs` places the service, every core and plugin migration chain, the plugin
+frame stylesheet, and the pinned Node runtime for the bundler. `node-runtime.json` is the one pin both
+this and `scripts/pack-node.mjs` read. Every runtime download and cache hit must match the reviewed
+sha256 it records, since a checksum from the same server can't catch a replaced file. Staging also
+copies the headless CLI bundle into `Resources/cli`. **Settings → Command line** asks the shell to
+write a launcher into a writable directory on the login shell's `PATH` (`cli_install.rs`). The
+launcher points at that build's Node and CLI, and the renderer can't choose a path or command.
 
 `pnpm --filter @acorn/desktop run build` stages and builds the renderer, then checks the startup budget
 ([startup budget](../frontend/startup-budget.md)) and the bundles' syntax.

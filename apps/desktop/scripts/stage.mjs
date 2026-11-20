@@ -70,10 +70,10 @@ for (const chain of chains) {
 
 // The bundled Node runtime, as a Tauri external binary: `binaries/node-<target triple>` is the name
 // `bundle.externalBin` resolves, and the triple comes from rustc rather than a guess about how
-// process.arch spells itself. The runtime is fetched from nodejs.org and checksum-verified, so the
-// developer's own Node doesn't have to be the pinned one; see `stageNodeRuntime`.
-const pin = JSON.parse(readFileSync(resolve(ROOT, 'node-runtime.json'), 'utf8')).version
-const { source } = await stageNodeRuntime({ pkg: PKG, version: pin, triple: target.triple })
+// process.arch spells itself. The runtime is fetched from nodejs.org and checked against the digest
+// node-runtime.json pins, so the developer's own Node doesn't have to be the pinned one; see `stageNodeRuntime`.
+const pin = JSON.parse(readFileSync(resolve(ROOT, 'node-runtime.json'), 'utf8'))
+const { source } = await stageNodeRuntime({ pkg: PKG, pin, triple: target.triple })
 
 // The plugin frame's stylesheet, as one file the `app-plugin://` handler serves at `/ui.css`
 // (src-tauri/src/plugin_scheme.rs). The module list is shared with the phone's sandbox build.
@@ -82,5 +82,5 @@ mkdirSync(resolve(PKG, 'dist/bridge'), { recursive: true })
 writeFileSync(resolve(PKG, 'dist/bridge/plugin-frame.css'), frameStyles)
 
 console.log(
-  `[stage] node ${pin} (${source}) -> binaries/node-${target.triple}; service + ${chains.length} migration chain(s) -> dist/helper; frame stylesheet -> dist/bridge`,
+  `[stage] node ${pin.version} (${source}) -> binaries/node-${target.triple}; service + ${chains.length} migration chain(s) -> dist/helper; frame stylesheet -> dist/bridge`,
 )
