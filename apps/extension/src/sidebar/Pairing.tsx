@@ -497,10 +497,11 @@ function collectApproval(
   })()
 }
 
-// A Node the account lists: its fingerprint is the account's word, so no words to compare, and a device
-// already paired with it approves this browser.
+// A Node the account lists. A device already paired with it approves this browser, and the person checks
+// it shows the same phrase and the identity words of the certificate the host checked.
 function Approve(props: { client: BridgeClient; node: BridgeProvidedNode; paired(node: NodeRecord): void }) {
   const [phrase, setPhrase] = createSignal<string | null>(null)
+  const [identity, setIdentity] = createSignal<string | undefined>()
   const [problem, setProblem] = createSignal<string | null>(null)
   const [refused, setRefused] = createSignal(false)
   let timer: ReturnType<typeof setTimeout> | undefined
@@ -516,6 +517,7 @@ function Approve(props: { client: BridgeClient; node: BridgeProvidedNode; paired
         providerId: props.node.providerId,
         providerNodeId: props.node.providerNodeId,
       })
+      setIdentity(adopted.identity)
       setPhrase(adopted.phrase)
       collectApproval(
         props.client,
@@ -546,14 +548,22 @@ function Approve(props: { client: BridgeClient; node: BridgeProvidedNode; paired
           action={
             <Stack>
               <Words phrase={words()} words={words().split(' ')} />
+              <Show when={identity()}>
+                {(node) => (
+                  <>
+                    <p>And these identity words for the Node:</p>
+                    <Words phrase={node()} words={node().split(' ')} />
+                  </>
+                )}
+              </Show>
               <Show when={!refused()} fallback={<Alert>The request was denied or has expired.</Alert>}>
                 <Waiting>Waiting for approval</Waiting>
               </Show>
             </Stack>
           }
         >
-          Open Acorn on a device already paired with {props.node.label}. It asks to allow this browser. Allow it if it
-          shows these words.
+          Open Acorn on a device already paired with {props.node.label}. It asks to allow this browser. Allow it only if
+          it shows these words.
         </EmptyState>
       )}
     </Show>

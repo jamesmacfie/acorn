@@ -1,8 +1,13 @@
 import { randomUUID } from 'node:crypto'
-import { beforeAll, beforeEach, expect, it, vi } from 'vitest'
+import { mkdtempSync, rmSync } from 'node:fs'
+import { tmpdir } from 'node:os'
+import { join } from 'node:path'
+import { afterAll, beforeAll, beforeEach, expect, it, vi } from 'vitest'
 import { generateSigningKey, signToken, type SigningKey } from '@acorn/protocol/accountToken.ts'
 import type { AccountKeys } from '@acorn/protocol/account.ts'
+import { fingerprintPhrase } from '@acorn/protocol/fingerprintWords.ts'
 import type { Env } from '../bindings'
+import { channelPublicKey } from '../transport/channelKey'
 import { pairingRoutes } from './pairing'
 
 // Who may raise a pairing ask from another computer (docs/api-reference/transport.md § Pairing by
@@ -19,15 +24,19 @@ vi.mock('../notify', () => ({ broadcastPairingRequested: vi.fn() }))
 const audited = vi.fn()
 vi.mock('../auditRequest', () => ({ auditRequest: (...args: unknown[]) => audited(...args), auditActor: vi.fn() }))
 
+const DATA_DIR = mkdtempSync(join(tmpdir(), 'acorn-pairing-ask-'))
+const FINGERPRINT = 'ef'.repeat(32)
+
 beforeAll(async () => {
   ;({ signing, keys } = await generateSigningKey('test-1'))
 })
+afterAll(() => rmSync(DATA_DIR, { recursive: true, force: true }))
 beforeEach(() => {
   audited.mockClear()
   owner = { accountId: OWNER, keys }
 })
 
-const assertion = (claims: Partial<{ sub: string; aud: string; exp: number }> = {}, key = signing) =>
+const assertion = (claims: Partial<{ sub: string; aud: string; iat: number; exp: number }> = {}, key = signing) =>
   signToken(
     'assertion',
     {
@@ -44,8 +53,14 @@ const assertion = (claims: Partial<{ sub: string; aud: string; exp: number }> = 
 
 // `incoming` is the socket the request came in on. The routes read the peer from it, so a request with
 // none reads as another computer.
-const env = (peer?: string) =>
-  ({ NODE_ID, DATA_DIR: '/unused', incoming: peer ? { socket: { remoteAddress: peer } } : undefined }) as unknown as Env
+const env = (peer?: string, extra: Partial<Env> = {}) =>
+  ({
+    NODE_ID,
+    DATA_DIR,
+    NODE_FINGERPRINT: FINGERPRINT,
+    incoming: peer ? { socket: { remoteAddress: peer } } : undefined,
+    ...extra,
+  }) as unknown as Env
 
 const ask = (body: unknown, peer?: string) =>
   pairingRoutes().open.request('/pair/requests', { method: 'POST', body: JSON.stringify(body) }, env(peer))
@@ -60,7 +75,10 @@ it('lets the owner account raise an ask from another computer, shows it as remot
   expect(response.status).toBe(200)
   expect(await response.json()).toMatchObject({ phrase: expect.any(String), secret: expect.any(String) })
   const pending = await routes.core.request('/pair/requests', {}, env())
-  expect(await pending.json()).toMatchObject({ request: { deviceName: 'MacBook', remote: true } })
+  // The Node's own certificate words, which the owner compares with the words the asker's probe saw.
+  expect(await pending.json()).toMatchObject({
+    request: { deviceName: 'MacBook', remote: true, identity: fingerprintPhrase(FINGERPRINT) },
+  })
   expect(audited).toHaveBeenCalledWith(
     expect.anything(),
     expect.objectContaining({
@@ -68,6 +86,33 @@ it('lets the owner account raise an ask from another computer, shows it as remot
       details: { accountId: OWNER, assertionId: 'assertion-1', deviceName: 'MacBook' },
     }),
   )
+})
+
+it("shows a phone's ask with the Node's channel key words, the key the phone's channel checked", async () => {
+  const routes = pairingRoutes()
+  const response = await routes.open.request(
+    '/pair/requests',
+    { method: 'POST', body: JSON.stringify({ deviceName: 'iPhone', assertion: await assertion() }) },
+    env(undefined, { browserChannel: true }),
+  )
+  expect(response.status).toBe(200)
+  const { request } = (await (await routes.core.request('/pair/requests', {}, env())).json()) as {
+    request: { identity: string }
+  }
+  expect(request.identity).toBe(fingerprintPhrase(channelPublicKey(DATA_DIR)))
+  expect(request.identity).not.toBe(fingerprintPhrase(FINGERPRINT))
+})
+
+it('shows an ask from this computer without identity words', async () => {
+  const routes = pairingRoutes()
+  await routes.open.request(
+    '/pair/requests',
+    { method: 'POST', body: JSON.stringify({ deviceName: 'acorn' }) },
+    env('127.0.0.1'),
+  )
+  const { request } = (await (await routes.core.request('/pair/requests', {}, env())).json()) as { request: object }
+  expect(request).not.toHaveProperty('identity')
+  expect(request).not.toHaveProperty('remote')
 })
 
 it('refuses an ask from another computer with no assertion', async () => {
@@ -79,6 +124,12 @@ it.each([
   ['another account', { sub: 'acct_someone_else' }],
   ['another Node', { aud: randomUUID() }],
   ['an assertion that has run out', { exp: Math.floor(Date.now() / 1000) - 1 }],
+  // The service signs for two minutes. The Node holds it to that, whatever `exp` says.
+  ['an assertion signed for longer than two minutes', { exp: Math.floor(Date.now() / 1000) + 121 }],
+  [
+    'an assertion dated ahead of the Node’s clock',
+    { iat: Math.floor(Date.now() / 1000) + 3600, exp: Math.floor(Date.now() / 1000) + 3720 },
+  ],
 ])('refuses an assertion for %s', async (_name, claims) => {
   const response = await ask({ deviceName: 'MacBook', assertion: await assertion(claims) })
   expect(response.status).toBe(403)

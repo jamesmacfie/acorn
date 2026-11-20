@@ -134,7 +134,7 @@ format is written down.
 | --- | --- | --- | --- |
 | Relay credential | `acorn-relay-credential+jwt` | `iss`, `sub` (account), `jti`, `iat`, `aud: "relay"`, `node` | Until the Node is removed or registers again. |
 | Relay ticket | `acorn-relay-ticket+jwt` | The credential's claims, plus `exp` | Five minutes. |
-| Account assertion | `acorn-account-assertion+jwt` | `iss`, `sub`, `jti`, `iat`, `aud` (the Node ID), `exp` | Two minutes. |
+| Account assertion | `acorn-account-assertion+jwt` | `iss`, `sub`, `jti`, `iat`, `aud` (the Node ID), `exp` | Two minutes. A Node refuses one signed for longer. |
 | Gateway token | `acorn-gateway+jwt` | `iss`, `sub`, `jti`, `iat`, `aud` (the Node ID), `exp`, `scope` (the plugin) | 60 seconds, one request ([the gateway token](./account-api/slack-gateway.md#the-gateway-token)). |
 
 The credential names the account that owns the Node, and the ticket names the account that may open
@@ -180,9 +180,10 @@ Node in to its own account or ask for a ticket.
 
 ## What the account service can do
 
-It can route a client to a Node and raise a pairing request. It can't approve one, read traffic, or get
-a device token. If breached, it could vouch for an impostor Node, so that a person pairs with the wrong
-machine. [Control plane security](./security/control-plane.md#the-account-service) says what bounds that.
+It can route a client to a Node and raise a pairing request. It can't approve one or read traffic. If
+breached, it could vouch for an impostor Node, so that a person pairs with the wrong machine, or for a
+relay that forwards a pairing ask to the real Node and keeps the device token. The identity words both
+ends show stop the second, when the owner compares them. [Control plane security](./security/control-plane.md#the-account-service) says what bounds that.
 
 ## Browsers
 

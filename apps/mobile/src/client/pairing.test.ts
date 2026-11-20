@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import type { AccountNode } from '@acorn/protocol/account.ts'
 import { ACORN_BASELINE } from '@acorn/protocol/baseline.ts'
+import { fingerprintPhrase } from '@acorn/protocol/fingerprintWords.ts'
 
 const saved = vi.hoisted(() => ({ calls: [] as unknown[][] }))
 vi.mock('./pairedNodes', () => ({ savePaired: async (...args: unknown[]) => void saved.calls.push(args) }))
@@ -53,6 +54,8 @@ describe('pairing this phone with a Node', () => {
     ]
     const pairing = await pairWithNode(NODE, 'iPhone Safari 1a2b')
     expect(pairing.phrase).toBe('engine fjord cherry')
+    // The words of the key the channel checked, which the device asked compares with the Node's own.
+    expect(pairing.identity).toBe(fingerprintPhrase(NODE.channelKey))
     expect(channel.requests[0]).toEqual({
       path: '/v1/pair/requests',
       body: { deviceName: 'iPhone Safari 1a2b', assertion: 'assertion.jwt' },

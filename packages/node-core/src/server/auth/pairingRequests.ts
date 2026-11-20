@@ -19,8 +19,9 @@ export const PAIRING_REQUEST_MS = 2 * 60_000
 const PHRASE_WORDS = 3
 
 export type PairingRequests = {
-  // Null when another ask was still waiting for an answer: that one is cancelled too.
-  ask(deviceName: string, remote?: boolean): PairingAsk | null
+  // Null when another ask was still waiting for an answer: that one is cancelled too. `remote` is an ask
+  // from another computer, with this Node's identity words for the connection it came over.
+  ask(deviceName: string, remote?: { identity: string }): PairingAsk | null
   // The request waiting for an answer, or null once it is answered, expired, or replaced.
   pending(): PairingRequest | null
   // False when `id` isn't the request waiting for an answer.
@@ -37,7 +38,7 @@ export function pairingRequests(now: () => number = () => Date.now()): PairingRe
     secret: Buffer
     expiresAt: number
     allowed: boolean
-    remote: boolean
+    remote: { identity: string } | undefined
   } | null = null
 
   const live = () => {
@@ -46,7 +47,7 @@ export function pairingRequests(now: () => number = () => Date.now()): PairingRe
   }
 
   return {
-    ask(deviceName, remote = false) {
+    ask(deviceName, remote) {
       if (live() && !held!.allowed) {
         held = null
         return null
@@ -70,7 +71,7 @@ export function pairingRequests(now: () => number = () => Date.now()): PairingRe
       const request = live()
       if (!request || request.allowed) return null
       const { id, deviceName, phrase, expiresAt, remote } = request
-      return { id, deviceName, phrase, expiresAt, ...(remote ? { remote } : {}) }
+      return { id, deviceName, phrase, expiresAt, ...(remote ? { remote: true, identity: remote.identity } : {}) }
     },
 
     decide(id, decision) {

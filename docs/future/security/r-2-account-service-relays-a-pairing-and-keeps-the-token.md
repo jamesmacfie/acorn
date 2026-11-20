@@ -1,3 +1,57 @@
+> **Completion note, November 20, 2026.** Fixed on the Acorn side, on branch
+> `phase-r-2-account-service-can-t-relay-a-pairing-and-keep-the`.
+>
+> What landed:
+>
+> - `PairingRequest` has an `identity` field on a remote ask: six words for the Node's own key on the
+>   connection the ask came over. That's the certificate fingerprint for a TLS stream, and the channel key
+>   for an ask through a phone's channel (`askedIdentity` in `routes/pairing.ts`). A request from this
+>   computer has none.
+> - `askVouchedNode` returns `identity`, the words of the certificate its probe saw. The desktop helper's
+>   `node-adopt` and the native host's `node.adopt` pass it on, and `NodeAdoption` and the bridge results
+>   carry it. The phone's `pairWithNode` returns the words of the channel key its handshake checked.
+> - Every asker shows the identity words beside the phrase: **Settings → Nodes** on the desktop, the
+>   extension's **Approve on another device**, and the phone's Nodes screen. The owner's dialog, on the
+>   desktop, the phone, and the terminal client, shows the Node's own words. Each says to allow only when
+>   the asker shows both.
+> - `ownerAssertion` refuses an assertion whose `exp` is more than 120 seconds after its `iat`, and one
+>   whose `iat` is more than 60 seconds ahead of the Node's clock.
+> - Tests: `pairingAsk.test.ts` checks a remote ask's certificate words, a phone ask's channel key words,
+>   no words on a local ask, and the two lifetime refusals. `nodePairing.test.ts` checks that
+>   `askVouchedNode` returns the probed certificate's words. `pairFromAnywhere.test.ts` pairs through a
+>   real relay and checks that the asker's words equal the ones the Node's dialog shows. The dialog, the
+>   terminal confirmation, the phone pairing, the helper, and the bridge tests cover the rest.
+> - Docs: `transport.md` § Pairing by approval, `control-plane.md` § The account service,
+>   `phone-channel.md` § Trust, `node-providers.md`, `account-api.md`, `security.md`, and the extension's
+>   setup and native messaging pages no longer say a vouched fingerprint stands in for the words.
+>
+> Decisions and deviations:
+>
+> - I took the finding's simpler form: identity words at both ends, compared by the owner. Nothing in the
+>   request body can bind the two ends, because a relay in between rewrites it.
+> - The bridge result's `identity` is optional, because the extension and its native host ship apart. An
+>   older host sends none, so the extension shows only the phrase. The owner's dialog still shows the
+>   Node's words, and an owner who follows it denies. The desktop renderer and its helper ship together,
+>   so `NodeAdoption.identity` is required.
+> - The clock allowance is 60 seconds, so a Node whose clock runs a little slow still takes honest
+>   assertions. An assertion works for at most three minutes of the Node's time.
+> - The phone's words protect the phone only as far as the app the account website serves. A breached
+>   website can make the phone show any words. That's R-1's trust boundary, and a signed phone app
+>   release is what closes it.
+> - I didn't run the live check with a stand-in proxy and `pnpm dev:agent`. The relay test covers the
+>   honest path end to end, and the unit tests cover a key that differs.
+> - No public site page describes pairing with a Node an account lists, so none changed. `stale` lists 14
+>   pages that cite the touched files. The ones I read describe local pairing and device tokens, which
+>   this doesn't change.
+>
+> For later phases: C-1 still lets a phone approve a pairing. The phone's dialog shows the identity words
+> too, because it uses the shared dialog. A new client that pairs with a listed Node must show
+> `identity` beside the phrase, or the owner can't compare.
+>
+> What acorn-cloud would still need: nothing for this fix. The service should keep signing assertions for
+> exactly `ASSERTION_LIFETIME_SECONDS`, or Nodes refuse them. Serving the phone app from a signed release
+> would let the phone's words hold against a breached website too.
+
 # R-2: A breached account service relays a pairing and keeps the device token
 
 Found November 20, 2026, in a read-only security review of `jamesmacfie/acorn` at `90b9e61e3`.

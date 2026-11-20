@@ -116,12 +116,15 @@ it('says when the request came from another computer', async () => {
       phrase: 'maple river stone',
       expiresAt: Date.now() + 60_000,
       remote: true,
+      identity: 'amber birch cobalt delta elm fern',
     },
   })
   dispose = render(() => <PairingRequestDialog />, document.body.appendChild(document.createElement('div')))
   await vi.waitFor(() => expect(dialog()).not.toBeNull())
   const text = dialog()!.textContent ?? ''
   expect(text).toContain('MacBook, signed in to your account on another computer')
+  // The Node's own identity words, which the asker must show too.
+  expect(text).toContain('And these identity words for this Node:amber birch cobalt delta elm fern')
   expect(text).toContain("If you didn't just click Connect on another computer, deny it.")
   expect(text).not.toContain('on the computer running')
 })

@@ -14,9 +14,11 @@ export function PairingRequests() {
   createEffect(() => {
     const current = asking()
     if (!current) return
+    const { phrase, identity } = current.request
+    const words = identity ? `${phrase}, and these identity words for this Node: ${identity}` : phrase
     const question = {
       title: 'Allow a new client?',
-      goes: `${askerLine(current)} Allow it only if it shows these words: ${current.request.phrase}`,
+      goes: `${askerLine(current)} Allow it only if it shows these words: ${words}`,
       stays: denyAdvice(current.request),
       actionLabel: 'Allow',
     }

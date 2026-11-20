@@ -6,6 +6,7 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { ensureCert } from '@acorn/node-core/server/transport'
 import { ACORN_BASELINE } from '@acorn/protocol/baseline.ts'
+import { fingerprintPhrase } from '@acorn/protocol/fingerprintWords.ts'
 import { NODE_PROTOCOL_VERSION } from '@acorn/protocol/node.ts'
 import { afterAll, afterEach, beforeAll, expect, it } from 'vitest'
 import { NodeResponseTooLargeError } from './nodeRequest'
@@ -136,12 +137,14 @@ async function startNodeAskedBy(asks: string[]): Promise<string> {
 it('asks a listed Node with the assertion once its certificate is the one the account vouched for', async () => {
   const asks: string[] = []
   const endpoint = await startNodeAskedBy(asks)
-  const { ask } = await askVouchedNode(
+  const { ask, identity } = await askVouchedNode(
     { endpoint, fingerprint: cert.fingerprint, assertion: 'an-assertion' },
     'MacBook',
     () => Promise.reject(new Error('a direct endpoint needs no ticket')),
   )
   expect(ask.phrase).toBe('one two three')
+  // The words of the certificate the probe saw, which the owner compares with the Node's own.
+  expect(identity).toBe(fingerprintPhrase(cert.fingerprint))
   expect(JSON.parse(asks[0]!)).toEqual({ deviceName: 'MacBook', assertion: 'an-assertion' })
 })
 

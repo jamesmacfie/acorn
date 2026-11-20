@@ -43,6 +43,18 @@ it('asks the owner with the three words, and allows what they confirm', async ()
   await vi.waitFor(() => expect(answer).toHaveBeenCalledWith('allow'))
 })
 
+it("asks a remote request's asker for the Node's identity words too", async () => {
+  mount()
+  setAsking({
+    nodeId: 'node-1',
+    request: { ...request('req-2').request, remote: true, identity: 'amber birch cobalt delta elm fern' },
+  })
+  expect(activeConfirmation()?.goes).toContain(
+    'maple river stone, and these identity words for this Node: amber birch cobalt delta elm fern',
+  )
+  finishConfirmation(false)
+})
+
 it('denies when the owner cancels', async () => {
   mount()
   setAsking(request('req-1'))

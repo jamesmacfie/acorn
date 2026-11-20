@@ -15,7 +15,9 @@ const ALLOW_DELAY_MS = 1_000
 // is read from the Node's device-only route, never from the frame, which a task-scoped socket hears too.
 //
 // The phrase is the check. The asker shows the same three words, so a request something else raced in
-// shows words the person doesn't recognize. The words on screen never change under the cursor: a frame
+// shows words the person doesn't recognize. An ask from another computer also carries the Node's identity
+// words, and the asker shows the words of the key it checked. A relay that forwards the ask can copy the
+// phrase but not make those two agree. The words on screen never change under the cursor: a frame
 // that brings a different request, or none, closes the dialog instead of replacing what the person is
 // reading. **Allow** also waits a second after the dialog opens, so a click meant for something else
 // can't land on it.

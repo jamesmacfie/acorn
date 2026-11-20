@@ -1,5 +1,6 @@
 import { Hono, type Context } from 'hono'
 import { ACORN_BASELINE } from '@acorn/protocol/baseline.ts'
+import { fingerprintPhrase } from '@acorn/protocol/fingerprintWords.ts'
 import {
   ACORN_BUILD,
   NODE_PROTOCOL_VERSION,
@@ -63,6 +64,17 @@ function attemptCeiling(perWindow: number, now: () => number = () => Date.now())
 // The single pairing failure (docs/api-reference/transport.md § Pairing): same status, same code, same message,
 // no details. 401 because the request presented a credential and it was rejected.
 const pairingFailed = (c: Context<AppEnv>): Response => respondError(c, 401, 'pairing_failed', ['Pairing failed.'])
+
+// The words of the key the asker's connection reached: the channel key for a phone, the certificate for
+// anyone else. The owner compares them with the words the asker shows for the key it checked, which is the
+// one check a relay between the two can't pass by forwarding (docs/api-reference/transport.md § Pairing by
+// approval).
+async function askedIdentity(c: Context<AppEnv>): Promise<string> {
+  const key = c.env.browserChannel
+    ? (await import('../transport/channelKey')).channelPublicKey(c.env.DATA_DIR)
+    : c.env.NODE_FINGERPRINT
+  return fingerprintPhrase(key)!
+}
 
 // A device token for the caller, the one time it exists outside the client. Never logged.
 async function paired(c: Context<AppEnv>, deviceName: string): Promise<Response> {
@@ -136,7 +148,7 @@ export function pairingRoutes(): { open: Hono<AppEnv>; core: Hono<AppEnv> } {
       if (!parsed.success) return respondError(c, 400, 'bad_request', ['A pairing request needs a device name.'])
       if (remote && !withinAskCeiling())
         return respondError(c, 429, 'rate_limited', ['Too many pairing attempts. Try again shortly.'])
-      const ask = requests.ask(parsed.data.deviceName, remote)
+      const ask = requests.ask(parsed.data.deviceName, remote ? { identity: await askedIdentity(c) } : undefined)
       if (owner)
         auditRequest(c, {
           action: 'pairing.request.raised',

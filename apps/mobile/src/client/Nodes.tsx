@@ -23,7 +23,7 @@ export function Nodes(props: { onOpen(nodeId: string): void; onBack?: () => void
     }
   })
   const [paired] = createResource(pairedVersion, async () => new Set((await pairedNodes()).map((node) => node.nodeId)))
-  const [pairing, setPairing] = createSignal<{ nodeId: string; phrase?: string } | null>(null)
+  const [pairing, setPairing] = createSignal<{ nodeId: string; phrase?: string; identity?: string } | null>(null)
   const [error, setError] = createSignal('')
   let current: Pairing | undefined
 
@@ -32,7 +32,7 @@ export function Nodes(props: { onOpen(nodeId: string): void; onBack?: () => void
     setPairing({ nodeId: node.nodeId })
     try {
       current = await pairWithNode(node)
-      setPairing({ nodeId: node.nodeId, phrase: current.phrase })
+      setPairing({ nodeId: node.nodeId, phrase: current.phrase, identity: current.identity })
       await current.paired
       setPairing(null)
       props.onOpen(node.nodeId)
@@ -134,9 +134,13 @@ export function Nodes(props: { onOpen(nodeId: string): void; onBack?: () => void
                         {(phrase) => (
                           <>
                             <Text emphasis="muted" wrap>
-                              Allow this phone on a device that is already paired. It should show:
+                              Allow this phone on a device that is already paired, only if it shows:
                             </Text>
                             <Text emphasis="strong">{phrase()}</Text>
+                            <Text emphasis="muted" wrap>
+                              And these identity words for the Node:
+                            </Text>
+                            <Text emphasis="strong">{pairing()?.identity}</Text>
                             <Button variant="ghost" onPress={cancel}>
                               Cancel
                             </Button>

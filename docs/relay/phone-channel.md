@@ -156,8 +156,11 @@ reload, only from the page's own origin.
   reads, and that does what the phone may do. That's true of any web app. Someone would have to change
   the served files on purpose, and the change would be visible in them. That's why a phone runs nothing
   on a Node until a computer gives it [shell access](./phone-channel/phone-devices.md#shell-access).
-- **The account vouches for the key.** A breached account service could list a Node with an impostor's key.
-  A phone that pairs with it would send the impostor its work. It still couldn't get into the real Node.
+- **The account vouches for the key.** A breached account service could list a Node with a key of its own,
+  then forward the phone's pairing ask to the real Node and keep the phone token it gets back. So the
+  phone shows the words of the key its channel checked beside the phrase, and the device asked to allow it
+  shows the words of the Node's own channel key. Through a relay in between, the two differ. A phone that
+  pairs with an impostor that doesn't forward sends the impostor its work.
 - **A phone can approve a pairing.** Raising a request from another computer needs the owner's account
   assertion, and a phone holds the account's session as well as its device token. Someone holding an
   unlocked phone could pair a new computer. Revoke a lost phone from a computer, and the 30-day limit ends one nobody uses.

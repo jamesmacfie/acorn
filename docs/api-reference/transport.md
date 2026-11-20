@@ -82,7 +82,7 @@ watching. The store is `packages/node-core/src/server/auth/pairingRequests.ts`.
    this computer. The Node answers with a `secret`, a
    three-word `phrase`, and `expiresInMs`, and broadcasts a content-free `pairing:requested` frame.
 2. A paired client reads `GET /v1/core/pair/requests` from the Node that sent the frame and shows the
-   device name and the phrase. The asker prints the same phrase.
+   device name and the phrase. The asker prints the same phrase. A remote ask also carries `identity`.
 3. The owner answers with `POST /v1/core/pair/requests/:id` and `decision` set to `allow` or `deny`.
    The answer is on the audit trail as `pairing.request.decided`.
 4. The client polls `POST /v1/pair/requests/claim` with its `secret` once a second. It gets `202`
@@ -99,7 +99,14 @@ These limits apply:
   with a code, because a dialog anyone on the network could raise is one the owner learns to click
   through. A Node with remote access off has no owner account and keeps the loopback-only rule.
   A remote ask counts against the ceiling only when its assertion checks out, and the audit trail
-  records it as `pairing.request.raised`, with the account ID and the assertion's ID.
+  records it as `pairing.request.raised`, with the account ID and the assertion's ID. The Node also
+  holds an assertion to its two-minute life: it refuses one whose `exp` is more than 120 seconds after
+  its `iat`, and one whose `iat` is more than 60 seconds ahead of the Node's clock.
+- A remote request's `identity` is six words for the Node's own key on the ask's connection: its
+  certificate, or its channel key for a phone. The asker shows the words of the key it checked, and the
+  dialog says to allow only when the phrase and the identity words both match. A breached account
+  service could list its own relay for the Node, forward the ask, and copy the phrase, but the relay's
+  key gives different words.
 - The ask has its own ceiling of 6 a minute, apart from the code route's 20, so a loop of asks can't
   block someone typing a code from another computer. The claim has no ceiling, because its secret is
   256 random bits.

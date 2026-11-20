@@ -48,11 +48,17 @@ Node's ID, a label, and the Node's certificate fingerprint, and nothing about wh
 
 **It can send a client to a Node and raise a pairing request, so a breach could send you to an
 impostor.** It signs relay tickets for any Node it lists and account assertions for any account. What
-it can't do is approve a pairing, read relayed traffic, or get a device token. A relay forwards TLS the
-client pins, so an impostor Node fails the pin as `identity_mismatch` unless the person pairs with it
-after comparing the wrong identity words. A Node the account lists skips the words, because the
-account vouches for its fingerprint, so a person who connects to a listing from a breached service pairs
-with the impostor and sends it their work. Four things bound that:
+it can't do is approve a pairing or read relayed traffic. A relay forwards TLS the client pins, so an
+impostor Node fails the pin as `identity_mismatch` unless the person pairs with it after comparing the
+wrong identity words.
+
+A Node the account lists is checked against the fingerprint the account vouches for, which a breached
+service chooses. It could list a relay of its own, forward a pairing ask to the real Node, and collect
+the device token once the owner allows it. So an ask from another computer shows identity words at both
+ends: the asker shows the words of the key it checked, and the owner's dialog shows the Node's own
+([pairing by approval](../api-reference/transport.md#pairing-by-approval)). Through a relay in between,
+the two sets differ, and the owner who compares them denies the request. An owner who allows it without
+comparing hands the service a device token. Four things bound the rest:
 
 - **Pairing is still a person's act.** A new device needs a code from a paired device or an approval
   from a device already paired with the Node. An assertion lets the owner account raise the dialog

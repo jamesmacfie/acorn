@@ -205,7 +205,11 @@ describe('node-adopt by approval', () => {
   const paired = { deviceToken: 'device-token-nobody-else-sees', nodeId: 'node-1', device: { id: 'device-1' } }
 
   it('asks with the assertion, remembers nothing until it is allowed, and then keeps the token out of the reply', async () => {
-    askVouchedNode.mockResolvedValue({ probe, ask: { secret: 'secret', phrase: 'maple river stone' } })
+    askVouchedNode.mockResolvedValue({
+      probe,
+      ask: { secret: 'secret', phrase: 'maple river stone' },
+      identity: 'amber birch cobalt delta elm fern',
+    })
     const { helper, remembered, upserted } = stubHelper(ASSERTED)
     const server = await startHelperServer(helper, { secret: 's'.repeat(32), appOrigin: 'http://acorn.localhost' })
     servers.push(server)
@@ -219,7 +223,10 @@ describe('node-adopt by approval', () => {
       })
 
     const adopted = await ask('node-adopt', REQUEST)
-    expect(adopted.ok === true && adopted.value).toEqual({ phrase: 'maple river stone' })
+    expect(adopted.ok === true && adopted.value).toEqual({
+      phrase: 'maple river stone',
+      identity: 'amber birch cobalt delta elm fern',
+    })
     expect(askVouchedNode).toHaveBeenCalledWith(
       { endpoint: ASSERTED.endpoint, fingerprint: VOUCHED, assertion: 'an-assertion' },
       expect.stringContaining('acorn on'),

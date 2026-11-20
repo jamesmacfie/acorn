@@ -9,6 +9,7 @@ import { afterEach, beforeAll, describe, expect, it, vi } from 'vitest'
 import { custody, desktopDataRootDir } from '@acorn/custody/local'
 import { ensureCert } from '@acorn/node-core/server/transport'
 import { ACORN_BASELINE } from '@acorn/protocol/baseline.ts'
+import { fingerprintPhrase } from '@acorn/protocol/fingerprintWords.ts'
 import { NODE_PROTOCOL_VERSION } from '@acorn/protocol/node.ts'
 import type { NodeStatus } from '@acorn/protocol/broker.ts'
 import type { BridgeRequest } from '@acorn/protocol/extensionBridge.ts'
@@ -662,7 +663,8 @@ describe('browser bridge pairing with a Node an account lists', () => {
 
   it('asks the listed Node with the assertion, and pairs it once a paired device allows it', async () => {
     const { call, away: target } = await setup()
-    expect(await call(away)).toEqual({ phrase: 'maple river stone' })
+    // The phrase the owner's dialog shows, and the words of the certificate this host checked.
+    expect(await call(away)).toEqual({ phrase: 'maple river stone', identity: fingerprintPhrase(certA.fingerprint) })
     expect(target.state.asks).toEqual([{ deviceName: 'test', assertion: 'an-assertion' }])
     expect(await call({ op: 'node.collect', label: 'Away' })).toBeNull()
     target.state.allowed = true

@@ -804,13 +804,17 @@ export function createBridge(options: {
     if (!answer.success || !('assertion' in answer.data))
       throw new BridgeFailure('node_error', 'That Node does not pair by approval.')
     try {
-      const { probe: vouched, ask: asked } = await askVouched(
+      const {
+        probe: vouched,
+        ask: asked,
+        identity,
+      } = await askVouched(
         { endpoint: answer.data.endpoint, fingerprint: answer.data.fingerprint, assertion: answer.data.assertion },
         options.deviceName,
         (relay) => broker.relayTicket(relay),
       )
       asking = { probe: vouched, secret: asked.secret, provider: { providerId, providerNodeId, sourceNodeId: source } }
-      return { phrase: asked.phrase }
+      return { phrase: asked.phrase, identity }
     } catch (error) {
       if (error instanceof PairingBusyError) throw new BridgeFailure('pairing_busy', error.message)
       if (error instanceof VouchedIdentityError) throw new BridgeFailure('identity_mismatch', error.message)

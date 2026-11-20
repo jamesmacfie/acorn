@@ -80,7 +80,7 @@ export default function ProvidedNodes() {
   const [creating, setCreating] = createSignal<string | null>(null)
   const [newLabel, setNewLabel] = createSignal('')
   // A node waiting for a device already paired with it to allow this one, and the words that device shows.
-  const [approving, setApproving] = createSignal<{ label: string; phrase: string } | null>(null)
+  const [approving, setApproving] = createSignal<{ label: string; phrase: string; identity: string } | null>(null)
   let collecting: ReturnType<typeof setTimeout> | undefined
   onCleanup(() => clearTimeout(collecting))
 
@@ -147,11 +147,15 @@ export default function ProvidedNodes() {
             <Card>
               <Stack gap="row">
                 <p>
-                  Open Acorn on a device already paired with {waiting().label}. It asks to allow this computer, with
-                  these words:
+                  Open Acorn on a device already paired with {waiting().label}. It asks to allow this computer. Allow it
+                  only if it shows these words:
                 </p>
                 <p>
                   <strong>{waiting().phrase}</strong>
+                </p>
+                <p>And these identity words for the Node:</p>
+                <p>
+                  <strong>{waiting().identity}</strong>
                 </p>
                 <Inline gap="row">
                   <Spinner label="Waiting for approval" />
@@ -184,7 +188,7 @@ export default function ProvidedNodes() {
                       void run(async () => {
                         const adoption = await adoptProvidedNode(row)
                         if ('phrase' in adoption) {
-                          setApproving({ label: row.label, phrase: adoption.phrase })
+                          setApproving({ label: row.label, phrase: adoption.phrase, identity: adoption.identity })
                           void collect()
                         }
                       })

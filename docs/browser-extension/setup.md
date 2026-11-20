@@ -74,9 +74,9 @@ closes pairing.
 2. **Approve in Acorn.** **Connect** asks the Node and shows three words. The desktop opens a dialog
    with the same words. Click **Allow** there, and the panel moves on by itself. **Use a pairing code
    instead** shows the code field. A Node that can't take an ask goes straight to the code.
-   A listed Node has no words to compare, because the account vouches for its fingerprint. **Approve on
-   another device** shows three words, and a desktop or terminal client already paired with that Node
-   shows the same words and **Allow**. The panel moves on when it's allowed. Sign in to the account in
+   For a Node the account lists, **Approve on another device** shows three words and six identity
+   words. A desktop or terminal client already paired with that Node shows the same three words, the
+   Node's identity words, and **Allow**. Allow it only when both sets match. The panel moves on when it's allowed. Sign in to the account in
    Acorn's **Settings → Account**: the panel lists Nodes through the Node it has paired.
 3. **Another Node.** Enter its HTTPS address and click **Check**. **Check its identity** shows six
    words. Compare them with the ones the Node shows: the code panel in the desktop's **Settings →

@@ -52,8 +52,11 @@ declares `pairingAssertion` instead, a short-lived statement that its user owns 
 then answers with that assertion in place of a token, and the host pairs by approval: it probes the
 endpoint, refuses a certificate other than the one the provider vouched for, asks with the assertion,
 and remembers the Node only once a device already paired with it allows the ask. The provider never
-holds a device token. The desktop's `adopt` answers with the words to show and a second call collects
-the Node. `list` and `pairingAssertion` receive the caller's user ID and nothing else of the request,
+holds a device token. The desktop's `adopt` answers with the phrase and the identity words of the
+certificate the host checked, and a second call collects the Node. The vouched fingerprint doesn't stand
+in for the owner's check: the provider chooses it, so it could vouch for a relay that forwards the ask.
+The device asked shows the Node's own identity words, and the person allows the ask only when both sets
+match ([pairing by approval](../api-reference/transport.md#pairing-by-approval)). `list` and `pairingAssertion` receive the caller's user ID and nothing else of the request,
 and reach the user's own connection with `ctx.providers.withConnection`.
 
 The client confirms the four lifecycle verbs using the `ToolRisk` tiers in `NODE_LIFECYCLE_RISK`

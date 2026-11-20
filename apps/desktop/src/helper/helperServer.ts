@@ -283,13 +283,13 @@ export function startHelperServer(
       }
       adopting = null
       if ('assertion' in record) {
-        const { probe, ask } = await askVouchedNode(
+        const { probe, ask, identity } = await askVouchedNode(
           { endpoint: record.endpoint, fingerprint: record.fingerprint, assertion: record.assertion },
           `acorn on ${hostname()}`,
           (relay) => helper.broker.relayTicket(relay),
         )
         adopting = { probe, secret: ask.secret, label: request.label, provider }
-        return { phrase: ask.phrase }
+        return { phrase: ask.phrase, identity }
       }
       // The provider vouched for a fingerprint; this is where that claim is checked against the
       // certificate the endpoint actually presents. A provider that lied, or an endpoint that has been

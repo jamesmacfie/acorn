@@ -156,8 +156,17 @@ export type PairingClaimPending = { status: 'pending' }
 
 // GET /v1/core/pair/requests: what the owner's dialog shows. One request at a time, like a code.
 // `remote` is an ask from another computer, raised by the owner's account, so the dialog doesn't say the
-// asker is on this one.
-export type PairingRequest = { id: string; deviceName: string; phrase: string; expiresAt: number; remote?: true }
+// asker is on this one. `identity` comes with it: the words of this Node's own key on the connection the
+// ask came over, its certificate's or, for a phone, its channel key's. The asker shows the words of the key
+// it checked, so a relay in between shows the owner two different sets.
+export type PairingRequest = {
+  id: string
+  deviceName: string
+  phrase: string
+  expiresAt: number
+  remote?: true
+  identity?: string
+}
 export type PairingRequestResponse = { request: PairingRequest | null }
 
 // POST /v1/core/pair/requests/:id.

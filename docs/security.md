@@ -75,8 +75,8 @@ Deleting a workspace removes its datasets. Row and byte caps plus retention boun
   app, so it could ship code that reads what the phone reads ([the phone channel](./relay/phone-channel.md#trust)).
 - **A relay** forwards TLS to a Node that dialed out to it, with no key to read it. The client pins the
   Node's certificate, a relayed caller is never loopback, and the relay's credential reaches the relay,
-  not the Node. An account's listing vouches for a Node's fingerprint in place of identity words
-  ([relay](./relay.md), [accounts](./security/control-plane.md#the-account-service)).
+  not the Node. An owner pairing with a Node an account lists still compares identity words from both
+  ends ([relay](./relay.md), [accounts](./security/control-plane.md#the-account-service)).
 - **The terminal client** collapses the shell and helper into one process. UI code and the broker share
   a realm, so what the desktop holds as a process boundary this holds as a module boundary. The device
   token lives in the broker's module, the plugin cache and acknowledgements in one custody module, and

@@ -170,8 +170,8 @@ export const bridgeRequestSchema = z.discriminatedUnion('op', [
   z.strictObject({ ...envelope, op: z.literal('node.ask') }),
   z.strictObject({ ...envelope, op: z.literal('node.collect'), label: z.string().trim().min(1).max(120) }),
   // The Nodes the selected Node's providers list, such as the ones its owner's account has. Pairing with
-  // one is `node.adopt` and then `node.collect`, for a listed Node's identity is its account's word and
-  // needs no words compared (docs/plugins/node-providers.md § Node providers).
+  // one is `node.adopt` and then `node.collect`. The person compares the phrase and the identity words with
+  // what a device already paired with that Node shows (docs/plugins/node-providers.md § Node providers).
   z.strictObject({ ...envelope, op: z.literal('nodes.provided') }),
   z.strictObject({
     ...envelope,
@@ -630,8 +630,10 @@ export type BridgeResults = {
   // `available` is whether the selected Node has a provider at all, so the sidebar can tell a provider
   // with no Nodes from no provider.
   'nodes.provided': { nodes: BridgeProvidedNode[]; available: boolean }
-  // The words a device already paired with that Node shows, as `node.ask` answers.
-  'node.adopt': { phrase: string }
+  // The words a device already paired with that Node shows, as `node.ask` answers, and the words of the
+  // certificate the host checked, which that device shows the Node's own words beside. An older host
+  // sends no `identity`.
+  'node.adopt': { phrase: string; identity?: string }
   'node.select': BridgeNodes
   'node.forget': BridgeNodes
   'node.rename': BridgeNodes

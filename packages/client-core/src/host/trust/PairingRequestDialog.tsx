@@ -21,6 +21,16 @@ export default function PairingRequestDialog() {
               <p>
                 <strong>{current().request.phrase}</strong>
               </p>
+              <Show when={current().request.identity}>
+                {(identity) => (
+                  <>
+                    <p>And these identity words for this Node:</p>
+                    <p>
+                      <strong>{identity()}</strong>
+                    </p>
+                  </>
+                )}
+              </Show>
               <p>{denyAdvice(current().request)}</p>
               <Show when={error()}>
                 <Alert>{error()}</Alert>

@@ -150,9 +150,10 @@ export type NodeAdoptRequest = z.infer<typeof nodeAdoptRequestSchema>
 
 // What adopting answers. A provider that held the node's credential gives the node. One that only knows
 // where the node is, such as an account, starts pairing by approval instead, and gives the words that a
-// device already paired with the node shows beside its Allow button. The caller then collects the node
+// device already paired with the node shows beside its Allow button, with the words of the certificate
+// this computer checked. That device shows the node's own beside them. The caller then collects the node
 // once that device allows it.
-export type NodeAdoption = { node: NodeRecord } | { phrase: string }
+export type NodeAdoption = { node: NodeRecord } | { phrase: string; identity: string }
 
 export const nodeProbeRequestSchema = z.strictObject({ endpoint: z.string().url() })
 

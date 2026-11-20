@@ -2,6 +2,7 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 import { pairedNode, toBrokerNode } from '@acorn/custody/broker'
 import { askToPair, collectPairing, probeNode } from '@acorn/custody/broker/nodePairing.ts'
 import { askVouchedNode, VouchedIdentityError } from '@acorn/custody/broker/vouchedNode.ts'
+import { fingerprintPhrase } from '@acorn/protocol/fingerprintWords.ts'
 import { nodeAdoptResultSchema, type NodeProvidersResponse } from '@acorn/protocol/nodeProviders.ts'
 import { startAccountStub, type AccountStub } from '@acorn/node-core/testkit'
 import { accountAuth, staticAuth } from './auth'
@@ -86,11 +87,13 @@ describe('pairing with a Node the account lists', () => {
   it('pairs once a device already paired with it allows the ask, and audits the ask', async () => {
     const connected = performance.now()
     const vouched = await adopt()
-    const { probe, ask: asked } = await askVouchedNode(vouched, 'the other computer', ticketFor)
+    const { probe, ask: asked, identity } = await askVouchedNode(vouched, 'the other computer', ticketFor)
 
-    // What the dialog on a device paired with home shows: the same words, and where the ask came from.
+    // What the dialog on a device paired with home shows: the same words, where the ask came from, and
+    // home's identity words, which match the ones the asker's probe saw because nothing sits between them.
     const waiting = (await request(home, 'GET', '/v1/core/pair/requests')).json!.request
-    expect(waiting).toMatchObject({ deviceName: 'the other computer', phrase: asked.phrase, remote: true })
+    expect(waiting).toMatchObject({ deviceName: 'the other computer', phrase: asked.phrase, remote: true, identity })
+    expect(identity).toBe(fingerprintPhrase(home.handshake.fingerprint))
     expect(await collectPairing(probe, asked.secret)).toBeNull()
     expect((await request(home, 'POST', `/v1/core/pair/requests/${waiting.id}`, { decision: 'allow' })).status).toBe(
       204,

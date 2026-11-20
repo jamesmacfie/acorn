@@ -2,6 +2,7 @@ import type { ChannelClient } from '@acorn/channel/client.ts'
 import { ACORN_BASELINE } from '@acorn/protocol/baseline.ts'
 import type { PairResult, PairingAsk } from '@acorn/protocol/node.ts'
 import type { AccountNode } from '@acorn/protocol/account.ts'
+import { fingerprintPhrase } from '@acorn/protocol/fingerprintWords.ts'
 import { fetchAssertion } from './account'
 import { openNodeChannel } from './openChannel'
 import { savePaired, type PairedNode } from './pairedNodes'
@@ -10,7 +11,8 @@ import { savePaired, type PairedNode } from './pairedNodes'
 // Node's own pairing by approval does the work: this phone asks, with an account assertion that says the
 // person is signed in as the Node's owner, and a device that is already paired shows the same three
 // words and an Allow button. The key the phone pins is the one the account listed for the Node, kept from
-// here on.
+// here on. A breached account could list a key of its own and forward the ask to the real Node, so the phone
+// also shows the words of the key its channel checked, and that device shows the Node's own.
 
 const POLL_MS = 1_500
 const encoder = new TextEncoder()
@@ -19,6 +21,8 @@ const decoder = new TextDecoder()
 export type Pairing = {
   /** The three words, shown on this phone and on the device that is asked to allow it. */
   phrase: string
+  /** The words of the channel key the handshake checked. The device asked shows the Node's own. */
+  identity: string
   /** Resolves once a paired device allowed it. Rejects when it was denied or ran out. */
   paired: Promise<PairedNode>
   cancel(): void
@@ -106,7 +110,7 @@ export async function pairWithNode(node: AccountNode, deviceName = phoneName()):
         client.close()
       }
     })()
-    return { phrase: ask.phrase, paired, cancel }
+    return { phrase: ask.phrase, identity: fingerprintPhrase(channelKey)!, paired, cancel }
   } catch (error) {
     client.close()
     throw error
