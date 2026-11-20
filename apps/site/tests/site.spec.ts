@@ -14,7 +14,7 @@ const routes = filesUnder(dist)
   .map((file) => `/${file.replace(/index\.html$/, '')}`)
 
 // Where a link may go: a page the build wrote, or a download path that src/worker.ts redirects to the
-// release's file on GitHub. The build lists those paths in download/links.json.
+// release's file on GitHub. The build lists those paths in dist/download/links.json.
 const downloads: Record<string, string> = JSON.parse(readFileSync(new URL('download/links.json', dist), 'utf8')).files
 const served = new Set([...routes, ...Object.keys(downloads)])
 
