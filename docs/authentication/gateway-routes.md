@@ -16,6 +16,8 @@ and nothing else. It accepts one only when all of these hold:
 - The signature checks out with the owner keys the Node recorded when **Remote access** was turned on.
 - `aud` is this Node's ID, and `sub` is the recorded owner account.
 - `scope` is the route's plugin, and `exp` hasn't passed.
+- `exp` is at most 60 seconds after `iat`, and `iat` is at most 60 seconds ahead of the Node's clock.
+  The Node holds the token to its life itself, because a restart forgets the seen IDs below.
 - Its `jti` hasn't been seen. Seen IDs stay in memory until they expire.
 - The request came through the relay: its `Host` is the relay's name for this Node, its stream has no
   peer address, and it isn't a phone's channel.

@@ -111,6 +111,15 @@ describe('the gateway route', () => {
     ['another owner', () => token({ sub: 'acct_someone' })],
     ['another plugin', () => token({ scope: 'other' })],
     ['an expired one', () => token({ exp: Math.floor(Date.now() / 1000) - 1 })],
+    ['one that lasts 10 minutes', () => token({ exp: Math.floor(Date.now() / 1000) + 600 })],
+    [
+      'one issued 5 minutes ago',
+      () => token({ iat: Math.floor(Date.now() / 1000) - 300, exp: Math.floor(Date.now() / 1000) + 30 }),
+    ],
+    [
+      'one dated ahead of the clock',
+      () => token({ iat: Math.floor(Date.now() / 1000) + 120, exp: Math.floor(Date.now() / 1000) + 150 }),
+    ],
     ['a stranger key', () => token({}, stranger)],
   ])('refuses %s', async (_name, make) => {
     const before = seen.length

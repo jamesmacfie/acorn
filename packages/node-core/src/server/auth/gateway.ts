@@ -1,5 +1,5 @@
 import type { Context } from 'hono'
-import { gatewayClaimsSchema } from '@acorn/protocol/account.ts'
+import { GATEWAY_TOKEN_LIFETIME_SECONDS, gatewayClaimsSchema } from '@acorn/protocol/account.ts'
 import { verifyToken } from '@acorn/protocol/accountToken.ts'
 import { relayHost } from '@acorn/protocol/relay.ts'
 import type { AppEnv } from '../middleware/auth'
@@ -11,9 +11,12 @@ import { readNodeRelay } from '../storage/nodeRelay'
 
 const MAX_BODY_BYTES = 256 * 1024
 
-// Token IDs already accepted, until they expire. In memory: a restart forgets them, and a token outlives a
-// restart by 60 seconds at most.
+// Token IDs already accepted, until they expire. In memory: a restart forgets them, so the Node holds a token
+// to its 60-second life itself, as `ownerAssertion` does an assertion. One the service signed for longer, or
+// dated ahead of this Node's clock past the allowance, is refused, so a replay after a restart has two
+// minutes of the Node's time at most.
 const seen = new Map<string, number>()
+const CLOCK_ALLOWANCE_SECONDS = 60
 
 // A gateway token (docs/account-api/slack-gateway.md § The gateway token), checked with the owner's keys
 // the Node recorded when remote access was turned on, as `ownerAssertion` checks an assertion. A key the
@@ -26,7 +29,14 @@ export async function gatewayCaller(
   const { owner } = readNodeRelay(expected.dataDir)
   if (!owner) return null
   const claims = await verifyToken(token, 'gateway', gatewayClaimsSchema, owner.keys, nowSeconds)
-  if (!claims || claims.aud !== expected.nodeId || claims.sub !== owner.accountId || claims.scope !== expected.scope)
+  if (
+    !claims ||
+    claims.aud !== expected.nodeId ||
+    claims.sub !== owner.accountId ||
+    claims.scope !== expected.scope ||
+    claims.exp - claims.iat > GATEWAY_TOKEN_LIFETIME_SECONDS ||
+    claims.iat > nowSeconds + CLOCK_ALLOWANCE_SECONDS
+  )
     return null
   for (const [jti, exp] of seen) if (exp <= nowSeconds) seen.delete(jti)
   if (seen.has(claims.jti)) return null
