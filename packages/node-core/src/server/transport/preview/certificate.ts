@@ -110,6 +110,8 @@ export function startCertificateManager(options: CertificateManagerOptions): Cer
       csr: csrDer,
       publishChallenge: (value) => publishChallenge(options.accountUrl, options.credential, value),
       pollMs: options.pollMs,
+      // A stand-in account service on this computer, in development and tests, names a stand-in authority here.
+      allowLoopback: ['127.0.0.1', 'localhost', '[::1]'].includes(new URL(options.accountUrl).hostname),
     })
     return parse(privateKey, certPem, preview.domain, nodeLabel)
   }

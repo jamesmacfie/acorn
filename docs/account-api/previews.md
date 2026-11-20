@@ -16,6 +16,10 @@ DNS zone allows. The domain is a host name and an optional port with no scheme. 
 flow, and a certificate and a server name never carry one. A service with no preview domain answers
 `404 not_found`, and a Node serves no previews against it. The route needs no authentication.
 
+A Node uses `acmeDirectory` only if it's `https` to a host that isn't a loopback, private, or link-local
+address, and it sends nothing to an address the directory names on another origin, or to a redirect. An
+account service on this computer, as in development, may name an authority on this computer over `http`.
+
 A Node's names are `<preview>.<node>.<domain>`. The `<node>` label is the first 32 hex characters of the
 SHA-256 of `acorn-preview-node:` and the Node ID, so the service, the relay, and the Node each compute it
 with no help.

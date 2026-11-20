@@ -31,7 +31,8 @@ stand-in a service with no preview domain. `account.challenges()` holds the TXT 
 by name, which is what a certificate authority would look up. `startFakeAcme` in the same testkit is a
 certificate authority that speaks ACME for one DNS-01 order and reads those records, so a Node gets a real
 certificate in a test with no internet. It checks each request's signature, nonce, and address, and signs with
-a CA of its own that a test trusts through `caPem`.
+a CA of its own that a test trusts through `caPem`. It listens on `http://127.0.0.1`, which a Node accepts
+only because the stand-in account service is on this computer too.
 
 `account.slack` is the Slack gateway and a fake Slack in front of it, for the Slack plugin's tests
 ([the Slack gateway's stand-in](./slack-gateway.md#the-stand-in)).

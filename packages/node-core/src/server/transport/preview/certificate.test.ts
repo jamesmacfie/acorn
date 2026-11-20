@@ -1,11 +1,15 @@
+import { generateKeyPairSync } from 'node:crypto'
 import { mkdtempSync, readFileSync, rmSync, statSync } from 'node:fs'
+import { createServer, type Server } from 'node:http'
+import type { AddressInfo } from 'node:net'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import { afterEach, beforeEach, describe, expect, it } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { accountPaths, registerNodeResponseSchema } from '@acorn/protocol/account.ts'
 import { previewNodeLabel } from '@acorn/protocol/relay.ts'
 import { startAccountStub, type AccountStub } from '../../../testkit/accountStub'
 import { startFakeAcme, type FakeAcme } from '../../../testkit/fakeAcme'
+import { obtainCertificate } from './acme'
 import { startCertificateManager, type CertificateManager, type PreviewCertificate } from './certificate'
 
 // The Node getting and renewing its preview certificate, against the account stand-in and an authority that
@@ -41,6 +45,7 @@ beforeEach(async () => {
 })
 
 afterEach(async () => {
+  vi.restoreAllMocks()
   manager?.close()
   manager = undefined
   await acme.close()
@@ -151,5 +156,75 @@ describe('the preview certificate', () => {
     expect(state.status).toBe('starting')
     expect(state.error).toMatch(/401/)
     expect(account.challenges().size).toBe(0)
+  })
+})
+
+describe('the certificate authority the service names', () => {
+  // Every address the Node asked for, so a refused one can be shown to get no request at all.
+  const fetched = (): string[] => {
+    const spy = vi.mocked(globalThis.fetch)
+    return spy.mock.calls.map(([input]) => String(input instanceof Request ? input.url : input))
+  }
+  beforeEach(() => void vi.spyOn(globalThis, 'fetch'))
+
+  async function listen(handle: (path: string) => object): Promise<{ server: Server; url: string; hits: string[] }> {
+    const hits: string[] = []
+    const server = createServer((req, res) => {
+      hits.push(req.url!)
+      res
+        .writeHead(200, { 'content-type': 'application/json', 'replay-nonce': 'n' })
+        .end(JSON.stringify(handle(req.url!)))
+    })
+    await new Promise<void>((resolve) => server.listen(0, '127.0.0.1', resolve))
+    return { server, url: `http://127.0.0.1:${(server.address() as AddressInfo).port}`, hits }
+  }
+
+  it("isn't asked when it's a cloud's metadata address", async () => {
+    account.setPreview({ domain: 'preview.example', acmeDirectory: 'http://169.254.169.254/' })
+    start()
+    const state = await manager!.check()
+    expect(state).toMatchObject({ status: 'starting', error: expect.stringMatching(/isn't a certificate authority/) })
+    expect(fetched().filter((url) => url.includes('169.254.169.254'))).toEqual([])
+    expect(account.challenges().size).toBe(0)
+  })
+
+  it('names no address off its own host that the Node then asks', async () => {
+    const elsewhere = await listen(() => ({}))
+    const directory = await listen(() => ({
+      newNonce: `${elsewhere.url.replace('127.0.0.1', 'localhost')}/nonce`,
+      newAccount: `${elsewhere.url}/account`,
+      newOrder: `${elsewhere.url}/order`,
+    }))
+    try {
+      account.setPreview({ domain: 'preview.example', acmeDirectory: `${directory.url}/directory` })
+      start()
+      expect((await manager!.check()).error).toMatch(/off http:\/\/127\.0\.0\.1/)
+      expect(directory.hits).toEqual(['/directory'])
+      expect(elsewhere.hits).toEqual([])
+    } finally {
+      directory.server.close()
+      elsewhere.server.close()
+    }
+  })
+
+  it.each([
+    ['plain http to a public host', 'http://acme.example/directory', false],
+    ['a private address', 'https://10.0.0.7/directory', false],
+    ['a home router', 'https://192.168.1.1/directory', false],
+    ['a link-local IPv6 address', 'https://[fe80::1]/directory', false],
+    ['this computer, unless the caller allows it', 'https://127.0.0.1/directory', false],
+    ['an IPv4 address written as IPv6', 'https://[::ffff:10.0.0.7]/directory', true],
+  ])('refuses %s', async (_name, directoryUrl, allowLoopback) => {
+    const { privateKey } = generateKeyPairSync('ec', { namedCurve: 'P-256' })
+    const ordering = obtainCertificate({
+      directoryUrl,
+      accountKey: privateKey,
+      name: '*.n.preview.example',
+      csr: Buffer.alloc(0),
+      publishChallenge: async () => {},
+      allowLoopback,
+    })
+    await expect(ordering).rejects.toThrow(/isn't a certificate authority/)
+    expect(fetched()).toEqual([])
   })
 })
