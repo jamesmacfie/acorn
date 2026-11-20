@@ -1,3 +1,56 @@
+> **Completion note, November 20, 2026.** Fixed on the Acorn side with the doc's first, cheapest fix, on
+> branch `phase-l-2-agents-can-t-read-the-relay-credential`. Expiry and key binding, the second and third
+> fixes, aren't in this phase.
+>
+> What landed:
+>
+> - Remote access records `relay` and `owner` in a new data-root file, `relay.json`, written mode `0600`
+>   through `writePrivateAtomic`. `recordNodeRelay` sends `relay` and `owner` there and `previews` to
+>   `node.json`. `readNodeRelay` reads `owner` from `relay.json` only, and `relay` from `node.json` first,
+>   then `relay.json`.
+> - The read block needed no change. Its sandbox denies the whole data folder and opens only listed
+>   paths, and its file guard does the same, so `relay.json` is blocked whether it exists at the session's
+>   start or is created mid-session.
+> - Opening a data root moves a `relay` and `owner` found together in `node.json` into `relay.json`. It
+>   writes `relay.json` first, so a crash between the two writes leaves the values in both, not lost.
+>   A `relay` with no `owner` is hand-written, and it stays in `node.json`.
+> - `DataRoot.relay` is gone. `relaySettings` takes the recorded relay, and the listener and the
+>   standalone entry pass it `readNodeRelay(root.dir)`. `readNodeRelay` is exported from the storage
+>   barrel for the standalone entry.
+> - `scripts/reset/inventory.mjs` lists `relay.json`, so a reset removes it.
+> - Docs: `relay.md` § The Node lists the three sources in order and says a hand-written credential in
+>   `node.json` is readable by read-blocked agents. `relay/accounts.md`, `managed-agents/read-block.md`,
+>   `data-layer/data-root.md`, `account-api.md` (still 200 lines), `authentication.md`,
+>   `first-party-plugins.md`, `security/control-plane.md`, and the site's "Where your data lives" page
+>   name `relay.json`.
+> - Tests: `packages/node-core/src/server/storage/nodeRelay.test.ts` checks that recording relay settings
+>   leaves no credential in `node.json` and gives `relay.json` mode `0600`, that a hand-written relay
+>   still reads and stays put, and that opening a root moves an older Node's relay out of `node.json`.
+>   The first and third cases fail on the old code. `readBlock.test.ts` puts a `relay.json` in its
+>   fixture data root and checks that no readable path covers it, that the sandbox denies the data
+>   folder, and that the file guard refuses a Read of it.
+>
+> Decisions and deviations:
+>
+> - A hand-written relay in `node.json` wins over `relay.json`, so the documented rule that the owner's
+>   own relay settings win over Remote access still holds. Remote access refuses to turn on while
+>   `node.json` names a relay, so the two meet only if someone edits `node.json` after turning it on.
+> - `owner` stays in `nodeIdentitySchema`, because the move on open has to parse it. Nothing writes it
+>   to `node.json`.
+> - `previews` stays in `node.json`. R-6 put it there because the listener reads it at boot, and it isn't
+>   a secret.
+> - The live check in `pnpm dev:agent` didn't run. The unit tests cover the sandbox settings and the
+>   file guard policy Acorn sends, but not Claude Code applying them. To run it, turn on **Keep agents
+>   out of Acorn's data folder**, record a decoy relay, and have a Claude Code session `cat` both files.
+>
+> Size: the Node service bundle grows by 583 B, from 1,970,905 B to 1,971,488 B.
+>
+> For later phases: R-6's precondition is met. A read-blocked agent no longer reaches the credential that
+> authenticates a preview's DNS challenge, unless the owner hand-wrote it into `node.json`. R-8 and R-9
+> should read relay settings through `readNodeRelay` and write them through `recordNodeRelay`. acorn-cloud
+> needs nothing for this fix. Its share of fixes 2 and 3, credential expiry with a refresh route and a
+> credential bound to a Node key, is still open.
+
 # L-2: An agent in the read block can read the Node's relay credential
 
 Found November 20, 2026, in a read-only security review of `jamesmacfie/acorn` at `90b9e61e3` and

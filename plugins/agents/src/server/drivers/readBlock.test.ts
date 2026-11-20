@@ -50,6 +50,7 @@ function fixture() {
   for (const file of [
     'core.sqlite',
     'node.json',
+    'relay.json',
     'node-keys.sealed',
     'internal-credentials/own.token',
     'tls/cert.pem',
@@ -124,6 +125,7 @@ describe('the data root read block', () => {
         'node-keys.sealed',
         'node.json',
         'plugins/agents.sqlite',
+        'relay.json',
         'tls',
         'worktrees/task-2',
       ].map((entry) => join(dataDir, entry)),
@@ -138,6 +140,18 @@ describe('the data root read block', () => {
         join(dataDir, 'node.json'),
       ]),
     )
+    // The relay credential Remote access records lives beside node.json, and nothing opens it again.
+    const relayFile = join(dataDir, 'relay.json')
+    expect(block.readable.some((path) => within(relayFile, path))).toBe(false)
+    const settings = claudeReadBlockSettings(block)
+    expect(settings.sandbox).toMatchObject({ filesystem: { denyRead: [dataDir], allowRead: block.readable } })
+    expect(
+      fileToolRefusal(guardPolicy(settings), {
+        tool_name: 'Read',
+        tool_input: { file_path: relayFile },
+        cwd: worktree,
+      }),
+    ).toMatch(/data folder/)
     expect(block).toMatchObject(gitWrites(worktree))
     expect(block.readable.map((path) => realpathSync(path))).toContain(realpathSync(join(repo, '.git')))
     expect(block.loopback).toBe('127.0.0.1:43123')

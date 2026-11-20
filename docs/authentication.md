@@ -179,7 +179,7 @@ callback URL ([connecting](./github-integration.md#connecting)).
 
 A Node runs no account code until someone signs in. **Settings → Account** runs the device flow, and the
 tokens are an encrypted `account` connection ([the account API](./account-api.md#the-sign-in-plugin)).
-**Remote access** records the account as the Node's owner in `node.json`. That isn't a grant: a device
+**Remote access** records the account as the Node's owner in `relay.json`. That isn't a grant: a device
 token still decides who may use a Node. A hosted gateway reaches a compiled plugin's
 `/v1/gateway/<plugin>` route with a gateway token alone ([gateway routes](./authentication/gateway-routes.md)).
 

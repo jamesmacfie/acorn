@@ -14,8 +14,8 @@ import { ACCOUNT_PROVIDER } from './provider'
 
 // Remote access: this Node registered with its owner's account, dialing the relay the account service
 // named (docs/account-api.md § The sign-in plugin). The relay URL, the Node's relay credential, and the
-// owner account are recorded in node.json, where the listener reads relay settings at every boot, so a
-// Node that restarts is still reachable with no account code running.
+// owner account are recorded in the data root's relay.json, where the listener reads relay settings at
+// every boot, so a Node that restarts is still reachable with no account code running.
 
 // What stops the switch being turned on: a relay somebody set for this Node some other way.
 export function blocker(c: Context<AppEnv>): string | undefined {

@@ -68,7 +68,7 @@ comparing hands the service a device token. Four things bound the rest:
 - **Pairing is still a person's act.** A new device needs a code from a paired device or an approval
   from a device already paired with the Node. An assertion lets the owner account raise the dialog
   and nothing more.
-- **The owner record isn't a grant.** `node.json` names the owner account and the service's keys, and
+- **The owner record isn't a grant.** `relay.json` names the owner account and the service's keys, and
   nothing in a Node lets an account in.
 - **Tokens are short.** A ticket lasts five minutes and an assertion two. A relay credential lasts
   until the Node is removed or registers again, and removing the Node on the account website revokes it

@@ -20,7 +20,7 @@ registering the plugin's routes.
 | Account service | Answers the routes below. It stores accounts, Node labels, certificate fingerprints, and relay routes. It stores no task content. |
 | Sign-in plugin | Runs on each person's local Node. It signs in, registers its Node, and asks for tickets for clients. See [the sign-in plugin](#the-sign-in-plugin). |
 | Relay | Reads the service's public keys and revoked credential list. It never calls any other route. |
-| Node | Keeps the owner account, the keys, and a relay credential in `node.json`. |
+| Node | Keeps the owner account, the keys, and a relay credential in `relay.json`, out of agents' reach. |
 | Slack gateway | Part of the service, with its own API: Slack events in, Slack calls out ([the Slack gateway API](./account-api/slack-gateway.md)). |
 
 A device token still decides who gets into a Node. A ticket gets a client to the Node, and the account
@@ -165,7 +165,7 @@ in: no request leaves the Node, and no timer runs. Its routes load on their firs
 - **Settings → Account.** **Sign in** runs the device flow, and **Sign out** ends it. The page draws in
   the desktop and the terminal client, which prints the address and the code.
 - **Remote access.** The switch on that page registers the Node, records the relay and the owner in
-  `node.json`, and starts the relay tunnel without a restart. Turning it off stops the tunnel and
+  `relay.json`, and starts the relay tunnel without a restart. Turning it off stops the tunnel and
   every stream it carries at once, forgets the relay and owner, and removes the Node from the account.
   A Node that can't reach the service still turns off, and the page says the account wasn't told.
   Signing out turns it off first.

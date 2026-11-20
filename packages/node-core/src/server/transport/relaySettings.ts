@@ -1,11 +1,12 @@
-import type { DataRoot } from '../storage/dataRoot'
+import type { NodeIdentity } from '@acorn/protocol/node.ts'
 import type { RelayState } from './relayTunnel'
 
 // Which relay this Node dials out to, if any (docs/relay.md § The Node). The environment wins
-// over node.json, as it does for the advertised host, and names both values or neither.
+// over the data root's recorded relay (`readNodeRelay`), as it does for the advertised host, and names
+// both values or neither.
 export type RelaySettings = { url: string; credential: string }
 
-export function relaySettings(root: Pick<DataRoot, 'relay'>): RelaySettings | undefined {
+export function relaySettings(root: Pick<NodeIdentity, 'relay'>): RelaySettings | undefined {
   const url = process.env.ACORN_RELAY_URL?.trim()
   const credential = process.env.ACORN_RELAY_CREDENTIAL?.trim()
   const settings = url || credential ? { url, credential } : root.relay

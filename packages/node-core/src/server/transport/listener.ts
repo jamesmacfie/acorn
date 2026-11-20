@@ -105,7 +105,7 @@ export function startListener(
   // empty makes the Host guard reject every upgrade forever, a bare 403 with nothing logged.
   const allowedHosts = new Set<string>()
   const advertised = runtime.ADVERTISED_HOSTS
-  const relay = relaySettings(root)
+  const relay = relaySettings(readNodeRelay(root.dir))
   // 0.0.0.0 rather than the advertised address itself: children of this node still reach it over loopback
   // with full certificate validation (the cert's SAN is IP:127.0.0.1), so both audiences have to keep
   // working. `endpoint` below stays loopback for the same reason.

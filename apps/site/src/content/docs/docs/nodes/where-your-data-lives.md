@@ -42,6 +42,7 @@ second one that tries is refused.
 | `channel/` | The key a phone pins, made when Remote access is turned on. |
 | `logs/` | The Node's logs. |
 | `node.json` | The Node's ID, when it was made, the last port it used, and the address answer from its first start. |
+| `relay.json` | The relay address, relay credential, and owner account that **Remote access** records. Only your user account can read it, and agents kept out of the data folder can't. |
 | `node.lock` | Says a Node has the folder open. |
 | `node-keys.sealed` | The desktop app's Node only: its keys, sealed with a key in the operating system's keychain. |
 | `session.key`, `internal-token` | A standalone Node only: its keys, unless you set `SESSION_ENC_KEY`. |

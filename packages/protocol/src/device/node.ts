@@ -58,11 +58,13 @@ export const nodeIdentitySchema = z.object({
   // state, never a boot that hangs.
   enrollmentError: z.strictObject({ at: z.number().int().positive(), reason: z.string() }).optional(),
   // The relay this Node dials out to, and the credential it proves itself with (docs/relay.md). Set
-  // by hand; ACORN_RELAY_URL and ACORN_RELAY_CREDENTIAL win over it. Absent means no relay code runs.
+  // by hand; ACORN_RELAY_URL and ACORN_RELAY_CREDENTIAL win over it, and so does the relay Remote access
+  // records in relay.json. A read-blocked agent can read this file, so a relay here is visible to it.
   relay: z.strictObject({ url: z.string().url(), credential: z.string().min(1) }).optional(),
   // The account that owns this Node, recorded when it was registered for remote access, with the keys
   // that account's service signs with (docs/account-api.md). It's no grant: the Node uses it only to
-  // check that an assertion names its owner.
+  // check that an assertion names its owner. Recorded in relay.json beside the relay; opening a root moves
+  // one found here, with its relay, into that file.
   owner: z.strictObject({ accountId: z.string().min(1), keys: accountKeysSchema }).optional(),
   // The owner agreed to show task apps on a phone (docs/relay/phone-channel.md § Previews). Absent means
   // no preview code runs, even with a relay: a preview's name sits under a domain the account service

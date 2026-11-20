@@ -60,8 +60,10 @@ A phone's browser asks the account service for a ticket itself, with the website
 
 An owner who signs in to an account turns on **Remote access** for the Node in **Settings → Account**.
 The Node registers with the account service, which answers with the relay's address, a relay credential,
-and its public keys. The Node records them in `node.json` as `relay` and `owner`, and its tunnel starts
-at once, without a restart. At every later boot the listener reads the same `relay` setting, so the
+and its public keys. The Node records them as `relay` and `owner` in the data root's `relay.json`, mode
+`0600`, and its tunnel starts at once, without a restart. They stay out of `node.json`, which an agent in
+[the read block](../managed-agents/read-block.md) can read. Opening a root moves a `relay` and `owner`
+that an older Node recorded in `node.json` into `relay.json`. At every later boot the listener reads the same `relay` setting, so the
 tunnel starts with no account code running.
 
 Under it, **Phone previews** is a second switch, off by default

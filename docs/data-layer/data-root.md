@@ -22,6 +22,7 @@ exclusive `node.lock` protects it, so only one process opens it.
   channel/key.pem              the Ed25519 key a phone pins, made when Remote access is turned on
   logs/
   node.json
+  relay.json                   Remote access's relay credential and owner, kept from agents
   node.lock
   node-keys.sealed             both keys below, sealed by the desktop helper
   internal-token               the internal token signing key, on a standalone Node

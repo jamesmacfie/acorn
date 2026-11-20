@@ -6,7 +6,7 @@ import { fileURLToPath } from 'node:url'
 import { ACORN_BASELINE } from '@acorn/protocol/baseline.ts'
 import { devDataDir } from '@acorn/node-core/server/transport/listener.ts'
 import { advertisedHosts, confirmAdvertiseHost, relaySettings } from '@acorn/node-core/server/transport'
-import { openDataRoot } from '@acorn/node-core/server/storage'
+import { openDataRoot, readNodeRelay } from '@acorn/node-core/server/storage'
 import { enrollNode } from '@acorn/node-core/server/enrollment.ts'
 import { fingerprintPhrase } from '@acorn/protocol/fingerprintWords.ts'
 import { NODE_PROTOCOL_VERSION, NODE_RESTART_EXIT_CODE } from '@acorn/protocol/node.ts'
@@ -192,7 +192,7 @@ function printPairingBanner(code: string | null): void {
   const reachable = advertisedHosts(root).map((host) => `https://${host}:${port}`)
   // The address a client types to come in through the relay. The credential isn't printed, because
   // this output often lands in a service log.
-  const relay = relaySettings(root)
+  const relay = relaySettings(readNodeRelay(root.dir))
   const relayed = relay && new URL(`${relay.url.replace(/\/+$/, '')}/${root.nodeId}`)
   if (relayed) relayed.username = 'CREDENTIAL'
   console.log('')

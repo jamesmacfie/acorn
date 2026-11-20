@@ -18,6 +18,9 @@ import { nodeIdentitySchema, type NodeIdentity } from '@acorn/protocol/node.ts'
 import { SEALED_NODE_KEYS_FILE } from '@acorn/protocol/serviceProtocol.ts'
 
 const IDENTITY_FILE = 'node.json'
+// Remote access's relay credential and owner. Apart from node.json because a read-blocked agent's shell
+// may read node.json, which the task CLI needs, and must not read this (docs/managed-agents/read-block.md).
+const RELAY_FILE = 'relay.json'
 const LOCK_FILE = 'node.lock'
 const V1_DATABASE = 'acorn.sqlite'
 const LOGS_DIR = 'logs'
@@ -34,8 +37,6 @@ export type DataRoot = {
   // prompt reappearing every boot (server/transport/advertise.ts).
   readonly advertiseHost: string | undefined
   recordAdvertiseHost(host: string): void
-  // The relay settings written by hand into node.json, if any. `relaySettings` reads them.
-  readonly relay: NodeIdentity['relay']
   release(): void
 }
 
@@ -151,6 +152,7 @@ export function readIdentity(path: string): NodeIdentity | null {
 }
 
 export const identityPathOf = (dir: string): string => join(dir, IDENTITY_FILE)
+export const relayPathOf = (dir: string): string => join(dir, RELAY_FILE)
 
 // Read-modify-write against the file, not against a field captured in memory. Two owners write
 // node.json, this process's DataRoot and the attachment functions below, which a route calls long
@@ -247,6 +249,14 @@ export function openDataRoot(dir: string): DataRoot {
     let identity: NodeIdentity = existing ?? { baseline: ACORN_BASELINE, nodeId: randomUUID(), createdAt: Date.now() }
     if (!existing) writePrivateAtomic(identityPath, `${JSON.stringify(identity, null, 2)}\n`)
     else chmodSync(identityPath, 0o600)
+    // A relay recorded with an owner is Remote access's, which belongs in relay.json. Move one found in
+    // node.json, writing relay.json first, so a crash between the two writes leaves it in both, not lost.
+    if (identity.owner) {
+      const { relay, owner, ...rest } = identity
+      writePrivateAtomic(relayPathOf(dir), `${JSON.stringify({ relay, owner }, null, 2)}\n`)
+      writePrivateAtomic(identityPath, `${JSON.stringify(rest, null, 2)}\n`)
+      identity = rest
+    }
 
     return {
       dir,
@@ -270,9 +280,6 @@ export function openDataRoot(dir: string): DataRoot {
         // guard lets it through.
         if (host === identity.advertiseHost) return
         identity = updateIdentity(identityPath, { advertiseHost: host })
-      },
-      get relay() {
-        return identity.relay
       },
       release,
     }

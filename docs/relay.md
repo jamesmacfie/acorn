@@ -39,10 +39,14 @@ can't set `Authorization`. It runs an encrypted handshake against the Node's cha
 A Node with relay settings dials its relay as soon as its listener binds. The settings are a relay
 URL and the relay's credential, from either of these places:
 
-- `ACORN_RELAY_URL` and `ACORN_RELAY_CREDENTIAL` in the environment. They win over `node.json`, as
+- `ACORN_RELAY_URL` and `ACORN_RELAY_CREDENTIAL` in the environment. They win over the data root, as
   `ACORN_ADVERTISE_HOST` does, and you set both or neither.
 - `"relay": { "url": "wss://relay.example.com", "credential": "..." }` in the data root's `node.json`,
-  written by hand while the Node is stopped.
+  written by hand while the Node is stopped. It wins over the next one. An agent in [the read block](./managed-agents/read-block.md)
+  can read `node.json`, because the task CLI finds the Node's port there, so it can read a credential
+  written there too. Use the environment to keep the credential from agents.
+- The data root's `relay.json`, mode `0600`, which **Remote access** writes
+  ([accounts](./relay/accounts.md)). The read block keeps agents out of it.
 
 `relaySettings` in `packages/node-core/src/server/transport/relaySettings.ts` reads them once per
 listener. A Node with neither loads none of the tunnel's code and makes no outbound connection.

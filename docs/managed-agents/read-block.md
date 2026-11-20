@@ -28,8 +28,10 @@ A blocked session's shell commands, and every process they start:
 
 - Can't read the data folder, except its own worktree, its own token file, the Node's certificate,
   `node.json`, its own skill folders, and its own attachment folder. The task CLI uses the token file,
-  the certificate, and `node.json`, which gives it the Node's current port. A hard link from the data
-  folder into the worktree fails too, because the sandbox checks the source path.
+  the certificate, and `node.json`, which gives it the Node's current port. **Remote access** keeps the
+  relay credential in `relay.json`, which stays blocked, but a relay written by hand into `node.json`
+  is readable ([the relay](../relay.md#the-node)). A hard link from the data folder into the worktree
+  fails too, because the sandbox checks the source path.
 - Can't read the client config folder, where the CLI, the terminal client, and the
   browser bridge keep their device tokens as plain files, or the desktop's custody root, which holds
   its paired Nodes and sometimes a plain `data.key` (`clientCustodyDirs` in
