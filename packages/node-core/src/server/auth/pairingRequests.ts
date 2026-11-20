@@ -24,10 +24,13 @@ export type PairingRequests = {
   ask(deviceName: string, remote?: { identity: string }): PairingAsk | null
   // The request waiting for an answer, or null once it is answered, expired, or replaced.
   pending(): PairingRequest | null
-  // False when `id` isn't the request waiting for an answer.
-  decide(id: string, decision: PairingDecision['decision']): boolean
-  // An allowed claim spends the request. Every kind of refusal looks the same to the caller.
-  claim(secret: string): { status: 'pending' } | { status: 'refused' } | { status: 'allowed'; deviceName: string }
+  // False when `id` isn't the request waiting for an answer. `deciderKind` is the deciding device's kind.
+  decide(id: string, decision: PairingDecision['decision'], deciderKind?: 'phone'): boolean
+  // An allowed claim spends the request. Every kind of refusal looks the same to the caller. `kind` is
+  // `phone` when a phone allowed it: the device it pairs gets no more than the phone that let it in.
+  claim(
+    secret: string,
+  ): { status: 'pending' } | { status: 'refused' } | { status: 'allowed'; deviceName: string; kind?: 'phone' }
 }
 
 export function pairingRequests(now: () => number = () => Date.now()): PairingRequests {
@@ -38,6 +41,7 @@ export function pairingRequests(now: () => number = () => Date.now()): PairingRe
     secret: Buffer
     expiresAt: number
     allowed: boolean
+    allowedByPhone: boolean
     remote: { identity: string } | undefined
   } | null = null
 
@@ -62,6 +66,7 @@ export function pairingRequests(now: () => number = () => Date.now()): PairingRe
         secret,
         expiresAt: now() + PAIRING_REQUEST_MS,
         allowed: false,
+        allowedByPhone: false,
         remote,
       }
       return { secret: secret.toString('base64url'), phrase, expiresInMs: PAIRING_REQUEST_MS }
@@ -74,11 +79,13 @@ export function pairingRequests(now: () => number = () => Date.now()): PairingRe
       return { id, deviceName, phrase, expiresAt, ...(remote ? { remote: true, identity: remote.identity } : {}) }
     },
 
-    decide(id, decision) {
+    decide(id, decision, deciderKind) {
       const request = live()
       if (!request || request.allowed || request.id !== id) return false
-      if (decision === 'allow') request.allowed = true
-      else held = null
+      if (decision === 'allow') {
+        request.allowed = true
+        request.allowedByPhone = deciderKind === 'phone'
+      } else held = null
       return true
     },
 
@@ -90,7 +97,11 @@ export function pairingRequests(now: () => number = () => Date.now()): PairingRe
         return { status: 'refused' }
       if (!request.allowed) return { status: 'pending' }
       held = null // single use
-      return { status: 'allowed', deviceName: request.deviceName }
+      return {
+        status: 'allowed',
+        deviceName: request.deviceName,
+        ...(request.allowedByPhone ? { kind: 'phone' as const } : {}),
+      }
     },
   }
 }

@@ -2,11 +2,13 @@ import { randomUUID } from 'node:crypto'
 import { mkdtempSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
+import { Hono } from 'hono'
 import { afterAll, beforeAll, beforeEach, expect, it, vi } from 'vitest'
 import { generateSigningKey, signToken, type SigningKey } from '@acorn/protocol/accountToken.ts'
 import type { AccountKeys } from '@acorn/protocol/account.ts'
 import { fingerprintPhrase } from '@acorn/protocol/fingerprintWords.ts'
 import type { Env } from '../bindings'
+import type { AppEnv, Principal } from '../middleware/auth'
 import { channelPublicKey } from '../transport/channelKey'
 import { pairingRoutes } from './pairing'
 
@@ -101,6 +103,40 @@ it("shows a phone's ask with the Node's channel key words, the key the phone's c
   }
   expect(request.identity).toBe(fingerprintPhrase(channelPublicKey(DATA_DIR)))
   expect(request.identity).not.toBe(fingerprintPhrase(FINGERPRINT))
+})
+
+// A phone could otherwise raise an ask with the account session, allow it with its own token, and claim a
+// full device over an ordinary connection (docs/relay/phone-channel/phone-devices.md § A device a phone
+// approved).
+it.each([
+  ['a phone allows it, and gets a phone’s device', { kind: 'device', userId: 'u', deviceKind: 'phone' }, 'phone'],
+  ['a computer allows it, and gets a full device', { kind: 'device', userId: 'u' }, undefined],
+] as const)('pairs a remote ask claimed off the channel: %s', async (_name, decider: Principal, kind) => {
+  const routes = pairingRoutes()
+  const issue = vi.fn(async () => ({ token: 'synthetic-token', device: { id: 'd2' } }))
+  const post = (body: unknown) => ({ method: 'POST', body: JSON.stringify(body) })
+  const raised = await routes.open.request(
+    '/pair/requests',
+    post({ deviceName: 'Laptop', assertion: await assertion() }),
+    env(undefined, { browserChannel: true }),
+  )
+  const { secret } = (await raised.json()) as { secret: string }
+  const core = new Hono<AppEnv>()
+    .use(async (c, next) => {
+      c.set('principal', decider)
+      await next()
+    })
+    .route('/', routes.core)
+  const { request } = (await (await core.request('/pair/requests', {}, env())).json()) as { request: { id: string } }
+  expect((await core.request(`/pair/requests/${request.id}`, post({ decision: 'allow' }), env())).status).toBe(204)
+
+  const claimed = await routes.open.request(
+    '/pair/requests/claim',
+    post({ secret }),
+    env(undefined, { DEVICES: { issue } } as unknown as Partial<Env>),
+  )
+  expect(claimed.status).toBe(200)
+  expect(issue).toHaveBeenCalledWith('Laptop', kind)
 })
 
 it('shows an ask from this computer without identity words', async () => {

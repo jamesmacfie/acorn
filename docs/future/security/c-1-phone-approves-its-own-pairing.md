@@ -1,3 +1,42 @@
+> **Completion note, November 20, 2026.** Fixed on the Acorn side, on branch
+> `phase-c-1-a-phone-can-t-approve-its-own-pairing`.
+>
+> What landed:
+>
+> - The held pairing request records whether a phone allowed it. `decide` in `auth/pairingRequests.ts`
+>   takes the deciding device's kind, and `claim` returns `kind: "phone"` for a request a phone allowed.
+> - `paired()` in `routes/pairing.ts` passes `'phone'` to `DEVICES.issue` when the claim came over the
+>   channel or a phone allowed the request. A laptop a phone lets in gets a phone's limits and no shell
+>   access, whatever connection collects the token.
+> - Tests: `pairingAsk.test.ts` raises a remote ask over the channel with a valid assertion, allows it as
+>   a phone, claims it on an ordinary connection, and expects a phone device. The same test, allowed by
+>   a computer, expects a full device. The phone case fails without the fix.
+> - Docs: `phone-devices.md` has a section, "A device a phone approved", and its refused-routes list
+>   points there. The Trust section of `phone-channel.md` and the device paragraph of `transport.md`
+>   match.
+>
+> Decisions and deviations:
+>
+> - I took the finding's preferred fix, not the stricter one, so a phone can still let in a laptop when
+>   it's the only device online. `phoneRules.ts` and its test are unchanged.
+> - The new test lives in `pairingAsk.test.ts`, not `pairing.test.ts`, because that file already signs
+>   owner assertions for remote asks. The existing local-ask case in `pairing.test.ts` still checks that
+>   a computer's approval gives a full device.
+> - A phone with shell access that allows a request also makes a phone device without shell access.
+>   Shell access is a grant for one device, so it doesn't pass on.
+> - Lifting a phone-approved laptop to full authority means revoking it and pairing it again from a
+>   computer. I didn't add a way to promote a device.
+> - The Node service bundle grows by 147 B, from 1,969,537 B to 1,969,684 B.
+> - I didn't run the live check in `pnpm dev:agent` with a phone paired through the channel.
+> - `stale` lists one site page, `/docs/nodes/pair-a-device-or-a-remote-node/`, which cites
+>   `transport.md`. It doesn't describe a phone allowing a pairing, so it needs no change.
+>
+> For later phases: a phone still answers pairing requests through `POST /v1/core/pair/requests/:id` in
+> `PHONE_ALLOWED`. Anything else that issues a device, such as a new pairing route, must carry the
+> approver's kind the same way, or it reopens this.
+>
+> What acorn-cloud would still need: nothing for this fix.
+
 # C-1: A phone can approve its own pairing request and get a full device
 
 Found November 20, 2026, in a read-only security review of `jamesmacfie/acorn` at `90b9e61e3`

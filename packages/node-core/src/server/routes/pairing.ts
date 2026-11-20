@@ -76,10 +76,14 @@ async function askedIdentity(c: Context<AppEnv>): Promise<string> {
   return fingerprintPhrase(key)!
 }
 
-// A device token for the caller, the one time it exists outside the client. Never logged.
-async function paired(c: Context<AppEnv>, deviceName: string): Promise<Response> {
-  // A device paired through a phone's channel is a phone's, whatever it says about itself.
-  const { token, device } = await c.env.DEVICES.issue(deviceName, c.env.browserChannel ? 'phone' : undefined)
+// A device token for the caller, the one time it exists outside the client. Never logged. `approvedBy` is
+// the kind of device that allowed a pairing request.
+async function paired(c: Context<AppEnv>, deviceName: string, approvedBy?: 'phone'): Promise<Response> {
+  // A device paired through a phone's channel is a phone's, whatever it says about itself. So is one a
+  // phone approved, whatever connection claims it, or a phone could approve its own ask and claim a full
+  // device somewhere else (docs/relay/phone-channel/phone-devices.md § A device a phone approved).
+  const phone = c.env.browserChannel || approvedBy === 'phone'
+  const { token, device } = await c.env.DEVICES.issue(deviceName, phone ? 'phone' : undefined)
   return c.json({
     baseline: ACORN_BASELINE,
     deviceToken: token,
@@ -167,7 +171,7 @@ export function pairingRoutes(): { open: Hono<AppEnv>; core: Hono<AppEnv> } {
       const claim = parsed.success ? requests.claim(parsed.data.secret) : { status: 'refused' as const }
       if (claim.status === 'refused') return pairingFailed(c)
       if (claim.status === 'pending') return c.json({ status: 'pending' } satisfies PairingClaimPending, 202)
-      return paired(c, claim.deviceName)
+      return paired(c, claim.deviceName, claim.kind)
     })
 
   const core = new Hono<AppEnv>()
@@ -194,7 +198,7 @@ export function pairingRoutes(): { open: Hono<AppEnv>; core: Hono<AppEnv> } {
       const parsed = pairingDecisionSchema.safeParse(await c.req.json().catch(() => null))
       if (!parsed.success) return respondError(c, 400, 'bad_request', ['Answer allow or deny.'])
       const request = requests.pending()
-      if (!request || !requests.decide(c.req.param('id'), parsed.data.decision))
+      if (!request || !requests.decide(c.req.param('id'), parsed.data.decision, c.get('principal')?.deviceKind))
         return respondError(c, 404, 'not_found', ['That pairing request was answered, replaced, or expired.'])
       auditRequest(c, {
         action: 'pairing.request.decided',

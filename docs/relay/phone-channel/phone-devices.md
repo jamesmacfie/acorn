@@ -28,7 +28,7 @@ someone holding the phone unlocked. The Node holds a phone to its screens, in tw
 No phone may call these routes:
 
 - Opening a pairing window, and everything under `/v1/core/devices`. Answering a pairing request is
-  allowed.
+  allowed, and the device a phone allows is held as a phone too ([below](#a-device-a-phone-approved)).
 - Every `POST`, `PUT`, `PATCH`, or `DELETE` under `/v1/core/plugins`, so a plugin write added later is
   refused too.
 - Backup and restore, security settings, `PUT /v1/core/node/reach`, and `POST /v1/core/node/stop`.
@@ -73,6 +73,15 @@ agent's commands. That's Claude Code's `default`, `plan`, or `dontAsk` mode, ran
 
 A phone's device that nobody uses for 30 days is revoked the next time it asks. Revoke one phone from
 **Settings → Nodes** on a computer, which lists each device. The others keep working.
+
+## A device a phone approved
+
+A phone may answer a pairing request, so it can let a laptop in when the phone is the only device
+online. The device it allows is marked `kind: "phone"`, whatever connection collects the token, and gets
+a phone's limits and no shell access. Otherwise script in the phone app could raise an ask with the
+account session, allow it with the phone's own token, and collect a full device somewhere else that
+outlives revoking the phone. To give such a laptop full authority, revoke it from a computer and pair it
+again there.
 
 ## Shell access
 

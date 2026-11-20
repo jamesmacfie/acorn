@@ -163,6 +163,7 @@ reload, only from the page's own origin.
   pairs with an impostor that doesn't forward sends the impostor its work.
 - **A phone can approve a pairing.** Raising a request from another computer needs the owner's account
   assertion, and a phone holds the account's session as well as its device token. Someone holding an
-  unlocked phone could pair a new computer. Revoke a lost phone from a computer, and the 30-day limit ends one nobody uses.
+  unlocked phone could pair a new computer, which then gets [a phone's
+  limits](./phone-channel/phone-devices.md#a-device-a-phone-approved). Revoke a lost phone from a computer, and the 30-day limit ends one nobody uses.
 - **A Node answers as data.** A channel's answers reach the app's code as bytes, never as a page on the
   app's address, so a loaded plugin's HTML can't run with the phone's session.
