@@ -13,8 +13,9 @@ A clone runs in the background, because a large repository takes longer than one
 and a restart loses every run. Both routes accept only a device token, so an agent with a task token
 can't fetch code onto the Node. `cloneOutcome` in `@acorn/protocol/api.ts` is the client side. A
 project this route clones starts [untrusted](./projects.md#untrusted-projects). A plugin's
-`core.projects.clone` and the importers that use it write a trusted project, unless the plugin
-passes `trusted: false`, as the workflows plugin's [run after a clone](../workflows/starting-runs.md#after-a-clone) does.
+`core.projects.clone` writes an untrusted project for a loaded plugin, and a clone that fills a
+placeholder is untrusted because its folder changed. A built-in importer's clone into a new row is
+trusted, unless the plugin passes `trusted: false`, as the workflows plugin's [run after a clone](../workflows/starting-runs.md#after-a-clone) does.
 
 The URL is untrusted input. The Node accepts `https://host/path`, `ssh://[user@]host[:port]/path`, and
 `user@host:path`. It refuses every other scheme, including `http`, `file`, `git`, and `ext::`, a
@@ -44,7 +45,8 @@ in its mirror, checks the path against its host's grammar, and finds a project f
 no folder yet. It passes that project as `fillProjectId`, and GitHub and GitLab pass the repository's
 ID in `fields`. A **Clone** item answers `{ ok: true, action: 'clone', cloneId }`, and a **Link
 folder** item still answers with its project ID. The project takes the folder's name, which is the
-repository's last path segment. Importer clones stay trusted.
+repository's last path segment. An importer clone into a new row stays trusted. One that fills a
+project with no folder yet is untrusted, because that project's folder changed.
 
 The importer screen follows each `cloneId` with `cloneOutcome` and marks its row **Cloning…**,
 **Cloned**, or the error. A finished clone reports its project to the host through `onImported`.

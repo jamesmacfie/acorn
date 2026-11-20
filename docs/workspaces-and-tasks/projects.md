@@ -49,10 +49,11 @@ path-less row a folder in Settings → Overview to repair it.
 
 ## Untrusted projects
 
-Each project is trusted or untrusted (`projects.trusted`). A project cloned from a URL you pasted
-starts untrusted. Folder adds, `acorn project add`, and importer clones stay trusted, and so does
-every project that existed before the column. Until you trust a project, nothing its repository
-ships runs on the Node. An agent can still read the code.
+Each project is trusted or untrusted (`projects.trusted`). A URL clone you paste starts untrusted,
+and so does any project a plugin adds or clones: `projects:write` never runs code, and the bridge
+sends a frame's `POST /v1/core/projects` with `trusted: false`. Folder adds, `acorn project add`,
+built-in importer clones, and older projects stay trusted. A new folder, even a placeholder's first,
+untrusts the project. Until you trust it, nothing its repository ships runs. Agents can read it.
 
 | Path | In an untrusted project |
 | --- | --- |
@@ -75,10 +76,9 @@ repository's own settings, so it can't run in an untrusted project."
 
 The project table in Settings → Overview and the header of the project's settings page mark an
 untrusted project **Untrusted**. To trust it, open its settings page and choose **Trust this
-project** under **Untrusted**.
-That calls `POST /v1/core/projects/:id/trust`, which only a device can call. Trust is one-way.
-Sessions and tasks that started before keep how they started, and the next ones load the
-repository's settings and run setup.
+project** under **Untrusted**. That calls `POST /v1/core/projects/:id/trust`, which only a device can
+call. Trust lasts until the folder changes. Sessions and tasks that started before keep how they
+started, and the next ones load the repository's settings and run setup.
 
 ## Arrange projects
 

@@ -769,6 +769,62 @@ describe('managed agent runtime conformance', () => {
     })
   })
 
+  it.each(['created by a loaded plugin', 'moved to another folder'])(
+    'locks down a session in a project %s, until the owner trusts it',
+    async (how) => {
+      class LockingDriver extends DeferredStartDriver {
+        readonly untrusted = true
+        options: AgentDriverStartOptions | null = null
+        override async start(options: AgentDriverStartOptions): Promise<AgentDriverSession> {
+          this.options = options
+          return super.start(options)
+        }
+      }
+      const startOptions = async (taskId: string) => {
+        await runtime?.stop()
+        const registry = new AgentDriverRegistry()
+        const driver = new LockingDriver()
+        registry.registerNative(driver.providerId, () => driver)
+        runtime = new ManagedAgentRuntime({
+          db: pluginDb.db,
+          dataDir,
+          core,
+          internalEnv: () => ({}),
+          secrets: SECRETS,
+          currentUserId: () => 'owner',
+          registry,
+        })
+        await runtime.acceptSession({
+          taskId,
+          providerId: driver.providerId,
+          profileId: driver.profileId,
+          kind: 'interactive',
+          config: {},
+        })
+        await driver.entered
+        driver.release()
+        return driver.options
+      }
+      const seed = await seedTask(testDb, dataDir)
+      const folder = join(dataDir, 'plugin-folder')
+      await mkdir(folder)
+      let projectId = 'project-runtime-test'
+      if (how === 'moved to another folder') {
+        // Through core's own service, with no holder: even a built-in's move needs fresh trust.
+        await core.projects.update(projectId, { path: folder })
+      } else {
+        projectId = (await core.projects.create({ name: 'plugin-made', path: folder }, 'loaded-plugin')).id
+        await testDb.db.update(schema.tasks).set({ projectId }).where(eq(schema.tasks.id, seed.taskId))
+      }
+      expect((await core.projects.byId(projectId))?.trusted).toBe(false)
+      expect(await startOptions(seed.taskId)).toMatchObject({ untrusted: true })
+
+      // What the device-only trust route writes.
+      await testDb.db.update(schema.projects).set({ trusted: true }).where(eq(schema.projects.id, projectId))
+      expect((await startOptions(seed.taskId))?.untrusted).toBeFalsy()
+    },
+  )
+
   it("refuses a harness that can't lock down in an untrusted project", async () => {
     const seed = await seedTask(testDb, dataDir)
     await testDb.db.update(schema.projects).set({ trusted: false })

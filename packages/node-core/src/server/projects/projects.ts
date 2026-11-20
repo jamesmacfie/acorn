@@ -453,6 +453,9 @@ export async function patchProject(
     const alreadyMapped = await projectAtPath(db, patch.path, id)
     if (alreadyMapped) return { ok: false, reason: 'Another project already uses that path.' }
     set.path = patch.path
+    // Trust covers the folder the owner reviewed. A plugin's request through this route looks like the
+    // owner's own, so every move waits for a device to trust the new folder.
+    if (patch.path !== project.path) set.trusted = false
   }
   if (Object.keys(set).length === 0) return { ok: true, project }
   db.transaction((tx) => {
@@ -475,19 +478,23 @@ export async function patchProject(
 
 // Core-only write seam for importer plugins. The public project routes remain the richer UI/config
 // surface; this pair covers only the fields a later importer needs to create a deferred remote
-// project and map it to a folder, not a general-purpose project mutation API.
+// project and map it to a folder, not a general-purpose project mutation API. `holder` is set for a
+// loaded plugin's call, and its new row starts untrusted: leave to manage projects isn't leave to run their code.
 export async function createProjectRef(
   db: AppDatabase,
   input: ProjectCreateRefInput,
   ownerId = '',
+  holder?: string,
 ): Promise<ProjectRef> {
+  const trusted = holder === undefined ? undefined : false
   const name = input.name.trim()
   if (!name) throw new Error('Project name cannot be blank.')
   if (input.github && (!input.github.owner.trim() || !input.github.name.trim()))
     throw new Error('GitHub owner and name cannot be blank.')
   const repository = inputRepository(input)
   if (input.path !== undefined && input.path !== null) {
-    const result = await createProject(db, { path: input.path, workspaceId: input.workspaceId, name }, ownerId)
+    // A folder that is already a project comes back as it was: its contents are the ones the owner trusted.
+    const result = await createProject(db, { path: input.path, workspaceId: input.workspaceId, name, trusted }, ownerId)
     if (!result.ok) throw result.code === 'workspaces_off' ? new WorkspacesOffError() : new Error(result.reason)
     if (repository) {
       await db
@@ -500,7 +507,12 @@ export async function createProjectRef(
   }
 
   if (!repository) throw new Error('Deferred projects need a repository facet.')
-  const result = insertProject(db, ownerId, { name, path: null, ...repositoryColumns(repository) }, input.workspaceId)
+  const result = insertProject(
+    db,
+    ownerId,
+    { name, path: null, trusted, ...repositoryColumns(repository) },
+    input.workspaceId,
+  )
   if (!result.ok) throw new Error(result.reason)
   return toProjectRef(result.project)
 }

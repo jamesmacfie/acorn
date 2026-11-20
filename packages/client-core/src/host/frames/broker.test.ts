@@ -233,7 +233,23 @@ describe('api calls', () => {
     expect(replyTo(h, 4)).toMatchObject({ ok: false, error: { code: PLUGIN_BRIDGE_DENIED } })
     expect(replyTo(h, 5)).toMatchObject({ ok: true })
     expect(h.svc.fetch).toHaveBeenCalledTimes(1)
-    expect(h.svc.fetch).toHaveBeenCalledWith('POST', projectsRoute, { name: 'ok' }, expect.anything())
+    expect(h.svc.fetch).toHaveBeenCalledWith('POST', projectsRoute, { name: 'ok', trusted: false }, expect.anything())
+  })
+
+  it('sends a frame’s new project as untrusted, whatever the frame asked for', async () => {
+    // The Node can't tell a frame's request from the owner's, whose folders start trusted.
+    const h = withBridge({ target: 'importer', api: ['core.projects:write'] })
+    h.send({ id: 3, kind: 'api', method: 'POST', path: projectsRoute, body: { path: '/repo', trusted: true } })
+    h.send({ id: 4, kind: 'api', method: 'POST', path: projectsRoute, body: ['not', 'an', 'object'] })
+    await h.settled(4)
+    expect(h.svc.fetch).toHaveBeenNthCalledWith(
+      1,
+      'POST',
+      projectsRoute,
+      { path: '/repo', trusted: false },
+      expect.anything(),
+    )
+    expect(h.svc.fetch).toHaveBeenNthCalledWith(2, 'POST', projectsRoute, { trusted: false }, expect.anything())
   })
 
   it('forwards the node’s own error envelope verbatim', async () => {

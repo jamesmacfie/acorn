@@ -69,7 +69,7 @@ const projectsFor = (
           const host = (input.repository?.host ?? (input.github ? 'github.com' : '')).trim().toLowerCase()
           if ((input.repository?.externalId ?? input.github?.repoId) != null && codeHostFor(host) !== pluginId)
             throw new Error(`Only the code host that holds ${host || 'this repository'} can set its external id.`)
-          return projects.create(input)
+          return projects.create(input, pluginId)
         },
       }
     : {}),

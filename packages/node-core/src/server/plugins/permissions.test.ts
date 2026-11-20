@@ -234,7 +234,7 @@ describe('scopeCore', () => {
 
   it('names a loaded plugin as the holder, and refuses an external id on a host it does not hold', async () => {
     const undo = declareCodeHost('demo', { label: 'Demo', hosts: ['git.demo.test'] }, false)
-    const create = vi.fn(async (_input: unknown) => ({}))
+    const create = vi.fn(async (_input: unknown, _holder?: string) => ({}))
     const update = vi.fn(async (_id: string, _patch: unknown, _holder?: string) => ({}))
     const clone = vi.fn(async (_input: unknown, _holder?: string) => ({ cloneId: 'c' }))
     const { projects } = scoped({ core: ['projects:write'] }, {
@@ -254,6 +254,8 @@ describe('scopeCore', () => {
       // Without an external id there's nothing of another provider's to set.
       await projects.create({ name: 'x', repository: { host: 'github.com', path: 'a/b' } })
       expect(create).toHaveBeenCalledTimes(2)
+      // The holder is what makes core start the row untrusted.
+      expect(create).toHaveBeenLastCalledWith({ name: 'x', repository: { host: 'github.com', path: 'a/b' } }, 'demo')
     } finally {
       undo()
     }

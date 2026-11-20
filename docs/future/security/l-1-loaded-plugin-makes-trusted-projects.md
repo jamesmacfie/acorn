@@ -1,3 +1,59 @@
+> **Completion note, November 20, 2026.** Fixed on the Acorn side, on branch
+> `phase-l-1-loaded-plugins-can-t-make-trusted-projects`.
+>
+> What landed:
+>
+> - A loaded plugin's new project starts untrusted. `ProjectService.create` takes a `holder`, like
+>   `update` and `clone` already did, and `scopeCore` passes the plugin's id. `createProjectRef` writes
+>   `trusted: false` for a holder, both for a folder and for a project with no folder yet. A folder
+>   that's already a project comes back unchanged, because its contents are the ones the owner trusted.
+> - A loaded plugin's clone is untrusted, even if the call asks for `trusted: true`.
+>   `clone.ts` `register` reads `context.holder` and ignores the input's flag for a plugin.
+> - Any folder change resets trust. `patchProject` sets `trusted: false` whenever `path` differs from the
+>   stored one, null included. That one place covers `PATCH /v1/core/projects/:id`, a loaded plugin's
+>   `update`, and a clone that fills a placeholder. The owner trusts the new folder through the existing
+>   device-only `POST /v1/core/projects/:id/trust`.
+> - Client plugins get the same rule. A bridge table rule can now carry `fixedBody`, which holds
+>   fields the broker writes over a frame's JSON body. `POST /v1/core/projects` uses it to send
+>   `trusted: false`, so a frame can't leave the flag out or set it to true. The route accepts
+>   `trusted: false` only, and refuses `true` with 400.
+> - The `projects:write` text, both on the trust prompt and for frame scopes, now says that projects
+>   the plugin adds or moves stay untrusted until you trust them. The plugin contract's comments
+>   (`coreProjects.ts`), `projects.md`, `clone-runs.md`, and `loaded-plugins.md` say the same.
+> - Tests: `projects.test.ts` covers a move, a same-folder patch, plugin and built-in creates, and a
+>   trusted placeholder mapped by a plugin. `clone.test.ts` covers a loaded plugin's clone asking for
+>   trust, and a placeholder fill. `routes/projects/projects.test.ts` covers the owner's create, a
+>   frame's create, and a refused `trusted: true`, plus a move and then a device trust.
+>   `broker.test.ts` shows the bridge forces the flag, even over a frame's `true`.
+>   `permissions.test.ts` shows the holder reaches `create`. `plugins/agents` `runtime.test.ts` uses the
+>   real core service: a loaded plugin's project, or a moved one, starts its next session locked down
+>   (`untrusted: true`, so Claude Code loads user settings only), and after trust the next session isn't.
+>
+> Decisions and deviations:
+>
+> - The reset applies to every caller, including the owner's own folder change in Settings and a
+>   built-in importer that fills a placeholder. The Node can't tell a plugin frame's request from the
+>   owner's, because both carry the device's credential, and the finding asks a device to confirm the
+>   changed checkout. An importer clone into a new row stays trusted, as before. No built-in creates a
+>   placeholder today, so the fill case only meets older rows.
+> - I forced the flag in the broker instead of stamping a frame header. A header would have to pass
+>   through the desktop broker, the relay, and every host's transport. The body rewrite stays inside
+>   client-core's bridge, which every host shares.
+> - The old Node default stays as it was: a URL-less create through the owner's route, a CLI add, and a
+>   built-in create are trusted. Only plugin-originated rows start untrusted.
+> - I didn't raise `PLUGIN_API_MAJOR`. The public contract only gained comments.
+> - Size: the Node service bundle went from 1,969,684 B to 1,969,792 B, which adds 108 B. The broker
+>   change is client-side.
+>
+> For later phases: an older client paired with this Node doesn't force the flag yet, so a client
+> plugin's create through that client is still trusted until the client updates. A Node move or a
+> loaded plugin's call is fixed whatever the client. `fixedBody` is available to any other bridge
+> route that needs to mark a frame's request. In a full run under load, `client-core`
+> `iconCensus.test.ts` "holds for the real tree" hit its 5 s timeout once, then passed on its own.
+>
+> What acorn-cloud would still need: nothing. Projects and the bridge are local to the Node and its
+> clients.
+
 # L-1. Loaded plugins can confer trust on a project checkout
 
 Found November 20, 2026, in Acorn at `90b9e61e3`. Severity is medium. The project trust gap is

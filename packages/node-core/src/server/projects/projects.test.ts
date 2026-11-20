@@ -201,6 +201,66 @@ describe('createProject / detectProject', () => {
     expect(patched.ok && patched.project.path === folder && patched.project.vcs === 'git').toBe(true)
   })
 
+  it('resets trust when the folder changes, and keeps it when the folder stays', async () => {
+    const first = join(dir, 'trusted-first')
+    const second = join(dir, 'trusted-second')
+    mkdirSync(first)
+    mkdirSync(second)
+    const created = await createProject(testDb.db, { path: first })
+    if (!created.ok) throw new Error('create failed')
+    expect(created.project.trusted).toBe(true)
+
+    expect(await patchProject(testDb.db, created.project.id, { path: first, name: 'renamed' })).toMatchObject({
+      ok: true,
+      project: { trusted: true },
+    })
+    expect(await patchProject(testDb.db, created.project.id, { path: second })).toMatchObject({
+      ok: true,
+      project: { path: second, trusted: false },
+    })
+  })
+
+  it('starts a loaded plugin’s project untrusted, and leaves a folder that is already a project as it was', async () => {
+    const folder = join(dir, 'plugin-made')
+    mkdirSync(folder)
+    expect(await createProjectRef(testDb.db, { name: 'made', path: folder }, '', 'loaded')).toMatchObject({
+      trusted: false,
+    })
+    expect(
+      await createProjectRef(
+        testDb.db,
+        { name: 'deferred', github: { owner: 'acme', name: 'deferred' } },
+        '',
+        'loaded',
+      ),
+    ).toMatchObject({ path: null, trusted: false })
+
+    const owned = join(dir, 'owner-made')
+    mkdirSync(owned)
+    const mine = await createProject(testDb.db, { path: owned })
+    if (!mine.ok) throw new Error('create failed')
+    expect(await createProjectRef(testDb.db, { name: 'again', path: owned }, '', 'loaded')).toMatchObject({
+      id: mine.project.id,
+      trusted: true,
+    })
+    // A built-in's create is the owner's, as before.
+    const builtIn = join(dir, 'built-in')
+    mkdirSync(builtIn)
+    expect(await createProjectRef(testDb.db, { name: 'built', path: builtIn })).toMatchObject({ trusted: true })
+  })
+
+  it('untrusts a trusted placeholder that any caller maps onto a folder', async () => {
+    // A placeholder a built-in made before this rule is trusted, and holds no checkout yet.
+    const placeholder = await createProjectRef(testDb.db, { name: 'web', github: { owner: 'acme', name: 'web' } })
+    expect(placeholder.trusted).toBe(true)
+    const folder = join(dir, 'mapped')
+    mkdirSync(folder)
+    expect(await updateProjectRef(testDb.db, placeholder.id, { path: folder }, 'loaded')).toMatchObject({
+      path: folder,
+      trusted: false,
+    })
+  })
+
   it('allows duplicate GitHub facets while projectByGithub resolves the oldest deterministically', async () => {
     await createProjectRef(testDb.db, { name: 'web', github: { owner: 'acme', name: 'web' } })
     const original = await projectByGithub(testDb.db, 'acme', 'web')

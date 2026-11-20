@@ -271,3 +271,40 @@ describe('trusting a project', () => {
     expect(res.status).toBe(403)
   })
 })
+
+// The plugin bridge sends `trusted: false` on a frame's create, and a folder move can come from a frame
+// too, so the route has to hold the rule itself (docs/workspaces-and-tasks/projects.md § Untrusted projects).
+describe('trust through the project routes', () => {
+  let t: TestDb
+  let dir: string
+
+  beforeEach(async () => {
+    t = makeTestDb()
+    vi.mocked(getDb).mockReturnValue(t.db)
+    dir = mkdtempSync(join(tmpdir(), 'acorn-route-trust-'))
+    mkdirSync(join(dir, 'widget'))
+    await seedProject(t, join(dir, 'widget'))
+  })
+
+  afterEach(() => {
+    t.cleanup()
+    rmSync(dir, { recursive: true, force: true })
+  })
+
+  it("creates the owner's folder trusted and a plugin frame's untrusted, and never takes trusted: true", async () => {
+    for (const name of ['mine', 'framed', 'asks']) mkdirSync(join(dir, name))
+    const create = async (body: unknown) => (await call('/api/projects', 'POST', body)).json()
+    expect(await create({ path: join(dir, 'mine') })).toMatchObject({ project: { trusted: true } })
+    expect(await create({ path: join(dir, 'framed'), trusted: false })).toMatchObject({ project: { trusted: false } })
+    expect((await call('/api/projects', 'POST', { path: join(dir, 'asks'), trusted: true })).status).toBe(400)
+  })
+
+  it('resets trust when the folder changes, until a device trusts it again', async () => {
+    mkdirSync(join(dir, 'elsewhere'))
+    const patch = async (body: unknown) => (await call('/api/projects/project-widget', 'PATCH', body)).json()
+    expect(await patch({ name: 'renamed' })).toMatchObject({ project: { trusted: true } })
+    expect(await patch({ path: join(dir, 'elsewhere') })).toMatchObject({ project: { trusted: false } })
+    await call('/api/projects/project-widget/trust', 'POST')
+    expect(await (await call('/api/projects/project-widget')).json()).toMatchObject({ trusted: true })
+  })
+})

@@ -44,6 +44,9 @@ type RouteRule = {
   scopes: Partial<Record<ApiMethod, string>>
   // Why a dangerous method on this path is absent. Prose for the next reader, not used at runtime.
   note?: string
+  // Fields the broker writes over a frame's JSON body. The Node can't tell a frame's request from the
+  // owner's, so this is how a route learns the request came from a plugin.
+  fixedBody?: Partial<Record<ApiMethod, Record<string, unknown>>>
 }
 
 // A single path segment. Ids are opaque and percent-encoded by the route builders, so `[^/]+` is the
@@ -102,7 +105,13 @@ const RULES: readonly RouteRule[] = [
   },
 
   // ── Projects ────────────────────────────────────────────────────────────────────────────────────
-  { path: shape('/v1/core/projects'), scopes: { GET: 'core.projects:read', POST: 'core.projects:write' } },
+  {
+    path: shape('/v1/core/projects'),
+    scopes: { GET: 'core.projects:read', POST: 'core.projects:write' },
+    // A folder the owner adds is trusted. One a plugin adds waits for the owner to trust it, because
+    // leave to manage projects isn't leave to run their code.
+    fixedBody: { POST: { trusted: false } },
+  },
   {
     path: shape(`/v1/core/projects/${SEG}`),
     scopes: { GET: 'core.projects:read', PATCH: 'core.projects:write' },
@@ -365,7 +374,9 @@ const RULES: readonly RouteRule[] = [
   },
 ]
 
-export type ApiDecision = { allowed: true; path: string } | { allowed: false; reason: string }
+export type ApiDecision =
+  | { allowed: true; path: string; fixedBody?: Record<string, unknown> }
+  | { allowed: false; reason: string }
 
 const DENY = (reason: string): ApiDecision => ({ allowed: false, reason })
 
@@ -437,7 +448,8 @@ export function allowApi(
   const scope = rule.scopes[method]
   if (!scope) return DENY(`${method} ${target} cannot be granted to a plugin`)
   if (!binding.api.includes(scope)) return DENY(`missing scope ${scope}`)
-  return { allowed: true, path: forwarded }
+  const fixedBody = rule.fixedBody?.[method]
+  return { allowed: true, path: forwarded, ...(fixedBody ? { fixedBody } : {}) }
 }
 
 /**
@@ -485,7 +497,7 @@ const SCOPE_DESCRIPTIONS: Readonly<Record<string, GrantDescription>> = {
     high: true,
   },
   'core.projects:write': {
-    text: 'Create and update projects, including their on-disk locations',
+    text: 'Create and update projects, including their on-disk locations. Projects it adds or moves stay untrusted, so their code doesn’t run until you trust them',
     icon: 'folder-plus',
     high: true,
   },

@@ -315,7 +315,10 @@ export function createFrameBridge(input: {
       return
     }
     try {
-      const result = await services.fetch(method, decision.path, body, controller.signal)
+      const sent = decision.fixedBody
+        ? { ...(typeof body === 'object' && body !== null && !Array.isArray(body) ? body : {}), ...decision.fixedBody }
+        : body
+      const result = await services.fetch(method, decision.path, sent, controller.signal)
       if (result.ok) reply({ id, ok: true, status: result.status, body: result.body })
       else {
         reply({

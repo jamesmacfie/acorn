@@ -45,9 +45,9 @@ export type ProjectService = {
     workspaceId: string,
     providerIds?: readonly string[],
   ): Promise<Array<{ connectionId: string; externalId: string; projectId: string }>>
-  create(input: ProjectCreateRefInput): Promise<ProjectRef>
   // A loaded plugin's calls pass its id as `holder` (server/plugins/permissions.ts), so it can't set an
-  // external id on a repository another code host holds.
+  // external id on a repository another code host holds, and what it creates or clones starts untrusted.
+  create(input: ProjectCreateRefInput, holder?: string): Promise<ProjectRef>
   update(id: string, patch: ProjectUpdateRefInput, holder?: string): Promise<ProjectRef | null>
   // Clone a Git URL in the background (docs/workspaces-and-tasks/clone-runs.md). It
   // throws a refusal of the URL or the folder, and `cloneRun` reports everything after that. `holder`
@@ -120,7 +120,7 @@ export function createProjectService(db: AppDatabase, activeIdentity: ActiveIden
         )
         .orderBy(asc(schema.workspaceExternalProjects.integrationId), asc(schema.workspaceExternalProjects.externalId))
     },
-    create: (input) => createProjectRef(db, input, activeIdentity.get() ?? ''),
+    create: (input, holder) => createProjectRef(db, input, activeIdentity.get() ?? '', holder),
     update: (id, patch, holder) => updateProjectRef(db, id, patch, holder),
     // The clone service loads on first use, to stay inside the service boot budget
     // (apps/node/scripts/check-service-budget.mjs).

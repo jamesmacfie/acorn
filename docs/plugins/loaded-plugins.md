@@ -88,7 +88,10 @@ the provider ownership check. A loaded integration provider passes a fetch handl
 Project access takes three grants. `projects:read` covers identity, checkout paths, and workspace
 external-project mappings for the connection providers this plugin registered. `projects:config`
 covers executable build, dev, and database configuration. `projects:write` covers creating or
-updating projects, and cloning a Git URL onto the Node with `clone` and `cloneRun`. The `telemetry` facet is the read side of telemetry and the one grant that returns
+updating projects, and cloning a Git URL onto the Node with `clone` and `cloneRun`. It doesn't let a
+project's code run: what the plugin creates or clones starts
+[untrusted](../workspaces-and-tasks/projects.md#untrusted-projects), and so does a project whose folder
+it changes. The `telemetry` facet is the read side of telemetry and the one grant that returns
 other packages' data, so the trust prompt draws it high. The `prefs` facet reads and writes the
 `plugin:<id>:*` namespace that the plugin's frame `state.get` and `state.set` verbs use. That's the
 supported channel between a node half and its frames, and values are capped at 1 MiB.

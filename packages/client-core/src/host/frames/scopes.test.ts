@@ -58,7 +58,10 @@ describe('the route table covers every core route', () => {
       ['core.changeRequests:reveal', 'Open a task’s pull or merge request diff at a line'],
       ['core.projects:config', 'Read every project’s build, dev and database scripts'],
       ['core.projects:read', 'Read projects, including where every codebase lives on disk'],
-      ['core.projects:write', 'Create and update projects, including their on-disk locations'],
+      [
+        'core.projects:write',
+        'Create and update projects, including their on-disk locations. Projects it adds or moves stay untrusted, so their code doesn’t run until you trust them',
+      ],
       ['core.tasks:read', 'Read tasks'],
       ['core.tasks:write', 'Create and update tasks'],
       ['core.workspaces:read', 'Read project collections'],

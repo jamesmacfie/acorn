@@ -45,7 +45,8 @@ export type ProjectCloneInput = {
   /** Written to the row as soon as it has its folder, before the run reports finished. */
   fields?: Omit<ProjectUpdateRefInput, 'path'>
   /** `false` makes the clone an untrusted project, which runs nothing its repository ships until the
-   *  owner trusts it. A plugin can only lower trust, so `true` isn't accepted. */
+   *  owner trusts it. A plugin can only lower trust, so `true` isn't accepted. A loaded plugin's clone
+   *  is untrusted either way. */
   trusted?: false
 }
 
@@ -93,7 +94,9 @@ export type CoreProjectService = {
     workspaceId: string,
     providerIds?: readonly string[],
   ): Promise<Array<{ connectionId: string; externalId: string; projectId: string }>>
+  /** A loaded plugin's new project is untrusted. A folder that is already a project comes back as it was. */
   create(input: ProjectCreateRefInput): Promise<ProjectRef>
+  /** A changed `path` makes the project untrusted until the owner trusts the new folder. */
   update(id: string, patch: ProjectUpdateRefInput): Promise<ProjectRef | null>
   /** Starts cloning a Git URL in the background and answers at once. It throws when the URL or the
    *  target folder is refused. At most three clones run at once, and the rest wait their turn. */

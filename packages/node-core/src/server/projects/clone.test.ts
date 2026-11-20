@@ -102,10 +102,24 @@ describe('clone runs', () => {
     if (!started.ok) throw new Error(started.error)
     const run = await finish(started.cloneId)
     expect(run).toEqual({ state: 'finished', result: { ok: true, projectId: placeholder.id } })
+    // The placeholder was trusted with no checkout, so the folder it now names needs the owner's trust.
     expect(await getProject(t.db, placeholder.id)).toMatchObject({
       path: join(parent(), 'checkout'),
       repoExternalId: '42',
+      trusted: false,
     })
+  })
+
+  it("makes a loaded plugin's clone untrusted, even when it asks for trust", async () => {
+    const started = await startCloneRun(
+      // `trusted: true` isn't in the plugin contract, but a plugin's call is untyped at runtime.
+      { url: `file://${origin}`, parentDir: parent(), trusted: true },
+      { db: t.db, ownerId: '', protocols, holder: 'loaded' },
+    )
+    if (!started.ok) throw new Error(started.error)
+    const run = await finish(started.cloneId)
+    if (run.state !== 'finished' || !run.result.ok) throw new Error(JSON.stringify(run))
+    expect((await getProject(t.db, run.result.projectId))?.trusted).toBe(false)
   })
 
   it('refuses a folder that exists and is not empty before git runs', async () => {

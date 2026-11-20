@@ -39,6 +39,8 @@ const createBody = z.object({
   path: z.string().min(1),
   workspaceId: z.string().optional(),
   name: z.string().max(120).optional(),
+  // The plugin bridge sends false for a frame's request. Nothing can ask for trust here.
+  trusted: z.literal(false).optional(),
 })
 const cloneBody = z.object({
   url: z.string().min(1).max(2048),
