@@ -2,8 +2,9 @@
 
 The November 20, 2026 review looked for ways to run code on a user's Node without their approval.
 The Slack, account service, relay, and Node findings cite Acorn `90b9e61e3` and
-`acorn-cloud` `19fa594`. Each open finding has one report with its evidence, fix, and
-verification requirements.
+`acorn-cloud` `19fa594`. A later pass the same day traced the path from the account service to a Node
+at Acorn `31ff472da` and added L-6, C-5, and R-6 to R-9. Each open finding has one report with its
+evidence, fix, and verification requirements.
 
 ## Where to start
 
@@ -27,9 +28,12 @@ escalation in [L-3](./l-3-delegation-can-widen-harness-permissions.md).
 | [C-1](./c-1-phone-approves-its-own-pairing.md) | Medium | A phone can approve its own pairing request and get a full device. | acorn |
 | [L-1](./l-1-loaded-plugin-makes-trusted-projects.md) | Medium | A loaded plugin can make a trusted project and run code outside its sandbox. | acorn |
 | [L-5](./l-5-permission-cards-can-omit-command-text.md) | Medium | An approval card can omit part of the command it authorizes. | acorn |
+| [L-6](./l-6-agent-retargets-an-open-remote-preview.md) | Medium | A task agent can point an open remote preview at any local port. | acorn |
+| [C-5](./c-5-sign-in-approval-shows-a-name-the-asker-chose.md) | Medium, needs an approved code | The sign-in approval page shows a name the asking computer chose. | Both |
 | [C-4](./c-4-cloud-deploy-can-use-untested-acorn-revision.md) | Medium | The cloud deploy can use a different Acorn revision from CI. | acorn-cloud |
 | [D-1](./d-1-standalone-release-resolves-unreviewed-dependencies.md) | Medium | Standalone packaging can resolve dependencies outside the reviewed lockfile. | acorn |
 | [D-2](./d-2-manual-builds-receive-updater-signing-key.md) | Medium, latent | Manual desktop builds receive the updater signing key. | acorn |
+| [R-6](./r-6-previews-put-the-cloud-inside-tls.md) | Medium, latent | Previews put the account service inside the encryption. | Both |
 | [D-4](./d-4-relay-build-context-can-include-local-secret-files.md) | Medium, conditional | A manual relay build can include local credential files. | Both |
 | [G-3](./g-3-dev-tunnel-exposes-test-mode.md) | Medium, only with `TEST_MODE=1` | The Slack dev tunnel can publish the service's test routes. | acorn-cloud |
 | [L-2](./l-2-read-block-exposes-relay-credential.md) | Low | An agent in the read block can read the Node's relay credential. | acorn |
@@ -39,6 +43,9 @@ escalation in [L-3](./l-3-delegation-can-widen-harness-permissions.md).
 | [G-6](./g-6-one-node-spends-team-rate-limit.md) | Low | One Node can use up a workspace's whole Slack rate limit. | acorn-cloud |
 | [R-4](./r-4-sign-out-leaves-phones-paired.md) | Low | Signing out of the account leaves phone devices paired. | acorn |
 | [R-5](./r-5-revoke-leaves-proxied-sockets-open.md) | Low | Revoking a device leaves in-flight requests and proxied sockets open. | acorn |
+| [R-7](./r-7-phone-rules-skip-plugin-routes-and-the-socket.md) | Low | The phone's refusal list skips plugin routes and the event socket. | acorn |
+| [R-8](./r-8-node-sends-relay-credential-over-plain-ws.md) | Low | The Node sends its relay credential to a plain `ws://` relay the account service names. | acorn |
+| [R-9](./r-9-node-fetches-the-certificate-authority-the-service-names.md) | Low | The Node fetches whatever certificate authority address the account service names. | acorn |
 | [D-3](./d-3-desktop-runtime-lacks-independent-digest.md) | Low | Desktop runtime verification trusts the download source. | acorn |
 | [S-5](./s-5-gateway-token-lifetime-not-capped.md) | Info | The Node doesn't enforce the gateway token's 60-second lifetime. | acorn |
 

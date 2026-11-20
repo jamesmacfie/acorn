@@ -148,6 +148,8 @@ Either way, the work is in this repository.
   rules and the 30-day limit don't cover.
 - [R-2](./r-2-account-service-relays-a-pairing-and-keeps-the-token.md): a breached account service gets a device token by relaying a pairing, with no phone needed.
 - [R-4](./r-4-sign-out-leaves-phones-paired.md): signing out leaves phone devices valid.
+- [R-7](./r-7-phone-rules-skip-plugin-routes-and-the-socket.md): the plugin routes and socket frames an
+  allowlist has to cover.
 - Docs that make a claim this finding contradicts:
   - [The account service](../../security/control-plane.md#the-account-service) says the service can't
     get a device token (`docs/security/control-plane.md:50-51`).
