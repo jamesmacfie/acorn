@@ -22,12 +22,11 @@ alternatives rejected.
 
 ## What's left
 
-1. **The hosted gateway**, built in the hosted service's own repository against
-   [the gateway API](../../account-api/slack-gateway.md): **Add to Slack**, Sign in with Slack on the
-   account website, encrypted bot tokens, the per-Node share of a team's rate budget, and grants that
-   lapse after 90 days idle. The stand-in does none of the last four. Its conformance runs with the
-   standalone fake Slack (`startFakeSlack`), as [acceptance](./06-acceptance.md) stage 2 describes.
-2. **The event subscriptions** on the production app, once the gateway answers Slack's address check.
+1. **Deploy the hosted gateway.** It's built against [the gateway API](../../account-api/slack-gateway.md)
+   in the hosted service's own repository, and passed acceptance stages 2 and 3 on November 20, 2026.
+   The per-Node share of a team's rate budget isn't built yet.
+2. **The production app's settings**: the event subscriptions once the deployed gateway answers Slack's
+   address check, `org_deploy_enabled`, public distribution, and an icon.
 3. **[Acceptance](./06-acceptance.md)**: the rest of the stand-in walk (an approval card from a harness
    that asks, and a Node restart during a turn), the live run, the rate limit run, and the release.
 
