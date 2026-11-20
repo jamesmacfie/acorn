@@ -15,7 +15,7 @@ import { slackApprovals } from './approvals'
 import { slackGateway } from './gateway'
 import { slackInbound } from './inbound'
 import { slackRuntime, type SlackDeps } from './runtime'
-import { settingsRoutes } from './settings'
+import { linkFromDelivery, settingsRoutes } from './settings'
 import { slackStore } from './store'
 import { slackTurns } from './turns'
 
@@ -68,6 +68,8 @@ export async function startSlack(ctx: Context) {
   const approvals = slackApprovals(rt, turns)
   const inbound = slackInbound(rt, turns, approvals.click)
   let linked = await store.hasLinks()
+  // A restart forgets it, which leaves the safe default, off.
+  const approvalsOnLink = { value: false }
   let recovered = false
 
   // The first event after a start also posts what turns that settled while the Node was down owe.
@@ -87,6 +89,8 @@ export async function startSlack(ctx: Context) {
         return new Response(null, { status: 404 })
       const delivery = slackDeliverySchema.safeParse(await request.json().catch(() => null))
       if (!delivery.success) return Response.json({ error: 'bad_request' }, { status: 400 })
+      if (!linked && (await linkFromDelivery({ store, gateway, approvalsOnLink }, delivery.data)))
+        linked = await store.hasLinks()
       whenLinked(() => inbound.receive(delivery.data))
       return Response.json({ ok: true })
     },
@@ -95,6 +99,7 @@ export async function startSlack(ctx: Context) {
       gateway,
       service,
       onLinksChanged: async () => void (linked = await store.hasLinks()),
+      approvalsOnLink,
     }),
     event(frame: AgentLifecycleFrame | { channel: 'tasks:changed'; taskId: string | null }): void {
       switch (frame.channel) {

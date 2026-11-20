@@ -10,7 +10,7 @@ import { makeTestNodeContext, testGate, type Env } from '@acorn/plugin-api/testk
 import { AccountNotSignedInError } from '@acorn/plugin-account/contract/service.ts'
 import type { SlackState } from '../shared/state'
 import type { SlackGateway } from './gateway'
-import { settingsRoutes } from './settings'
+import { linkFromDelivery, settingsRoutes } from './settings'
 import { slackStore } from './store'
 
 // Settings → Slack's states, one at a time, as `GET /state` reports them for the client to draw.
@@ -52,6 +52,7 @@ async function state(links: () => Promise<SlackLink[]>): Promise<SlackState> {
     gateway,
     service,
     onLinksChanged: async () => {},
+    approvalsOnLink: { value: false },
   })
   const response = await new Hono<AppEnv>()
     .use('/api/*', ...testGate({ kind: 'device', deviceId: 'd1', userId: 'james' }))
@@ -89,4 +90,24 @@ it("passes on the gateway's failure as an error, still signed in", async () => {
     throw new Error('The Slack gateway didn’t answer.')
   })
   expect(failed).toMatchObject({ signedIn: true, links: [], error: 'The Slack gateway didn’t answer.' })
+})
+
+it('records the link a sender-routed delivery proves, with the approvals choice, and nothing else', async () => {
+  const store = slackStore(makeTestNodeContext({ plugin: { name: 'slack' } }).storage.open())
+  const deps = {
+    store,
+    gateway: { links: async () => [link(NODE_ID)] } as SlackGateway,
+    approvalsOnLink: { value: true },
+  }
+  const delivery = (routedBy: 'sender' | 'grant', team_id: string) => ({
+    eventId: 'Ev1',
+    routedBy,
+    kind: 'event' as const,
+    payload: { team_id, event: { type: 'app_mention' } },
+  })
+  expect(await linkFromDelivery(deps, delivery('grant', 'T1'))).toBe(false)
+  expect(await linkFromDelivery(deps, delivery('sender', 'T0OTHER'))).toBe(false)
+  expect(await store.hasLinks()).toBe(false)
+  expect(await linkFromDelivery(deps, delivery('sender', 'T1'))).toBe(true)
+  expect(await store.link('T1')).toMatchObject({ slackUserId: 'U0JAMES', approvals: true })
 })

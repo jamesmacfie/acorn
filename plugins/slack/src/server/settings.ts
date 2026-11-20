@@ -1,11 +1,12 @@
 import { Hono } from 'hono'
 import { z } from 'zod'
-import { accountPaths, listNodesResponseSchema } from '@acorn/protocol/account.ts'
+import { accountPaths, listNodesResponseSchema, type SlackDelivery } from '@acorn/protocol/account.ts'
 import { type AppEnv, readNodeRelay, requireDevice, respondError } from '@acorn/plugin-api/node'
 import { AccountNotSignedInError, type AccountService } from '@acorn/plugin-account/contract/service.ts'
 import type { SlackState } from '../shared/state'
 import { GatewayCallError, type SlackGateway } from './gateway'
 import type { SlackStore } from './store'
+import { installId } from './text'
 
 // Settings → Slack's routes, under /v1/p/slack. A paired device only: linking Slack lets the hosted
 // gateway send this Node prompts, which is the owner's call, never a task agent's.
@@ -20,11 +21,10 @@ export function settingsRoutes(deps: {
   service: AccountService
   /** The local links changed, so the plugin knows whether to act on events. */
   onLinksChanged: () => Promise<void>
+  /** The approvals choice made beside **Link Slack**, applied when the link appears. */
+  approvalsOnLink: { value: boolean }
 }) {
-  const { store, gateway, service } = deps
-  // The approvals choice made beside **Link Slack**, applied when the link appears. A restart forgets it,
-  // which leaves the safe default, off.
-  let approvalsOnLink = false
+  const { store, gateway, service, approvalsOnLink } = deps
 
   const refusal = (c: Parameters<typeof respondError>[0], error: unknown) =>
     error instanceof AccountNotSignedInError
@@ -51,7 +51,7 @@ export function settingsRoutes(deps: {
           } satisfies SlackState)
         }
         const here = links.filter((link) => link.nodeId === c.env.NODE_ID)
-        await store.syncLinks(here, approvalsOnLink)
+        await store.syncLinks(here, approvalsOnLink.value)
         await deps.onLinksChanged()
         const local = await store.links()
         // Another Node's label, for "Slack work goes to Mac Studio".
@@ -82,7 +82,7 @@ export function settingsRoutes(deps: {
         if (!readNodeRelay(c.env.DATA_DIR).owner)
           return respondError(c, 409, 'remote_access_off', ['Turn on Remote access in Settings → Account first.'])
         try {
-          approvalsOnLink = body.data.approvals
+          approvalsOnLink.value = body.data.approvals
           return c.json(await gateway.startLink(c.env.NODE_ID))
         } catch (error) {
           return refusal(c, error)
@@ -117,4 +117,19 @@ export function settingsRoutes(deps: {
         return c.json({ ok: true })
       })
   )
+}
+
+/** The owner linked in a browser, and nothing has read the link onto this Node since: Settings → Slack
+ *  learns of it when it next opens. A delivery the gateway routed by its sender proves that the sender's link
+ *  names this Node, so read the link once here instead. True when a link was recorded. */
+export async function linkFromDelivery(
+  deps: { store: SlackStore; gateway: SlackGateway; approvalsOnLink: { value: boolean } },
+  delivery: SlackDelivery,
+): Promise<boolean> {
+  if (delivery.routedBy !== 'sender') return false
+  const teamId = installId(delivery.payload)
+  const link = (await deps.gateway.links().catch(() => [])).find((candidate) => candidate.teamId === teamId)
+  if (!link) return false
+  await deps.store.syncLinks([link], deps.approvalsOnLink.value)
+  return true
 }
