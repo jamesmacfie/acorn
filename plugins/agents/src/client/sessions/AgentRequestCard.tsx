@@ -1,7 +1,20 @@
 import { createSignal, For, Show } from 'solid-js'
 import type { AgentRequest } from '../../contract/wire.ts'
 import { AGENT_REQUEST_CARD_POINT, type AgentRequestCardProps } from '@acorn/protocol/extensionPoints.ts'
-import { Alert, Button, Card, Checkbox, Field, Heading, Inline, Input, Select, Stack, Text } from '@acorn/plugin-api/ui'
+import {
+  Alert,
+  Button,
+  Card,
+  Checkbox,
+  CodeBlock,
+  Field,
+  Heading,
+  Inline,
+  Input,
+  Select,
+  Stack,
+  Text,
+} from '@acorn/plugin-api/ui'
 import { formFactor } from '@acorn/plugin-api/client'
 import { Slot } from '@acorn/plugin-api/ui/host'
 import { managedAgentApi } from './managedClient'
@@ -52,6 +65,9 @@ export default function AgentRequestCard(props: {
         }>)
       : []
   const approval = () => appApprovalOf(payload().approval)
+  const command = () => (typeof payload().command === 'string' ? (payload().command as string) : '')
+  // Codex's detail is the command itself, which the block below already shows.
+  const detail = () => (props.request.detail && props.request.detail !== command() ? props.request.detail : '')
   // On a phone every choice is a full-width button, and a lone single-choice question is answered by
   // the tap on its option, with no select to open and no Submit to find.
   const narrow = () => formFactor() === 'narrow'
@@ -94,12 +110,25 @@ export default function AgentRequestCard(props: {
             Response sent; waiting for the provider to acknowledge it…
           </Text>
         </Show>
-        <Show when={props.request.detail}>
-          {(detail) => (
+        <Show when={command()}>
+          {(shown) => (
+            <CodeBlock wrap maxHeight="block">
+              {shown()}
+            </CodeBlock>
+          )}
+        </Show>
+        <Show when={detail()}>
+          {(shown) => (
             <Text emphasis="muted" wrap>
-              {detail()}
+              {shown()}
             </Text>
           )}
+        </Show>
+        <Show when={payload().truncated === true}>
+          <Alert tone="warn">
+            This request was too long to keep in full, so the card shows only part of it. Check the agent's tool call in
+            the transcript before you allow it.
+          </Alert>
         </Show>
         <Show when={approval()}>
           {(shown) => (

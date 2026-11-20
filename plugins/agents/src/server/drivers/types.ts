@@ -27,7 +27,8 @@ export type AgentDriverGeneratedArtifact = {
 /**
  * A parked permission request, with what a policy hook needs to judge it. Driver-only like the artifact
  * above: the runtime runs `agents:before-permission` on it, and ProviderEventMaterializer keeps only
- * `request`, so the subject never reaches the wire, SQLite, or telemetry.
+ * `request`. The subject's `command` reaches the stored request only when a person is asked
+ * (`settlePermissionRequest`), so their card shows what runs. The rest goes only to the hook.
  *
  * `open` and `respond` reach the request where the driver parked it, so a veto works even while
  * `start` is still running and the runtime holds no session handle yet.

@@ -1241,6 +1241,7 @@ const permission = (extra: Partial<BridgeAgentRequest> = {}): BridgeAgentRequest
   answer: null,
   sentNote: null,
   unsupported: null,
+  command: null,
   ...extra,
 })
 
@@ -1270,6 +1271,15 @@ describe('questions and approvals', () => {
     ])
     expect(status(subject.root)).toBe('Answered: Reject')
     expect(button(subject.root, 'Allow')).toBeUndefined()
+  })
+
+  it("shows the harness's command as literal text above the detail", async () => {
+    const subject = mount()
+    subject.state.agentRequests.push(permission({ command: 'echo <b>hi</b> && rm -rf build' }))
+    await openSession(subject)
+    const blocks = [...card(subject.root)!.querySelectorAll('pre')].map((block) => block.textContent)
+    expect(blocks).toEqual(['echo <b>hi</b> && rm -rf build', 'rm -rf build\nIn /src/acorn'])
+    expect(card(subject.root)!.querySelector('b')).toBeNull()
   })
 
   it('answers a form with labels, several choices, typed text, and a secret it never stores', async () => {

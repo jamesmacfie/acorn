@@ -134,7 +134,13 @@ export async function answerLoopHook(
     }
     const { by, reason } = verdict.ask
     const origin = await originOf(ports, before)
-    const answer = await holdAsk(ports, session.id, { title: before.title, by, reason, origin })
+    const answer = await holdAsk(ports, session.id, {
+      title: before.title,
+      command: before.command,
+      by,
+      reason,
+      origin,
+    })
     // An approval is no decision, so the harness's own checks still run. Never an allow.
     if (answer === 'allowed') return reply('')
     return reply(
@@ -188,7 +194,7 @@ async function originOf(ports: LoopHookPorts, before: AgentBeforeToolPayload): P
 async function holdAsk(
   ports: LoopHookPorts,
   sessionId: string,
-  question: { title: string; by: string; reason: string; origin: AgentRequestOrigin | undefined },
+  question: { title: string; command: string; by: string; reason: string; origin: AgentRequestOrigin | undefined },
 ): Promise<LoopAskAnswer> {
   const live = ports.live(sessionId)
   if (!live) return 'expired'
@@ -210,6 +216,7 @@ async function holdAsk(
     kind: 'permission',
     title: question.title,
     detail: `${question.by} wants you to decide: ${question.reason}`,
+    ...(question.command ? { command: question.command } : {}),
     options: [
       { id: 'allow', label: 'Allow', kind: 'allow_once' },
       { id: 'reject', label: 'Reject', kind: 'reject_once' },

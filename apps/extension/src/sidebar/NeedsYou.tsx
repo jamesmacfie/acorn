@@ -291,7 +291,7 @@ function NeedsYouRow(props: {
   )
 }
 
-// An expanded row: the request's detail, its buttons, and Open chat at the far end.
+// An expanded row: the request's command and detail, its buttons, and Open chat at the far end.
 function RowAnswer(props: {
   client: BridgeClient
   target: { nodeId: string; taskId: string; sessionId: string }
@@ -316,6 +316,13 @@ function RowAnswer(props: {
   const question = () => props.request.questions[0]?.prompt
   return (
     <div class="row-answer">
+      <Show when={props.request.command}>
+        {(command) => (
+          <CodeBlock wrap maxHeight="block">
+            {command()}
+          </CodeBlock>
+        )}
+      </Show>
       <Show when={props.request.detail}>
         {(detail) => (
           <CodeBlock wrap maxHeight="block">

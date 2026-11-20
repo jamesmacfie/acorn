@@ -13,6 +13,8 @@ import { safeProviderMessage } from '../drivers/diagnostics'
 const sliceText = (value: string | undefined, max = 16_384): string | undefined =>
   value == null ? undefined : value.slice(0, max)
 
+const markedCut = (value: string, max: number): string => (value.length > max ? `${value.slice(0, max - 1)}…` : value)
+
 const boundedConfig = (option: AgentConfigOption): AgentConfigOption => ({
   ...option,
   id: option.id.slice(0, 200),
@@ -198,12 +200,20 @@ export function boundProviderEvent(event: AgentNormalizedEvent, secretValues: It
         providerTurnId: event.providerTurnId.slice(0, 2_000),
         text: event.text.slice(0, 128 * 1024),
       }
-    case 'request':
+    case 'request': {
+      // A person approves what the card shows, so a cut here is marked twice: the text ends in "…" and
+      // the request says it's `truncated`. A whole command is the operation itself, so a long title
+      // beside it is only a summary cut short.
+      const over = (value: string | undefined, max: number) => value != null && value.length > max
+      const truncated =
+        over(event.command, 16_384) || over(event.detail, 16_384) || (!event.command && over(event.title, 500))
       return {
         ...event,
         requestId: event.requestId.slice(0, 2_000),
-        title: event.title.slice(0, 500),
-        detail: sliceText(event.detail, 16_384),
+        title: markedCut(event.title, 500),
+        detail: event.detail == null ? undefined : markedCut(event.detail, 16_384),
+        command: event.command == null ? undefined : markedCut(event.command, 16_384),
+        ...(truncated ? { truncated: true as const } : {}),
         options: event.options?.slice(0, 100).map((option) => ({
           ...option,
           id: option.id.slice(0, 2_000),
@@ -221,6 +231,7 @@ export function boundProviderEvent(event: AgentNormalizedEvent, secretValues: It
         // The host already capped the reason; this keeps the row's bound here too.
         blocked: event.blocked && { by: event.blocked.by.slice(0, 200), reason: event.blocked.reason.slice(0, 200) },
       }
+    }
     case 'request_resolved':
       return event
     case 'artifact':

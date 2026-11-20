@@ -85,6 +85,7 @@ const permission: BridgeAgentRequest = {
   answer: null,
   sentNote: null,
   unsupported: null,
+  command: null,
 }
 
 // The pull request's page belongs to the task, as GitHub's address for its pull number, and so does

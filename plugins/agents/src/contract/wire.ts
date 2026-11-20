@@ -416,13 +416,19 @@ export type AgentNormalizedEvent =
   | { type: 'plan_proposal'; itemId: string; providerTurnId: string; text: string }
   | { type: 'usage'; usage: AgentUsage }
   /** `blocked` marks a request refused by unattended policy or a permission policy plugin. The row is written
-   *  resolved, never pending, and an older client draws it as an ordinary resolved request. */
+   *  resolved, never pending, and an older client draws it as an ordinary resolved request.
+   *
+   *  `command` is the command line a permission request would run, as the harness sent it, for a card
+   *  to show as literal text. `truncated` means a storage bound cut the title, detail, or command, so
+   *  no card shows the whole operation (docs/managed-agents/permission-policy.md § What the card shows). */
   | {
       type: 'request'
       requestId: string
       kind: AgentRequestKind
       title: string
       detail?: string
+      command?: string
+      truncated?: true
       options?: AgentPermissionOption[]
       questions?: AgentQuestion[]
       approval?: AgentAppApproval

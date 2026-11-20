@@ -275,6 +275,32 @@ describe('where a command came from', () => {
   })
 })
 
+describe('the command a permission runs', () => {
+  const permission = (detail: string | null, extra: Record<string, unknown>): AgentRequest => ({
+    ...request(false),
+    kind: 'permission',
+    title: 'Allow command?',
+    detail,
+    payload: { options: [{ id: 'allow', label: 'Allow', kind: 'allow_once' }], questions: [], ...extra },
+  })
+  const code = (host: HTMLElement) => [...host.querySelectorAll('pre')].map((block) => block.textContent)
+  const buttons = (host: HTMLElement) => [...host.querySelectorAll('button')].map((button) => button.textContent)
+
+  it('shows the command as literal text, once when the detail repeats it', () => {
+    const command = 'echo <b>hi</b> && rm -rf build'
+    const host = drawRequest(permission(command, { command }))
+    expect(code(host)).toEqual([command])
+    expect(host.querySelector('b')).toBeNull()
+    expect(host.textContent).not.toContain('too long to keep in full')
+  })
+
+  it('warns when the request was cut to store it, and keeps its buttons', () => {
+    const host = drawRequest(permission(null, { command: 'make x…', truncated: true }))
+    expect(host.textContent).toContain('This request was too long to keep in full')
+    expect(buttons(host)).toEqual(['Allow'])
+  })
+})
+
 // The reveal that a "Needs you" notice drives is a navigation command, not a standing state. A pane
 // derives the card's `focus` from a row it rebuilds on every streamed event, so the reveal effect is
 // re-notified while the value stays true. It must land the reader once and then leave the caret alone.

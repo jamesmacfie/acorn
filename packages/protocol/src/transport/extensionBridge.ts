@@ -518,6 +518,8 @@ export type BridgeAgentRequest = {
   status: 'pending' | 'resolving' | 'resolved' | 'expired'
   title: string
   detail: string | null
+  // The command a permission request would run, as the harness sent it. Shown as literal text.
+  command: string | null
   // Buttons. `reject` marks a refusal.
   options: { id: string; label: string; reject: boolean }[]
   // A form. A question with no options takes typed text.

@@ -1,3 +1,4 @@
+import type { AgentRequestState } from '@acorn/plugin-agents/contract/lifecycle.ts'
 import type { SlackRuntime } from './runtime'
 import { installId } from './text'
 import type { Turns } from './turns'
@@ -10,6 +11,38 @@ import type { Turns } from './turns'
 type Payload = Record<string, unknown>
 const APPROVE = 'acorn_approve'
 const DENY = 'acorn_deny'
+/** The most of one command or detail a card shows, under Slack's 3,000-character text limit. */
+const CARD_TEXT = 2_900
+
+// The request's words go in rich text, which Slack shows as typed. In mrkdwn, `<!channel>`, a
+// `<url|label>` link, or a stray ``` would change what the owner reads.
+const richText = (element: Payload) => ({ type: 'rich_text', elements: [element] })
+const literal = (text: string) => richText({ type: 'rich_text_preformatted', elements: [{ type: 'text', text }] })
+// The notification text is mrkdwn, so its control characters are escaped.
+const inert = (text: string) => text.replaceAll('&', '&amp;').replaceAll('<', '&lt;').replaceAll('>', '&gt;')
+
+/**
+ * What a card shows of a request, and whether that's all of it. It isn't when the agents plugin cut
+ * the request to store it, when `safeText` removed a secret or a key, or when the command or detail
+ * doesn't fit a card. Only a whole card can approve.
+ */
+async function cardText(rt: SlackRuntime, request: AgentRequestState, folder: string | null) {
+  const command = typeof request.payload.command === 'string' ? request.payload.command : ''
+  // Codex's detail is the command itself.
+  const detail = request.detail && request.detail !== command ? request.detail : ''
+  const [title, safeCommand, safeDetail] = await Promise.all(
+    [request.title, command, detail].map((text) => (text ? rt.safeText(text, folder) : '')),
+  )
+  const fit = (text: string) => (text.length > CARD_TEXT ? `${text.slice(0, CARD_TEXT - 1)}…` : text)
+  const whole =
+    request.payload.truncated !== true &&
+    title === request.title &&
+    safeCommand === command &&
+    safeDetail === detail &&
+    fit(safeCommand) === safeCommand &&
+    fit(safeDetail) === safeDetail
+  return { title: title!, command: fit(safeCommand!), detail: fit(safeDetail!), whole }
+}
 
 export function slackApprovals(rt: SlackRuntime, turns: Turns) {
   const { store } = rt
@@ -58,38 +91,55 @@ export function slackApprovals(rt: SlackRuntime, turns: Turns) {
       )
       // A request posts one card, so a repeated event can't leave a second card that answers it.
       if (!request || (await store.card(event.requestId))) return
-      const folder = await rt.tasks.folder(thread.taskId)
-      const title = await rt.safeText(request.title, folder)
-      const detail = request.detail ? await rt.safeText(request.detail, folder) : ''
+      const shown = await cardText(rt, request, await rt.tasks.folder(thread.taskId))
       const value = `${event.sessionId}|${event.requestId}`
-      const buttons = link.approvals
-        ? [
-            {
-              type: 'button',
-              action_id: APPROVE,
-              style: 'primary',
-              text: { type: 'plain_text', text: 'Approve' },
-              value,
-            },
-            { type: 'button', action_id: DENY, style: 'danger', text: { type: 'plain_text', text: 'Deny' }, value },
-          ]
-        : [
-            {
-              type: 'button',
-              action_id: 'acorn_open',
-              text: { type: 'plain_text', text: 'Answer in Acorn' },
-              ...(url ? { url } : {}),
-            },
-          ]
+      const buttons =
+        link.approvals && shown.whole
+          ? [
+              {
+                type: 'button',
+                action_id: APPROVE,
+                style: 'primary',
+                text: { type: 'plain_text', text: 'Approve' },
+                value,
+              },
+              { type: 'button', action_id: DENY, style: 'danger', text: { type: 'plain_text', text: 'Deny' }, value },
+            ]
+          : [
+              {
+                type: 'button',
+                action_id: 'acorn_open',
+                text: { type: 'plain_text', text: 'Answer in Acorn' },
+                ...(url ? { url } : {}),
+              },
+            ]
       const posted = await rt.call(thread.teamId, 'chat.postMessage', {
         channel: thread.channelId,
         thread_ts: thread.threadTs,
-        text: `The agent asks: ${title}`,
+        text: `The agent asks: ${inert(shown.title)}`,
         blocks: [
-          { type: 'section', text: { type: 'mrkdwn', text: `*The agent asks:* ${title}` } },
-          ...(detail
-            ? [{ type: 'section', text: { type: 'mrkdwn', text: `\`\`\`${detail.slice(0, 2_900)}\`\`\`` } }]
-            : []),
+          richText({
+            type: 'rich_text_section',
+            elements: [
+              { type: 'text', text: 'The agent asks: ', style: { bold: true } },
+              { type: 'text', text: shown.title },
+            ],
+          }),
+          ...(shown.command ? [literal(shown.command)] : []),
+          ...(shown.detail ? [literal(shown.detail)] : []),
+          ...(shown.whole
+            ? []
+            : [
+                {
+                  type: 'context',
+                  elements: [
+                    {
+                      type: 'plain_text',
+                      text: 'Part of this request is cut or hidden here, so answer it in Acorn, where you can read all of it.',
+                    },
+                  ],
+                },
+              ]),
           { type: 'actions', elements: buttons },
         ],
       })
@@ -145,6 +195,16 @@ export function slackApprovals(rt: SlackRuntime, turns: Turns) {
       )
       if (!request || request.status !== 'pending') {
         await replace(!request || request.status === 'expired' ? 'Expired.' : 'Answered in Acorn.')
+        return true
+      }
+      // A card posted before this check, or one whose text has since changed, may show less than it approves.
+      if (action.action_id === APPROVE && !(await cardText(rt, request, await rt.tasks.folder(thread.taskId))).whole) {
+        await rt.ephemeral(
+          teamId,
+          channel,
+          user,
+          `This card can't show all of the request, so approve it in Acorn: ${rt.taskUrl(thread.taskId)}`,
+        )
         return true
       }
       if (!(await store.claimCard(requestId))) return true

@@ -192,6 +192,13 @@ function RequestCard(props: {
       <Card stripe={open() ? 'warn' : undefined} pad="sm">
         <span class="eyebrow">{KIND_LABELS[request().kind] ?? request().kind}</span>
         <strong>{request().title}</strong>
+        <Show when={request().command}>
+          {(command) => (
+            <CodeBlock wrap maxHeight="block">
+              {command()}
+            </CodeBlock>
+          )}
+        </Show>
         <Show when={request().detail}>
           {(detail) => (
             <CodeBlock wrap maxHeight="block">

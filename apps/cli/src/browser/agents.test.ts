@@ -350,7 +350,16 @@ describe('requests for the sidebar', () => {
       answer: null,
       sentNote: null,
       unsupported: null,
+      command: null,
     })
+  })
+
+  it("carries the harness's command once, as its own field", () => {
+    const options = request().payload.options
+    const codex = bridgeRequest(request({ detail: 'make clean', payload: { options, command: 'make clean' } }))
+    expect(codex).toMatchObject({ command: 'make clean', detail: null, unsupported: null })
+    const claude = bridgeRequest(request({ title: '`make`', detail: 'execute', payload: { options, command: 'make' } }))
+    expect(claude).toMatchObject({ command: 'make', detail: 'execute' })
   })
 
   it('keeps a form, with option labels, multiple choice, and secret fields', () => {
@@ -454,6 +463,11 @@ describe('requests for the sidebar', () => {
       "app access doesn't read",
     ],
     ['nothing to send', { payload: { options: [], questions: [] } }, 'no answer'],
+    [
+      'a request cut short to store it',
+      { payload: { options: [{ id: 'allow_once', label: 'Allow', kind: 'allow_once' }], truncated: true } },
+      'too long to keep in full',
+    ],
   ])('shows %s with a reason instead of an answer', (_name, extra, reason) => {
     const narrowed = bridgeRequest(request(extra as Partial<AgentRequest>))
     expect(narrowed.unsupported).toContain(reason)

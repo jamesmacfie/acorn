@@ -224,6 +224,21 @@ describe('agents:before-permission', () => {
     })
   })
 
+  it.each([
+    ['whole', 'rm -rf build && make', 'rm -rf build && make', undefined],
+    ['marked cut', `make ${'x'.repeat(20_000)}`, `make ${'x'.repeat(16_378)}…`, true],
+  ])("stores the harness's own command on the card, %s", async (_name, sent, stored, truncated) => {
+    command = sent
+    const { session } = await start()
+    const request = await vi.waitFor(async () => {
+      const row = await runtime.store.request(session.id, 'permission-1')
+      expect(row?.status).toBe('pending')
+      return row!
+    })
+    expect(request.payload.command).toBe(stored)
+    expect(request.payload.truncated).toBe(truncated)
+  })
+
   it('refuses with the first reject-once option and records the request already resolved', async () => {
     const seen: AgentBeforePermissionPayload[] = []
     handle(async (payload) => {

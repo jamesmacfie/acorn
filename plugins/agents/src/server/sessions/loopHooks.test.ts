@@ -183,6 +183,7 @@ describe('harness bridge calls', () => {
       kind: 'permission',
       title: 'git push --force',
       detail: 'policy wants you to decide: This pushes to a remote.',
+      payload: expect.objectContaining({ command: 'git push --force' }),
     })
     await runtime.resolveRequest(session.id, card.providerRequestId, { optionId: 'reject' }, randomUUID())
     expect(decision((await refused).output)).toMatchObject({

@@ -257,21 +257,26 @@ export function bridgeRequest(request: AgentRequest): BridgeAgentRequest {
   const questions = parseRows(request.payload.questions, parseQuestion)
   const approval = request.payload.approval === undefined ? null : appApprovalOf(request.payload.approval)
   const optionId = sentOptionId(request)
+  const command = typeof request.payload.command === 'string' ? request.payload.command : null
   const unsupported = !ANSWERABLE_KINDS.has(request.kind)
     ? `The extension can't answer a ${request.kind.replace('_', ' ')} request yet. Answer it in the Acorn app.`
-    : options.malformed || questions.malformed
-      ? "Some of this request's choices don't read, so the extension won't guess an answer. Answer it in the Acorn app."
-      : request.payload.approval !== undefined && !approval
-        ? "This request's app access doesn't read, so the extension can't show what it grants. Answer it in the Acorn app."
-        : !options.rows.length && !questions.rows.length
-          ? 'This request offers no answer the extension can send. Answer it in the Acorn app.'
-          : null
+    : request.payload.truncated === true
+      ? "This request was too long to keep in full, so the extension can't show all of it. Answer it in the Acorn app."
+      : options.malformed || questions.malformed
+        ? "Some of this request's choices don't read, so the extension won't guess an answer. Answer it in the Acorn app."
+        : request.payload.approval !== undefined && !approval
+          ? "This request's app access doesn't read, so the extension can't show what it grants. Answer it in the Acorn app."
+          : !options.rows.length && !questions.rows.length
+            ? 'This request offers no answer the extension can send. Answer it in the Acorn app.'
+            : null
   return {
     requestId: request.providerRequestId,
     kind: request.kind,
     status: request.status,
     title: request.title,
-    detail: request.detail,
+    // Codex's detail is the command itself.
+    detail: request.detail === command ? null : request.detail,
+    command,
     options: options.rows,
     questions: questions.rows,
     approval: approval

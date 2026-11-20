@@ -109,13 +109,20 @@ event after a restart posts what turns that settled while the Node was down owe.
 
 ## Approvals
 
-When an agent in a Slack session asks permission, a card in its thread shows the request's title and
-detail, with known key values removed. With approvals from Slack on, it has **Approve** and **Deny**,
+When an agent in a Slack session asks permission, a card in its thread shows the request's title, the
+command it would run, and its detail, with known key values removed. The card puts that text in rich
+text, so Slack shows it as typed. With approvals from Slack on, it has **Approve** and **Deny**,
 which answer the request's allow-once or reject-once option through `agents.requestAnswer`
 ([session control](../managed-agents/session-control.md#answering-a-request-from-a-plugin)). Only the
 owner's click counts, and only on a card from a thread made under the current link. Without approvals
 on, the card links to Acorn. Any other kind of request asks the
 owner to answer in Acorn.
+
+A card that can't show the whole request links to Acorn even with approvals on, and says part of the
+request is cut or hidden. That covers a request the agents plugin cut to store it, one with a secret
+or key removed, and a command or detail over 2,900 characters. A click on **Approve** checks the
+request again before it answers
+([what the card shows](../managed-agents/permission-policy.md#what-the-card-shows)).
 
 Each request posts one card, and the Node keeps a `slack_cards` row for it: the install, channel,
 message, thread, session, and link. A click answers only the request whose card sits at the message it

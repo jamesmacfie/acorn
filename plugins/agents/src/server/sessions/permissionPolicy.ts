@@ -60,7 +60,9 @@ export async function settlePermissionRequest(
   if (!ports.owned()) return
   const [request] = await ports.materialize({
     ...event.request,
-    ...(blocked ? { blocked } : {}),
+    // The harness's own command, so the card a person answers shows what runs rather than the harness's
+    // summary of it. A refused request asks nobody, so its command stays out of the ledger.
+    ...(blocked ? { blocked } : event.subject.command ? { command: event.subject.command } : {}),
     ...(origin ? { origin } : {}),
   })
   if (!request || !ports.owned()) return

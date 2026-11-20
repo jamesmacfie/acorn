@@ -57,8 +57,10 @@ How each harness fills them:
   file-change approval gives `edit`, with `grantRoot` as its one path when Codex sent one. A
   permissions approval gives `permissions`.
 
-The subject stays in the driver's event. The event materializer keeps only the request, so the
-command and paths never reach the wire, SQLite, or telemetry through this hook.
+The subject stays in the driver's event. The event materializer keeps only the request. When the
+request goes to a person, its `command` is copied onto the request so the card can show it
+([what the card shows](#what-the-card-shows)). A vetoed request keeps no command, and `paths` never
+reach the wire, SQLite, or telemetry through this hook.
 
 ## What a veto does
 
@@ -121,6 +123,31 @@ one muted line under its title, such as "`https://get.example.sh` appears in the
 issue 12", 3 calls earlier." This runs for a harness's own request and for a plugin's ask through a
 [harness bridge](./loop-hooks.md). It changes nothing else: the hook payload doesn't carry it, and it
 blocks nothing. `plugins/agents/src/server/sessions/commandOrigin.ts` holds the match.
+
+## What the card shows
+
+A person approves the operation the harness will run, so the card shows that operation, not only the
+harness's summary of it.
+
+- A permission request a person answers carries `command`, the command line exactly as the harness
+  sent it, when it sent one. A request from a [harness bridge](./loop-hooks.md) ask carries it too.
+  The desktop and the browser extension show it in a code block, as literal text. When Codex's detail
+  is the same command, the cards show it once.
+- The agents plugin bounds what it stores: the title at 500 characters, and the detail and command at
+  16,384 each. A cut value ends in "…", and the request gets `truncated: true`. A long title beside a
+  whole command doesn't count, because the command is the operation and the title only summarizes it.
+  Both fields are in the row's `payload`, which `agents.requests` passes to plugins.
+- The desktop card keeps its buttons on a cut request and warns that it shows only part of it. The
+  extension shows a cut request without buttons and asks the person to answer in the Acorn app.
+- Slack shows the request in rich text, which it draws as typed, and escapes the notification text.
+  A card offers **Approve** only when it shows the whole request: nothing cut to store it, nothing
+  removed as a secret or a key, and no command or detail over 2,900 characters. Otherwise it says
+  part of the request is cut or hidden and links to Acorn. A click on **Approve** checks again, so a
+  card posted before this check can't approve less than it shows
+  ([Slack approvals](../integrations/slack.md#approvals)).
+
+`boundProviderEvent` in `plugins/agents/src/server/sessions/boundProviderEvent.ts` holds the bounds,
+and `cardText` in `plugins/slack/src/server/approvals.ts` holds Slack's check.
 
 ## What it doesn't do
 

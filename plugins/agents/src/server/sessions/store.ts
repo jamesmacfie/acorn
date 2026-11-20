@@ -373,6 +373,8 @@ export class AgentStore {
             questions: event.questions ?? [],
             ...(event.approval ? { approval: event.approval } : {}),
             ...(event.origin ? { origin: event.origin } : {}),
+            ...(event.command ? { command: event.command } : {}),
+            ...(event.truncated ? { truncated: true } : {}),
           }),
           createdAt: timestamp,
         })

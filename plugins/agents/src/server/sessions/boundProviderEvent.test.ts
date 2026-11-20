@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest'
+import type { AgentNormalizedEvent } from '../../contract/wire.ts'
 import { boundProviderEvent } from './boundProviderEvent'
 
 describe('provider event storage bounds', () => {
@@ -29,6 +30,40 @@ describe('provider event storage bounds', () => {
       ['private-token-value'],
     )
     expect(diagnostic.type === 'diagnostic' ? diagnostic.message : '').not.toContain('private-token-value')
+  })
+})
+
+// A person approves what a permission card shows, so every cut a card might hide is marked.
+describe('permission request bounds', () => {
+  const bound = (event: Partial<Extract<AgentNormalizedEvent, { type: 'request' }>>) => {
+    const bounded = boundProviderEvent(
+      { type: 'request', requestId: 'r', kind: 'permission', title: 't', ...event },
+      [],
+    )
+    return bounded.type === 'request' ? bounded : null
+  }
+
+  it('keeps a request within the bounds as it came', () => {
+    const request = bound({ title: '`ls`', detail: 'execute', command: 'ls' })
+    expect(request).toMatchObject({ title: '`ls`', detail: 'execute', command: 'ls' })
+    expect(request?.truncated).toBeUndefined()
+  })
+
+  it.each([
+    ['an over-length command', { command: 'c'.repeat(20_000) }, 'command', 16_384],
+    ['an over-length detail', { detail: 'd'.repeat(20_000) }, 'detail', 16_384],
+    ['an over-length title with no command', { title: 't'.repeat(600) }, 'title', 500],
+  ] as const)('marks %s as truncated and ends it in an ellipsis', (_name, event, field, max) => {
+    const request = bound(event)
+    expect(request?.truncated).toBe(true)
+    expect(request?.[field]).toHaveLength(max)
+    expect(request?.[field]?.endsWith('…')).toBe(true)
+  })
+
+  it('treats a long title beside a whole command as a summary cut short', () => {
+    const request = bound({ title: 't'.repeat(600), command: 'make' })
+    expect(request?.title.endsWith('…')).toBe(true)
+    expect(request?.truncated).toBeUndefined()
   })
 })
 
