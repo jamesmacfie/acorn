@@ -13,7 +13,7 @@ covers:
   - integrations
   - ai-models
   - slack
-checked: 52225e24f
+checked: '31ff472da'
 ---
 
 This page lists every setting in **Settings** > **Connections**. Every page is stored on the Node:
@@ -63,9 +63,10 @@ with **Remote access** on, and says which is missing.
 | Setting | What it changes | Stored on | Default |
 | --- | --- | --- | --- |
 | **Link Slack** | Gives an address that runs Sign in with Slack, and waits until the link reaches this Node. | Account service | Not linked |
+| **Confirm** | Accepts the Slack user the link names. Slack can't start anything here until you do, and a link that later names another user needs confirming again. **Not me, unlink** removes it. | Node | Not confirmed |
 | **Link this Node instead** | Moves a link that sends Slack work to another of your Nodes to this one. | Account service | |
 | **Unlink** | Removes the link. Mentions and DMs from you stop reaching this Node. | Account service | |
-| **Answer approvals from Slack** | Shows **Approve** and **Deny** in the thread when the agent asks to run something. Off, the card links to acorn instead. Turning it on means a break-in at the hosted service could approve what your agent runs. | Node | Off |
+| **Answer approvals from Slack** | Chosen beside **Confirm**. Shows **Approve** and **Deny** in the thread when the agent asks to run something. Off, the card links to acorn instead. Turning it on means a break-in at the hosted service could approve what your agent runs. | Node | Off |
 
 ## In the terminal
 

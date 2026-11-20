@@ -252,6 +252,26 @@ async function applyRequestedConfig(
   await runtime.applyRequestedConfig(sessionId, wanted)
 }
 
+// The setting, by provider, under which the harness asks a person before each command. Claude Code's
+// `default` mode asks for every shell command, unless the owner's own settings allow that command.
+// A provider missing from this table can't show that it asks, so a turn that needs approval is refused
+// on it. Codex is missing because it doesn't report its approval policy, only its sandbox.
+const ASKING_SETTING: Record<string, { optionId: string; value: string }> = {
+  claude: { optionId: 'mode', value: 'default' },
+}
+
+/** Switches the session to the setting that asks before each command, then checks that it holds. */
+async function requireAskingSetting(runtime: ManagedAgentRuntime, sessionId: string, providerId: string) {
+  const asking = ASKING_SETTING[providerId]
+  if (!asking) throw new Error(`This agent (${providerId}) can't be made to ask before each command it runs.`)
+  await applyRequestedConfig(runtime, sessionId, { [asking.optionId]: asking.value })
+  const { config } = await runtime.store.requireSession(sessionId)
+  const options = Array.isArray(config.configOptions) ? config.configOptions : []
+  const current = options.find((option) => option.id === asking.optionId)?.currentValue
+  if (current !== asking.value)
+    throw new Error(`The agent didn't switch to asking before each command (it reports ${current ?? 'no mode'}).`)
+}
+
 type JudgeUsage = { inputTokens?: number; outputTokens?: number }
 
 /** Adds what the completion checks reported to the turns' usage. Tokens only: a check reports no cost. */
@@ -319,6 +339,8 @@ export function createSessionExecute(
     }
     const session = await sessionFor(runtime, request, providerId, posture, caller)
     await applyRequestedConfig(runtime, session.id, request.configOptions)
+    // After the requested options, so a request can't ask its way out of it.
+    if (request.requireCommandApproval) await requireAskingSetting(runtime, session.id, providerId)
     // A plugin's turn is checked even though it runs gated: the person didn't start it, so nobody chose
     // to let it run with the harness's checks off.
     if (caller || (posture === 'autonomous' && !request.allowUnguardedAgents)) {

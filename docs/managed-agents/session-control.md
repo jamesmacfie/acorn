@@ -108,6 +108,13 @@ Every other field works as it does for a workflow step, including `tools`, `sche
 `configOptions`, `goal`, and `timeoutMs`. Its session is a workflow session, so the task's session
 list groups it with workflow sessions.
 
+Set `requireCommandApproval` when the prompt comes from outside the Node. The turn then switches the
+session to the harness setting that asks a person before each command, after `configOptions`, and
+checks that the setting holds before it queues the turn. For Claude Code that's `default` mode, even
+when the person's own default is Auto, which approves commands with a classifier. A harness that
+Acorn knows no such setting for, or one that doesn't report it afterward, is refused. Codex is
+refused, because it reports its sandbox but not its approval policy. Slack sets this on every turn.
+
 `onEvent`, `onGoal`, and `admitAutomatic` cross the worker as functions the plugin lends for the call.
 The plugin's `signal` crosses too: aborting it cancels the turn, and the result comes back
 `cancelled`. `reload.test.ts` checks the binding, a streamed event, and the abort across a real

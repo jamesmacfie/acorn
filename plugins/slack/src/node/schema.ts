@@ -4,10 +4,13 @@ import { index, integer, primaryKey, sqliteTable, text, uniqueIndex } from 'driz
 // text lives here, on the Node that owns it: the hosted gateway keeps IDs only. `task_id` and
 // `session_id` are plain IDs into core's tasks and the agents plugin's sessions, never joined.
 
-// The owner's link in each Slack team, as the gateway reported it when the person linked from Settings →
-// Slack. The Node checks every turn and click against it, whatever the gateway checked.
+// The owner's link in each Slack team, recorded only when a paired device confirmed the exact Slack user
+// the gateway reported for this Node. The Node checks every turn and click against it, whatever the
+// gateway checked. `link_id` is new on each confirmation, and the threads and picks made under a link
+// carry it, so work from before an unlink or a relink can't run under the next link.
 export const slackLinks = sqliteTable('slack_links', {
   teamId: text('team_id').primaryKey(),
+  linkId: text('link_id').notNull(),
   teamName: text('team_name').notNull(),
   slackUserId: text('slack_user_id').notNull(),
   slackUserName: text('slack_user_name').notNull(),
@@ -55,6 +58,7 @@ export const slackThreads = sqliteTable(
     channelId: text('channel_id').notNull(),
     threadTs: text('thread_ts').notNull(),
     taskId: text('task_id').notNull(),
+    linkId: text('link_id').notNull(),
     mode: text('mode', { enum: ['tasks', 'conversation'] }).notNull(),
     ended: integer('ended', { mode: 'boolean' }).notNull().default(false),
     // Guests already told this thread isn't theirs, as a JSON array of Slack user IDs.
@@ -111,6 +115,7 @@ export const slackPending = sqliteTable('slack_pending', {
   teamId: text('team_id').notNull(),
   channelId: text('channel_id').notNull(),
   ts: text('ts').notNull(),
+  linkId: text('link_id').notNull(),
   event: text('event').notNull(),
   expiresAt: integer('expires_at').notNull(),
 })

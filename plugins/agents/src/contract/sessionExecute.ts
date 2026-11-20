@@ -74,6 +74,10 @@ export type AgentSessionExecuteRequest = {
   /** Lets an autonomous turn run with the harness's checks off. Without it the step is refused with
    *  UnguardedAgentError. Resolved by the workflows plugin like `posture`, and refused like it. */
   allowUnguardedAgents?: boolean
+  /** Every command the agent runs waits for a person's answer. The turn switches the harness to the
+   *  setting that asks, and is refused when the harness doesn't report that setting afterward. Set for
+   *  turns that start from outside the Node, such as Slack's. */
+  requireCommandApproval?: boolean
   /** A completion condition, already rendered. The step continues in the same session until a
    *  check finds it satisfied, or the step reaches a blocker or a limit. Needs a profile with a
    *  one-shot mode, because the check runs through it. */

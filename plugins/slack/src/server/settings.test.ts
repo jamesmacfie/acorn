@@ -10,7 +10,7 @@ import { makeTestNodeContext, testGate, type Env } from '@acorn/plugin-api/testk
 import { AccountNotSignedInError } from '@acorn/plugin-account/contract/service.ts'
 import type { SlackState } from '../shared/state'
 import type { SlackGateway } from './gateway'
-import { linkFromDelivery, settingsRoutes } from './settings'
+import { settingsRoutes } from './settings'
 import { slackStore } from './store'
 
 // Settings → Slack's states, one at a time, as `GET /state` reports them for the client to draw.
@@ -38,8 +38,10 @@ const remoteAccessOn = async () =>
     owner: { accountId: 'acct_james', keys: (await generateSigningKey('k1')).keys },
   })
 
-async function state(links: () => Promise<SlackLink[]>): Promise<SlackState> {
-  const gateway = { links } as SlackGateway
+const newStore = () => slackStore(makeTestNodeContext({ plugin: { name: 'slack' } }).storage.open())
+
+/** Settings → Slack's routes on a device's request, with the gateway reporting `links`. */
+function settings(links: () => Promise<SlackLink[]>, store = newStore()) {
   const service = {
     fetch: async () =>
       Response.json({
@@ -48,17 +50,26 @@ async function state(links: () => Promise<SlackLink[]>): Promise<SlackState> {
     url: async () => '',
   }
   const routes = settingsRoutes({
-    store: slackStore(makeTestNodeContext({ plugin: { name: 'slack' } }).storage.open()),
-    gateway,
+    store,
+    gateway: { links, unlink: async () => {} } as unknown as SlackGateway,
     service,
     onLinksChanged: async () => {},
-    approvalsOnLink: { value: false },
   })
-  const response = await new Hono<AppEnv>()
+  const app = new Hono<AppEnv>()
     .use('/api/*', ...testGate({ kind: 'device', deviceId: 'd1', userId: 'james' }))
     .route('/api/slack', routes)
-    .fetch(new Request('http://acorn.test/api/slack/state'), { DATA_DIR: dataDir, NODE_ID } as unknown as Env)
-  return (await response.json()) as SlackState
+  return (path: string, body?: unknown) =>
+    app.fetch(
+      new Request(`http://acorn.test/api/slack${path}`, {
+        method: body === undefined ? 'GET' : 'POST',
+        ...(body === undefined ? {} : { headers: { 'content-type': 'application/json' }, body: JSON.stringify(body) }),
+      }),
+      { DATA_DIR: dataDir, NODE_ID } as unknown as Env,
+    )
+}
+
+async function state(links: () => Promise<SlackLink[]>, store?: ReturnType<typeof newStore>): Promise<SlackState> {
+  return (await (await settings(links, store)('/state')).json()) as SlackState
 }
 
 it('reports nobody signed in', async () => {
@@ -78,10 +89,27 @@ it('reports remote access off, then on with no link', async () => {
 it("names the other Node a link sends Slack work to, and says when it's this one", async () => {
   await remoteAccessOn()
   expect((await state(async () => [link(OTHER_NODE)])).links).toEqual([
-    { teamId: 'T1', teamName: 'Acme', slackUserName: 'James', here: false, nodeLabel: 'Mac Studio', approvals: false },
+    {
+      teamId: 'T1',
+      teamName: 'Acme',
+      slackUserName: 'James',
+      slackUserId: 'U0JAMES',
+      here: false,
+      nodeLabel: 'Mac Studio',
+      confirmed: false,
+      approvals: false,
+    },
   ])
   expect((await state(async () => [link(NODE_ID)])).links).toEqual([
-    { teamId: 'T1', teamName: 'Acme', slackUserName: 'James', here: true, approvals: false },
+    {
+      teamId: 'T1',
+      teamName: 'Acme',
+      slackUserName: 'James',
+      slackUserId: 'U0JAMES',
+      here: true,
+      confirmed: false,
+      approvals: false,
+    },
   ])
 })
 
@@ -92,22 +120,60 @@ it("passes on the gateway's failure as an error, still signed in", async () => {
   expect(failed).toMatchObject({ signedIn: true, links: [], error: 'The Slack gateway didn’t answer.' })
 })
 
-it('records the link a sender-routed delivery proves, with the approvals choice, and nothing else', async () => {
-  const store = slackStore(makeTestNodeContext({ plugin: { name: 'slack' } }).storage.open())
-  const deps = {
-    store,
-    gateway: { links: async () => [link(NODE_ID)] } as SlackGateway,
-    approvalsOnLink: { value: true },
-  }
-  const delivery = (routedBy: 'sender' | 'grant', team_id: string) => ({
-    eventId: 'Ev1',
-    routedBy,
-    kind: 'event' as const,
-    payload: { team_id, event: { type: 'app_mention' } },
-  })
-  expect(await linkFromDelivery(deps, delivery('grant', 'T1'))).toBe(false)
-  expect(await linkFromDelivery(deps, delivery('sender', 'T0OTHER'))).toBe(false)
+// The gateway's list is only what to offer: whoever holds the account, or the gateway itself, can put
+// any Slack user in it.
+it('records nothing for a link only the gateway reports, however often the page reads it', async () => {
+  const store = newStore()
+  await state(async () => [link(NODE_ID)], store)
+  await state(async () => [link(NODE_ID)], store)
   expect(await store.hasLinks()).toBe(false)
-  expect(await linkFromDelivery(deps, delivery('sender', 'T1'))).toBe(true)
+})
+
+it('confirms only the Slack user the device was shown, for this Node, with that request’s approvals choice', async () => {
+  const store = newStore()
+  let reported = [link(OTHER_NODE)]
+  const send = settings(async () => reported, store)
+  const confirm = (slackUserId: string, approvals: boolean) =>
+    send('/confirm', { teamId: 'T1', slackUserId, approvals })
+  // The gateway sends this user's Slack work to another Node.
+  expect((await confirm('U0JAMES', true)).status).toBe(409)
+  reported = [link(NODE_ID)]
+  // Someone else's Slack user, which the page never showed.
+  expect((await confirm('U0MALLORY', true)).status).toBe(409)
+  expect(await store.hasLinks()).toBe(false)
+  expect((await confirm('U0JAMES', true)).status).toBe(200)
   expect(await store.link('T1')).toMatchObject({ slackUserId: 'U0JAMES', approvals: true })
+  expect((await state(async () => reported, store)).links[0]).toMatchObject({ confirmed: true, approvals: true })
+  // Confirming the same user again keeps the link, and the threads made under it.
+  const { linkId } = (await store.link('T1'))!
+  expect((await confirm('U0JAMES', false)).status).toBe(200)
+  expect(await store.link('T1')).toMatchObject({ linkId, approvals: false })
+})
+
+it('drops a confirmed link when the gateway names another Slack user, which waits for its own confirmation', async () => {
+  const store = newStore()
+  let reported = [link(NODE_ID)]
+  const send = settings(async () => reported, store)
+  await send('/confirm', { teamId: 'T1', slackUserId: 'U0JAMES', approvals: true })
+  const first = (await store.link('T1'))!.linkId
+  reported = [{ ...link(NODE_ID), slackUserId: 'U0MALLORY', slackUserName: 'Mallory' }]
+  expect((await state(async () => reported, store)).links[0]).toMatchObject({
+    slackUserId: 'U0MALLORY',
+    confirmed: false,
+    approvals: false,
+  })
+  expect(await store.hasLinks()).toBe(false)
+  // The earlier link's approvals choice doesn't carry over.
+  await send('/confirm', { teamId: 'T1', slackUserId: 'U0MALLORY', approvals: false })
+  expect(await store.link('T1')).toMatchObject({ slackUserId: 'U0MALLORY', approvals: false })
+  expect((await store.link('T1'))!.linkId).not.toBe(first)
+})
+
+it('keeps the local links when the gateway fails to answer', async () => {
+  const store = newStore()
+  await store.confirmLink(link(NODE_ID), false)
+  await state(async () => {
+    throw new Error('down')
+  }, store)
+  expect(await store.hasLinks()).toBe(true)
 })

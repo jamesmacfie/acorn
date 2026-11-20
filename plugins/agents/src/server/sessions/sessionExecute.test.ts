@@ -28,7 +28,7 @@ const advertised = (startMode?: string): AgentConfigOption[] => [
           label: 'Mode',
           category: 'mode' as const,
           currentValue: startMode,
-          values: ['default', 'bypassPermissions'].map((value) => ({ value, label: value })),
+          values: ['default', 'auto', 'bypassPermissions'].map((value) => ({ value, label: value })),
         },
       ]
     : []),
@@ -461,6 +461,63 @@ describe('agents.sessionExecute config options', () => {
         turn('acme', { stepId: 'guide-2', configOptions: { mode: 'bypassPermissions' } }),
       ).rejects.toBeInstanceOf(UnguardedAgentError)
       expect(driver.turns).toHaveLength(0)
+    })
+
+    // A fake harness that would run commands under its own classifier, as Claude Code's Auto mode does.
+    describe('a turn whose commands must wait for a person', () => {
+      it('switches the harness to the mode that asks, whatever it started in or the request asked for', async () => {
+        driver.startMode = 'auto'
+        const result = await turn('slack', { requireCommandApproval: true, configOptions: { mode: 'auto' } })
+        expect(result?.status).toBe('ok')
+        expect(driver.configSets.at(-1)).toEqual(['mode', 'default'])
+        const session = await runtime.store.requireSession(result!.agentSessionId!)
+        expect(
+          (session.config.configOptions as AgentConfigOption[]).find((option) => option.id === 'mode'),
+        ).toMatchObject({ currentValue: 'default' })
+        // The next turn in the same session checks again, after someone changed the mode in between.
+        await runtime.patchSession(session.id, {
+          config: {
+            ...session.config,
+            configOptions: (session.config.configOptions as AgentConfigOption[]).map((option) =>
+              option.id === 'mode' ? { ...option, currentValue: 'auto' } : option,
+            ),
+          },
+        })
+        const sets = driver.configSets.length
+        await turn('slack', { stepId: 'guide-2', managedSessionId: session.id, requireCommandApproval: true })
+        expect(driver.configSets.slice(sets)).toContainEqual(['mode', 'default'])
+        expect(driver.turns).toHaveLength(2)
+      })
+
+      it('refuses a harness that reports no mode, before it queues a turn', async () => {
+        driver.startMode = undefined
+        await expect(turn('slack', { requireCommandApproval: true })).rejects.toThrow("didn't switch to asking")
+        expect(driver.turns).toHaveLength(0)
+      })
+
+      it('refuses a harness Acorn has no asking setting for', async () => {
+        const contributed = new ConfigDriver('acme:agent', 'acme:agent')
+        contributed.startMode = 'default'
+        const releaseDriver = registry.registerNative('acme:agent', () => contributed)
+        const releaseProfile = agentProfileRegistry.register({
+          kind: 'agent',
+          command: 'acme',
+          backendPreference: 'tmux',
+          transport: 'pty',
+          id: 'acme:agent',
+          label: 'Acme',
+          managedProvider: 'acme:agent',
+        })
+        try {
+          await expect(turn('slack', { profileId: 'acme:agent', requireCommandApproval: true })).rejects.toThrow(
+            "can't be made to ask",
+          )
+          expect(contributed.turns).toHaveLength(0)
+        } finally {
+          releaseProfile()
+          releaseDriver()
+        }
+      })
     })
 
     it('continues only a session the same plugin started', async () => {

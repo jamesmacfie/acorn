@@ -12,8 +12,9 @@ const send = <T>(path: string, method: string, body: unknown): Promise<T> =>
 
 export const fetchSlackState = (nodeId: string | null = activeNodeId()): Promise<SlackState> =>
   readJson<SlackState>(slackRoute('/state'), { nodeId })
-export const startLink = (approvals: boolean) =>
-  send<{ url: string; expiresAt: number }>('/link', 'POST', { approvals })
+export const startLink = () => send<{ url: string; expiresAt: number }>('/link', 'POST', {})
+export const confirmLink = (teamId: string, slackUserId: string, approvals: boolean) =>
+  send<{ ok: true }>('/confirm', 'POST', { teamId, slackUserId, approvals })
 export const unlink = (teamId: string) => send<{ ok: true }>('/unlink', 'POST', { teamId })
 export const setApprovals = (teamId: string, enabled: boolean) =>
   send<{ ok: true }>('/approvals', 'PUT', { teamId, enabled })

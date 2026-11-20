@@ -1,3 +1,4 @@
+import { randomUUID } from 'node:crypto'
 import { and, asc, eq, inArray, lte, max } from 'drizzle-orm'
 import type { PluginDatabase } from '@acorn/plugin-api/node'
 import {
@@ -15,6 +16,7 @@ import {
 // concerned: a thread maps to its sessions, never to a task alone (docs/integrations/slack.md § Room
 // for forks and several agents).
 
+type Link = typeof slackLinks.$inferSelect
 export type Channel = typeof slackChannels.$inferSelect
 export type Thread = typeof slackThreads.$inferSelect
 export type Message = typeof slackMessages.$inferSelect
@@ -40,20 +42,44 @@ export function slackStore(db: PluginDatabase) {
     links: () => db.select().from(slackLinks).all(),
     link: async (teamId: string) =>
       (await db.select().from(slackLinks).where(eq(slackLinks.teamId, teamId)).get()) ?? null,
-    /** The gateway's links for this Node, made the local truth. A team linked again keeps its approvals choice. */
-    async syncLinks(
-      here: { teamId: string; teamName: string; slackUserId: string; slackUserName: string }[],
+    /** What the gateway reports for this Node can only take local links away or rename them. A link it no
+     *  longer reports, or reports for another Slack user, is gone. A new one waits for `confirmLink`. */
+    async reconcileLinks(here: { teamId: string; teamName: string; slackUserId: string; slackUserName: string }[]) {
+      for (const link of await db.select().from(slackLinks).all()) {
+        const reported = here.find((next) => next.teamId === link.teamId && next.slackUserId === link.slackUserId)
+        if (!reported) await db.delete(slackLinks).where(eq(slackLinks.teamId, link.teamId))
+        else
+          await db
+            .update(slackLinks)
+            .set({ teamName: reported.teamName, slackUserName: reported.slackUserName })
+            .where(eq(slackLinks.teamId, link.teamId))
+      }
+    },
+    /** A link a paired device confirmed, with the approvals choice made beside it. The same Slack user
+     *  confirmed again keeps the link ID, and with it the threads already going. */
+    async confirmLink(
+      link: { teamId: string; teamName: string; slackUserId: string; slackUserName: string },
       approvals: boolean,
     ) {
-      const current = await db.select().from(slackLinks).all()
-      for (const link of current)
-        if (!here.some((next) => next.teamId === link.teamId && next.slackUserId === link.slackUserId))
-          await db.delete(slackLinks).where(eq(slackLinks.teamId, link.teamId))
-      for (const link of here) {
-        const known = current.find((row) => row.teamId === link.teamId && row.slackUserId === link.slackUserId)
-        if (known) await db.update(slackLinks).set(link).where(eq(slackLinks.teamId, link.teamId))
-        else await db.insert(slackLinks).values({ ...link, approvals, createdAt: Date.now() })
-      }
+      const { teamId, teamName, slackUserId, slackUserName } = link
+      const current = await db.select().from(slackLinks).where(eq(slackLinks.teamId, teamId)).get()
+      if (current?.slackUserId === slackUserId)
+        return db.update(slackLinks).set({ teamName, slackUserName, approvals }).where(eq(slackLinks.teamId, teamId))
+      await db.delete(slackLinks).where(eq(slackLinks.teamId, teamId))
+      await db.insert(slackLinks).values({
+        teamId,
+        teamName,
+        slackUserId,
+        slackUserName,
+        linkId: randomUUID(),
+        approvals,
+        createdAt: Date.now(),
+      })
+    },
+    /** The link a thread or pick was made under, or null once that link is unlinked or replaced. */
+    linkOf: async (made: { teamId: string; linkId: string }): Promise<Link | null> => {
+      const link = await db.select().from(slackLinks).where(eq(slackLinks.teamId, made.teamId)).get()
+      return link?.linkId === made.linkId ? link : null
     },
     removeLink: (teamId: string) => db.delete(slackLinks).where(eq(slackLinks.teamId, teamId)),
     setApprovals: (teamId: string, approvals: boolean) =>

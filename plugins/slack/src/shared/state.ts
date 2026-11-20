@@ -4,10 +4,14 @@ type SlackLinkState = {
   teamId: string
   teamName: string
   slackUserName: string
+  /** The Slack user ID, which the device sends back when it confirms the link. */
+  slackUserId: string
   /** This Node takes the link's Slack work. Otherwise `nodeLabel` names the Node that does. */
   here: boolean
   nodeLabel?: string
-  /** The owner answers approvals from Slack. Only known for a link to this Node. */
+  /** A paired device confirmed this Slack user for this Node. Until then, Slack can't start work here. */
+  confirmed: boolean
+  /** The owner answers approvals from Slack. Only known for a confirmed link to this Node. */
   approvals: boolean
 }
 

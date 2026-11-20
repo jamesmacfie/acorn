@@ -471,6 +471,7 @@ acorn-plugin-types: member AgentSessionExecuteRequest.onEvent
 acorn-plugin-types: member AgentSessionExecuteRequest.onGoal
 acorn-plugin-types: member AgentSessionExecuteRequest.profileId
 acorn-plugin-types: member AgentSessionExecuteRequest.prompt
+acorn-plugin-types: member AgentSessionExecuteRequest.requireCommandApproval
 acorn-plugin-types: member AgentSessionExecuteRequest.schema
 acorn-plugin-types: member AgentSessionExecuteRequest.signal
 acorn-plugin-types: member AgentSessionExecuteRequest.stepId

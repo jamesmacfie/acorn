@@ -1,3 +1,48 @@
+> **Completion note, November 20, 2026.** Fixed on the Acorn side, on branch
+> `phase-x-1-slack-identity-approval-and-execution-policy`.
+>
+> What landed:
+>
+> - A Slack link counts only after a paired device confirms it. `GET /v1/p/slack/state` can only drop or
+>   rename local links. A new `POST /v1/p/slack/confirm` takes the workspace, the Slack user ID the page
+>   showed, and the approvals choice. It records the link only while the gateway still reports that user
+>   for this Node. Otherwise it answers 409 `slack_link_changed`. `linkFromDelivery` is gone, so a
+>   delivery never records a link. A different Slack user for a workspace drops the local link and waits
+>   for its own confirmation.
+> - The approvals choice travels in the confirm request. The in-process `approvalsOnLink` is gone, and
+>   `/link` takes no body.
+> - Each confirmation mints a `link_id`. Threads and project picks store it. `store.linkOf` checks it in
+>   `pump`, again as a turn starts, in `turnChanged`, in restart recovery, before a card posts, and on a
+>   click. A click on a card from another workspace's thread no longer answers it either. A thread from
+>   an old link ends.
+> - `agents.sessionExecute` has a `requireCommandApproval` field, published in `acorn-plugin-types`
+>   too. It switches Claude Code to `default` mode after `configOptions` and refuses the turn when the
+>   session doesn't report that mode afterward. A provider with no known asking setting is refused.
+>   Slack sets it on every turn.
+>
+> Decisions and deviations:
+>
+> - Migration `0001_link_confirmation` deletes every existing Slack link and pending pick, and ends
+>   every Slack thread. Those links were recorded without a confirmation, so each owner confirms once
+>   after upgrading.
+> - Codex and contributed harnesses are refused for Slack turns. Codex reports its sandbox profile but
+>   not its approval policy, so Acorn can't show that it asks. Supporting Codex needs Acorn to set and
+>   read Codex's approval policy.
+> - `default` mode still honors the owner's own `permissions.allow` rules and hooks in their Claude
+>   settings. I treated those as the owner's choice.
+> - **Answer approvals from Slack** still lets a Slack click approve a command. That's the opted-in risk
+>   the switch describes. I didn't build an independently authenticated origin for unattended remote
+>   work. The finding makes that conditional on defending against a compromised gateway.
+>
+> What acorn-cloud would still need:
+>
+> - Nothing for this fix to work. Two things would make it stronger. The gateway could sign each
+>   delivery's sender with a key the Node can check apart from the service's routing token. It could
+>   also tell a Node when its link changes, so a stale link drops without waiting for the settings page.
+>
+> For later phases: the bound `agents.sessionExecute` copy behaves the same for loaded plugins unless
+> they set `requireCommandApproval`. The review guide and other loaded plugins keep Auto.
+
 # X-1. Cloud account access can authorize Slack turns on the Node
 
 Found November 20, 2026, in Acorn at `90b9e61e3` and `acorn-cloud` at `19fa594`. Severity

@@ -50,12 +50,25 @@ the gateway for an address that runs Sign in with Slack, which you open, and the
 link reaches the Node. The terminal client shows the address to open. When your Slack user is linked to
 another of your Nodes, the page says where Slack work goes and offers **Link this Node instead**.
 
-**Answer approvals from Slack** is unticked by default, beside this sentence: "If the hosted service
-were broken into, whoever did it could send your agent a prompt and approve what it runs." The choice
-is kept on the Node, so the gateway can't change it.
+The gateway's list of links is only an offer. Anyone who holds the account can add a link, and so can
+the gateway itself, so the link counts only after a paired device confirms it. The page names the
+workspace and the Slack user, with the user's ID, and offers **Confirm** and **Not me, unlink**.
+**Confirm** sends back the exact workspace and Slack user the page showed. The Node records the link only
+while the gateway still reports that user for this Node. A delivery never records a link.
 
-Until a link exists, the plugin makes no request and acts on no event. Its registration is all that
-runs at boot. The rest loads on the first delivery, settings request, or agents event.
+When the gateway stops reporting a confirmed link, or reports another Slack user for that workspace,
+the Node drops its link at the next read of the page. A different user waits for its own confirmation.
+Each confirmation gets a new link ID. Threads and project picks keep the ID they were made under, so
+work from before an unlink or a relink never runs, and its cards answer nothing. A turn checks the ID
+again as it starts.
+
+**Answer approvals from Slack** is unticked by default, beside this sentence: "If the hosted service
+were broken into, whoever did it could send your agent a prompt and approve what it runs." It's chosen
+beside **Confirm** and goes with that confirmation, so it applies to that Slack user only. It's kept on
+the Node, so the gateway can't change it.
+
+Until a confirmed link exists, the plugin makes no request and acts on no event. Its registration is all
+that runs at boot. The rest loads on the first delivery, settings request, or agents event.
 
 ## Two modes
 
@@ -80,7 +93,11 @@ a single prefix. With no project, the bot offers a picker, which can remember th
 
 The plugin runs each owner message through `agents.sessionExecute`, bound to itself the way the host
 binds a loaded plugin's copy. So a Slack turn runs gated, a harness mode that skips its own permission
-checks is refused, and the session list shows the session "by slack". The prompt is the owner's words.
+checks is refused, and the session list shows the session "by slack". Each turn also sets
+`requireCommandApproval`, so every command waits for a person: Claude Code switches to `default` mode
+even when the owner's default is Auto, and a harness that can't show it asks, Codex included, is
+refused ([session control](../managed-agents/session-control.md#running-a-turn-from-a-plugin)). The
+prompt is the owner's words.
 The Slack rules, guests' replies, and a thread's earlier messages go in `context`, which the model reads
 as information. Turns run one at a time per session, for up to four hours each.
 
@@ -94,7 +111,8 @@ When an agent in a Slack session asks permission, a card in its thread shows the
 detail, with known key values removed. With approvals from Slack on, it has **Approve** and **Deny**,
 which answer the request's allow-once or reject-once option through `agents.requestAnswer`
 ([session control](../managed-agents/session-control.md#answering-a-request-from-a-plugin)). Only the
-owner's click counts. Without approvals on, the card links to Acorn. Any other kind of request asks the
+owner's click counts, and only on a card from a thread made under the current link. Without approvals
+on, the card links to Acorn. Any other kind of request asks the
 owner to answer in Acorn.
 
 ## Room for forks and several agents

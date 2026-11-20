@@ -72,9 +72,11 @@ a device token, because device tokens don't depend on the account.
 relay with a gateway token, which opens one route, the Slack plugin's ([gateway routes](../authentication/gateway-routes.md)).
 So a breach of the service could send a linked Node's agent a prompt as its owner, which spends the
 owner's usage and runs gated. On a Node whose owner turned on **Answer approvals from Slack**, it could
-approve what that agent asks to run, too. Both need the owner to have linked Slack, the box is unticked
-by default with this risk beside it, and the Node checks every sender against its own record of the
-owner ([Slack](../integrations/slack.md#linking)).
+approve what that agent asks to run, too. Both need a link that a paired device confirmed for that
+exact Slack user. The box is unticked by default with this risk beside it, the Node checks every sender
+against its own record of the owner, and every command in a Slack turn waits for a person's approval
+([Slack](../integrations/slack.md#linking)). A breach can't add a Slack user of its own without that
+confirmation.
 
 ## Node providers
 

@@ -48,7 +48,12 @@ export function slackInbound(rt: SlackRuntime, turns: Turns, onClick?: (payload:
     const fromOwner = event.user === link.slackUserId
     const text = withoutMention(String(event.text ?? ''), mention)
     const at = rt.now()
-    const thread = await store.activeThread(teamId, channel, threadTs)
+    let thread = await store.activeThread(teamId, channel, threadTs)
+    // Made under a link since unlinked or replaced: it ends, and nothing more runs in it.
+    if (thread && thread.linkId !== link.linkId) {
+      await store.endThread(thread.id)
+      thread = null
+    }
 
     if (thread) {
       if (fromOwner) {
@@ -111,13 +116,14 @@ export function slackInbound(rt: SlackRuntime, turns: Turns, onClick?: (payload:
     const mode: Mode = settings?.mode ?? (dm ? 'conversation' : 'tasks')
     const projects = await rt.projects()
     const project = projects.find((candidate) => candidate.id === settings?.projectId)
-    if (!project) return offerPicker(teamId, channel, event.user, projects, { ts, threadTs })
-    await open({ teamId, channel, ts, threadTs, text, dm, mode, projectId: project.id })
+    if (!project) return offerPicker(teamId, channel, event.user, projects, { ts, threadTs, linkId: link.linkId })
+    await open({ teamId, linkId: link.linkId, channel, ts, threadTs, text, dm, mode, projectId: project.id })
   }
 
   // A thread starts: a task of its own, or the channel's shared task, then the turn.
   async function open(start: {
     teamId: string
+    linkId: string
     channel: string
     ts: string
     threadTs: string
@@ -126,7 +132,7 @@ export function slackInbound(rt: SlackRuntime, turns: Turns, onClick?: (payload:
     mode: Mode
     projectId: string
   }) {
-    const { teamId, channel, ts, threadTs, mode, projectId } = start
+    const { teamId, linkId, channel, ts, threadTs, mode, projectId } = start
     let taskId: string
     try {
       taskId = mode === 'tasks' ? await taskFor(start) : await channelTask(teamId, channel, projectId, start.dm)
@@ -144,7 +150,17 @@ export function slackInbound(rt: SlackRuntime, turns: Turns, onClick?: (payload:
     const id = `${teamId}:${channel}:${ts}`
     // Mentioned partway through a thread: read it once, for the first turn.
     const history = threadTs !== ts ? await readHistory(teamId, channel, threadTs, ts) : null
-    await store.insertThread({ id, teamId, channelId: channel, threadTs, taskId, mode, history, createdAt: rt.now() })
+    await store.insertThread({
+      id,
+      teamId,
+      linkId,
+      channelId: channel,
+      threadTs,
+      taskId,
+      mode,
+      history,
+      createdAt: rt.now(),
+    })
     await store.updateMessage({ teamId, channelId: channel, ts }, { threadId: id, status: 'waiting' })
     await turns.pump((await store.thread(id))!)
   }
@@ -202,7 +218,7 @@ export function slackInbound(rt: SlackRuntime, turns: Turns, onClick?: (payload:
     channel: string,
     user: string,
     projects: { id: string; name: string }[],
-    message?: { ts: string; threadTs: string },
+    message?: { ts: string; threadTs: string; linkId: string },
   ) {
     // Slack shows nothing for a thread that holds only a private message, so a note about a fresh mention
     // goes in the channel. One about a message partway through a thread goes in that thread.
@@ -224,7 +240,8 @@ export function slackInbound(rt: SlackRuntime, turns: Turns, onClick?: (payload:
         teamId,
         channelId: channel,
         ts: message.ts,
-        event: JSON.stringify(message),
+        linkId: message.linkId,
+        event: JSON.stringify({ ts: message.ts, threadTs: message.threadTs }),
         expiresAt: rt.now() + PICK_TTL_MS,
       })
     const option = (text: string, value: string) => ({ text: { type: 'plain_text', text: text.slice(0, 75) }, value })
@@ -284,7 +301,8 @@ export function slackInbound(rt: SlackRuntime, turns: Turns, onClick?: (payload:
     if (!pendingId) return void (await respond(`This channel now uses ${project.name}.`))
     const pending = await store.pending(pendingId)
     await store.removePending(pendingId)
-    if (!pending || pending.expiresAt <= rt.now()) return void (await respond('This expired. Mention @acorn again.'))
+    if (!pending || pending.expiresAt <= rt.now() || pending.linkId !== link.linkId)
+      return void (await respond('This expired. Mention @acorn again.'))
     const message = await store.message(teamId, channel, pending.ts)
     if (!message) return void (await respond('This expired. Mention @acorn again.'))
     await respond(`Started in ${project.name}`)
@@ -293,6 +311,7 @@ export function slackInbound(rt: SlackRuntime, turns: Turns, onClick?: (payload:
     const dm = channel.startsWith('D')
     await open({
       teamId,
+      linkId: link.linkId,
       channel,
       ts: pending.ts,
       threadTs,

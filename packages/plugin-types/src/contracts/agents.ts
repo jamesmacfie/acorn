@@ -163,6 +163,9 @@ export type AgentSessionExecuteRequest = {
   managedSessionId?: string
   /** Your own id for the turn. A retry with the same one reuses its session instead of starting another. */
   stepId?: string
+  /** Every command the agent runs waits for a person's answer. The turn switches the harness to the
+   *  setting that asks, and is refused on a harness that can't show it does. */
+  requireCommandApproval?: boolean
   /** A completion condition the turn keeps working towards, checked after each turn. */
   goal?: string
   admitAutomatic?: (request: { kind: 'turn' | 'check'; usage: AgentExecuteUsage }) => Promise<string | null>

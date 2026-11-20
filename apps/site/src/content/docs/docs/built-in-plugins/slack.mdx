@@ -10,7 +10,7 @@ sources:
   - plugins/slack/src/server/inbound.ts
   - plugins/slack/src/server/turns.ts
   - plugins/slack/src/server/approvals.ts
-checked: 'a18d5dd02'
+checked: '31ff472da'
 ---
 
 import PluginFacts from '../../../../components/PluginFacts.astro'
@@ -20,7 +20,7 @@ DM. The agent's progress, its permission requests, and its answer come back to t
 Node never holds a Slack token: the account service's Slack gateway makes each Slack call for it.
 
 <PluginFacts id="slack">
-  <Fragment slot="adds">**Settings** > **Connections** > **Slack**, with **Link Slack**, **Unlink**, and the **Answer approvals from Slack** switch, and a "Shared to …" note in the composer of a session Slack started.</Fragment>
+  <Fragment slot="adds">**Settings** > **Connections** > **Slack**, with **Link Slack**, **Confirm**, **Unlink**, and the **Answer approvals from Slack** switch, and a "Shared to …" note in the composer of a session Slack started.</Fragment>
   <Fragment slot="needs">A sign-in on **Settings** > **Account**, **Remote access** on, and the Acorn app installed in your Slack workspace.</Fragment>
   <Fragment slot="reach">The account service's Slack gateway, through your sign-in. Nothing is contacted until you link Slack.</Fragment>
 </PluginFacts>
@@ -28,14 +28,20 @@ Node never holds a Slack token: the account service's Slack gateway makes each S
 ## Link Slack
 
 Open **Settings** > **Connections** > **Slack** and click **Link Slack**. Open the address it shows and
-sign in with Slack. The page finds the link once it reaches your Node. Only your own Slack user starts
-turns on your Node. Anyone else's reply in your thread reaches the agent as context with your next
-message.
+sign in with Slack. The page finds the link once it reaches your Node, and shows the workspace and the
+Slack user it names. Click **Confirm** if that's you, or **Not me, unlink** if it isn't. Slack can't
+start anything on your Node until you confirm. If the link later names a different Slack user, you
+confirm again. Only your own Slack user starts turns on your Node. Anyone else's reply in your thread
+reaches the agent as context with your next message.
 
-**Answer approvals from Slack** is off unless you tick it. With it on, a request to run a command shows
-**Approve** and **Deny** in the thread. With it off, the card links to the task in acorn instead. If the
-hosted service were broken into, whoever did it could send your agent a prompt, and with the switch on,
-approve what it runs.
+Every command an agent runs from Slack waits for your approval. A Claude Code session switches to
+**Default** mode, even if you usually run it in **Auto**. Codex can't start from Slack, because acorn
+can't confirm that it asks before each command.
+
+**Answer approvals from Slack** sits beside **Confirm** and is off unless you tick it. With it on, a
+request to run a command shows **Approve** and **Deny** in the thread. With it off, the card links to the
+task in acorn instead. If the hosted service were broken into, whoever did it could send your agent a
+prompt, and with the switch on, approve what it runs.
 
 ## Use it
 

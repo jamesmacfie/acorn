@@ -38,6 +38,8 @@ export function slackTurns(rt: SlackRuntime) {
    *  `rt.serial`; the agent call runs outside it, and its turn joins the queue again through `onTurn`. */
   async function pump(thread: Thread): Promise<void> {
     if (running.has(thread.id) || thread.ended) return
+    // Made under a link since unlinked or replaced, so nothing more runs in it.
+    if (!(await store.linkOf(thread))) return void (await store.endThread(thread.id))
     const sessionId = await store.threadSession(thread.id)
     if (sessionId && (await store.openTurn(sessionId))) return
     const message = await store.nextOwnerMessage(thread.id)
@@ -60,9 +62,11 @@ export function slackTurns(rt: SlackRuntime) {
         const said = await rt.safeText(reason, await rt.tasks.folder(thread.taskId))
         await rt.post(thread.teamId, thread.channelId, thread.threadTs, `${said} ${rt.taskUrl(thread.taskId)}`.trim())
       })
+    // Checked as the turn starts, so a message queued before an unlink or a relink never runs after it.
+    const link = await store.linkOf(thread)
+    if (!link) return rt.serial(() => store.updateMessage(message, { status: 'failed' }))
     if (!rt.execute) return fail("This Node can't run agent turns right now.")
-    const link = await store.link(thread.teamId)
-    const name = link?.slackUserName ?? 'the owner'
+    const name = link.slackUserName
     const channel = await store.channel(thread.teamId, thread.channelId)
     const guests = await store.waitingGuests(thread.id)
     const context = [
@@ -71,7 +75,7 @@ export function slackTurns(rt: SlackRuntime) {
         source: 'slack',
         content: rulesContext({
           channel: channelLabel(thread.channelId, channel?.name),
-          team: link?.teamName ?? 'Slack',
+          team: link.teamName,
           owner: name,
         }),
       },
@@ -104,6 +108,8 @@ export function slackTurns(rt: SlackRuntime) {
         prompt: message.text,
         context,
         timeoutMs: TURN_TIMEOUT_MS,
+        // The prompt comes from outside the Node, so no command runs until a person approves it.
+        requireCommandApproval: true,
         stepId: `slack:${thread.teamId}:${thread.channelId}:${message.ts}`,
         ...(sessionId ? { managedSessionId: sessionId } : {}),
         onTurn: (turn) => {
@@ -226,7 +232,7 @@ export function slackTurns(rt: SlackRuntime) {
     /** `plugin:agents:turn-changed`. A turn typed in Acorn into a Slack session gets a row here, to mirror. */
     async turnChanged(event: AgentTurnChangedEvent) {
       const thread = await store.threadOfSession(event.sessionId)
-      if (!thread || thread.ended) return
+      if (!thread || thread.ended || !(await store.linkOf(thread))) return
       let turn = await store.turn(event.turnId)
       if (!turn) {
         // Plugin notes, goal turns, and delegation reports aren't posted. Slack's own turns get their row
@@ -279,7 +285,7 @@ export function slackTurns(rt: SlackRuntime) {
     async recover() {
       for (const turn of await store.unpostedTurns()) {
         const thread = await store.thread(turn.threadId)
-        if (!thread) continue
+        if (!thread || !(await store.linkOf(thread))) continue
         const state = (await rt.turns?.list({ taskId: thread.taskId, sessionId: turn.sessionId }))?.find(
           (row) => row.turnId === turn.turnId,
         )

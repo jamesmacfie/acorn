@@ -1,11 +1,11 @@
-// Settings → Slack: link this Node's owner's Slack user, and choose whether approvals can be answered
-// from Slack (docs/integrations/slack.md § Linking). Drawn with the kit, so the terminal client draws the
+// Settings → Slack: link this Node's owner's Slack user, confirm the Slack user the link names, and
+// choose whether approvals can be answered from Slack (docs/integrations/slack.md § Linking). Drawn with the kit, so the terminal client draws the
 // same page, where the link's address shows as text to open.
 import { createQuery, useQueryClient } from '@tanstack/solid-query'
 import { createSignal, For, Show } from 'solid-js'
 import { activeNodeId, createSettingSave } from '@acorn/plugin-api/client'
 import { Alert, Button, Checkbox, SettingRow, SettingsSection, Text } from '@acorn/plugin-api/ui'
-import { fetchSlackState, setApprovals, startLink, unlink } from './slackClient'
+import { confirmLink, fetchSlackState, setApprovals, startLink, unlink } from './slackClient'
 
 const POLL_WHILE_LINKING_MS = 2_000
 const RISK =
@@ -15,7 +15,7 @@ export default function SlackSettings() {
   const client = useQueryClient()
   const key = ['slack', 'state', activeNodeId()]
   const [pending, setPending] = createSignal<{ url: string } | null>(null)
-  const [approvalsOnLink, setApprovalsOnLink] = createSignal(false)
+  const [approvalsOnConfirm, setApprovalsOnConfirm] = createSignal(false)
   const state = createQuery(() => ({
     queryKey: key,
     queryFn: () => fetchSlackState(),
@@ -30,7 +30,7 @@ export default function SlackSettings() {
   const save = createSettingSave()
   const link = () =>
     void save.run(async () => {
-      setPending(await startLink(approvalsOnLink()))
+      setPending(await startLink())
       await refresh()
     })
 
@@ -66,50 +66,85 @@ export default function SlackSettings() {
             <Show
               when={current().links.some((entry) => entry.here)}
               fallback={
-                <>
-                  <SettingRow
-                    label="Link Slack"
-                    description="Mention @acorn in Slack, or DM it, to start an agent here. Only your replies run as turns."
-                    layout={pending() ? 'stacked' : undefined}
-                    error={save.error()}
+                <SettingRow
+                  label="Link Slack"
+                  description="Mention @acorn in Slack, or DM it, to start an agent here. Only your replies run as turns."
+                  layout={pending() ? 'stacked' : undefined}
+                  error={save.error()}
+                >
+                  <Show
+                    when={pending()}
+                    fallback={
+                      <Button variant="solid" tone="accent" onPress={link}>
+                        Link Slack
+                      </Button>
+                    }
                   >
-                    <Show
-                      when={pending()}
-                      fallback={
-                        <Button variant="solid" tone="accent" onPress={link}>
-                          Link Slack
+                    {(started) => (
+                      <>
+                        <Text wrap>Sign in with Slack at this address. Keep this page open until it finishes.</Text>
+                        <Button href={started().url}>Open Slack sign-in</Button>
+                        <Text emphasis="muted" wrap>
+                          {started().url}
+                        </Text>
+                        <Button variant="ghost" onPress={() => setPending(null)}>
+                          Cancel
                         </Button>
-                      }
+                      </>
+                    )}
+                  </Show>
+                </SettingRow>
+              }
+            >
+              <For each={current().links.filter((entry) => entry.here && !entry.confirmed)}>
+                {(entry) => (
+                  <>
+                    <SettingRow
+                      label={`Confirm ${entry.teamName}`}
+                      description={`Your acorn account linked the Slack user ${entry.slackUserName} (${entry.slackUserId}) in ${entry.teamName} to this Node. Confirm only if that's you. Until you do, Slack can't start agents here.`}
+                      layout="stacked"
+                      error={save.error()}
                     >
-                      {(started) => (
-                        <>
-                          <Text wrap>Sign in with Slack at this address. Keep this page open until it finishes.</Text>
-                          <Button href={started().url}>Open Slack sign-in</Button>
-                          <Text emphasis="muted" wrap>
-                            {started().url}
-                          </Text>
-                          <Button variant="ghost" onPress={() => setPending(null)}>
-                            Cancel
-                          </Button>
-                        </>
-                      )}
-                    </Show>
-                  </SettingRow>
-                  {/* Chosen before linking, so the first approval after the link already follows it. */}
-                  <Show when={!pending()}>
+                      <Button
+                        variant="solid"
+                        tone="accent"
+                        onPress={() =>
+                          void save.run(async () => {
+                            await confirmLink(entry.teamId, entry.slackUserId, approvalsOnConfirm())
+                            setPending(null)
+                            setApprovalsOnConfirm(false)
+                            await refresh()
+                          })
+                        }
+                      >
+                        Confirm
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        onPress={() =>
+                          void save.run(async () => {
+                            setPending(null)
+                            await unlink(entry.teamId)
+                            await refresh()
+                          })
+                        }
+                      >
+                        Not me, unlink
+                      </Button>
+                    </SettingRow>
+                    {/* Sent with the confirmation, so it applies to this Slack user and no other. */}
                     <SettingRow label="Answer approvals from Slack" description={RISK}>
                       <Checkbox
                         switch
                         ariaLabel="Answer approvals from Slack"
-                        checked={approvalsOnLink()}
-                        onChange={setApprovalsOnLink}
+                        checked={approvalsOnConfirm()}
+                        onChange={setApprovalsOnConfirm}
                       />
                     </SettingRow>
-                  </Show>
-                </>
-              }
-            >
-              <For each={current().links.filter((entry) => entry.here)}>
+                  </>
+                )}
+              </For>
+              <For each={current().links.filter((entry) => entry.here && entry.confirmed)}>
                 {(entry) => (
                   <>
                     <SettingRow

@@ -32,7 +32,7 @@ export function slackApprovals(rt: SlackRuntime, turns: Turns) {
     }) {
       const thread = await store.threadOfSession(event.sessionId)
       if (!thread || thread.ended) return
-      const link = await store.link(thread.teamId)
+      const link = await store.linkOf(thread)
       if (!link) return
       if (event.status !== 'pending') {
         await turns.waiting(event.sessionId, false)
@@ -128,7 +128,9 @@ export function slackApprovals(rt: SlackRuntime, turns: Turns) {
       }
       if (answered.has(requestId)) return true
       const thread = await store.threadOfSession(sessionId)
-      if (!thread || !rt.requestAnswer) return true
+      // A card counts only under the link its thread was made under, so a click from another team, or
+      // from before an unlink or a relink, answers nothing.
+      if (!thread || thread.linkId !== link.linkId || !rt.requestAnswer) return true
       const request = (await rt.requests?.list({ taskId: thread.taskId, sessionId }))?.find(
         (row) => row.requestId === requestId,
       )
