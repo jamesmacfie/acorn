@@ -144,6 +144,32 @@ function ViewMenu(props: { model: ChangesModel }) {
   )
 }
 
+// The verbs over the whole worktree that are too rare, or too dangerous, to earn a button in the
+// header. Discard all arms on the first press, like the row's Discard, because it can't be undone.
+function ChangesMenu(props: { model: ChangesModel }) {
+  return (
+    <Menu
+      ariaLabel="Changes actions"
+      placement="bottom-end"
+      trigger={({ open, toggle }) => (
+        <IconButton icon="ellipsis" label="Changes actions" opens="menu" expanded={open()} onPress={toggle} />
+      )}
+    >
+      {(menu) => (
+        <Menu.Item
+          context={menu}
+          tone="danger"
+          confirm="Discard all changes?"
+          title="git reset --hard && git clean -fd. Throws away every change, new files included. You can't undo this."
+          onSelect={() => void props.model.discardAll()}
+        >
+          Discard all changes
+        </Menu.Item>
+      )}
+    </Menu>
+  )
+}
+
 // The house list header: the label and its count, then the list's own controls. No line totals,
 // because every row carries its own. Send is a banner at the top of the list, where it has room to
 // say whether the send worked.
@@ -198,6 +224,9 @@ export function ChangesHeader(props: { task: Task; model: ChangesModel }) {
             >
               Unstage all
             </Button>
+          </Show>
+          <Show when={changedCount(model())}>
+            <ChangesMenu model={model()} />
           </Show>
         </Show>
       }

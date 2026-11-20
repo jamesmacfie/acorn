@@ -44,6 +44,7 @@ const setView = vi.fn()
 const commitAction = vi.fn(async () => {})
 const toggleAmend = vi.fn()
 const setNoVerify = vi.fn()
+const discardAll = vi.fn()
 
 /** What the footer reads beyond the list's own state. Defaults are "a message typed, nothing set". */
 type Commit = { draft: string; amend: boolean; signoff: boolean; noVerify: boolean }
@@ -114,6 +115,7 @@ const model = (
     stage,
     unstage,
     discard: () => {},
+    discardAll,
     sendRef: () => {},
     project: () => undefined,
     unsent: () => [],
@@ -134,7 +136,7 @@ afterEach(() => {
   for (const dispose of disposers.splice(0)) dispose()
   host.remove()
   for (const surface of document.querySelectorAll('.ui-menu')) surface.remove()
-  for (const stub of [stage, unstage, setView, commitAction, toggleAmend, setNoVerify]) stub.mockClear()
+  for (const stub of [stage, unstage, setView, commitAction, toggleAmend, setNoVerify, discardAll]) stub.mockClear()
   // The folds persist their open state, and a test that collapsed one must not tell the next one.
   localStorage.clear()
 })
@@ -518,6 +520,27 @@ describe('the view menu', () => {
 
     items.find((item) => item.label === 'List')!.press()
     expect(setView).toHaveBeenCalledWith({ mode: 'list' })
+  })
+})
+
+describe('the changes menu', () => {
+  const trigger = () => host.querySelector<HTMLButtonElement>('button[aria-label="Changes actions"]')
+
+  it('is not drawn on a clean tree, where there is nothing to discard', () => {
+    drawHeader([])
+    expect(trigger()).toBeNull()
+  })
+
+  // Armed rather than behind a dialog, like the row's Discard: the armed label is the prompt.
+  it('makes Discard all changes ask twice', () => {
+    drawHeader([change('src/a.ts', false), change('n.md', false, 'untracked')])
+    trigger()!.click()
+    document.querySelector<HTMLButtonElement>('.ui-menu .ui-menu-item')!.click()
+    expect(discardAll).not.toHaveBeenCalled()
+    expect(document.querySelector('.ui-menu')?.textContent).toContain('Discard all changes?')
+
+    document.querySelector<HTMLButtonElement>('.ui-menu .ui-menu-item[data-armed]')!.click()
+    expect(discardAll).toHaveBeenCalledOnce()
   })
 })
 
