@@ -80,6 +80,7 @@ the whole plugin system in one page.
 | [security/review-2026-10-21.md](./security/review-2026-10-21.md) | Review of the work since October 11: loaded plugin paths the host dispatches, raced pairing asks, agent-created tasks, unguarded agent steps behind record triggers, and the audit. Each finding, its change, the checks, and what stays open. |
 | [security/review-2026-10-22.md](./security/review-2026-10-22.md) | Review of the retired phone gateway and client tokens: client device tokens outside the agent fence, forwarded answers that rendered as pages, phone sessions that never expired, plugin writes from a phone, and agent-written memory. Each finding, its change, the checks and walks, and what stays open. |
 | [security/review-2026-10-11.md](./security/review-2026-10-11.md) | Follow-up review: the TOML parser cap, release-build renderer origin, idempotency query strings, plugin route gates, and the dependency audit. |
+| [November 20 security findings](./future/security/README.md) | Open findings and proposed fixes for unauthorized Node execution. |
 
 ## The renderer
 
