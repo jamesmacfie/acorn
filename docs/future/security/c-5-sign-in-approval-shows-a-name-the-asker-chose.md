@@ -7,7 +7,8 @@
 > - The comment on `deviceCodeRequestSchema.deviceName` in `packages/protocol/src/device/account.ts`
 >   said the name lets a person tell it's their own sign-in. That's the assumption this finding
 >   breaks. It now says the name is the asker's own label and proves nothing.
-> - `docs/account-api.md` § Sign in says what a service's approval page must do: show the address the
+> - `docs/account-api/sign-in.md`, linked from `docs/account-api.md` § Sign in, says what a service's
+>   approval page must do: show the address the
 >   code request came from and the code's age beside the name, never present the name as proof, and
 >   tell the person not to approve a code someone sent them. It also allows a shorter refresh token for
 >   a sign-in that never registered a Node.
