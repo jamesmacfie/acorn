@@ -43,7 +43,8 @@ const channelKey = z.string().regex(/^[0-9a-f]{64}$/)
 // --- Sign-in: the OAuth device authorization grant, RFC 8628, with JSON bodies ---
 
 export const deviceCodeRequestSchema = z.strictObject({
-  // What the person sees beside the code when they approve, so they can tell it's their own sign-in.
+  // A label the asker chose, shown beside the code on the approval page. Anyone can send any name, so it
+  // proves nothing about who is asking (docs/account-api.md#sign-in).
   deviceName: z.string().min(1).max(100).optional(),
 })
 export type DeviceCodeRequest = z.infer<typeof deviceCodeRequestSchema>

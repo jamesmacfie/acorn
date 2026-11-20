@@ -1,3 +1,42 @@
+> **Completion note, November 20, 2026.** Nothing in this repository changes behavior. The fix belongs
+> to acorn-cloud, and X-1 already covers this repository's part. Branch
+> `phase-c-5-sign-in-approval-shows-who-is-really-asking`.
+>
+> What landed:
+>
+> - The comment on `deviceCodeRequestSchema.deviceName` in `packages/protocol/src/device/account.ts`
+>   said the name lets a person tell it's their own sign-in. That's the assumption this finding
+>   breaks. It now says the name is the asker's own label and proves nothing.
+> - `docs/account-api.md` § Sign in says what a service's approval page must do: show the address the
+>   code request came from and the code's age beside the name, never present the name as proof, and
+>   tell the person not to approve a code someone sent them. It also allows a shorter refresh token for
+>   a sign-in that never registered a Node.
+>
+> Decisions and deviations:
+>
+> - No code or tests here. The approval page, the address it records, and the refresh token's life are
+>   all acorn-cloud's. The conformance suite in `accountContract.test.ts` checks API schemas and can't
+>   see a web page, so the page test the finding asks for lives in acorn-cloud.
+> - The plugin keeps sending the host name. It's still useful context for an honest owner. The fix is to
+>   stop treating it as proof, not to drop it.
+> - A shorter refresh token needs nothing here. `providerSteps.ts` already treats a refused refresh
+>   (`invalid_grant`) as "sign in again".
+> - X-1 is this repository's half. A Slack link counts only after a paired device confirms it, so an
+>   account taken this way starts no agent turns. R-2 shows identity words at both ends of a pairing,
+>   so an account alone can't pair silently either.
+>
+> What acorn-cloud needs:
+>
+> 1. Record the requesting address, and its rough location if the service has one, when it issues a
+>    device code. Show it and the code's age on the approval page beside the asked-for name
+>    (`src/web/website.ts:411-416`).
+> 2. Say plainly on that page that a code someone sent you is never yours to approve.
+> 3. Shorten the refresh token's life for a sign-in that has never registered a Node, so a token used
+>    only to read and link runs out in days (`src/api.ts:31-32`, `:180-190`).
+> 4. Add a website test that the approval page carries the address the device code request came from.
+>
+> For later phases: nothing depends on this change.
+
 # C-5: The sign-in approval page shows a name the asking computer chose
 
 Found November 20, 2026, in a read-only security review of `jamesmacfie/acorn` at `31ff472da` and

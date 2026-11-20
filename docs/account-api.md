@@ -87,6 +87,13 @@ account ID has no relationship to any sign-in provider's user ID. Trade a refres
 `{ "grantType": "refresh_token", "refreshToken": "…" }`. A refresh token works once, and every refresh
 answers with a new pair. A refused refresh means the person must sign in again.
 
+`/device/code` takes no credential, so `deviceName` is whatever the asker sent. The plugin sends the
+computer's host name, and an attacker can send the owner's. A service's approval page must not present
+the name as proof of who is asking. It shows what the service saw itself beside the name: the address
+the code request came from and how long ago it was made. It also tells the person never to approve a
+code that someone else sent them. A service can shorten the refresh token's life for a sign-in that has
+never registered a Node. The plugin handles that as it handles any refused refresh.
+
 ### Register a Node
 
 `PUT /nodes/{nodeId}` takes `{ label, fingerprint, channelKey }` and answers
