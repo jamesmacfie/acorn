@@ -12,7 +12,7 @@ the account owner each time. The reviewed code is in `acorn-cloud/src/web/websit
 `acorn-cloud/src/auth.ts`. The cloud repository tracks the fix as
 [security issue 1](https://github.com/jamesmacfie/acorn-cloud/blob/19fa594/docs/open-issues.md#security).
 
-The account session is the first boundary in [X-1](./x-1-account-takeover-to-slack-agent-turns.md).
+The account session was the first boundary in X-1, which [the November 20 review](../../security/review-2026-11-20.md) records as fixed.
 The review checked the implementation and existing sign-in tests. It did not measure production abuse
 controls or attempt an account takeover.
 

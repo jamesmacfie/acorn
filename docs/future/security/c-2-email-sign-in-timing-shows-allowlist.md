@@ -64,7 +64,6 @@ to work, and it slows every sign-in.
 ## Related
 
 - [C-3. Email sign-in attempts reset across codes](./c-3-email-code-budget-resets.md)
-- [X-1. Cloud account access can authorize Slack turns on the Node](./x-1-account-takeover-to-slack-agent-turns.md)
-- [C-1](./c-1-phone-approves-its-own-pairing.md): another account-service finding from the same
-  review.
+- X-1, what an account could do to a Node, and C-1, another account-service finding from the same
+  review, are fixed in [the November 20 review](../../security/review-2026-11-20.md).
 - Open issue 1 in `acorn-cloud:docs/open-issues.md`, the slow code-guessing attack this helps aim.

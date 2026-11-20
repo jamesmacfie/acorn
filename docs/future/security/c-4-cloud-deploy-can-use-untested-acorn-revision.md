@@ -11,7 +11,7 @@ build the relay. A merge between the two jobs can make both deployed components 
 revision from the one used for the account service's checks.
 
 This weakens the release gate for components in the Node's trust boundary. The hosted phone app
-can use paired Node credentials, as described in [R-1](./r-1-account-website-runs-code-through-a-phone.md).
+can use paired Node credentials, as R-1 in [the November 20 review](../../security/review-2026-11-20.md) describes.
 The issue concerns which commit a single workflow run checks and deploys. The service can keep
 selecting Acorn's default branch for each run.
 
