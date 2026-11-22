@@ -597,6 +597,7 @@ export const agentsPlugin = (dataDir: string, deps: AgentsPluginDeps): NodePlugi
           'DELETE /sessions/:sessionId/turns/:turnId',
           'POST /sessions/:sessionId/turns/:turnId/steer',
           'POST /sessions/:sessionId/requests/:requestId/resolve',
+          'POST /sessions/:sessionId/requests/:requestId/explain',
           'POST /sessions/:sessionId/cancel',
           'POST /sessions/:sessionId/subagents/:subagentId/cancel',
           'POST /sessions/:sessionId/fork',

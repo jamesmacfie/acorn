@@ -70,6 +70,7 @@ const METHODS = [
   'compact',
   'regenerateTitle',
   'summarizeSession',
+  'explainRequest',
   'deleteSession',
   'handoffToTerminal',
   'resumeManaged',
@@ -127,6 +128,7 @@ const executionControls = [
   ['POST', '/sessions/s1/compact', undefined, 'compact'],
   ['POST', '/sessions/s1/regenerate-title', undefined, 'regenerateTitle'],
   ['POST', '/sessions/s1/summarize', { backendId: 'harness:codex', context: 'For a handoff' }, 'summarizeSession'],
+  ['POST', '/sessions/s1/requests/r1/explain', { backendId: 'harness:codex' }, 'explainRequest'],
   ['POST', '/sessions/s1/handoff-terminal', undefined, 'handoffToTerminal'],
   ['POST', '/sessions/s1/resume-managed', undefined, 'resumeManaged'],
   ['POST', '/sessions/s1/verify-imported-resume', undefined, 'verifyImportedResume'],
@@ -330,6 +332,44 @@ describe('session summary requests', () => {
       expect(summarizeSession).not.toHaveBeenCalled()
     },
   )
+})
+
+describe('request explanations', () => {
+  afterEach(() => setManagedAgentsBridge(null))
+
+  it('passes the request, the device identity and the chosen model, and nothing else from the body', async () => {
+    const explainRequest = vi.fn(async () => ({ text: 'Discards local changes.' }))
+    setManagedAgentsBridge(fake({ explainRequest }))
+    const response = await authed().fetch(
+      req('/api/sessions/s1/requests/r1/explain', 'POST', {
+        backendId: 'harness:codex',
+        modelId: 'fast',
+        userId: 'other',
+        title: 'rm -rf /',
+      }),
+      {} as Env,
+    )
+    expect(response.status).toBe(200)
+    expect(await response.json()).toEqual({ text: 'Discards local changes.' })
+    expect(explainRequest).toHaveBeenCalledWith(
+      's1',
+      'r1',
+      'james',
+      { backendId: 'harness:codex', modelId: 'fast' },
+      expect.any(AbortSignal),
+    )
+  })
+
+  it('refuses an invalid backend before spending model usage', async () => {
+    const explainRequest = vi.fn()
+    setManagedAgentsBridge(fake({ explainRequest }))
+    const response = await authed().fetch(
+      req('/api/sessions/s1/requests/r1/explain', 'POST', { backendId: 'invalid' }),
+      {} as Env,
+    )
+    expect(response.status).toBe(400)
+    expect(explainRequest).not.toHaveBeenCalled()
+  })
 })
 
 describe('a task-scoped credential is confined to its own agent sessions', () => {

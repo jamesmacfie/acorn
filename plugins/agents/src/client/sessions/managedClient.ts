@@ -20,6 +20,7 @@ import type { CreateAgentSessionInput, EnqueueAgentTurnInput, ImportAgentTranscr
 import type { AgentSessionMcp } from '../../shared/mcpServers'
 import { MAX_INLINE_IMAGE_BYTES } from './inlineImage'
 import { SUMMARY_TIMEOUT_MS, type SessionSummary, type SessionSummaryInput } from '../../shared/sessionSummary'
+import { EXPLAIN_TIMEOUT_MS, type RequestExplainInput, type RequestExplanation } from '../../shared/requestExplain'
 
 export type AgentOrigin = { nodeId?: string | null; signal?: AbortSignal }
 
@@ -225,6 +226,14 @@ export const managedAgentApi = {
       headers: { 'content-type': 'application/json' },
       body: JSON.stringify(input),
       timeoutMs: SUMMARY_TIMEOUT_MS + 10_000,
+    }),
+  explainRequest: (sessionId: string, requestId: string, input: RequestExplainInput, options: AgentOrigin = {}) =>
+    writeJson<RequestExplanation>(sessionRoute(sessionId, `/requests/${encodeURIComponent(requestId)}/explain`), {
+      ...options,
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify(input),
+      timeoutMs: EXPLAIN_TIMEOUT_MS + 10_000,
     }),
   setGoal: (sessionId: string, objective: string | null, options: AgentOrigin = {}) =>
     jsonWrite<AgentSession>(sessionRoute(sessionId, '/goal'), 'PUT', { objective }, false, options),

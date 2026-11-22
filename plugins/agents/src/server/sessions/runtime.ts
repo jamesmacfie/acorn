@@ -34,6 +34,7 @@ import { defaultSpawnedAgentDefaults, type SpawnedAgentDefaults } from '../../sh
 import { readAgentSessionDefaults } from '../sessionDefaultsStore'
 import type { TurnAttendanceContext, WorkflowPosture } from './attendance'
 import type { SessionSummaryInput } from '../../shared/sessionSummary'
+import type { RequestExplainInput } from '../../shared/requestExplain'
 import { agentDriverRegistry } from '../drivers/registry'
 import { ProviderCatalogue, shellQuote } from './providerCatalogue'
 import { sessionAccount } from '../../shared/accounts'
@@ -720,6 +721,25 @@ export class ManagedAgentRuntime {
       userId,
       snapshot,
       request,
+      AbortSignal.any([signal, this.engine.shutdownSignal]),
+    )
+  }
+
+  async explainRequest(
+    sessionId: string,
+    providerRequestId: string,
+    userId: string,
+    input: RequestExplainInput,
+    signal: AbortSignal,
+  ) {
+    const request = await this.store.request(sessionId, providerRequestId)
+    if (!request) throw new Error('Agent request not found.')
+    const { explainRequest } = await import('./requestExplain')
+    return explainRequest(
+      this.core.models,
+      userId,
+      request,
+      input,
       AbortSignal.any([signal, this.engine.shutdownSignal]),
     )
   }

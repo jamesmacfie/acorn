@@ -28,7 +28,8 @@ function bridgeFailure(error: unknown): never {
     throw new BridgeError(409, String(error.code), error.message)
   }
   const message = error instanceof Error ? error.message : 'Managed agent operation failed.'
-  if (/before summarizing|empty summary/.test(message)) throw new BridgeError(422, 'agent_summary_unavailable', message)
+  if (/before summarizing|returned an empty/.test(message))
+    throw new BridgeError(422, 'agent_summary_unavailable', message)
   // A request naming a provider this Node never registered, as opposed to one that is unavailable now.
   if (/^Unknown agent provider/.test(message)) throw new BridgeError(400, 'bad_request', message)
   if (/not found/i.test(message)) throw new BridgeError(404, 'agent_not_found', message)
@@ -48,6 +49,16 @@ const guarded = async <T>(operation: () => Promise<T>): Promise<T> => {
   try {
     return await operation()
   } catch (error) {
+    return bridgeFailure(error)
+  }
+}
+
+/** `guarded`, except a provider's own failure passes through for the route to report with its status. */
+const generation = async <T>(operation: () => Promise<T>): Promise<T> => {
+  try {
+    return await operation()
+  } catch (error) {
+    if (isProviderOperationError(error)) throw error
     return bridgeFailure(error)
   }
 }
@@ -186,14 +197,8 @@ export function managedAgentsBridge(
     sessionMcp: (sessionId) => guarded(() => runtime.sessionMcp(sessionId)),
     setSessionMcp: (sessionId, enabled) => guarded(() => runtime.setSessionMcpServers(sessionId, enabled)),
     regenerateTitle: (sessionId) => guarded(() => runtime.regenerateTitle(sessionId)),
-    summarizeSession: async (sessionId, userId, input, signal) => {
-      try {
-        return await runtime.summarizeSession(sessionId, userId, input, signal)
-      } catch (error) {
-        if (isProviderOperationError(error)) throw error
-        return bridgeFailure(error)
-      }
-    },
+    summarizeSession: (...args) => generation(() => runtime.summarizeSession(...args)),
+    explainRequest: (...args) => generation(() => runtime.explainRequest(...args)),
     deleteSession: (sessionId) => guarded(() => runtime.deleteSession(sessionId)),
     handoffToTerminal: (sessionId) => guarded(() => runtime.handoffToTerminal(sessionId)),
     resumeManaged: (sessionId) => guarded(() => runtime.resumeManaged(sessionId)),
