@@ -1,12 +1,27 @@
 import { createSignal, For, Show } from 'solid-js'
 import type { AgentRequest } from '../../contract/wire.ts'
 import { AGENT_REQUEST_CARD_POINT, type AgentRequestCardProps } from '@acorn/protocol/extensionPoints.ts'
-import { Alert, Button, Card, Checkbox, Field, Heading, Inline, Input, Select, Stack, Text } from '@acorn/plugin-api/ui'
+import {
+  Alert,
+  Button,
+  Card,
+  Checkbox,
+  Field,
+  Heading,
+  Inline,
+  Input,
+  Select,
+  Stack,
+  Text,
+  Toolbar,
+} from '@acorn/plugin-api/ui'
 import { formFactor } from '@acorn/plugin-api/client'
 import { Slot } from '@acorn/plugin-api/ui/host'
 import { managedAgentApi } from './managedClient'
 import { appApprovalOf, approvalScopeNote, approvalTarget } from '../../contract/appApproval.ts'
 import { originLine, requestOriginOf } from './requestOrigin'
+import RequestExplain, { retainedExplanation } from './RequestExplain'
+import AgentMarkdown from './ManagedAgentMarkdown'
 
 // A question the harness is blocked on: a permission, a choice, a form. Drawn in the transcript at the
 // point the agent asked, by the card for its own `request` event (`AgentEventCard`), so that
@@ -37,6 +52,8 @@ export default function AgentRequestCard(props: {
   }
   const [busy, setBusy] = createSignal(false)
   const [error, setError] = createSignal('')
+  const [explanation, setExplanation] = createSignal(retainedExplanation(props.request.id))
+  const [explainError, setExplainError] = createSignal('')
   const payload = () => props.request.payload
   const options = () =>
     Array.isArray(payload().options) ? (payload().options as Array<{ id: string; label: string; kind?: string }>) : []
@@ -193,8 +210,22 @@ export default function AgentRequestCard(props: {
               </Button>
             )}
           </For>
+          <Show when={props.request.kind === 'permission' && props.request.status === 'pending'}>
+            {/* Pushed to the row's end on a wide card. On a phone it wraps under the answers instead. */}
+            <Show when={!narrow()}>
+              <Toolbar.Spacer />
+            </Show>
+            <RequestExplain
+              request={props.request}
+              explained={!!explanation()}
+              onExplained={setExplanation}
+              onFailed={setExplainError}
+            />
+          </Show>
         </Inline>
         <Show when={error()}>{(message) => <Alert>{message()}</Alert>}</Show>
+        <Show when={explainError()}>{(message) => <Alert tone="warn">{message()}</Alert>}</Show>
+        <Show when={explanation()}>{(text) => <AgentMarkdown text={text()} taskId={props.taskId} />}</Show>
         {/* Another plugin's note on this request, under the buttons. It gets the request's identity
             and title, and no way to answer it. */}
         <Show when={props.request.status === 'pending'}>

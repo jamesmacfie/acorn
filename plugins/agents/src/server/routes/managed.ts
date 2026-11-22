@@ -50,6 +50,7 @@ import {
 } from '../../shared/schemas'
 import { agentMcpSessionSelectionSchema, type AgentSessionMcp } from '../../shared/mcpServers'
 import type { SessionSummary, SessionSummaryInput } from '../../shared/sessionSummary'
+import type { RequestExplainInput, RequestExplanation } from '../../shared/requestExplain'
 
 export type ManagedAgentsBridge = {
   // Ownership resolvers for the task-scope guard below. See docs/security/transport-and-auth.md § Transport and auth.
@@ -144,6 +145,13 @@ export type ManagedAgentsBridge = {
     input: SessionSummaryInput,
     signal: AbortSignal,
   ): Promise<SessionSummary>
+  explainRequest(
+    sessionId: string,
+    requestId: string,
+    userId: string,
+    input: RequestExplainInput,
+    signal: AbortSignal,
+  ): Promise<RequestExplanation>
   deleteSession(sessionId: string): Promise<AgentDeleteResult>
   handoffToTerminal(sessionId: string): Promise<AgentSession>
   resumeManaged(sessionId: string): Promise<AgentSession>
@@ -238,6 +246,23 @@ const confineFilter = <F extends { taskId?: string }>(c: Context<AppEnv>, filter
   return { ...filter, taskId: own }
 }
 
+/** A one-shot generation on the reader's chosen model, for the run summary and a request explanation.
+ *  A provider's own refusal keeps its status, and anything else reads as the provider being unreachable. */
+const generate = async <S extends z.ZodType>(
+  c: Context<AppEnv>,
+  schema: S,
+  run: (bridge: ManagedAgentsBridge, input: z.output<S>, userId: string) => Promise<unknown>,
+): Promise<Response> => {
+  const parsed = schema.safeParse(await c.req.json().catch(() => null))
+  if (!parsed.success) return respondError(c, 400, 'bad_request')
+  try {
+    return await viaBridge(c, MANAGED_AGENTS, (bridge) => run(bridge, parsed.data, c.get('principal')!.userId))
+  } catch (error) {
+    if (isProviderOperationError(error)) return respondError(c, error.status, error.code)
+    return respondError(c, 502, 'provider_unavailable')
+  }
+}
+
 export const managedAgents = new Hono<AppEnv>()
   .use(
     '*',
@@ -266,6 +291,7 @@ export const managedAgents = new Hono<AppEnv>()
       '/sessions/:sessionId/regenerate-title',
       '/sessions/:sessionId/handoff-terminal',
       '/sessions/:sessionId/summarize',
+      '/sessions/:sessionId/requests/:requestId/explain',
       '/sessions/:sessionId/resume-managed',
       '/sessions/:sessionId/verify-imported-resume',
       '/sessions/:sessionId/goal/resume',
@@ -613,19 +639,16 @@ export const managedAgents = new Hono<AppEnv>()
   .post('/sessions/:sessionId/regenerate-title', (c) =>
     viaBridge(c, MANAGED_AGENTS, (bridge) => bridge.regenerateTitle(c.req.param('sessionId'))),
   )
-  .post('/sessions/:sessionId/summarize', async (c) => {
-    const { sessionSummarySchema } = await import('../../shared/sessionSummary')
-    const parsed = sessionSummarySchema.safeParse(await c.req.json().catch(() => null))
-    if (!parsed.success) return respondError(c, 400, 'bad_request')
-    try {
-      return await viaBridge(c, MANAGED_AGENTS, (bridge) =>
-        bridge.summarizeSession(c.req.param('sessionId'), c.get('principal')!.userId, parsed.data, c.req.raw.signal),
-      )
-    } catch (error) {
-      if (isProviderOperationError(error)) return respondError(c, error.status, error.code)
-      return respondError(c, 502, 'provider_unavailable')
-    }
-  })
+  .post('/sessions/:sessionId/summarize', async (c) =>
+    generate(c, (await import('../../shared/sessionSummary')).sessionSummarySchema, (bridge, input, userId) =>
+      bridge.summarizeSession(c.req.param('sessionId'), userId, input, c.req.raw.signal),
+    ),
+  )
+  .post('/sessions/:sessionId/requests/:requestId/explain', async (c) =>
+    generate(c, (await import('../../shared/sessionSummary')).modelChoiceSchema, (bridge, input, userId) =>
+      bridge.explainRequest(c.req.param('sessionId'), c.req.param('requestId'), userId, input, c.req.raw.signal),
+    ),
+  )
   .put('/sessions/:sessionId/goal', async (c) => {
     const parsed = sessionGoalSchema.safeParse(await c.req.json().catch(() => null))
     if (!parsed.success) return respondError(c, 400, 'bad_request')

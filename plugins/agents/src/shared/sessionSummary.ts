@@ -4,7 +4,8 @@ import { parseBackendId } from '@acorn/protocol/modelProviders.ts'
 export const SUMMARY_CONTEXT_MAX_CHARS = 10_000
 export const SUMMARY_TIMEOUT_MS = 180_000
 
-export const sessionSummarySchema = z.object({
+/** Which text backend spends the tokens: the summary's and a request explanation's shared half. */
+export const modelChoiceSchema = z.object({
   backendId: z
     .string()
     .min(1)
@@ -18,6 +19,9 @@ export const sessionSummarySchema = z.object({
       }
     }),
   modelId: z.string().trim().min(1).max(200).optional(),
+})
+
+export const sessionSummarySchema = modelChoiceSchema.extend({
   context: z.string().max(SUMMARY_CONTEXT_MAX_CHARS).default(''),
 })
 

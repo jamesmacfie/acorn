@@ -18,8 +18,9 @@ vi.mock('./managedClient', () => ({
   },
 }))
 
-// The slot reads the reader's arbitration preference through a query.
-vi.mock('@tanstack/solid-query', () => ({ createQuery: () => ({ data: {} }) }))
+// The slot reads the reader's arbitration preference through a query, and a permission's Explain
+// control reads the model backends, of which this has none.
+vi.mock('@tanstack/solid-query', () => ({ createQuery: () => ({ data: {} }), useQueryClient: () => ({}) }))
 
 const { default: AgentRequestCard } = await import('./AgentRequestCard')
 
