@@ -108,10 +108,12 @@ export default function PluginTrustDialog(props: { bundlesOnly?: boolean }) {
     container: () => dialog,
   })
 
+  // The portal mounts with the request, not at boot, so it lands in the body after an open settings
+  // layer and paints above it (both sit at the modal's z-level, so the later one wins).
   return (
-    <Portal>
-      <Show when={request()}>
-        {(current) => (
+    <Show when={request()}>
+      {(current) => (
+        <Portal>
           <div class="overlay-backdrop">
             <section
               ref={(el) => {
@@ -313,9 +315,9 @@ export default function PluginTrustDialog(props: { bundlesOnly?: boolean }) {
               </div>
             </section>
           </div>
-        )}
-      </Show>
-    </Portal>
+        </Portal>
+      )}
+    </Show>
   )
 }
 
