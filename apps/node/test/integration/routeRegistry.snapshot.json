@@ -444,6 +444,8 @@
     "POST /v1/p/agents/sessions/:sessionId/implement-plan",
     "POST /v1/p/agents/sessions/:sessionId/regenerate-title",
     "POST /v1/p/agents/sessions/:sessionId/regenerate-title",
+    "POST /v1/p/agents/sessions/:sessionId/requests/:requestId/explain",
+    "POST /v1/p/agents/sessions/:sessionId/requests/:requestId/explain",
     "POST /v1/p/agents/sessions/:sessionId/requests/:requestId/resolve",
     "POST /v1/p/agents/sessions/:sessionId/requests/:requestId/resolve",
     "POST /v1/p/agents/sessions/:sessionId/resume-managed",
