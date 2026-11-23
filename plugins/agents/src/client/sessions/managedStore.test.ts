@@ -13,6 +13,7 @@ import type {
   AgentSessionSnapshot,
   AgentTurn,
 } from '../../contract/wire.ts'
+import { sessionListRow } from '../../shared/sessionList'
 
 let onFrame: ((value: unknown) => void) | undefined
 vi.mock('./wsChannel', () => ({
@@ -284,6 +285,25 @@ describe('what a projected event costs', () => {
       event: event(1, { type: 'error', code: 'boom', message: 'boom', retryable: false }),
     })
     await vi.waitFor(() => expect(snapshotCalls).toEqual([SESSION]))
+  })
+})
+
+// The Node sends a session's slash commands, skills and option lists on the socket only when they
+// change, and a list row otherwise (SessionFrames). The composer reads them from the roster row.
+describe('a list row over the socket', () => {
+  it('keeps the commands an open session already holds, newer or older', async () => {
+    const commands = [{ name: 'review' }]
+    const full = { ...session, lastEventSeq: 1, config: { commands } } as AgentSession
+    await seed({ session: full })
+    const roster = () => managedAgentStore.sessions().find((item) => item.id === SESSION)!
+
+    push({ channel: 'agent:session', session: sessionListRow({ ...full, lastEventSeq: 2, title: 'Renamed' }) })
+    expect(roster()).toMatchObject({ title: 'Renamed', lastEventSeq: 2, config: { commands } })
+    expect(roster().listRow).toBeUndefined()
+    expect(managedAgentStore.snapshotFor(SESSION)?.session).toEqual(roster())
+
+    push({ channel: 'agent:session', session: sessionListRow({ ...full, lastEventSeq: 1, title: 'Stale' }) })
+    expect(roster()).toMatchObject({ title: 'Renamed', lastEventSeq: 2, config: { commands } })
   })
 })
 

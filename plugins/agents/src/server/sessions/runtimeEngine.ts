@@ -1400,7 +1400,8 @@ export class ManagedAgentEngine {
     // Only when the event changed what the row says. Most events in a streamed reply move nothing on
     // the row except its sequence and clock, and the row is large, mostly the harness's skills list, so
     // sending it after every event would fill the agent socket with rows. The comparison skips `config`
-    // because of its size, so the one event that writes it, `session_metadata`, always sends.
+    // because of its size, so the one event that can write it, `session_metadata`, always sends.
+    // SessionFrames gives the socket a list row when `config` came out the same.
     if (event.type === 'session_metadata' || this.frames.rowChanged(session)) {
       this.frames.emit({ channel: 'agent:session', session })
     }

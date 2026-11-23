@@ -512,7 +512,9 @@ export type AgentSession = {
   createdAt: number
   updatedAt: number
   /** Set on a row from a session list or search, which leaves out what only an open session reads
-   *  (`sessionListRow`). The session's own read and its socket frames carry the full row. */
+   *  (`sessionListRow`). The session's own read carries the full row. Its socket frames carry the full
+   *  row only when the session's `config` changed since the socket last carried it, and a list row
+   *  otherwise (`SessionFrames`). */
   listRow?: true
 }
 

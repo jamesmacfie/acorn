@@ -140,9 +140,12 @@ A list or search row carries `listRow: true` and leaves out what only an open se
 slash commands and skills the provider advertised, the standing context, and every config option
 value but the chosen one. That keeps a 50-session page under 100 KB, where whole rows run to megabytes.
 `sessionListRow` in `plugins/agents/src/shared/sessionList.ts` makes the row. The session's own read,
-`GET /sessions/:id`, and its `agent:session` socket frames carry the full row. When a list row is the
-newer of two, the client keeps the detail the full row brought (`newestManagedSession`). Settings and
-the inline diff card read each provider's choices from the providers answer, which the Node fills from
+`GET /sessions/:id`, carries the full row. An `agent:session` socket frame carries the full row the
+first time after the Node starts and whenever the session's `config` changed since the socket last
+carried it, and a list row otherwise (`SessionFrames`). The Node's own listeners and webhooks always
+get the full row. When a list row is the newer of two, the client keeps the detail the full row brought
+(`newestManagedSession`), and a window that holds no detail reads it when it opens the session.
+Settings and the inline diff card read each provider's choices from the providers answer, which the Node fills from
 the newest session that advertised them.
 
 ## Titles
