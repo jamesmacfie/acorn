@@ -52,6 +52,13 @@ event has a durable sequence. HTTP pages are the replay authority, and the WebSo
 tail. A state change and its event records commit together. Once a turn has committed events, a
 restart doesn't resubmit it: reconciliation marks the work interrupted for you to inspect.
 
+A `session_metadata` event merges the provider's config options, slash commands, skills, and
+executable into the session's `config`, which is where every reader takes them from. The stored event
+and its `agent:event` frame never carry the commands or skills: a harness sends the list at every
+process start, and it runs to tens of kilobytes. They carry config options and the executable only
+when those differ from `config`. When nothing differs, `config` isn't rewritten.
+`AgentStore.recordEvent` does this.
+
 Reconciliation runs after the Node starts listening, and it gives the event loop a turn between steps
 and every 50 sessions, so reads answer while it runs. A session it hasn't reached yet reads as working
 until its new row arrives. Every write to the session routes waits for it to finish, so a prompt sent

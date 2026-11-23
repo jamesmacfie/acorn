@@ -93,6 +93,32 @@ const parseSubagents = (value: string | null): AgentSubagent[] => {
 const jsonOrUndefined = (roster: AgentSubagent[] | undefined): string | undefined =>
   roster ? JSON.stringify(roster) : undefined
 
+type SessionMetadataEvent = Extract<AgentNormalizedEvent, { type: 'session_metadata' }>
+
+// Every reader takes these from the session's config, so the event and its frame carry only what the
+// config doesn't already say. Commands and skills never ride on the event: the list runs to tens of
+// kilobytes and a harness sends it at every process start, in two versions that alternate, so a copy
+// that merely differs from the last one would still be stored each time. `configJson` is absent when
+// nothing differs, so the row is not rewritten.
+function mergeSessionMetadata(
+  event: SessionMetadataEvent,
+  currentConfigJson: string,
+): { event: SessionMetadataEvent; configJson?: string } {
+  const config = JSON.parse(currentConfigJson) as Record<string, unknown>
+  const recorded = { ...event }
+  let changed = false
+  for (const field of ['configOptions', 'commands', 'skills', 'executable'] as const) {
+    if (!event[field]) continue
+    const same = JSON.stringify(event[field]) === JSON.stringify(config[field])
+    if (!same) {
+      config[field] = event[field]
+      changed = true
+    }
+    if (same || field === 'commands' || field === 'skills') delete recorded[field]
+  }
+  return { event: recorded, ...(changed ? { configJson: JSON.stringify(config) } : {}) }
+}
+
 export type EnqueueTurnOutcome = {
   turn: AgentTurn
   inserted: boolean
@@ -198,16 +224,9 @@ export class AgentStore {
           ? 'none'
           : projection.attention
       const seq = current.lastEventSeq + 1
-      const configJson =
-        event.type === 'session_metadata'
-          ? JSON.stringify({
-              ...(JSON.parse(current.configJson) as Record<string, unknown>),
-              ...(event.configOptions ? { configOptions: event.configOptions } : {}),
-              ...(event.commands ? { commands: event.commands } : {}),
-              ...(event.skills ? { skills: event.skills } : {}),
-              ...(event.executable ? { executable: event.executable } : {}),
-            })
-          : projection.configJson
+      const metadata = event.type === 'session_metadata' ? mergeSessionMetadata(event, current.configJson) : null
+      const recorded = metadata?.event ?? event
+      const configJson = metadata ? metadata.configJson : projection.configJson
       // The subagent roster projected onto the row in the same transaction as the event insert, so a
       // reader can never see a roster that disagrees with the ledger it was folded from. It is on the
       // row rather than in a table of its own because ManagedAgentEngine.record() broadcasts the row
@@ -246,7 +265,7 @@ export class AgentStore {
       // call is indexed once.
       const stream = this.streamTransition(tx, sessionId, current.lastEventSeq, turnId, event)
       const fold = this.ledgerFold.plan(tx, sessionId, turnId, event)
-      const stored = fold?.stored ?? event
+      const stored = fold?.stored ?? recorded
       const values: typeof schema.agentEvents.$inferInsert = {
         id: eventId,
         sessionId,
@@ -272,7 +291,7 @@ export class AgentStore {
         // frame stays the size of the change. The stored row folds to the same card.
         row: {
           ...values,
-          eventJson: JSON.stringify(event),
+          eventJson: JSON.stringify(recorded),
           turnId: values.turnId ?? null,
           searchText: values.searchText ?? null,
         },
