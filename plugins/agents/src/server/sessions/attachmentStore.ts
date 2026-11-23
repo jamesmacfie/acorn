@@ -11,6 +11,11 @@ const MAX_ATTACHMENT_BYTES = 10 * 1024 * 1024
 const MAX_TEXT_BYTES = 1024 * 1024
 const UPLOAD_GRACE_MS = 24 * 60 * 60 * 1_000
 
+/** A file the store turns down. The message says why, in words the composer can show as they are. */
+export class AttachmentRefusedError extends Error {
+  override name = 'AttachmentRefusedError'
+}
+
 const TEXT_EXTENSIONS = new Set([
   'txt',
   'md',
@@ -110,12 +115,15 @@ function validatedMediaType(
     ['application/json', 'application/xml', 'application/yaml'].includes(supplied) ||
     TEXT_EXTENSIONS.has(extension)
   if (!declaredText)
-    throw new Error('Unsupported attachment type. Use JPEG, PNG, GIF, WebP, PDF, or UTF-8 text/source files.')
-  if (bytes.byteLength > MAX_TEXT_BYTES) throw new Error('Decoded text attachments are limited to 1 MiB.')
+    throw new AttachmentRefusedError(
+      'Unsupported attachment type. Use JPEG, PNG, GIF, WebP, PDF, or UTF-8 text/source files.',
+    )
+  if (bytes.byteLength > MAX_TEXT_BYTES)
+    throw new AttachmentRefusedError('Decoded text attachments are limited to 1 MiB.')
   try {
     new TextDecoder('utf-8', { fatal: true }).decode(bytes)
   } catch {
-    throw new Error('Text attachments must contain valid UTF-8.')
+    throw new AttachmentRefusedError('Text attachments must contain valid UTF-8.')
   }
   return { mediaType: supplied.startsWith('text/') ? supplied : 'text/plain', textEncoding: 'utf-8' }
 }
@@ -170,8 +178,9 @@ export class AgentAttachmentStore {
     suppliedMediaType: string,
     bytes: Uint8Array,
   ): Promise<AgentAttachment> {
-    if (!bytes.byteLength) throw new Error('Empty attachments are not supported.')
-    if (bytes.byteLength > MAX_ATTACHMENT_BYTES) throw new Error('Attachments are limited to 10 MiB each.')
+    if (!bytes.byteLength) throw new AttachmentRefusedError('Empty attachments are not supported.')
+    if (bytes.byteLength > MAX_ATTACHMENT_BYTES)
+      throw new AttachmentRefusedError('Attachments are limited to 10 MiB each.')
     if (!(await this.core.tasks.load(taskId))) throw new Error('Task not found.')
     const safeFilename =
       basename(filename)

@@ -73,6 +73,12 @@ export async function addDraftFiles(owner: ComposerOrigin, files: File[], pickin
       state.setError('A turn can include at most eight attachments.')
       return
     }
+    // The Node refuses these anyway. Catching them here skips sending megabytes it would throw away.
+    const oversized = files.find((file) => file.size > 10 * 1024 * 1024)
+    if (oversized) {
+      state.setError(`${oversized.name} is over the 10 MiB limit for one attachment.`)
+      return
+    }
     const aggregate =
       state.attachments().reduce((total, item) => total + item.byteSize, 0) +
       files.reduce((total, file) => total + file.size, 0)
@@ -90,7 +96,12 @@ export async function addDraftFiles(owner: ComposerOrigin, files: File[], pickin
         result.status === 'fulfilled' && !current.some((item) => item.id === result.value.id) ? [result.value] : [],
       ),
     ])
-    if (uploaded.some((result) => result.status === 'rejected')) state.setError('Unable to upload attachment.')
+    // Show the Node's reason, such as an unsupported type, so the person knows what to change.
+    const failed = uploaded.findIndex((result) => result.status === 'rejected')
+    if (failed >= 0) {
+      const reason = operationError((uploaded[failed] as PromiseRejectedResult).reason, 'Unknown error.')
+      state.setError(`Unable to upload ${files[failed]!.name}. ${reason}`)
+    }
   } catch (caught) {
     state.setError(operationError(caught, 'Unable to upload attachment.'))
   } finally {

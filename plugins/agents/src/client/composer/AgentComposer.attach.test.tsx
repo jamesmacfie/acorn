@@ -172,6 +172,22 @@ describe('attaching files', () => {
     expect(uploadAttachment).toHaveBeenCalledTimes(1)
   })
 
+  it("shows the Node's reason when it turns a file down", async () => {
+    uploadAttachment.mockRejectedValueOnce(new Error('Unsupported attachment type.'))
+    const host = mount()
+    const field = host.querySelector<HTMLTextAreaElement>('textarea[aria-label="Message agent"]')!
+    const paste = new Event('paste', { bubbles: true, cancelable: true })
+    Object.defineProperty(paste, 'clipboardData', {
+      value: { files: [new File(['x'], 'tabs.gp5', { type: 'application/octet-stream' })] },
+    })
+
+    field.dispatchEvent(paste)
+
+    await vi.waitFor(() =>
+      expect(host.textContent).toContain('Unable to upload tabs.gp5. Unsupported attachment type.'),
+    )
+  })
+
   it('uploads nothing when the owner dismisses the dialog', async () => {
     vi.stubGlobal(
       'window',

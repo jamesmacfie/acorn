@@ -20,6 +20,9 @@ function bridgeFailure(error: unknown): never {
   // Something a phone needs shell access for (`PhoneShellRequiredError`), matched by name like the next.
   if (error instanceof Error && error.name === 'PhoneShellRequiredError')
     throw new BridgeError(403, 'phone_refused', error.message)
+  // A file the attachment store turns down (`AttachmentRefusedError`). The message names the limit it broke.
+  if (error instanceof Error && error.name === 'AttachmentRefusedError')
+    throw new BridgeError(422, 'attachment_refused', error.message)
   // The secret gate's refusal (`SecretPublicationRefused`), matched by
   // shape so this bridge does not load the checker. Its message names rules and positions, never a value.
   if (error instanceof Error && 'refusal' in error) throw new BridgeError(409, 'secret_check_blocked', error.message)

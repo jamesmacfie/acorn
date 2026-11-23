@@ -262,6 +262,24 @@ it('answers a session for an unknown provider as a bad request', async () => {
   })
 })
 
+it('answers a file the attachment store turns down as unprocessable, with its reason', async () => {
+  const { AttachmentRefusedError } = await import('../sessions/attachmentStore')
+  const runtime = {
+    attachments: {
+      upload: async () => {
+        throw new AttachmentRefusedError('Attachments are limited to 10 MiB each.')
+      },
+    },
+  } as unknown as ManagedAgentRuntime
+  await expect(
+    managedAgentsBridge(runtime).uploadAttachment('t1', 'shot.png', 'image/png', new Uint8Array([1])),
+  ).rejects.toMatchObject({
+    status: 422,
+    code: 'attachment_refused',
+    message: 'Attachments are limited to 10 MiB each.',
+  })
+})
+
 it('answers a secret gate refusal as a conflict that keeps its reason', async () => {
   const { SecretPublicationRefused } = await import('../sessions/secretPublication')
   const report = {
