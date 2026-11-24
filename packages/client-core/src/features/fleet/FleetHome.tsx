@@ -9,7 +9,7 @@ import { nodes, nodeStatus } from '../../infra/node/fleet'
 import { reconnectNode } from '../../infra/node/fleetActions'
 import { formatLastSeen } from '../../infra/node/freshness'
 import NodeChip from './NodeChip'
-import './nodes.css'
+import './fleet-home.css'
 import { Alert, Badge, Button } from '../../kit/components/primitives'
 import { pluginLabel } from '../../host/plugins/pluginLabel'
 import { createWorkspaceWords } from '../workspaces/words'
@@ -56,7 +56,7 @@ export default function FleetHome() {
   const unavailable = () => tasksPerNode().unavailable
 
   return (
-    <main class="panes fleet-home">
+    <main class="fleet-home">
       <header class="fleet-home-head">
         <h1>Fleet</h1>
         <p class="muted">

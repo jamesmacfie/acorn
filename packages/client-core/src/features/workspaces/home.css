@@ -3,14 +3,15 @@
 
    `.home-source` was one of a family of class names Home emitted that nothing ever defined, so the
    `.panes` three-column shell grid underneath was laying the page out: the heading in the first
-   column, the content in the second, the third empty. Defining the container is what the sibling
-   surface already does — `.fleet-home` overrides `.panes` the same way (node/nodes.css). The rest of
-   that family went with the task list they belonged to. */
+   column, the content in the second, the third empty. Home no longer carries `.panes`, and neither
+   does `.fleet-home`: overriding it depended on which stylesheet loaded last. The rest of that family
+   went with the task list they belonged to. */
 .home-source {
   display: flex;
   flex-direction: column;
   gap: var(--space-4);
   /* The block pad every other top-level page has, so the title lands on Memory's line. */
   padding: var(--space-5) var(--pane-pad);
+  min-height: 0;
   overflow-y: auto;
 }

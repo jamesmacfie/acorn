@@ -1,0 +1,79 @@
+/* Fleet home (FleetHome.tsx), in its own file so only the lazy Fleet page loads it, not the phone
+   first screen that pulls in nodes.css for the chip. Card grid rather than a table: a node has five facts and two
+   actions, and a table row cannot hold a button pair without fighting the column widths. */
+.fleet-home {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+  /* The same pad as Home, so the title lands on the same line. */
+  padding: var(--space-5) var(--pane-pad);
+  min-height: 0;
+  overflow-y: auto;
+}
+.fleet-home-head h1 {
+  margin: 0;
+  font-size: var(--fs-lg);
+}
+.fleet-home-head p {
+  margin: var(--space-2) 0 0;
+  font-size: var(--fs-sm);
+}
+.fleet-cards {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+  gap: var(--space-3);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.fleet-card {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  padding: var(--pane-pad);
+  border: var(--surface-border);
+  border-radius: var(--radius-surface);
+}
+/* Keep the freshness chip its own width rather than stretched across the card. */
+.fleet-card > .node-chip {
+  align-self: flex-start;
+}
+.fleet-card.active {
+  border-color: var(--accent);
+}
+.fleet-card-head {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+.fleet-card-label {
+  font-weight: var(--fw-medium);
+}
+.fleet-card-endpoint {
+  color: var(--text-muted);
+  font-family: var(--font-mono);
+  font-size: var(--fs-xs);
+  overflow-wrap: anywhere;
+}
+.fleet-card-stats {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-3) var(--space-5);
+  margin: 0;
+}
+.fleet-card-stats dt {
+  color: var(--text-muted);
+  font-size: var(--fs-xs);
+}
+.fleet-card-stats dd {
+  margin: 0;
+  font-size: var(--fs-sm);
+}
+.fleet-card-actions {
+  display: flex;
+  gap: var(--space-2);
+  margin-top: auto;
+}
+.fleet-card-attention {
+  color: var(--warn);
+}

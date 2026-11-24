@@ -53,7 +53,7 @@ export default function Home() {
   )
 
   return (
-    <main class="panes home-source">
+    <main class="home-source">
       <Inline spread>
         <Heading level={1}>Home</Heading>
         <Show when={panelsAt(scope()).length}>{addButton('sm')}</Show>
