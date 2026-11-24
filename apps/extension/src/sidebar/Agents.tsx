@@ -49,7 +49,8 @@ export function Agents(props: {
   const requests = () => props.requests.filter((request) => request.taskId === props.taskId)
   const waiting = (sessionId: string) => requests().some((request) => request.sessionId === sessionId)
 
-  const agents = agentChoice(props.client, props.nodeId)
+  // Keyed by the task, so the pins it reads are this task's project's.
+  const agents = agentChoice(props.client, props.nodeId, props.taskId)
   onMount(() => void agents.load())
   // Back in the panel, perhaps after signing in to a harness elsewhere, so New lists what can start.
   const again = () => void agents.load(false, true)

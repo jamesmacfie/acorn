@@ -104,6 +104,9 @@ export type AgentSessionDefaults = {
   inline: { providerId: string | null; pinned: AgentDefaultValues }
   /** Separate choices for agent_spawn, including agents in child task worktrees. */
   spawned: SpawnedAgentDefaults
+  /** The row of New each project starts from, by project id to `choiceId`. Written whole, because the
+   *  node's merge is shallow. */
+  projectChoices: Record<string, string>
 }
 
 // Following, because it needs no setup to be useful and it matches what a session switch means: you
@@ -126,6 +129,7 @@ export const defaultAgentSessionDefaults = (): AgentSessionDefaults => ({
   last: {},
   inline: { providerId: null, pinned: {} },
   spawned: defaultSpawnedAgentDefaults(),
+  projectChoices: {},
 })
 
 // The client is the less-trusted side and this decides which model a provider child runs, so the
@@ -135,6 +139,7 @@ const MAX_PROVIDERS = 20
 const MAX_OPTIONS = 20
 const MAX_ID = 200
 const MAX_VALUE = 500
+const MAX_PROJECTS = 500
 
 const values = (input: unknown, field: string, errors: string[]): AgentDefaultValues | null => {
   if (input == null) return {}
@@ -277,6 +282,7 @@ export function validateAgentSessionDefaults(
         }
     }
   }
+  const projectChoices = record.projectChoices == null ? undefined : choicesByProject(record.projectChoices, errors)
   if (errors.length) return { ok: false, errors }
   return {
     ok: true,
@@ -306,8 +312,27 @@ export function validateAgentSessionDefaults(
       ...(last ? { last } : {}),
       ...(inline ? { inline } : {}),
       ...(spawned ? { spawned } : {}),
+      ...(projectChoices ? { projectChoices } : {}),
     },
   }
+}
+
+function choicesByProject(input: unknown, errors: string[]): Record<string, string> | undefined {
+  if (typeof input !== 'object' || input == null || Array.isArray(input)) {
+    errors.push('projectChoices must be an object.')
+    return undefined
+  }
+  const entries = Object.entries(input as Record<string, unknown>)
+  if (entries.length > MAX_PROJECTS) {
+    errors.push(`projectChoices cannot name more than ${MAX_PROJECTS} projects.`)
+    return undefined
+  }
+  const usable = (id: unknown): id is string => typeof id === 'string' && id.length > 0 && id.length <= MAX_ID
+  if (!entries.every(([projectId, choiceId]) => usable(projectId) && usable(choiceId))) {
+    errors.push('projectChoices must map project ids to choice ids.')
+    return undefined
+  }
+  return Object.fromEntries(entries) as Record<string, string>
 }
 
 /** Whatever an earlier version of this plugin wrote, or the built-in defaults when it is unreadable. */

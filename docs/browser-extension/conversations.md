@@ -32,13 +32,21 @@ carries none of its code. It narrows each answer to what the sidebar draws:
 - `agents.choices` returns the rows of the desktop's **New** picker, built by the host with the
   agents plugin's `plugins/agents/src/contract/newSessionChoices.ts`: each harness, or its named
   logins in its place, then each custom agent on a harness the Node registers. Each row has its
-  name, its mark and account icon, what it says under its name, and whether it can start. `refresh`
-  asks the Node to check its harnesses again, as the picker's refresh button does.
+  name, its mark and account icon, what it says under its name, whether it can start, and its `id`,
+  the plugin's `choiceId`. `refresh` asks the Node to check its harnesses again, as the picker's
+  refresh button does. `taskId` asks which row the task's project pins, read from the agents plugin's
+  session defaults and answered as each row's `pinned`. A CLI from before pins answers `bad_request`
+  to `taskId`, so the extension asks again without it and draws no pins.
+- `agents.pin` sets the row the task's project starts by default, by `choiceId`, or clears it with
+  null. The host reads the session defaults and writes the whole `projectChoices` map back, because
+  the Node merges that record one field deep. Pins are shared with the desktop's **New**.
 - `session.cancel` posts an empty body to the session's `cancel` route, which stops its running turn,
   as the desktop's **Stop** does. See [the state line](./transcript.md#the-state-line).
 - `session.create` sends `kind: 'interactive'`, the row's `customAgentId` and `account` when it has
   them, and an empty `config`, so the Node applies the same defaults any other client gets. The
-  sidebar's **New chat** is the kit's own `Picker`, as on the desktop.
+  sidebar's **New chat** is a split button, as on the desktop: the button starts the pinned row, else
+  the first, and the chevron opens the kit's own `Picker`, with a pin on each row. With one row, the
+  button alone starts it.
 
 ## A task's Agents tab
 

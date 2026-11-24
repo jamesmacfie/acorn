@@ -916,6 +916,74 @@ describe('conversation', () => {
     expect(new Set(creates.map((request) => request.key)).size).toBe(1)
     expect(conversationTitle(subject.root)).toBe('New chat')
   })
+
+  it("starts the project's pinned row from New, pins from the list, and copes with a CLI that has no pins", async () => {
+    const row = (id: string, label: string, customAgentId: string | null, pinned: boolean) => ({
+      id,
+      providerId: 'claude',
+      profileId: 'claude-code',
+      customAgentId,
+      account: null,
+      label,
+      text: label,
+      description: 'Available',
+      glyph: null,
+      accountIcon: null,
+      available: true,
+      pinned,
+    })
+    const subject = mount()
+    subject.state.answers.set('agents.choices', () => ({
+      result: {
+        nodeId: 'n1',
+        choices: [
+          row('claude', 'Claude Code', null, false),
+          row('custom-agent:reviewer', 'Reviewer', 'reviewer', true),
+        ],
+      },
+    }))
+    subject.state.answers.set('agents.pin', (request) => ({
+      result: { nodeId: 'n1', taskId: request.taskId, choiceId: request.choiceId },
+    }))
+    await openSession(subject)
+    await back(subject.root)
+    expect(subject.state.requests.find((request) => request.op === 'agents.choices')).toMatchObject({ taskId: 't1' })
+
+    button(subject.root, 'New chat: Reviewer')!.click()
+    await settle()
+    expect(subject.state.requests.filter((request) => request.op === 'session.create').at(-1)).toMatchObject({
+      customAgentId: 'reviewer',
+    })
+
+    await back(subject.root)
+    button(subject.root, 'New chat')!.click()
+    await settle()
+    button(document.body, 'Start this in the project by default')!.click()
+    await settle()
+    expect(subject.state.requests.filter((request) => request.op === 'agents.pin')).toMatchObject([
+      { taskId: 't1', choiceId: 'claude' },
+    ])
+  })
+
+  it('asks for rows again without the task when the CLI refuses it', async () => {
+    const subject = mount()
+    subject.state.answers.set('agents.choices', (request) =>
+      request.taskId
+        ? { error: { code: 'bad_request', message: 'The request does not match the bridge protocol.' } }
+        : undefined,
+    )
+    await openSession(subject)
+    await back(subject.root)
+    const asks = subject.state.requests.filter((request) => request.op === 'agents.choices')
+    // Each load asks with the task, then without it.
+    expect(asks.length).toBeGreaterThan(0)
+    expect(asks.map((request) => 'taskId' in request)).toEqual(asks.map((_, index) => index % 2 === 0))
+    // The first row New can start, with no pins to draw.
+    expect(button(subject.root, 'New chat: Claude Code')).toBeDefined()
+    button(subject.root, 'New chat')!.click()
+    await settle()
+    expect(button(document.body, 'Start this in the project by default')).toBeUndefined()
+  })
 })
 
 describe('home', () => {

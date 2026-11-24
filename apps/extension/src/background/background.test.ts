@@ -635,6 +635,29 @@ describe('site buttons', () => {
         })
       })
 
+      it("picks the task's project's pinned agent when none is remembered", async () => {
+        const { fake, host } = await started()
+        host.choices = choices.map((choice) => ({ ...choice, pinned: choice.label === 'Claude · work' }))
+        fake.hosts[0]!.send({
+          v: 1,
+          event: 'agent',
+          nodeId: 'a',
+          sessions: [],
+          tasks: ['t1'],
+          missed: false,
+          requests: false,
+        })
+        await settle()
+        expect(await fake.sendFromPage({ type: 'acorn:ask.open', ...element })).toMatchObject({ agent: 'claude:work:' })
+        const asked = fake.hosts[0]!.received.filter((message) => (message as { op: string }).op === 'agents.choices')
+        expect(asked.at(-1)).toMatchObject({ taskId: 't1' })
+        // A pick made in this box earlier still comes first.
+        fake.storage.set('askAgent:a', 'claude::reviewer')
+        expect(await fake.sendFromPage({ type: 'acorn:ask.open', ...element })).toMatchObject({
+          agent: 'claude::reviewer',
+        })
+      })
+
       it('sends a new chat about the element, with its screenshot, then opens the panel on it', async () => {
         const { fake, panel, pickId } = await opened()
         // The element's box with 8 CSS pixels around it, in device pixels.

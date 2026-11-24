@@ -75,6 +75,8 @@ async function fakeNode(nodeId: string, options: { protocolVersion?: number } = 
     projectsDelay: null as Promise<void> | null,
     // Accept the next turn, then drop the connection before answering.
     dropTurnReply: false,
+    // The agents plugin's session defaults, of which the bridge reads and writes only each project's pin.
+    sessionDefaults: { followLastSession: true, projectChoices: { p2: 'claude' } } as Record<string, unknown>,
     turns: new Map<string, { id: string; text: string }>(),
     lastQuery: '',
     lastTurnInput: null as unknown,
@@ -325,6 +327,14 @@ async function fakeNode(nodeId: string, options: { protocolVersion?: number } = 
       for await (const chunk of req) body += chunk
       state.lastSessionBody = JSON.parse(body)
       return reply(200, { ...agentSession('s2'), ...JSON.parse(body), config: {} })
+    }
+    if (url.pathname === '/v1/p/agents/session-defaults') {
+      if (req.method === 'PUT') {
+        let body = ''
+        for await (const chunk of req) body += chunk
+        state.sessionDefaults = { ...state.sessionDefaults, ...JSON.parse(body) }
+      }
+      return reply(200, state.sessionDefaults)
     }
     if (url.pathname === '/v1/p/agents/custom-agents')
       return reply(200, [
@@ -967,6 +977,7 @@ describe('browser bridge agent operations', () => {
           glyph: null,
           accountIcon: null,
           available: true,
+          id: 'claude',
         },
         {
           providerId: 'claude',
@@ -979,6 +990,7 @@ describe('browser bridge agent operations', () => {
           glyph: 'rocket',
           accountIcon: null,
           available: true,
+          id: 'custom-agent:reviewer',
         },
       ],
     })
@@ -992,6 +1004,39 @@ describe('browser bridge agent operations', () => {
     const inWorkspace = await call({ op: 'sessions.list', nodeId: 'node-a', workspaceId: 'w1' })
     expect(inWorkspace).toMatchObject({ workspaceId: 'w1', sessions: [{ id: 's1' }] })
     expect(node.state.lastQuery).toBe('?workspaceId=w1&archived=false&limit=100')
+  })
+
+  it("pins the New row a task's project starts, and leaves other projects' pins alone", async () => {
+    const { call, node } = await selected()
+    const pins = async () =>
+      (
+        (await call({ op: 'agents.choices', nodeId: 'node-a', taskId: 't1' })).choices as {
+          id: string
+          pinned: boolean
+        }[]
+      )
+        .filter((choice) => choice.pinned)
+        .map((choice) => choice.id)
+    expect(await pins()).toEqual([])
+    expect(await call({ op: 'agents.pin', nodeId: 'node-a', taskId: 't1', choiceId: 'custom-agent:reviewer' })).toEqual(
+      {
+        nodeId: 'node-a',
+        taskId: 't1',
+        choiceId: 'custom-agent:reviewer',
+      },
+    )
+    expect(await pins()).toEqual(['custom-agent:reviewer'])
+    expect(node.state.sessionDefaults.projectChoices).toEqual({ p1: 'custom-agent:reviewer', p2: 'claude' })
+    await call({ op: 'agents.pin', nodeId: 'node-a', taskId: 't1', choiceId: null })
+    expect(node.state.sessionDefaults).toEqual({ followLastSession: true, projectChoices: { p2: 'claude' } })
+    // Without a task, the rows don't say.
+    const { choices } = await call({ op: 'agents.choices', nodeId: 'node-a' })
+    expect(choices[0]).not.toHaveProperty('pinned')
+    await expect(
+      call({ op: 'agents.pin', nodeId: 'node-a', taskId: 'gone', choiceId: 'claude' }),
+    ).rejects.toMatchObject({
+      code: 'not_found',
+    })
   })
 
   it('reads a session page and reports a missing session as not found', async () => {

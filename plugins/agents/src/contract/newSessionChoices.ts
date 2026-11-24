@@ -76,6 +76,13 @@ export const choiceId = (choice: NewSessionChoice): string =>
       ? `${choice.provider.id}:account:${choice.account}`
       : choice.provider.id
 
+/** The row New starts without asking: the project's pinned row while it can still start, else the first.
+ *  The first is what core's session starter has always taken. */
+export const defaultChoice = (
+  choices: readonly NewSessionChoice[],
+  pinnedId: string | undefined,
+): NewSessionChoice | undefined => choices.find((choice) => choiceId(choice) === pinnedId) ?? choices[0]
+
 export const choiceLabel = (choice: NewSessionChoice): string =>
   choice.agent?.name ??
   (choice.account

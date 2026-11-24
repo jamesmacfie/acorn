@@ -20,7 +20,7 @@ import {
   choiceStart,
   type NewSessionChoice,
 } from '../contract/newSessionChoices.ts'
-import { readNewSessionChoices } from './sessionStarter'
+import { readDefaultChoice, readNewSessionChoices } from './sessionStarter'
 import { requestSessionGoalEditor } from './sessions/sessionGoalCommand'
 
 // What this plugin puts in the palette: the rail source it owns, a way to start a session in the open
@@ -71,10 +71,33 @@ export const agentsCommands: readonly ContributedCommand[] = [
     run: (context) => requestSessionGoalEditor(context.taskId),
   },
   {
+    id: 'agents.sessions.new-default',
+    title: 'New agent session',
+    hint: 'start this project’s default agent in this task',
+    keywords: ['agent', 'new', 'start', 'session', 'default'],
+    category: 'action',
+    palette: true,
+    scope: 'task',
+    requires: { plugin: 'agents' },
+    // What the pane's New button does: the project's pinned row, else the first.
+    run: async (context) => {
+      const taskId = context.taskId
+      if (!taskId) return
+      const choice = await readDefaultChoice(taskId)
+      if (!choice) throw new Error('No agent harness on this Node is installed and signed in.')
+      await startSessionFromPalette(
+        taskId,
+        { id: choice.provider.id, profileId: choice.agent?.profileId ?? choice.provider.profileId },
+        choiceStart(choice),
+      )
+    },
+  },
+  {
+    // The id predates the default row above, and is kept so a shortcut bound to it still opens the list.
     id: 'agents.sessions.new',
     kind: 'search',
-    title: 'New agent session',
-    hint: 'start an agent in this task',
+    title: 'New agent session…',
+    hint: 'pick a harness or an agent to start in this task',
     keywords: ['agent', 'new', 'start', 'session', 'harness'],
     category: 'action',
     palette: true,

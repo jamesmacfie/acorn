@@ -137,6 +137,8 @@ textarea.ui-input[data-grow] { flex: 1; min-height: 0; resize: none; }
    to space it from. */
 .ui-dropdown-label > .ui-icon:first-child:not(:only-child) { margin-inline-end: var(--space-2); vertical-align: -0.125em; }
 .ui-dropdown-chevron { flex: none; color: var(--text-muted); font-size: var(--fs-2xs); }
+/* A bare chevron, such as the half of a split button, so the button's gap doesn't push it off centre. */
+.ui-dropdown-label:empty { display: none; }
 
 /* Select: the list is a .ui-popover borrowing the menu's item vocabulary. The native <select> is still
    in the DOM as the value store; see kit/components/inputs/Select.tsx for why. */

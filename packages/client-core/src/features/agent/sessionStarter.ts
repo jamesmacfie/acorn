@@ -10,7 +10,7 @@ type AgentSessionChoice = { id: string; label: string }
 export type AgentSessionStarter = {
   /** The agents a person can start now, in the order the agent pane's New button lists them. */
   choices(): Promise<AgentSessionChoice[]>
-  /** Starts an interactive session in the task on the chosen agent, or the first startable one, puts
+  /** Starts an interactive session in the task on the chosen agent, or the one New starts there, puts
    *  `draft` in its composer unsent, and opens it. Answers the session ID. */
   start(input: { taskId: string; title: string; choiceId?: string; draft: string }): Promise<string>
 }

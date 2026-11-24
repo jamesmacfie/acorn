@@ -127,7 +127,12 @@ export function askElement(
       screenshot(windowId, url, message),
       events.sessions(task.id) ??
         events.read({ op: 'sessions.list', nodeId, taskId: task.id }).then((result) => result.sessions),
-      events.read({ op: 'agents.choices', nodeId }),
+      // An older CLI refuses the task, and its rows then carry no pins.
+      events.read({ op: 'agents.choices', nodeId, taskId: task.id }).catch((error: unknown) => {
+        if (error instanceof CallFailure && error.code === 'bad_request')
+          return events.read({ op: 'agents.choices', nodeId })
+        throw error
+      }),
       api.storage.local.get([askAgentKey(nodeId)]),
     ])
     const pick: Pick = {
@@ -152,7 +157,12 @@ export function askElement(
       task: task.title,
       sessions: pick.sessions.map(({ id, title }) => ({ id, title })),
       agents: pick.agents.map((agent, index) => ({ key: keys[index]!, label: agent.label })),
-      agent: keys.find((key) => key === remembered) ?? keys[0] ?? null,
+      // The last agent picked here, else the one New starts in the task's project.
+      agent:
+        keys.find((key) => key === remembered) ??
+        keys[pick.agents.findIndex((agent) => agent.pinned)] ??
+        keys[0] ??
+        null,
       screenshot: !!shot,
     }
   }

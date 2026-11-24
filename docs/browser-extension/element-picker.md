@@ -54,7 +54,8 @@ box's shadow root with two groups:
 - The task's title: one row per conversation in the task that isn't archived.
 
 **To** starts on a new chat with the row last used from the box, stored as `askAgent:<nodeId>`
-([browser storage](./conversations.md#browser-storage)), else the first. With no agent able to start,
+([browser storage](./conversations.md#browser-storage)), else the row the task's project pins, else
+the first. With no agent able to start,
 it says "No agent can start on this Node", and **Send** stays off until the person picks a
 conversation. With no conversation either, **To** is off. Choosing a row sets **To** and closes the
 menu. The menu opens under **To**, or above it when the box sits too low, and closes on Escape or a

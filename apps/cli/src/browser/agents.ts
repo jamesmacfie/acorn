@@ -23,6 +23,7 @@ import {
   choiceAvailable,
   choiceDescription,
   choiceGlyph,
+  choiceId,
   choiceLabel,
   choiceText,
   newSessionChoices,
@@ -50,6 +51,8 @@ import type {
 // cards use, so the sidebar names it as they do.
 
 export const agentsRoute = '/v1/p/agents'
+// The agents plugin's session defaults, which hold each project's pinned New row.
+export const sessionDefaultsRoute = `${agentsRoute}/session-defaults`
 export const sessionRoute = (sessionId: string) => `${agentsRoute}/sessions/${encodeURIComponent(sessionId)}`
 export const toolCallRoute = (sessionId: string, toolId: string) =>
   `${sessionRoute(sessionId)}/tools/${encodeURIComponent(toolId)}`
@@ -80,12 +83,16 @@ const withoutAttachmentLines = (text: string): string =>
     .replace(/\n{3,}/g, '\n\n')
     .trim()
 
-// The desktop's New rows, from the Node's harnesses and custom agents.
+// The desktop's New rows, from the Node's harnesses and custom agents. `pinnedId` is the row a task's
+// project starts by default, or null for none; left out, the rows don't say whether they're pinned.
 export const bridgeChoices = (
   providers: readonly AgentProviderDescriptor[],
   agents: readonly CustomAgent[],
+  pinnedId?: string | null,
 ): BridgeAgentChoice[] =>
   newSessionChoices(providers, agents).map((choice) => ({
+    id: choiceId(choice),
+    ...(pinnedId === undefined ? {} : { pinned: choiceId(choice) === pinnedId }),
     providerId: choice.provider.id,
     profileId: choice.provider.profileId,
     customAgentId: choice.agent?.id ?? null,

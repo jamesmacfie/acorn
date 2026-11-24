@@ -196,7 +196,24 @@ export const bridgeRequestSchema = z.discriminatedUnion('op', [
   // page address goes to the Node for it (docs/browser-extension/task-pages.md).
   z.strictObject({ ...envelope, op: z.literal('tasks.pages'), nodeId }),
   // The rows of the desktop's New picker. `refresh` asks the Node to check its harnesses again first.
-  z.strictObject({ ...envelope, op: z.literal('agents.choices'), nodeId, refresh: z.boolean().optional() }),
+  // `taskId` asks which row its project starts by default, answered as each row's `pinned`. An older
+  // host refuses it, so the extension asks again without it.
+  z.strictObject({
+    ...envelope,
+    op: z.literal('agents.choices'),
+    nodeId,
+    refresh: z.boolean().optional(),
+    taskId: rowId.optional(),
+  }),
+  // Pins the row New starts in the task's project, by the row's `id`, or clears the pin with null. The
+  // Node caps a row id at 200 characters.
+  z.strictObject({
+    ...envelope,
+    op: z.literal('agents.pin'),
+    nodeId,
+    taskId: rowId,
+    choiceId: z.string().min(1).max(200).nullable(),
+  }),
   // One task's sessions, or every task's in one workspace.
   z
     .strictObject({
@@ -449,6 +466,11 @@ export type BridgeAgentChoice = {
   glyph: string | null
   accountIcon: string | null
   available: boolean
+  // The agents plugin's `choiceId`, which `agents.pin` names. Absent from an older host.
+  id?: string
+  // Whether the asked-about task's project starts this row by default. Present only when
+  // `agents.choices` named a task and the host knows about pins.
+  pinned?: boolean
 }
 
 // The fields of the agents plugin's session row the sidebar draws. `runtimeState` and `attention`
@@ -642,6 +664,7 @@ export type BridgeResults = {
   'projects.list': { nodeId: string; projects: BridgeProject[]; workspaces: BridgeWorkspace[] }
   'tasks.pages': { nodeId: string; tasks: BridgePageTask[] }
   'agents.choices': { nodeId: string; choices: BridgeAgentChoice[] }
+  'agents.pin': { nodeId: string; taskId: string; choiceId: string | null }
   'sessions.list': { nodeId: string; sessions: BridgeAgentSession[] } & ({ taskId: string } | { workspaceId: string })
   'session.read': BridgeSessionRead
   'session.create': { nodeId: string; session: BridgeAgentSession }

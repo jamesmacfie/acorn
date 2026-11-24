@@ -106,6 +106,7 @@ import {
   bridgeRequest,
   bridgeSession,
   bridgeSessionRead,
+  sessionDefaultsRoute,
   sessionRoute,
   toolCallRoute,
 } from './agents'
@@ -620,6 +621,30 @@ export function createBridge(options: {
     return parsed.data
   }
 
+  // The project of an active task, for the New row its project pins.
+  async function taskProjectId(nodeId: string, taskId: string): Promise<string> {
+    const tasks = await readList<Task>(nodeId, tasksRoute, (body) => body)
+    const projectId = tasks.find((task) => task.id === taskId)?.projectId
+    if (!projectId) throw new BridgeFailure('not_found', 'That task is not active on this Node.')
+    return projectId
+  }
+
+  // Each project's pinned New row, by project id, from the agents plugin's session defaults. An older
+  // Node has none.
+  async function projectPins(nodeId: string): Promise<Record<string, string>> {
+    const defaults = (await nodeRequest(nodeId, { method: 'GET', path: sessionDefaultsRoute })) as {
+      projectChoices?: unknown
+    } | null
+    const pins = defaults?.projectChoices
+    return pins && typeof pins === 'object' && !Array.isArray(pins) ? (pins as Record<string, string>) : {}
+  }
+
+  // The row the task's project pins, or null for none.
+  const projectPin = async (nodeId: string, taskId: string): Promise<string | null> => {
+    const [projectId, pins] = await Promise.all([taskProjectId(nodeId, taskId), projectPins(nodeId)])
+    return pins[projectId] ?? null
+  }
+
   // A task, with its workspace, while it's active. Null once it's archived.
   async function activeTask(
     nodeId: string,
@@ -924,7 +949,27 @@ export function createBridge(options: {
             return []
           }),
         ])
-        return { nodeId: request.nodeId, choices: bridgeChoices(providers, agents) }
+        // A failed pin read still lists every row, only without saying which one New starts.
+        const pinned = request.taskId
+          ? await projectPin(request.nodeId, request.taskId).catch((error: unknown) => {
+              if (error instanceof BridgeFailure && error.code !== 'node_error' && error.code !== 'not_found')
+                throw error
+              return undefined
+            })
+          : undefined
+        return { nodeId: request.nodeId, choices: bridgeChoices(providers, agents, pinned) }
+      }
+      case 'agents.pin': {
+        const { nodeId, taskId, choiceId } = request
+        const [projectId, pins] = await Promise.all([taskProjectId(nodeId, taskId), projectPins(nodeId)])
+        const { [projectId]: _unpinned, ...others } = pins
+        // The whole map, because the Node merges the defaults record one field deep.
+        await nodeRequest(nodeId, {
+          method: 'PUT',
+          path: sessionDefaultsRoute,
+          body: { projectChoices: choiceId ? { ...others, [projectId]: choiceId } : others },
+        })
+        return { nodeId, taskId, choiceId }
       }
       case 'sessions.list': {
         // The schema lets through exactly one of the two.

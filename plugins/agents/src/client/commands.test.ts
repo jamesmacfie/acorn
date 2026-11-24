@@ -103,9 +103,10 @@ describe('the agents plugin catalogue', () => {
     mocks.readJson.mockResolvedValue([])
   })
 
-  it('registers session goals, mark-all-read, and two task-scoped searches', () => {
+  it('registers session goals, a default start, mark-all-read, and two task-scoped searches', () => {
     expect(agentsCommands.map((command) => command.id)).toEqual([
       'agents.goal.set',
+      'agents.sessions.new-default',
       'agents.sessions.new',
       'agents.sessions.mark-read',
       'agents.sessions.find',

@@ -8,7 +8,8 @@ searches, and [command kinds](../plugins/commands.md#command-kinds) holds the vo
 
 | Row | Kind | What it does |
 | --- | --- | --- |
-| New agent session | Search, task-scoped | Lists installed harnesses, then the custom agents on them. Picking one creates the session, selects it, and shows the Agent pane |
+| New agent session | Action, task-scoped | Starts the row the pane's **New** button starts: the one pinned for the task's project, else the first. ID `agents.sessions.new-default` |
+| New agent session… | Search, task-scoped | Lists installed harnesses, then the custom agents on them. Picking one creates the session, selects it, and shows the Agent pane. ID `agents.sessions.new` |
 | New *harness* session, New *agent* session | Action, task-scoped | One row per choice New agent session lists, so typing a harness or agent name finds it. IDs are `agents.harness.<provider>` and `agents.custom-agent.<id>`. Desktop only |
 | Mark all agents read | Action, no scope | Clears every finished or failed agent and marks their notices read. Shown only when one exists |
 | Find an agent session | Search, task-scoped | The Node's search over session titles, events, and artifacts, for the captured task |
@@ -24,7 +25,13 @@ export that holds a likely secret is refused ([secret checks](../security/secret
 
 ## How the rows behave
 
-**New agent session is a picker, and it needs an open task.** A session is created against a task's
+**New agent session starts the project's default.** The pane's **New** is a split button. The button
+starts the row pinned for the task's project, or the first row when none is pinned or the pinned one can't
+start. The chevron opens the full list, where the pin on each row sets or clears the project's default.
+The pins are stored as `projectChoices` in the session defaults record (project ID to row ID), so every
+device sees the same one. Core's session starter takes the same row when its caller names none.
+
+**New agent session… is a picker, and it needs an open task.** A session is created against a task's
 worktree, so the palette hides the row with no task open. The harness list comes from the Node, so the
 row is a search that loads once when the palette opens and filters locally as you type (`localSearch`,
 `packages/client-core/src/host/registries/commands/localSearch.ts`). Only installed harnesses are

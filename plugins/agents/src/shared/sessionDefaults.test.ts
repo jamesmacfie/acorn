@@ -103,6 +103,16 @@ describe('stored defaults', () => {
     expect(validateAgentSessionDefaults([]).ok).toBe(false)
   })
 
+  it("keeps each project's New row, and refuses a map that isn't ids to ids", () => {
+    expect(validateAgentSessionDefaults({ projectChoices: { p1: 'codex' } })).toEqual({
+      ok: true,
+      value: { projectChoices: { p1: 'codex' } },
+    })
+    expect(validateAgentSessionDefaults({ projectChoices: { p1: '' } }).ok).toBe(false)
+    expect(validateAgentSessionDefaults({ projectChoices: { p1: 7 } }).ok).toBe(false)
+    expect(validateAgentSessionDefaults({ projectChoices: ['codex'] }).ok).toBe(false)
+  })
+
   it('drops an empty choice rather than storing it as a value', () => {
     const result = validateAgentSessionDefaults({ pinned: { codex: { model: '' } } })
     expect(result.ok && result.value.pinned).toEqual({})

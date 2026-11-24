@@ -7,6 +7,7 @@ import {
   choiceLabel,
   choiceStart,
   choiceText,
+  defaultChoice,
   newSessionChoices,
   providerStartable,
 } from '../../contract/newSessionChoices.ts'
@@ -85,5 +86,12 @@ describe('new session choices', () => {
     expect(iconed.map(choiceLabel)).toEqual(['Claude Code · work', 'Claude Code · home'])
     const renamed = newSessionChoices([{ ...claude, accounts: [{ ...claude.accounts[0]!, label: 'Acme' }] }], [])
     expect(renamed.map(choiceLabel)).toEqual(['Claude Code · Acme'])
+  })
+
+  it("starts the project's pinned row, and the first once that row can't start", () => {
+    const choices = newSessionChoices([provider('claude'), provider('codex')], [agent('Writer', 'claude')])
+    expect(defaultChoice(choices, 'custom-agent:Writer')?.agent?.name).toBe('Writer')
+    expect(defaultChoice(choices, 'gone')?.provider.id).toBe('claude')
+    expect(defaultChoice(choices, undefined)?.provider.id).toBe('claude')
   })
 })

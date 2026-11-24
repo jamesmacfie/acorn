@@ -1,5 +1,5 @@
-import { createEffect, createMemo, createResource, For, Show } from 'solid-js'
-import { createQuery } from '@tanstack/solid-query'
+import { createEffect, createMemo, createResource, For, Match, Show, Switch, type JSX } from 'solid-js'
+import { createQuery, useQueryClient } from '@tanstack/solid-query'
 import {
   clientCapability,
   featureUsable,
@@ -49,10 +49,13 @@ import {
   choiceAccountIcon,
   choiceDescription,
   choiceGlyph,
+  choiceId,
   choiceLabel,
   choiceText,
+  defaultChoice,
   type NewSessionChoice,
 } from '../../contract/newSessionChoices.ts'
+import { agentSessionDefaultsOptions, writeAgentSessionDefaults } from '../settings/sessionDefaultsClient'
 import { sessionCustomAgent } from '../../shared/customAgents'
 import { canStopAgent, canStopSubagent } from './agentActivity'
 import { selectedManagedSubagent } from './managedSelection'
@@ -82,6 +85,19 @@ import { accountIcon, accountLabel, sessionAccount } from '../../shared/accounts
 export function AgentDetailHeader(props: { task: Task; model: AgentPaneModel }) {
   const model = props.model
   const pricing = createQuery(() => agentPricingOptions())
+  const queryClient = useQueryClient()
+  const sessionDefaults = createQuery(() => agentSessionDefaultsOptions())
+  // The row this project's New starts, pinned from its list, else the first row.
+  const pinnedId = () => sessionDefaults.data?.projectChoices?.[props.task.projectId]
+  const startChoice = () => defaultChoice(model.choices(), pinnedId())
+  const togglePin = (choice: NewSessionChoice) => {
+    const current = sessionDefaults.data
+    if (!current) return
+    const { [props.task.projectId]: _unpinned, ...others } = current.projectChoices ?? {}
+    const projectChoices =
+      pinnedId() === choiceId(choice) ? others : { ...others, [props.task.projectId]: choiceId(choice) }
+    void model.action(() => writeAgentSessionDefaults(queryClient, current, { projectChoices }), false)
+  }
   // A task terminal on one account, for what the CLI does itself, such as adding an MCP server or
   // signing in to one (docs/managed-agents/accounts.md).
   const openAccountTerminal = (taskId: string, providerId: string, name: string) =>
@@ -264,6 +280,87 @@ export function AgentDetailHeader(props: { task: Task; model: AgentPaneModel }) 
       )}
     </Menu>
   )
+  const newButton = (choice: NewSessionChoice) => (
+    <Button
+      label={`New ${choiceLabel(choice)} session`}
+      size="sm"
+      disabled={model.creating()}
+      onPress={() => void model.createSession(choice)}
+    >
+      <Inline gap="inline">
+        <ProviderGlyph glyph={choiceGlyph(choice)} label={choiceLabel(choice)} />
+        <Show when={choiceAccountIcon(choice)}>
+          {(icon) => <Icon name={icon()} title={accountLabel(choice.provider, choice.account!)} />}
+        </Show>
+        <Only formFactors={['desktop', 'tui']}>New</Only>
+      </Inline>
+    </Button>
+  )
+  const newPicker = (label: JSX.Element) => (
+    <Picker<NewSessionChoice>
+      label={label}
+      ariaLabel="New session"
+      size="sm"
+      placement="bottom-end"
+      placeholder="Filter agents…"
+      emptyText={model.providersLoading() ? 'Checking which agents this node can run…' : NO_AGENTS}
+      results={(query) =>
+        model.choices().filter((item) => choiceLabel(item).toLowerCase().includes(query.trim().toLowerCase()))
+      }
+      leading={(item) => (
+        <Inline gap="inline">
+          <ProviderGlyph glyph={choiceGlyph(item)} label={choiceLabel(item)} />
+          <Show when={choiceAccountIcon(item)}>
+            {(icon) => <Icon name={icon()} title={accountLabel(item.provider, item.account!)} />}
+          </Show>
+        </Inline>
+      )}
+      rowLabel={choiceText}
+      rowDescription={choiceDescription}
+      // The row New starts, so the list shows what the button beside it does.
+      isActive={(item) => item === startChoice()}
+      isDisabled={() => model.creating()}
+      onSelect={(item) => void model.createSession(item)}
+      trailing={(item, close) => (
+        <Inline gap="inline">
+          <IconButton
+            icon={pinnedId() === choiceId(item) ? 'pin-off' : 'pin'}
+            variant="bare"
+            size="xs"
+            label={
+              pinnedId() === choiceId(item)
+                ? 'Stop starting this in the project by default'
+                : 'Start this in the project by default'
+            }
+            disabled={!sessionDefaults.data}
+            onPress={() => togglePin(item)}
+          />
+          <Show when={!item.agent && item.account}>
+            {(account) => (
+              <IconButton
+                icon="square-terminal"
+                variant="bare"
+                size="xs"
+                label={`Open a terminal on ${accountLabel(item.provider, account())}`}
+                onPress={() => {
+                  close()
+                  void openAccountTerminal(props.task.id, item.provider.id, account())
+                }}
+              />
+            )}
+          </Show>
+        </Inline>
+      )}
+      tools={
+        <IconButton
+          icon="refresh-cw"
+          title="Refresh agent executables and health"
+          label="Refresh agent executables and health"
+          onPress={() => void model.refreshProviders()}
+        />
+      }
+    />
+  )
   return (
     <Toolbar ariaLabel="Agent session">
       {/* The provider's mark, then the title, on one line. The mark takes the title here because
@@ -354,81 +451,31 @@ export function AgentDetailHeader(props: { task: Task; model: AgentPaneModel }) 
       </Show>
       <AgentUsageIndicator defaultAccounts={usageAccounts()} providers={model.providers()} />
       {/* An archived task has no worktree to start a session in (docs/panes/contributions.md § Contributions). */}
-      {/* One way to start a session needs no list, so New starts it (docs/managed-agents/accounts.md). */}
-      <Show when={props.task.status === 'active' && model.choices().length === 1 && model.choices()[0]}>
-        {(only) => (
-          <Button
-            label={`New ${choiceLabel(only())} session`}
-            size="sm"
-            disabled={model.creating()}
-            onPress={() => void model.createSession(only())}
-          >
-            <Inline gap="inline">
-              <ProviderGlyph glyph={choiceGlyph(only())} label={choiceLabel(only())} />
-              <Show when={choiceAccountIcon(only())}>
-                {(icon) => <Icon name={icon()} title={accountLabel(only().provider, only().account!)} />}
-              </Show>
-              <Only formFactors={['desktop', 'tui']}>New</Only>
-            </Inline>
-          </Button>
-        )}
-      </Show>
-      <Show when={props.task.status === 'active' && model.choices().length !== 1}>
-        <Picker<NewSessionChoice>
-          label={
-            <>
-              <Only formFactors={['desktop', 'tui']}>New</Only>
-              <Only formFactors={['narrow']}>
-                <Icon name="plus" />
-              </Only>
-            </>
+      {/* New starts this project's row straight away, and the chevron beside it lists every row. With
+          a single row there is nothing to pick, so New is the whole control
+          (docs/managed-agents/accounts.md). With none, the picker alone says why. The terminal keeps
+          the picker alone too: its bar is full at this width, and its picker draws no pins. */}
+      <Show when={props.task.status === 'active'}>
+        <Switch
+          fallback={
+            <Toolbar.Group joined>
+              {newButton(startChoice()!)}
+              {newPicker(null)}
+            </Toolbar.Group>
           }
-          ariaLabel="New session"
-          size="sm"
-          placement="bottom-end"
-          placeholder="Filter agents…"
-          emptyText={model.providersLoading() ? 'Checking which agents this node can run…' : NO_AGENTS}
-          results={(query) =>
-            model.choices().filter((item) => choiceLabel(item).toLowerCase().includes(query.trim().toLowerCase()))
-          }
-          leading={(item) => (
-            <Inline gap="inline">
-              <ProviderGlyph glyph={choiceGlyph(item)} label={choiceLabel(item)} />
-              <Show when={choiceAccountIcon(item)}>
-                {(icon) => <Icon name={icon()} title={accountLabel(item.provider, item.account!)} />}
-              </Show>
-            </Inline>
-          )}
-          rowLabel={choiceText}
-          rowDescription={choiceDescription}
-          isActive={() => false}
-          isDisabled={() => model.creating()}
-          onSelect={(item) => void model.createSession(item)}
-          trailing={(item, close) => (
-            <Show when={!item.agent && item.account}>
-              {(account) => (
-                <IconButton
-                  icon="square-terminal"
-                  variant="bare"
-                  size="xs"
-                  label={`Open a terminal on ${accountLabel(item.provider, account())}`}
-                  onPress={() => {
-                    close()
-                    void openAccountTerminal(props.task.id, item.provider.id, account())
-                  }}
-                />
-              )}
-            </Show>
-          )}
-          tools={
-            <IconButton
-              icon="refresh-cw"
-              title="Refresh agent executables and health"
-              label="Refresh agent executables and health"
-              onPress={() => void model.refreshProviders()}
-            />
-          }
-        />
+        >
+          <Match when={model.choices().length === 1 && model.choices()[0]}>{(only) => newButton(only())}</Match>
+          <Match when={HOST === 'tui' || !model.choices().length}>
+            {newPicker(
+              <>
+                <Only formFactors={['desktop', 'tui']}>New</Only>
+                <Only formFactors={['narrow']}>
+                  <Icon name="plus" />
+                </Only>
+              </>,
+            )}
+          </Match>
+        </Switch>
       </Show>
       {/* Last on a phone, where it also holds the chips the bar has no room for. */}
       <Only formFactors={['narrow']}>

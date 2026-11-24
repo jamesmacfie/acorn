@@ -8,6 +8,7 @@ const mocks = vi.hoisted(() => ({
   readJson: vi.fn(),
   startSession: vi.fn(),
   openManagedSession: vi.fn(),
+  taskById: vi.fn(),
 }))
 vi.mock('./sessions/managedClient', () => ({
   managedAgentApi: { providers: mocks.providers, enqueue: mocks.enqueue },
@@ -17,6 +18,7 @@ vi.mock('./sessions/managedStore', () => ({ managedAgentStore: { startSession: m
 vi.mock('@acorn/plugin-api/client', async (importOriginal) => ({
   ...(await importOriginal<Record<string, unknown>>()),
   readJson: mocks.readJson,
+  taskById: mocks.taskById,
 }))
 
 import { choiceLabel, newSessionChoices } from '../contract/newSessionChoices.ts'
@@ -95,6 +97,18 @@ describe('the agent session starter', () => {
   it('starts the first row when no agent is chosen', async () => {
     await agentSessionStarter.start({ taskId: 'task-1', title: 'Build Weather', draft: 'x' })
     expect(mocks.startSession).toHaveBeenCalledWith('task-1', expect.objectContaining({ id: 'claude-code' }), {
+      title: 'Build Weather',
+    })
+  })
+
+  it("starts the task's project's pinned row when no agent is chosen", async () => {
+    mocks.taskById.mockReturnValue({ id: 'task-1', projectId: 'p1' })
+    mocks.readJson.mockImplementation(async (route: string) =>
+      route.endsWith('/session-defaults') ? { projectChoices: { p1: 'custom-agent:a1' } } : [reviewer],
+    )
+    await agentSessionStarter.start({ taskId: 'task-1', title: 'Build Weather', draft: 'x' })
+    expect(mocks.startSession).toHaveBeenCalledWith('task-1', expect.objectContaining({ id: 'codex' }), {
+      customAgentId: 'a1',
       title: 'Build Weather',
     })
   })
