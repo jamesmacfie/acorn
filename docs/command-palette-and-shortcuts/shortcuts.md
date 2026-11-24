@@ -19,7 +19,8 @@ keyboard acts as if the losing binding weren't there.
 Settings stores overrides by command ID in the device's `keybindings` preference. A `null` or empty
 override unbinds a command, and resetting it restores the default. An empty `defaultChord` registers
 a binding that starts unbound, which Settings shows as **Unbound** with a way to record a chord. The
-rail source openers use it ([palette commands](./commands.md) § Rail source openers). Their overrides
+rail source openers and the workspace shortcuts use it ([palette commands](./commands.md) § Rail
+source openers). Their overrides
 are per device, not per Node, so a key set for Docker works on every Node that has Docker and sits
 unused on one that doesn't.
 

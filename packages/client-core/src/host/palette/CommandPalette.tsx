@@ -10,6 +10,7 @@ import type { CommandExecutionContext } from '../registries/commands/commands'
 import { registerNavigationCommands } from '../registries/commands/navigationCommands'
 import { createRouterNavigation } from './routerNavigation'
 import { registerDesktopSourceOpeners } from './sourceOpeners'
+import { registerWorkspaceShortcuts } from './workspaceShortcuts'
 import { registerTabStripCommands } from './tabStripCommands'
 import { createCommandPaletteView } from './paletteView'
 import { Alert } from '../../kit/components/primitives'
@@ -77,6 +78,8 @@ export default function CommandPalette() {
     const commands = registerNavigationCommands(navigation)
     onCleanup(() => commands.dispose())
   })
+  // A shortcut the person can set for every workspace in the fleet.
+  registerWorkspaceShortcuts(navigation)
   // Open <label> for every source the rail can draw, each with a shortcut the person can set.
   registerDesktopSourceOpeners(() => context().workspaceId)
   // Show <tab> tab for every tab strip on screen.

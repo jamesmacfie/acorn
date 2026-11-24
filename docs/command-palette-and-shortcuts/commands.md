@@ -68,6 +68,17 @@ The terminal client registers the same rows from its source menu's list and open
 selecting it in that menu. It shows no hint, because it has no rail switch, and it registers no
 shortcuts, because its keys are its own keymap's.
 
+### Workspace shortcuts
+
+The desktop registers a **Go to \<name\>** command for every workspace in the fleet, each with a
+shortcut in the **Workspaces** group of Settings → Shortcuts, or **Projects** when workspaces are
+off (`packages/client-core/src/host/palette/workspaceShortcuts.ts`). Each starts unbound. The
+commands stay out of the palette, because **Switch workspace** already searches the roster. The ID
+is `workspace.<nodeId>.<workspaceId>.open`, since a workspace ID is unique only within one Node, so
+a rename keeps its key and re-pairing a Node drops it. Pressing the key opens the workspace the way
+the topbar picker does, switching Node if it has to. The terminal registers none, for the same
+reason it registers no rail source shortcuts.
+
 ### Last workspace
 
 **Last workspace** is an action, and it swaps the same pair of workspaces both ways.
