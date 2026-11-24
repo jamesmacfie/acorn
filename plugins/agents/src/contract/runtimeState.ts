@@ -2,13 +2,12 @@
 // browser extension.
 
 import type { RailMarker } from '@acorn/plugin-api/client'
+import { runtimeStarting } from './wire.ts'
+
+// Re-exported for the browser extension, which reads all three runtime helpers from here.
+export { runtimeStarting }
 
 type Tone = 'ok' | 'muted' | 'accent' | 'warn' | 'danger'
-
-/** The harness is still setting up its session. A client draws the conversation and lets the person
- *  type, but holds Send until this ends. */
-export const runtimeStarting = (state: string): boolean =>
-  state === 'creating' || state === 'connecting' || state === 'replaying' || state === 'reconnecting'
 
 /** A managed session's runtime state, as shown in the pane header, task sidebar, Agent Center, the
  *  sessions dashboard panel, and the extension's agent rows.

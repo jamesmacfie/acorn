@@ -2,7 +2,7 @@ import { mkdir } from 'node:fs/promises'
 import { join } from 'node:path'
 import { awaitWithSignal } from '../processes/startCancellation'
 import { AFTER_TOOL_HOOK, BEFORE_TOOL_HOOK, LOOP_HOOK_ROUTE, LOOP_HOOK_VERSION } from '../../contract/loopHook.ts'
-import { runtimeStarting } from '../../contract/runtimeState.ts'
+import { runtimeStarting } from '../../contract/wire.ts'
 import type {
   CompiledCoreServices,
   InternalEnvFactory,

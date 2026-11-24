@@ -1,5 +1,4 @@
-import { runtimeStarting } from '../../contract/runtimeState.ts'
-import type { AgentSession } from '../../contract/wire.ts'
+import { runtimeStarting, type AgentSession } from '../../contract/wire.ts'
 
 /** The provider is still establishing an input-ready protocol session. Drafting remains local and
  * available during these states, but submitting would race startup metadata and saved defaults. */

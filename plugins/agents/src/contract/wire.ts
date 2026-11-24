@@ -17,6 +17,12 @@ export type AgentRuntimeState =
   | 'failed'
   | 'archived'
 
+/** The harness is still setting up its session. A client draws the conversation and lets the person
+ *  type, but holds Send until this ends. Here rather than in ./runtimeState.ts, which imports client
+ *  types the server can't compile against. */
+export const runtimeStarting = (state: string): boolean =>
+  state === 'creating' || state === 'connecting' || state === 'replaying' || state === 'reconnecting'
+
 export type AgentAttentionReason =
   | 'permission'
   | 'question'
