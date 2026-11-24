@@ -20,6 +20,7 @@
       "task.terminal.new-claude",
       "task.terminal.new-codex",
       "agents.goal.set",
+      "agents.sessions.new-default",
       "agents.sessions.new",
       "agents.sessions.mark-read",
       "agents.sessions.find",
