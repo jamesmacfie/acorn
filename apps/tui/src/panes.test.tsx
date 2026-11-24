@@ -1,5 +1,6 @@
 /** @jsxImportSource @acorn/tui/jsx */
 import { describe, expect, it } from 'vitest'
+import { openFirstSession } from './agentsDriving'
 import { renderFixture } from './harness'
 
 // The pane sweep: every first-party pane the roster registers, opened at exactly 80 by 24 with the
@@ -88,7 +89,10 @@ describe('every pane at 80 by 24', () => {
   }, 60_000)
 
   it("git: the Changes tab's tracked group, its counts, and the commit line at the foot", async () => {
-    const frame = await screenFor('git', { until: 'Tracked' })
+    // 25 rows, not 24: the header's controls stack one per row here, and with the Discard all menu
+    // they push the first file below the list's fold at 24. A pane taller than the screen clips by
+    // design (docs/ui-design/every-node.md), so the extra row is the room this case needs to see a file.
+    const frame = await screenFor('git', { until: 'Tracked', height: 25 })
     // Groups by what a file is, not by which staging area it is in: staging is the checkbox on the
     // row, and the fixture's three files are two tracked edits and one new file.
     expect(frame).toContain('Tracked')
@@ -146,20 +150,7 @@ describe('every pane at 80 by 24', () => {
   // layout suite owns.
   it('agents: a session opens on a transcript, a tool card, an approval and a composer', async () => {
     const screen = await renderFixture({ pane: 'agents', width: 120, height: 40 })
-    // Tab to the session list, wherever the cycle starts, then open the row the caret is on.
-    //
-    // The bound is the whole cycle and then some, because the shell puts three regions down the left
-    // before the pane strip; too few presses leave `RETURN` on the Menu, which opens a browse source
-    // (./chrome/Rail.tsx). And it waits for the row's own title: `Find why…` is the *subtitle* of the
-    // first row, on the line below the caret's, so a loop looking for it never matches.
-    let found = false
-    for (let step = 0; step < 10 && !found; step += 1) {
-      const caret = (await screen.frame()).split('\n').find((line) => line.includes('\u203a')) ?? ''
-      found = caret.includes('Write src/login.ts')
-      if (!found) await screen.press('TAB')
-    }
-    expect(found).toBe(true)
-    await screen.press('RETURN')
+    await openFirstSession(screen)
     const frame = await screen.frame()
     screen.done()
 

@@ -10,8 +10,8 @@ import type { Screen } from './harness'
 // than about the store behind it.
 
 /** Open the first session the way a reader does: Tab to the list, then Enter on the row. The bound is
- *  the whole region cycle and then some — three panels stand left of the pane strip — and the row is
- *  named by its own title rather than its subtitle (./panes.test.tsx § agents). */
+ *  the whole region cycle and then some — three panels stand left of the pane strip, and too few
+ *  presses leave Enter on the Menu, which opens a browse source (./chrome/Rail.tsx). */
 export async function openFirstSession(screen: Screen): Promise<void> {
   // The rows before the walk. The list is a query, and on a loaded machine ten Tab presses run out
   // before it answers — which reads as "no region held the row" rather than as "the row was late".
