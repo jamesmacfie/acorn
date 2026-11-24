@@ -36,16 +36,18 @@ export default function WorkspacePalette() {
     const all = fleet().entries
     // The node label is part of the haystack, not a separate filter: two nodes both having a "Default"
     // workspace is the normal case, and typing the node name is how the owner disambiguates.
-    return all
-      .map((entry) => ({
-        entry,
-        score: fuzzyScore(q, fleet().grouped ? `${entry.workspace.name} ${entry.node.label}` : entry.workspace.name),
-        inName: fuzzyScore(q, entry.workspace.name) !== null,
-      }))
-      .filter((x): x is { entry: FleetWorkspace; score: number; inName: boolean } => x.score !== null)
-      // On a tie, a workspace whose own name matches beats one that only matches through its node label.
-      .sort((a, b) => b.score - a.score || Number(b.inName) - Number(a.inName))
-      .map((x) => x.entry)
+    return (
+      all
+        .map((entry) => ({
+          entry,
+          score: fuzzyScore(q, fleet().grouped ? `${entry.workspace.name} ${entry.node.label}` : entry.workspace.name),
+          inName: fuzzyScore(q, entry.workspace.name) !== null,
+        }))
+        .filter((x): x is { entry: FleetWorkspace; score: number; inName: boolean } => x.score !== null)
+        // On a tie, a workspace whose own name matches beats one that only matches through its node label.
+        .sort((a, b) => b.score - a.score || Number(b.inName) - Number(a.inName))
+        .map((x) => x.entry)
+    )
   })
 
   function pick(entry: FleetWorkspace) {
