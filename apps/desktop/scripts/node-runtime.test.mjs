@@ -4,7 +4,7 @@ import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { cachedLicense, cachedRuntime, runtimeBinaryName, stageNodeRuntime } from './node-runtime.mjs'
+import { cachedLicense, cachedRuntime, runtimeBinaryName, stageNodeRuntime, tar } from './node-runtime.mjs'
 
 const VERSION = '24.21.0'
 const digest = (bytes) => createHash('sha256').update(bytes).digest('hex')
@@ -102,7 +102,8 @@ describe('pinned Unix runtime', () => {
     mkdirSync(join(dir, root, 'bin'), { recursive: true })
     writeFileSync(join(dir, root, 'bin/node'), contents.node)
     writeFileSync(join(dir, root, 'LICENSE'), contents.license)
-    execFileSync('tar', ['-czf', join(dir, 'archive.tar.gz'), '-C', dir, root])
+    // The script's own tar: on Windows, the GNU tar first on PATH reads `C:` in a path as a remote host.
+    execFileSync(tar, ['-czf', join(dir, 'archive.tar.gz'), '-C', dir, root])
     return readFileSync(join(dir, 'archive.tar.gz'))
   }
 
