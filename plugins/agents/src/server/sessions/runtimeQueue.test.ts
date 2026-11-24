@@ -310,6 +310,23 @@ describe('durable queue admission', () => {
     expect(counts()).toEqual({ active: 1, reserved: 0 })
   })
 
+  it('stops a session whose only turn is cancelled while it is still replaying', async () => {
+    const held = deferred<void>()
+    launch = async (options) => {
+      await options.onEvent({ type: 'session_state', state: 'replaying' })
+      await held.promise
+      throw new Error('aborted')
+    }
+    const item = await session(),
+      turn = await enqueue(item.id)
+    await vi.waitFor(async () => expect((await runtime.store.getSession(item.id))?.runtimeState).toBe('replaying'))
+    const cancelling = runtime.cancelTurn(item.id, turn.id)
+    await vi.waitFor(() => expect(starts[0]!.signal?.aborted).toBe(true))
+    held.resolve()
+    await cancelling
+    expect((await runtime.store.getSession(item.id))?.runtimeState).toBe('stopped')
+  })
+
   it('rechecks cancellation after a held workspace read before starting any provider', async () => {
     const workspace = deferred<string>()
     vi.mocked(ctx.core.tasks.workspaceId).mockReturnValue(workspace.promise)

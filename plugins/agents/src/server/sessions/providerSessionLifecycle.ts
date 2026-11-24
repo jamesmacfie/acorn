@@ -100,6 +100,8 @@ export type ProviderLifecyclePorts = {
   closed(sessionId: string, generation: ProviderGeneration, attempt: number, error?: Error): Promise<void>
   closeMessage(error?: Error): string
   startFailed(sessionId: string, admissionTurnId: string | null, error: unknown): Promise<void>
+  /** A stop ended a start before it had a process. The session may still show a starting state. */
+  startStopped(sessionId: string): Promise<void>
   retirementFlush(sessionId: string): Promise<void>
   session(sessionId: string): Promise<AgentSession>
   idleSweep(): Promise<void>
@@ -632,6 +634,9 @@ export class ProviderSessionLifecycle {
       await this.retireMcp(live)
       await Promise.allSettled([...live.callbacks])
       if (live.retirementFailure) throw live.retirementFailure
+      // start() skips startFailed while stopping, so nothing else moves the session off connecting or
+      // replaying. Every client holds Send in those states. Shutdown is left to the next boot's reconcile.
+      if (!live.handle && !this.ports.shuttingDown()) await this.ports.startStopped(sessionId)
       await this.ports.retirementFlush(sessionId)
       if (this.live.get(sessionId) === live) this.live.delete(sessionId)
     })())

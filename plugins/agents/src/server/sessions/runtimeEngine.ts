@@ -2,6 +2,7 @@ import { mkdir } from 'node:fs/promises'
 import { join } from 'node:path'
 import { awaitWithSignal } from '../processes/startCancellation'
 import { AFTER_TOOL_HOOK, BEFORE_TOOL_HOOK, LOOP_HOOK_ROUTE, LOOP_HOOK_VERSION } from '../../contract/loopHook.ts'
+import { runtimeStarting } from '../../contract/runtimeState.ts'
 import type {
   CompiledCoreServices,
   InternalEnvFactory,
@@ -389,6 +390,15 @@ export class ManagedAgentEngine {
         closed: (sessionId, generation, attempt, error) => this.onProviderClosed(sessionId, generation, attempt, error),
         closeMessage: (error) => safeProviderMessage(error, 'Provider process closed.', this.mintedSecrets),
         startFailed: (sessionId, turnId, error) => this.onProviderStartFailed(sessionId, turnId, error),
+        startStopped: async (sessionId) => {
+          const session = await this.store.getSession(sessionId)
+          if (session && runtimeStarting(session.runtimeState))
+            await this.record(sessionId, null, {
+              type: 'session_state',
+              state: 'stopped',
+              detail: 'The provider stopped before it finished starting. Send a prompt to resume.',
+            })
+        },
         retirementFlush: async (sessionId) => {
           await this.providerEvents.flush(sessionId)
           await this.store.flushSearch(sessionId)
