@@ -339,7 +339,7 @@ describe('Rollbar source (docs/integrations.md, docs/integrations/rollbar.md § 
 
   it('legacy counter-only link resolves to the canonical item', async () => {
     const integrationId = await connect()
-    // No prior list or summary, so detail must resolve via item_by_counter, which still returns id 999.
+    // No prior list or summary, so detail must resolve by counter, which still returns id 999.
     vi.mocked(rollbarFetch).mockResolvedValueOnce(rollbarJson(API_ITEM))
     const res = await app.fetch(
       new Request(`http://acorn.test/api/rollbar/items/142/detail?integration=${integrationId}`),
@@ -474,7 +474,7 @@ describe('Rollbar source (docs/integrations.md, docs/integrations/rollbar.md § 
         .map(([token]) => token)
         .sort(),
     ).toEqual(['api-token', 'web-token'])
-    expect(paths.some(([, path]) => path.startsWith('/item_by_counter'))).toBe(false)
+    expect(paths.some(([, path]) => path.startsWith('/item/?counter='))).toBe(false)
     expect(await t.db.select().from(schema.issues)).toMatchObject([{ integrationId: web, identifier: '142' }])
   })
 

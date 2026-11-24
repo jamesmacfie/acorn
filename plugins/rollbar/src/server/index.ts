@@ -27,7 +27,7 @@ export const setRollbarApiTelemetry = (next: ApiTelemetry | undefined): void => 
 
 const OPERATIONS: [RegExp, string][] = [
   [/^\/project$/, 'project'],
-  [/^\/item_by_counter\/[^/]+$/, 'item_by_counter'],
+  [/^\/item\/$/, 'item_by_counter'],
   [/^\/item\/[^/]+\/instances$/, 'item.instances'],
   [/^\/item\/[^/]+$/, 'item'],
   [/^\/instance\/[^/]+$/, 'instance'],
@@ -126,7 +126,9 @@ export const itemsPath = (page: number) => `/items?status=active&page=${page}`
 // One page of active items matching the reader's text, in Rollbar's own search language
 // (docs/integrations/rollbar.md § Rail search). The connection's token is what scopes it to one project.
 export const itemsSearchPath = (query: string) => `/items?status=active&page=1&query=${encodeURIComponent(query)}`
-export const itemByCounterPath = (counter: string) => `/item_by_counter/${encodeURIComponent(counter)}`
+// Rollbar's documented lookup by project counter. The older /item_by_counter/<counter> fails for items
+// Acorn hasn't cached (seen 2026-11-25).
+export const itemByCounterPath = (counter: string) => `/item/?counter=${encodeURIComponent(counter)}`
 export const itemByIdPath = (itemId: string) => `/item/${encodeURIComponent(itemId)}`
 export const itemInstancesPath = (itemId: string, limit: number) =>
   `/item/${encodeURIComponent(itemId)}/instances?limit=${limit}`

@@ -123,7 +123,7 @@ fresh, so a deleted item or a rejected token isn't hidden by the cache.
   connection is one project, so the route asks every connection that isn't disabled. A connection
   counts only when Rollbar's id for the answer is the page's.
 - For an account address, the route reads `{ kind: 'detail', identifier: counter }`, which asks
-  Rollbar's `/item_by_counter/<counter>`. A counter means something only inside its project, so the
+  Rollbar's `/item/?counter=<counter>`. A counter means something only inside its project, so the
   route asks only connections whose project name, recorded from Rollbar when the token was checked,
   is the address's project. When none is, it answers 404 and names the project.
 
