@@ -40,9 +40,11 @@ export default function WorkspacePalette() {
       .map((entry) => ({
         entry,
         score: fuzzyScore(q, fleet().grouped ? `${entry.workspace.name} ${entry.node.label}` : entry.workspace.name),
+        inName: fuzzyScore(q, entry.workspace.name) !== null,
       }))
-      .filter((x): x is { entry: FleetWorkspace; score: number } => x.score !== null)
-      .sort((a, b) => b.score - a.score)
+      .filter((x): x is { entry: FleetWorkspace; score: number; inName: boolean } => x.score !== null)
+      // On a tie, a workspace whose own name matches beats one that only matches through its node label.
+      .sort((a, b) => b.score - a.score || Number(b.inName) - Number(a.inName))
       .map((x) => x.entry)
   })
 
